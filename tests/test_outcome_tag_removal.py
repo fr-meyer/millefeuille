@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, call
 from zotero_docai_pipeline.cli.commands import dry_run_command
 from zotero_docai_pipeline.cli.main import validate_flags
 from zotero_docai_pipeline.clients.exceptions import ZoteroClientError
+from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
 from zotero_docai_pipeline.domain.config import (
     AppConfig,
     AttachmentUrlExportConfig,
@@ -353,6 +354,35 @@ class TestWriteKeyValidation(unittest.TestCase):
         )
 
         validate_flags(cfg)
+
+
+def _make_zotero_client():
+    """Build a ZoteroClient without __init__, with mocked read/write clients."""
+    client = object.__new__(ZoteroClient)
+    client._zotero_read = MagicMock()
+    mock_write_client = MagicMock()
+    client._require_write_client = MagicMock(return_value=mock_write_client)
+    stub_config = MagicMock()
+    stub_config.library_id = "0"
+    client.config = stub_config
+    client.credentials = stub_config
+    return client, mock_write_client
+
+
+class TestRemoveTagClientNoOp(unittest.TestCase):
+    """Direct ZoteroClient tests for absent-tag no-op behavior in remove_tag()."""
+
+    def test_remove_tag_absent_tag_does_not_call_update_item(self):
+        client, mock_write_client = _make_zotero_client()
+        mock_write_client.item.return_value = {
+            "key": "ITEM1",
+            "data": {"key": "ITEM1", "tags": []},
+        }
+
+        result = client.remove_tag("ITEM1", "pending")
+
+        self.assertIsNone(result)
+        mock_write_client.update_item.assert_not_called()
 
 
 if __name__ == "__main__":

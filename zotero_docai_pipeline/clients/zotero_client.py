@@ -1346,7 +1346,8 @@ class ZoteroClient:
         """Remove a tag from a Zotero item.
 
         Fetches the item, removes the specified tag from its tags list,
-        and updates it via the API.
+        and updates it via the API. If the tag is already absent, this
+        method is a no-op and does not call the update API.
 
         Args:
             item_key: Zotero item key to remove the tag from.
@@ -1371,6 +1372,17 @@ class ZoteroClient:
                     f"Invalid item data structure for item_key={item_key}"
                 )
             item_data = cast(dict[str, Any], item_data_raw)
+            item_tags = [
+                t.get("tag", "") if isinstance(t, dict) else t
+                for t in item_data.get("tags", [])
+            ]
+            if tag not in item_tags:
+                logger.info(
+                    f"Tag '{tag}' already absent from "
+                    f"item_key={item_key}, skipping update"
+                )
+                return
+
             tags = item_data.get("tags", [])
             item_data["tags"] = [t for t in tags if t.get("tag") != tag]
 
