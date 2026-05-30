@@ -121,12 +121,16 @@ class TestFetchItemsForTagLogging(unittest.TestCase):
             return "Fetched" in msg and "items for tag" in msg
 
         info_completion = [
-            r for r in logs.records if r.levelno == logging.INFO and is_fetch_completion(r)
+            r
+            for r in logs.records
+            if r.levelno == logging.INFO and is_fetch_completion(r)
         ]
         self.assertEqual(info_completion, [])
 
         debug_completion = [
-            r for r in logs.records if r.levelno == logging.DEBUG and is_fetch_completion(r)
+            r
+            for r in logs.records
+            if r.levelno == logging.DEBUG and is_fetch_completion(r)
         ]
         self.assertEqual(len(debug_completion), 1)
         self.assertEqual(
