@@ -48,7 +48,7 @@ import time
 from typing import Any
 
 try:
-    from hydra.utils import get_original_cwd
+    from hydra.utils import get_original_cwd  # type: ignore[import-untyped]
 except ImportError:
     # Hydra not available (e.g., in tests), fall back to current directory
     def get_original_cwd() -> str:
@@ -2262,6 +2262,9 @@ class Pipeline:
             if self.export_config.attachment_urls.log:
                 log_export_records(records, self.logger)
             if self.export_config.attachment_urls.write_manifest:
+                assert self.export_config.attachment_urls.manifest_path is not None, (
+                    "manifest_path must be set when write_manifest is enabled"
+                )
                 write_manifest(
                     records, self.export_config.attachment_urls.manifest_path
                 )
