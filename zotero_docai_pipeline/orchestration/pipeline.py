@@ -2226,7 +2226,7 @@ class Pipeline:
 
         # Step 1: Discover items
         items, discovery_stats = self._discover_items()
-        items = frozen_items = list(items)
+        items = list(items)
 
         st_agg: ProcessingTagResult | None = None
         st_item_succeeded = 0

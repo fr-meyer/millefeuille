@@ -185,7 +185,7 @@ def validate_flags(cfg: AppConfig) -> None:
     logger = logging.getLogger(__name__)
     logger.debug("Validating flag configuration")
 
-    if cfg.processing.dry_run and cfg.download.enabled:
+    if cfg.processing.dry_run and cfg.download.enabled and not cfg.selection_tagging.enabled:
         raise ConfigError(
             "Invalid configuration: dry_run mode cannot be used with download feature. "
             "Set processing.dry_run=false or download.enabled=false."
@@ -279,6 +279,27 @@ def validate_flags(cfg: AppConfig) -> None:
         )
 
     logger.debug("Flag configuration validated successfully")
+
+
+def _enforce_explicit_download_upload_folder(app_cfg: AppConfig) -> None:
+    """Reject the packaged download-folder placeholder for live download runs.
+
+    Dry-run preview does not write files, so placeholder paths are allowed when
+    ``processing.dry_run`` is True (e.g. combined selection-tagging + download
+    preview).
+    """
+    if (
+        app_cfg.download.enabled
+        and not app_cfg.processing.dry_run
+        and app_cfg.download.upload_folder.strip()
+        == PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER
+    ):
+        raise ConfigError(
+            "download.upload_folder must be set to an explicit path when "
+            f"download.enabled=true. The packaged default "
+            f"{PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER!r} is not accepted. "
+            "Override with: download.upload_folder=/your/path"
+        )
 
 
 def initialize_tree_processor(
@@ -674,17 +695,7 @@ def main(cfg: DictConfig) -> None:
             exit_code = 0
         else:
             # --- Fail-fast path enforcement for download mode ---
-            if (
-                app_cfg.download.enabled
-                and app_cfg.download.upload_folder.strip()
-                == PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER
-            ):
-                raise ConfigError(
-                    "download.upload_folder must be set to an explicit path when "
-                    f"download.enabled=true. The packaged default "
-                    f"{PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER!r} is not accepted. "
-                    "Override with: download.upload_folder=/your/path"
-                )
+            _enforce_explicit_download_upload_folder(app_cfg)
 
             # --- Fail-fast path enforcement for save-to-disk mode ---
             if (

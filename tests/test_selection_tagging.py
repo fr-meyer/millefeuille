@@ -8,7 +8,10 @@ from zotero_docai_pipeline.cli.commands import (
     dry_run_command,
     process_command,
 )
-from zotero_docai_pipeline.cli.main import validate_flags
+from zotero_docai_pipeline.cli.main import (
+    _enforce_explicit_download_upload_folder,
+    validate_flags,
+)
 from zotero_docai_pipeline.clients.exceptions import ZoteroClientError
 from zotero_docai_pipeline.domain.config import (
     AppConfig,
@@ -16,6 +19,7 @@ from zotero_docai_pipeline.domain.config import (
     AuthQueryConfig,
     ConfigError,
     DownloadConfig,
+    PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER,
     ExportConfig,
     MistralOCRConfig,
     ProcessingConfig,
@@ -274,6 +278,105 @@ class TestCombinedDryRunPreview(unittest.TestCase):
         # Outcome-branch preview must also be present (download is enabled)
         self.assertIn("On success", joined)
         self.assertIn("On failure", joined)
+
+
+class TestCombinedDryRunValidation(unittest.TestCase):
+    """Tests validate_flags allows dry_run + download when selection_tagging is enabled."""
+
+    def test_combined_dry_run_with_download_allowed_when_selection_tagging_enabled(self):
+        cfg = _make_app_config(
+            processing=ProcessingConfig(dry_run=True),
+            selection_tagging=SelectionTaggingConfig(
+                enabled=True,
+                add=TagTargetConfig(values=["add-me"]),
+                remove=TagTargetConfig(values=[]),
+            ),
+            download=DownloadConfig(enabled=True),
+            ocr=MistralOCRConfig(enabled=False),
+            tag_adding=TagAddingConfig(enabled=False),
+        )
+        try:
+            validate_flags(cfg)
+        except ConfigError:
+            self.fail("validate_flags raised ConfigError unexpectedly")
+
+    def test_dry_run_with_download_still_rejected_without_selection_tagging(self):
+        cfg = _make_app_config(
+            processing=ProcessingConfig(dry_run=True),
+            selection_tagging=SelectionTaggingConfig(
+                enabled=False,
+                add=TagTargetConfig(values=[]),
+                remove=TagTargetConfig(values=[]),
+            ),
+            download=DownloadConfig(enabled=True),
+            ocr=MistralOCRConfig(enabled=False),
+            tag_adding=TagAddingConfig(enabled=False),
+        )
+        with self.assertRaises(ConfigError):
+            validate_flags(cfg)
+
+
+class TestCombinedDryRunMainPreflight(unittest.TestCase):
+    """Tests packaged CLI preflight for combined selection-tagging + download dry-run."""
+
+    @patch("zotero_docai_pipeline.cli.commands.build_export_records")
+    def test_dry_run_with_placeholder_download_folder_reaches_dry_run_path(
+        self, mock_build_export
+    ):
+        mock_build_export.return_value = []
+        cfg = _make_app_config(
+            processing=ProcessingConfig(dry_run=True),
+            selection_tagging=SelectionTaggingConfig(
+                enabled=True,
+                add=TagTargetConfig(values=["add-me"]),
+                remove=TagTargetConfig(values=[]),
+            ),
+            download=DownloadConfig(enabled=True),
+            ocr=MistralOCRConfig(enabled=False),
+            tag_adding=TagAddingConfig(enabled=False),
+        )
+        self.assertEqual(
+            cfg.download.upload_folder.strip(),
+            PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER,
+        )
+
+        try:
+            _enforce_explicit_download_upload_folder(cfg)
+        except ConfigError:
+            self.fail(
+                "packaged download.upload_folder preflight blocked combined dry-run"
+            )
+        validate_flags(cfg)
+
+        item = _make_item("ITEM1", "Test Paper", tags=["existing"])
+        discovery_stats = _make_discovery_stats()
+        mock_zotero_client = MagicMock()
+        mock_zotero_client.get_items_by_selection.return_value = (
+            [item],
+            discovery_stats,
+        )
+        logger = MagicMock()
+
+        exit_code = dry_run_command(cfg, logger, mock_zotero_client)
+
+        self.assertEqual(exit_code, 0)
+        mock_zotero_client.add_tag.assert_not_called()
+        mock_zotero_client.remove_tag.assert_not_called()
+
+    def test_live_download_with_placeholder_download_folder_still_rejected(self):
+        cfg = _make_app_config(
+            processing=ProcessingConfig(dry_run=False),
+            selection_tagging=SelectionTaggingConfig(
+                enabled=True,
+                add=TagTargetConfig(values=["add-me"]),
+                remove=TagTargetConfig(values=[]),
+            ),
+            download=DownloadConfig(enabled=True),
+            ocr=MistralOCRConfig(enabled=False),
+            tag_adding=TagAddingConfig(enabled=False),
+        )
+        with self.assertRaises(ConfigError):
+            _enforce_explicit_download_upload_folder(cfg)
 
 
 class TestItemsWithoutCitationKey(unittest.TestCase):
