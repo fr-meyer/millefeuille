@@ -7,6 +7,7 @@ logging system and support unicode/emoji for user-friendly terminal output.
 import logging
 import os
 import sys
+from typing import Any
 
 from tabulate import tabulate
 
@@ -742,6 +743,43 @@ def log_tag_adding_start(
     )
     formatted_message = _format_with_emoji(message, "🏷️", "[TAG ADDING]")
     logger.info(formatted_message)
+
+
+def log_selection_tagging_summary(
+    logger: logging.Logger, summary: dict[str, Any]
+) -> None:
+    """Log summary for selection-tagging operations."""
+    logger.info("")
+    formatted_header = _format_with_emoji(
+        "Selection Tagging Summary:", "\U0001f3f7\ufe0f", "[SELECTION TAGGING]"
+    )
+    logger.info(formatted_header)
+
+    selected = summary.get("selection_tagging_selected", 0)
+    item_succeeded = summary.get("selection_tagging_item_succeeded", 0)
+    item_failed = summary.get("selection_tagging_item_failed", 0)
+    add_succeeded = summary.get("selection_tagging_add_succeeded", 0)
+    add_failed = summary.get("selection_tagging_add_failed", 0)
+    remove_succeeded = summary.get("selection_tagging_remove_succeeded", 0)
+    remove_failed = summary.get("selection_tagging_remove_failed", 0)
+
+    table_data = [
+        ["Selected items", selected],
+        ["Retag success items", item_succeeded],
+        ["Retag failure items", item_failed],
+        [
+            "Add ops",
+            f"{add_succeeded} succeeded, {add_failed} failed",
+        ],
+        [
+            "Remove ops",
+            f"{remove_succeeded} succeeded, {remove_failed} failed",
+        ],
+    ]
+
+    tablefmt = "grid" if _supports_unicode() else "simple"
+    table_str = tabulate(table_data, headers=["Metric", "Count"], tablefmt=tablefmt)
+    logger.info(table_str)
 
 
 def log_tag_adding_result(

@@ -209,6 +209,8 @@ class TestDryRunPreview(unittest.TestCase):
             str(c.args[0]) for c in logger.info.call_args_list if c.args
         ]
         joined = " ".join(info_messages)
+        self.assertNotIn("On success", joined)
+        self.assertNotIn("On failure", joined)
         self.assertIn("Would add", joined)
         self.assertIn("Would remove", joined)
         self.assertIn("Selected items", joined)
@@ -325,6 +327,115 @@ class TestAlreadyPresentAddAndAbsentRemoveAreNoOps(unittest.TestCase):
         self.assertEqual(item_failed, 0)
         self.assertEqual(agg.add_failed, 0)
         self.assertEqual(agg.remove_failed, 0)
+
+
+class TestLiveSelectionTaggingExportLogOrder(unittest.TestCase):
+    """Tests visible log order for live selection-tagging plus export runs."""
+
+    @patch("zotero_docai_pipeline.cli.commands.Pipeline")
+    @patch("zotero_docai_pipeline.cli.commands.ItemProcessor")
+    def test_selection_tagging_summary_before_export_logs(
+        self, mock_processor_cls, mock_pipeline_cls
+    ):
+        logger = MagicMock()
+        cfg = _make_app_config(
+            selection_tagging=SelectionTaggingConfig(
+                enabled=True,
+                add=TagTargetConfig(values=["sel-add"]),
+                remove=TagTargetConfig(values=[]),
+            ),
+            export=ExportConfig(
+                attachment_urls=AttachmentUrlExportConfig(enabled=True, log=True)
+            ),
+            ocr=MistralOCRConfig(enabled=False),
+            download=DownloadConfig(enabled=False),
+            tag_adding=TagAddingConfig(enabled=False),
+        )
+        mock_pipeline_cls.return_value.run.return_value = {
+            "selection_tagging_selected": 1,
+            "selection_tagging_item_succeeded": 1,
+            "selection_tagging_item_failed": 0,
+            "selection_tagging_add_succeeded": 1,
+            "selection_tagging_add_failed": 0,
+            "selection_tagging_remove_succeeded": 0,
+            "selection_tagging_remove_failed": 0,
+            "selection_tagging_summary_displayed": True,
+            "total_time": 0.0,
+        }
+        mock_zotero_client = MagicMock()
+
+        process_command(cfg, logger, mock_zotero_client, None)
+
+        info_messages = [
+            str(c.args[0]) for c in logger.info.call_args_list if c.args
+        ]
+        summary_count = sum(
+            1 for msg in info_messages if "Selection Tagging Summary" in msg
+        )
+        self.assertEqual(
+            summary_count,
+            0,
+            "pipeline already emitted summary; process_command must not duplicate",
+        )
+
+    def test_pipeline_logs_summary_before_export_in_standalone_mode(self):
+        pipeline = object.__new__(Pipeline)
+        pipeline.logger = MagicMock()
+        pipeline.processing_config = ProcessingConfig()
+        pipeline.tree_processor = None
+        pipeline.tree_structure_config = TreeStructureConfig()
+        pipeline.download_config = DownloadConfig(enabled=False)
+        pipeline.tag_adding_config = TagAddingConfig(enabled=False)
+        pipeline.selection_tagging_config = SelectionTaggingConfig(
+            enabled=True,
+            add=TagTargetConfig(values=["sel-add"]),
+            remove=TagTargetConfig(values=[]),
+        )
+        pipeline.ocr_config = MistralOCRConfig(enabled=False)
+        pipeline.export_config = ExportConfig(
+            attachment_urls=AttachmentUrlExportConfig(enabled=True, log=True)
+        )
+        pipeline.zotero_client = MagicMock()
+
+        item = _make_item("ITEM1", "Paper")
+        discovery_stats = _make_discovery_stats()
+        tag_result = ProcessingTagResult(
+            outcome="selection_tagging",
+            add_attempted=1,
+            add_succeeded=1,
+            add_failed=0,
+            remove_attempted=0,
+            remove_succeeded=0,
+            remove_failed=0,
+        )
+
+        with patch.object(
+            pipeline, "_discover_items", return_value=([item], discovery_stats)
+        ):
+            with patch.object(
+                pipeline,
+                "_apply_selection_tagging",
+                return_value=(tag_result, 1, 0),
+            ):
+                with patch(
+                    "zotero_docai_pipeline.orchestration.pipeline.build_export_records",
+                    return_value=[],
+                ):
+                    summary = pipeline.run()
+
+        info_messages = [
+            str(c.args[0]) for c in pipeline.logger.info.call_args_list if c.args
+        ]
+        summary_idx = next(
+            i for i, msg in enumerate(info_messages) if "Selection Tagging Summary" in msg
+        )
+        export_idx = next(
+            i
+            for i, msg in enumerate(info_messages)
+            if "nothing to export" in msg.lower()
+        )
+        self.assertLess(summary_idx, export_idx)
+        self.assertTrue(summary.get("selection_tagging_summary_displayed"))
 
 
 class TestLiveExportRunsAfterSelectionTagging(unittest.TestCase):
@@ -462,6 +573,7 @@ class TestProcessCommandSummaryOrdering(unittest.TestCase):
             "selection_tagging_selected": 1,
             "selection_tagging_item_succeeded": 1,
             "selection_tagging_item_failed": 0,
+            "selection_tagging_summary_displayed": False,
             "total_pdfs_downloaded": 1,
             "total_pdfs_failed": 0,
             "total_time": 0.0,

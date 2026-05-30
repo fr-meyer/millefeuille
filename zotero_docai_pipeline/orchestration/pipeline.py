@@ -95,6 +95,7 @@ from zotero_docai_pipeline.utils.logging import (
     log_completion,
     log_disk_save,
     log_error,
+    log_selection_tagging_summary,
     log_startup,
     log_tag_adding_result,
     log_tag_adding_start,
@@ -2230,6 +2231,18 @@ class Pipeline:
         st_agg: ProcessingTagResult | None = None
         st_item_succeeded = 0
         st_item_failed = 0
+        selection_tagging_summary_displayed = False
+
+        def _emit_selection_tagging_summary_before_export() -> None:
+            nonlocal selection_tagging_summary_displayed
+            if (
+                self.selection_tagging_config.enabled
+                and self.export_config.attachment_urls.enabled
+            ):
+                log_selection_tagging_summary(
+                    self.logger, _selection_tagging_fields()
+                )
+                selection_tagging_summary_displayed = True
 
         def _export_attachment_urls() -> None:
             if not self.export_config.attachment_urls.enabled:
@@ -2268,6 +2281,7 @@ class Pipeline:
         if not items:
             self.logger.info("No items found to process")
             if self.selection_tagging_config.enabled:
+                _emit_selection_tagging_summary_before_export()
                 _export_attachment_urls()
             return {
                 "total_items": 0,
@@ -2288,6 +2302,9 @@ class Pipeline:
                 "tag_adding_eligible": 0,
                 "tag_adding_no_key": 0,
                 "tag_adding_processed": 0,
+                "selection_tagging_summary_displayed": (
+                    selection_tagging_summary_displayed
+                ),
                 **_selection_tagging_fields(selected=0),
             }
 
@@ -2303,6 +2320,7 @@ class Pipeline:
             st_agg, st_item_succeeded, st_item_failed = self._apply_selection_tagging(
                 items
             )
+            _emit_selection_tagging_summary_before_export()
             _export_attachment_urls()
             total_time = time.time() - start_time
             summary = {
@@ -2324,6 +2342,9 @@ class Pipeline:
                 "tag_adding_eligible": 0,
                 "tag_adding_no_key": 0,
                 "tag_adding_processed": 0,
+                "selection_tagging_summary_displayed": (
+                    selection_tagging_summary_displayed
+                ),
                 **_selection_tagging_fields(),
             }
             log_completion(self.logger)
@@ -2406,6 +2427,7 @@ class Pipeline:
             st_agg, st_item_succeeded, st_item_failed = self._apply_selection_tagging(
                 items
             )
+            _emit_selection_tagging_summary_before_export()
             _export_attachment_urls()
 
         # ========================================================================
@@ -2543,6 +2565,9 @@ class Pipeline:
             summary["tag_adding_no_key"] = no_key_count
             summary["tag_adding_processed"] = tag_adding_processed
             summary.update(_selection_tagging_fields())
+            summary["selection_tagging_summary_displayed"] = (
+                selection_tagging_summary_displayed
+            )
 
             # Log completion
             log_completion(self.logger)
@@ -2955,6 +2980,9 @@ class Pipeline:
             summary["tag_adding_processed"] = 0
 
         summary.update(_selection_tagging_fields())
+        summary["selection_tagging_summary_displayed"] = (
+            selection_tagging_summary_displayed
+        )
 
         # Log completion
         log_completion(self.logger)

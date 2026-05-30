@@ -31,6 +31,7 @@ from zotero_docai_pipeline.utils.logging import (
     log_config_summary,
     log_discovery_stats,
     log_error_summary,
+    log_selection_tagging_summary,
     log_summary_table,
     log_timing_summary,
 )
@@ -99,34 +100,35 @@ def dry_run_command(
             logger.info(f"  PDFs        : {pdf_count}")
             current_tags = ", ".join(item.tags) if item.tags else "[none]"
             logger.info(f"  Current tags: {current_tags}")
-            success_plan = _plan_outcome_tags(cfg.tagging, cfg.zotero, "success")
-            failure_plan = _plan_outcome_tags(cfg.tagging, cfg.zotero, "failure")
-            success_add = (
-                ", ".join(success_plan.tags_to_add)
-                if success_plan.tags_to_add
-                else "[none]"
-            )
-            success_remove = (
-                ", ".join(success_plan.tags_to_remove)
-                if success_plan.tags_to_remove
-                else "[none]"
-            )
-            failure_add = (
-                ", ".join(failure_plan.tags_to_add)
-                if failure_plan.tags_to_add
-                else "[none]"
-            )
-            failure_remove = (
-                ", ".join(failure_plan.tags_to_remove)
-                if failure_plan.tags_to_remove
-                else "[none]"
-            )
-            logger.info("  On success:")
-            logger.info(f"    Would add   : {success_add}")
-            logger.info(f"    Would remove: {success_remove}")
-            logger.info("  On failure:")
-            logger.info(f"    Would add   : {failure_add}")
-            logger.info(f"    Would remove: {failure_remove}")
+            if not cfg.selection_tagging.enabled:
+                success_plan = _plan_outcome_tags(cfg.tagging, cfg.zotero, "success")
+                failure_plan = _plan_outcome_tags(cfg.tagging, cfg.zotero, "failure")
+                success_add = (
+                    ", ".join(success_plan.tags_to_add)
+                    if success_plan.tags_to_add
+                    else "[none]"
+                )
+                success_remove = (
+                    ", ".join(success_plan.tags_to_remove)
+                    if success_plan.tags_to_remove
+                    else "[none]"
+                )
+                failure_add = (
+                    ", ".join(failure_plan.tags_to_add)
+                    if failure_plan.tags_to_add
+                    else "[none]"
+                )
+                failure_remove = (
+                    ", ".join(failure_plan.tags_to_remove)
+                    if failure_plan.tags_to_remove
+                    else "[none]"
+                )
+                logger.info("  On success:")
+                logger.info(f"    Would add   : {success_add}")
+                logger.info(f"    Would remove: {success_remove}")
+                logger.info("  On failure:")
+                logger.info(f"    Would add   : {failure_add}")
+                logger.info(f"    Would remove: {failure_remove}")
 
         log_discovery_stats(logger, discovery_stats, total_pdfs)
     else:
@@ -490,37 +492,7 @@ def _display_selection_tagging_summary(
     logger: logging.Logger, summary: dict[str, Any]
 ) -> None:
     """Display summary for selection-tagging operations."""
-    logger.info("")
-    formatted_header = _format_with_emoji(
-        "Selection Tagging Summary:", "\U0001f3f7\ufe0f", "[SELECTION TAGGING]"
-    )
-    logger.info(formatted_header)
-
-    selected = summary.get("selection_tagging_selected", 0)
-    item_succeeded = summary.get("selection_tagging_item_succeeded", 0)
-    item_failed = summary.get("selection_tagging_item_failed", 0)
-    add_succeeded = summary.get("selection_tagging_add_succeeded", 0)
-    add_failed = summary.get("selection_tagging_add_failed", 0)
-    remove_succeeded = summary.get("selection_tagging_remove_succeeded", 0)
-    remove_failed = summary.get("selection_tagging_remove_failed", 0)
-
-    table_data = [
-        ["Selected items", selected],
-        ["Retag success items", item_succeeded],
-        ["Retag failure items", item_failed],
-        [
-            "Add ops",
-            f"{add_succeeded} succeeded, {add_failed} failed",
-        ],
-        [
-            "Remove ops",
-            f"{remove_succeeded} succeeded, {remove_failed} failed",
-        ],
-    ]
-
-    tablefmt = "grid" if _supports_unicode() else "simple"
-    table_str = tabulate(table_data, headers=["Metric", "Count"], tablefmt=tablefmt)
-    logger.info(table_str)
+    log_selection_tagging_summary(logger, summary)
 
 
 def process_command(
@@ -567,7 +539,9 @@ def process_command(
     )
     summary = pipeline.run()
 
-    if cfg.selection_tagging.enabled:
+    if cfg.selection_tagging.enabled and not summary.get(
+        "selection_tagging_summary_displayed"
+    ):
         _display_selection_tagging_summary(logger, summary)
 
     # Determine which mode is enabled for appropriate summary display
