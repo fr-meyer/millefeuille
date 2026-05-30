@@ -37,10 +37,10 @@ Example usage:
     ...       f"{summary['failed_items']} failed")
 """
 
+from dataclasses import dataclass
 import json
 import logging
 import os
-from dataclasses import dataclass
 from pathlib import Path
 import re
 import tempfile

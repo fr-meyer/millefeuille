@@ -33,7 +33,7 @@ from zotero_docai_pipeline.orchestration.pipeline import Pipeline, _plan_outcome
 
 
 def _make_tagging_config(**kwargs) -> TaggingConfig:
-    """Build a TaggingConfig with a valid selection and optional tag-target overrides."""
+    """Build a TaggingConfig with valid selection and optional tag-target overrides."""
     tag_fields = {
         "apply_on_success": TagTargetConfig(),
         "apply_on_error": TagTargetConfig(),

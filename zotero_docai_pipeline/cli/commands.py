@@ -101,20 +101,32 @@ def dry_run_command(
             logger.info(f"  Current tags: {current_tags}")
             success_plan = _plan_outcome_tags(cfg.tagging, cfg.zotero, "success")
             failure_plan = _plan_outcome_tags(cfg.tagging, cfg.zotero, "failure")
+            success_add = (
+                ", ".join(success_plan.tags_to_add)
+                if success_plan.tags_to_add
+                else "[none]"
+            )
+            success_remove = (
+                ", ".join(success_plan.tags_to_remove)
+                if success_plan.tags_to_remove
+                else "[none]"
+            )
+            failure_add = (
+                ", ".join(failure_plan.tags_to_add)
+                if failure_plan.tags_to_add
+                else "[none]"
+            )
+            failure_remove = (
+                ", ".join(failure_plan.tags_to_remove)
+                if failure_plan.tags_to_remove
+                else "[none]"
+            )
             logger.info("  On success:")
-            logger.info(
-                f"    Would add   : {', '.join(success_plan.tags_to_add) if success_plan.tags_to_add else '[none]'}"
-            )
-            logger.info(
-                f"    Would remove: {', '.join(success_plan.tags_to_remove) if success_plan.tags_to_remove else '[none]'}"
-            )
+            logger.info(f"    Would add   : {success_add}")
+            logger.info(f"    Would remove: {success_remove}")
             logger.info("  On failure:")
-            logger.info(
-                f"    Would add   : {', '.join(failure_plan.tags_to_add) if failure_plan.tags_to_add else '[none]'}"
-            )
-            logger.info(
-                f"    Would remove: {', '.join(failure_plan.tags_to_remove) if failure_plan.tags_to_remove else '[none]'}"
-            )
+            logger.info(f"    Would add   : {failure_add}")
+            logger.info(f"    Would remove: {failure_remove}")
 
         log_discovery_stats(logger, discovery_stats, total_pdfs)
     else:
