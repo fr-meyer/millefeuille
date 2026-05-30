@@ -196,6 +196,40 @@ def dry_run_command(
                 f"  First {example_count} example(s): {unmatched_keys[:5]}"
             )
 
+    if cfg.selection_tagging.enabled:
+        logger.info("")
+        formatted_header = _format_with_emoji(
+            "Selection Tagging Preview:", "\U0001f3f7\ufe0f", "[SELECTION TAGGING]"
+        )
+        logger.info(formatted_header)
+
+        for item in items:
+            title = item.title[:60]
+            logger.info(f'  - "{title}"')
+            current_tags = ", ".join(item.tags) if item.tags else "[none]"
+            logger.info(f"  Current tags: {current_tags}")
+            would_add = (
+                ", ".join(cfg.selection_tagging.add.values)
+                if cfg.selection_tagging.add.values
+                else "[none]"
+            )
+            logger.info(f"  Would add: {would_add}")
+            would_remove = (
+                ", ".join(cfg.selection_tagging.remove.values)
+                if cfg.selection_tagging.remove.values
+                else "[none]"
+            )
+            logger.info(f"  Would remove: {would_remove}")
+
+        logger.info(f"  Selected items: {len(items)}")
+        logger.info(
+            f"  Planned add ops: {len(items) * len(cfg.selection_tagging.add.values)}"
+        )
+        logger.info(
+            f"  Planned remove ops: "
+            f"{len(items) * len(cfg.selection_tagging.remove.values)}"
+        )
+
     if cfg.export.attachment_urls.enabled:
         records = build_export_records(items, zotero_client)
         if cfg.export.attachment_urls.auth_query.enabled:
@@ -217,10 +251,24 @@ def dry_run_command(
     return 0
 
 
+def _failure_severity(failed: int, succeeded: int, *, total: int = 0) -> int:
+    """Map per-feature failed/succeeded counts to exit severity (0, 1, or 2)."""
+    if failed <= 0:
+        return 0
+    if succeeded > 0:
+        return 1
+    if total > 0 or failed > 0:
+        return 2
+    return 0
+
+
 def _determine_exit_code(
     summary: dict[str, Any],
 ) -> int:
     """Determine the appropriate exit code based on processing summary.
+
+    Each active feature contributes its own severity from feature-specific
+    counters; the final exit code is the worst severity across contributors.
 
     Args:
         summary: Dictionary containing processing summary with keys:
@@ -247,40 +295,45 @@ def _determine_exit_code(
     if not isinstance(total_pdfs_failed, int):
         total_pdfs_failed = 0
 
-    # Check PDF download failures - must return non-zero exit code
-    if total_pdfs_failed > 0:
-        if successful_items == 0:
-            return 2  # Complete failure (no items succeeded)
-        else:
-            return 1  # Partial failure (some items succeeded)
+    severities: list[int] = []
 
-    # Check tag-adding failures
+    if total_pdfs_failed > 0:
+        total_pdfs_downloaded = summary.get("total_pdfs_downloaded", 0)
+        if not isinstance(total_pdfs_downloaded, int):
+            total_pdfs_downloaded = 0
+        severities.append(
+            _failure_severity(total_pdfs_failed, total_pdfs_downloaded)
+        )
+
     tag_adding_failed = summary.get("tag_adding_failed", 0)
     if not isinstance(tag_adding_failed, int):
         tag_adding_failed = 0
     if tag_adding_failed > 0:
-        if successful_items == 0:
-            return 2  # Complete failure (no items succeeded)
-        else:
-            return 1  # Partial failure (some items succeeded)
+        tag_adding_succeeded = summary.get("tag_adding_succeeded", 0)
+        if not isinstance(tag_adding_succeeded, int):
+            tag_adding_succeeded = 0
+        severities.append(
+            _failure_severity(tag_adding_failed, tag_adding_succeeded)
+        )
 
     st_item_failed = summary.get("selection_tagging_item_failed", 0)
     if not isinstance(st_item_failed, int):
         st_item_failed = 0
     if st_item_failed > 0:
-        if successful_items == 0:
-            return 2
-        else:
-            return 1
+        st_item_succeeded = summary.get("selection_tagging_item_succeeded", 0)
+        if not isinstance(st_item_succeeded, int):
+            st_item_succeeded = 0
+        severities.append(_failure_severity(st_item_failed, st_item_succeeded))
 
-    if failed_items == 0:
-        return 0  # Success
-    elif successful_items > 0:
-        return 1  # Partial failure
-    elif total_items > 0:
-        return 2  # Complete failure
-    else:
-        return 0  # No items is not an error
+    if failed_items > 0:
+        if total_items > 0 or successful_items > 0:
+            severities.append(
+                _failure_severity(failed_items, successful_items)
+            )
+
+    if severities:
+        return max(severities)
+    return 0
 
 
 def _display_download_summary(logger: logging.Logger, summary: dict) -> None:
