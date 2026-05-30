@@ -236,6 +236,53 @@ class TestDryRunPreview(unittest.TestCase):
         self.assertLess(st_idx, export_idx)
 
 
+class TestDryRunManifestSuppression(unittest.TestCase):
+    """Tests that dry-run suppresses manifest writes while still logging exports."""
+
+    @patch("zotero_docai_pipeline.cli.commands.log_export_records")
+    @patch("zotero_docai_pipeline.cli.commands.write_manifest", create=True)
+    def test_dry_run_suppresses_manifest_write(
+        self, mock_write_manifest, mock_log_export_records
+    ):
+        cfg = _make_app_config(
+            processing=ProcessingConfig(dry_run=True),
+            selection_tagging=SelectionTaggingConfig(
+                enabled=True,
+                add=TagTargetConfig(values=["add-me"]),
+                remove=TagTargetConfig(values=["remove-me"]),
+            ),
+            export=ExportConfig(
+                attachment_urls=AttachmentUrlExportConfig(
+                    enabled=True,
+                    log=True,
+                    write_manifest=True,
+                    manifest_path="./manifest.json",
+                )
+            ),
+        )
+        item = _make_item("ITEM1", "Test Paper", tags=["existing"])
+        discovery_stats = _make_discovery_stats()
+        mock_zotero_client = MagicMock()
+        mock_zotero_client.get_items_by_selection.return_value = (
+            [item],
+            discovery_stats,
+        )
+        logger = MagicMock()
+
+        dry_run_command(cfg, logger, mock_zotero_client)
+
+        mock_write_manifest.assert_not_called()
+        mock_log_export_records.assert_called_once()
+
+        info_messages = [
+            str(c.args[0]) for c in logger.info.call_args_list if c.args
+        ]
+        self.assertTrue(
+            any("[dry-run] Manifest write suppressed" in msg for msg in info_messages),
+            "dry-run should log manifest write suppression when write_manifest is enabled",
+        )
+
+
 class TestCombinedDryRunPreview(unittest.TestCase):
     """Tests that combined dry-runs show both selection-tagging and outcome-branch previews."""
 

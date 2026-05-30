@@ -23,7 +23,6 @@ from zotero_docai_pipeline.orchestration.processor import ItemProcessor
 from zotero_docai_pipeline.utils.export import (
     build_export_records,
     log_export_records,
-    write_manifest,
 )
 from zotero_docai_pipeline.utils.logging import (
     _format_with_emoji,
@@ -248,7 +247,7 @@ def dry_run_command(
         if cfg.export.attachment_urls.log:
             log_export_records(records, logger)
         if cfg.export.attachment_urls.write_manifest:
-            write_manifest(records, cfg.export.attachment_urls.manifest_path)
+            logger.info("  [dry-run] Manifest write suppressed (no writes in dry-run mode)")
 
     return 0
 
