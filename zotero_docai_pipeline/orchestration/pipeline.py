@@ -84,6 +84,11 @@ from zotero_docai_pipeline.domain.models import (
 )
 from zotero_docai_pipeline.domain.tree_processor import TreeStructureProcessor
 from zotero_docai_pipeline.orchestration.processor import ItemProcessor
+from zotero_docai_pipeline.utils.export import (
+    build_export_records,
+    log_export_records,
+    write_manifest,
+)
 from zotero_docai_pipeline.utils.logging import (
     log_completion,
     log_disk_save,
@@ -91,11 +96,6 @@ from zotero_docai_pipeline.utils.logging import (
     log_startup,
     log_tag_adding_result,
     log_tag_adding_start,
-)
-from zotero_docai_pipeline.utils.export import (
-    build_export_records,
-    log_export_records,
-    write_manifest,
 )
 from zotero_docai_pipeline.utils.progress import ProgressBar
 from zotero_docai_pipeline.utils.redaction import redact_url
@@ -192,7 +192,9 @@ class Pipeline:
         self.download_config = download_config
         self.tag_adding_config = tag_adding_config
         self.tagging_config = tagging_config
-        self.export_config = export_config if export_config is not None else ExportConfig()
+        self.export_config = (
+            export_config if export_config is not None else ExportConfig()
+        )
         self.logger = logging.getLogger(__name__)
         self._tree_structures: dict[str, DocumentTree] = {}
         self._download_path_mapping: dict[str, str] = {}
@@ -710,18 +712,23 @@ class Pipeline:
                             all_attachments_succeeded = False
                             break
 
-                    if all_attachments_succeeded and apply_processed_tag:
-                        if self._apply_processing_tags(item.key, success=True):
-                            processed_tagged_count += 1
+                    if (
+                        all_attachments_succeeded
+                        and apply_processed_tag
+                        and self._apply_processing_tags(item.key, success=True)
+                    ):
+                        processed_tagged_count += 1
                 else:
                     if apply_processed_tag:
                         pdf_attachments = [
                             att for att in item.attachments
                             if self._is_pdf_attachment(att)
                         ]
-                        if len(pdf_attachments) == 0:
-                            if self._apply_processing_tags(item.key, success=False):
-                                error_tagged_count += 1
+                        if (
+                            len(pdf_attachments) == 0
+                            and self._apply_processing_tags(item.key, success=False)
+                        ):
+                            error_tagged_count += 1
             except ZoteroClientError as e:
                 self.logger.warning(f"Failed to tag item {item.key}: {e}")
 
@@ -752,7 +759,10 @@ class Pipeline:
         results: list[TagAddingResult] = []
         no_key_count: int = 0
 
-        if self.tag_adding_config.replace_all_existing_tags and not self._replace_mode_logged:
+        if (
+            self.tag_adding_config.replace_all_existing_tags
+            and not self._replace_mode_logged
+        ):
             self.logger.info(
                 "Tag Adding is running in REPLACE mode: all existing tags on "
                 "matched items will be removed before applying assigned tags."
@@ -766,7 +776,8 @@ class Pipeline:
 
             if not item_citation_key.strip():
                 self.logger.debug(
-                    f"Item '{item_title}' (key={item_key}) has no citation key, skipping tag adding"
+                    f"Item '{item_title}' (key={item_key}) has no citation key, "
+                    "skipping tag adding"
                 )
                 no_key_count += 1
                 continue
@@ -864,7 +875,10 @@ class Pipeline:
         disk_pdfs: list[tuple[bytes, str, str, str]],
     ) -> int:
         """Supplement missing in-memory PDFs with disk-backed entries."""
-        known_pdf_keys = {(item_key, attachment_key) for _, _, item_key, attachment_key in pdfs}
+        known_pdf_keys = {
+            (item_key, attachment_key)
+            for _, _, item_key, attachment_key in pdfs
+        }
         supplemented_count = 0
 
         for disk_pdf in disk_pdfs:
@@ -1991,7 +2005,8 @@ class Pipeline:
                 apply_processed_tag=apply_processed_tag_on_download,
             )
 
-            # Compute items that succeeded download (includes no-PDF items as vacuously successful)
+            # Compute items that succeeded download (includes no-PDF items as
+            # vacuously successful)
             path_mapping = self._download_path_mapping
             download_succeeded_items: list[DiscoveredItem] = []
             for item in items:
@@ -2028,7 +2043,9 @@ class Pipeline:
                     tag_adding_eligible,
                     total_assigned_tags,
                 )
-                tag_adding_results, no_key_count = self._apply_tag_adding(download_succeeded_items)
+                tag_adding_results, no_key_count = self._apply_tag_adding(
+                    download_succeeded_items
+                )
                 tag_adding_processed = self._apply_output_tag_to_eligible_items(
                     download_succeeded_items,
                     tag_adding_results,
@@ -2328,7 +2345,9 @@ class Pipeline:
 
                     # Step B: apply processing tags based on tag-adding outcome.
                     item_matched = bool(item_tag_results)
-                    item_succeeded = item_matched and not item_tag_results[0].tags_failed
+                    item_succeeded = (
+                        item_matched and not item_tag_results[0].tags_failed
+                    )
 
                     if item_matched and not item_succeeded:
                         self._apply_processing_tags(item.key, success=False)

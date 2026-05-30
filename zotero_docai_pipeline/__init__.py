@@ -5,7 +5,7 @@ Automate PDF-to-Markdown extraction for Zotero attachments using Mistral Documen
 and save results as Zotero notes for Notero/Notion sync.
 """
 
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 
 try:
     __version__ = version("zotero-docai-pipeline")

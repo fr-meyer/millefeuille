@@ -311,9 +311,8 @@ class TestGetItemsByTagLegacyPath(unittest.TestCase):
             client,
             "_fetch_items_for_tag",
             side_effect=auth_error,
-        ):
-            with self.assertRaises(ZoteroAuthError) as cm:
-                client.get_items_by_tag("docai")
+        ), self.assertRaises(ZoteroAuthError) as cm:
+            client.get_items_by_tag("docai")
         self.assertIs(cm.exception, auth_error)
 
     def test_propagates_zotero_api_error(self):
@@ -323,9 +322,8 @@ class TestGetItemsByTagLegacyPath(unittest.TestCase):
             client,
             "_fetch_items_for_tag",
             side_effect=api_error,
-        ):
-            with self.assertRaises(ZoteroAPIError) as cm:
-                client.get_items_by_tag("docai")
+        ), self.assertRaises(ZoteroAPIError) as cm:
+            client.get_items_by_tag("docai")
         self.assertIs(cm.exception, api_error)
 
 

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import json
 import logging
-import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
+import tempfile
 
 from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
 from zotero_docai_pipeline.domain.models import (
@@ -15,6 +15,15 @@ from zotero_docai_pipeline.domain.models import (
 )
 
 _logger = logging.getLogger(__name__)
+
+_ZOTERO_RENAME_FORMULA = (
+    '{{ firstCreator suffix=" - " }}{{ year suffix=" - " }}'
+    '{{ title truncate="125" }}'
+)
+_ZOTERO_RENAME_HINT = (
+    f"Configure the Zotero rename formula {_ZOTERO_RENAME_FORMULA} "
+    "to ensure canonical filenames."
+)
 
 _GENERIC_FILENAMES: frozenset[str] = frozenset({
     "file",
@@ -34,7 +43,7 @@ def build_export_records(
     zotero_client: ZoteroClient,
 ) -> list[DiscoveredAttachmentExportRecord]:
     """Build export rows for PDF attachments on the given discovered items."""
-    discovered_at = datetime.now(timezone.utc).isoformat()
+    discovered_at = datetime.now(UTC).isoformat()
     library_id = zotero_client.credentials.library_id
     library_type = "user"
 
@@ -56,22 +65,23 @@ def build_export_records(
                 raise ValueError(
                     f"Filename fidelity check failed for item_key={item.key!r} "
                     f"attachment_key={attachment.key!r}: "
-                    f"filename={filename_raw!r} is not a string (Zotero API may have returned null or a non-text value). "
-                    'Configure the Zotero rename formula {{ firstCreator suffix=" - " }}{{ year suffix=" - " }}{{ title truncate="125" }} to ensure canonical filenames.'
+                    f"filename={filename_raw!r} is not a string "
+                    "(Zotero API may have returned null or a non-text value). "
+                    f"{_ZOTERO_RENAME_HINT}"
                 )
             if not filename_raw.strip():
                 raise ValueError(
                     f"Filename fidelity check failed for item_key={item.key!r} "
                     f"attachment_key={attachment.key!r}: "
                     f"filename={filename_raw!r} is empty or whitespace-only. "
-                    'Configure the Zotero rename formula {{ firstCreator suffix=" - " }}{{ year suffix=" - " }}{{ title truncate="125" }} to ensure canonical filenames.'
+                    f"{_ZOTERO_RENAME_HINT}"
                 )
             if _is_generic_filename(filename_raw):
                 raise ValueError(
                     f"Filename fidelity check failed for item_key={item.key!r} "
                     f"attachment_key={attachment.key!r}: "
-                    f"filename={filename_raw!r} matches a known generic fallback pattern. "
-                    'Configure the Zotero rename formula {{ firstCreator suffix=" - " }}{{ year suffix=" - " }}{{ title truncate="125" }} to ensure canonical filenames.'
+                    f"filename={filename_raw!r} matches a known generic "
+                    f"fallback pattern. {_ZOTERO_RENAME_HINT}"
                 )
 
             zotero_uri_web = f"https://www.zotero.org/users/{library_id}/items/{item.key}"

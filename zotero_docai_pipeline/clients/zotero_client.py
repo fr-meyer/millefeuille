@@ -345,7 +345,9 @@ class ZoteroClient:
             if len(authors) == 1:
                 author_string = _display_name(authors[0])
             elif len(authors) == 2:
-                author_string = f"{_display_name(authors[0])} and {_display_name(authors[1])}"
+                first = _display_name(authors[0])
+                second = _display_name(authors[1])
+                author_string = f"{first} and {second}"
             elif len(authors) >= 3:
                 names = [_display_name(a) for a in authors]
                 author_string = ", ".join(names[:-1]) + ", and " + names[-1]
@@ -580,7 +582,7 @@ class ZoteroClient:
                         kept_by_conflict_include_wins += 1
 
         final_keys = [
-            item_key for item_key in candidate_map.keys()
+            item_key for item_key in candidate_map
             if item_key not in excluded_keys
         ]
 
@@ -591,7 +593,8 @@ class ZoteroClient:
         )
         if kept_by_conflict_include_wins > 0:
             logger.info(
-                "Kept %d conflicting item(s) because conflict_resolution='include_wins'",
+                "Kept %d conflicting item(s) because "
+                "conflict_resolution='include_wins'",
                 kept_by_conflict_include_wins,
             )
 

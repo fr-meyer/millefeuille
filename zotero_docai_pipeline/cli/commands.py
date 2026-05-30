@@ -13,7 +13,7 @@ from tabulate import tabulate
 from zotero_docai_pipeline.clients.ocr_client import OCRClient
 from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
 from zotero_docai_pipeline.domain.config import AppConfig
-from zotero_docai_pipeline.domain.models import ProcessingResult, TagAddingResult
+from zotero_docai_pipeline.domain.models import TagAddingResult
 from zotero_docai_pipeline.domain.tree_processor import TreeStructureProcessor
 from zotero_docai_pipeline.orchestration.pipeline import Pipeline
 from zotero_docai_pipeline.orchestration.processor import ItemProcessor
@@ -22,7 +22,6 @@ from zotero_docai_pipeline.utils.export import (
     log_export_records,
     write_manifest,
 )
-from zotero_docai_pipeline.utils.redaction import redact_url
 from zotero_docai_pipeline.utils.logging import (
     _format_with_emoji,
     _supports_unicode,
@@ -32,6 +31,7 @@ from zotero_docai_pipeline.utils.logging import (
     log_summary_table,
     log_timing_summary,
 )
+from zotero_docai_pipeline.utils.redaction import redact_url
 
 
 def attachment_is_pdf(content_type: str | None, filename: str | None) -> bool:
@@ -96,7 +96,8 @@ def dry_run_command(
                 f"  Authors     : {item.paper_metadata.author_string or '[no authors]'}"
             )
             logger.info(f"  PDFs        : {pdf_count}")
-            logger.info(f"  Current tags: {', '.join(item.tags) if item.tags else '[none]'}")
+            current_tags = ", ".join(item.tags) if item.tags else "[none]"
+            logger.info(f"  Current tags: {current_tags}")
             logger.info(
                 f"  Would apply : {', '.join(would_apply) if would_apply else '[none]'}"
             )
@@ -125,17 +126,20 @@ def dry_run_command(
         if matching_items:
             if cfg.tag_adding.replace_all_existing_tags:
                 logger.info(
-                    "\u26a0\ufe0f  Replace mode: all existing tags on these items will be removed."
+                    "\u26a0\ufe0f  Replace mode: all existing tags on these items "
+                    "will be removed."
                 )
                 for item in matching_items:
                     title = item.title[:60]
                     ckey = (item.citation_key or "").strip()
                     assigned_tags = assignments.get(ckey, [])
                     logger.info(
-                        f'  - "{title}" (citation key: {ckey})  \u2192  tags REPLACED by: {assigned_tags}'
+                        f'  - "{title}" (citation key: {ckey})  \u2192  '
+                        f"tags REPLACED by: {assigned_tags}"
                     )
                 logger.info(
-                    f"  {len(matching_items)} item(s) would have ALL existing tags replaced with their assigned tags"
+                    f"  {len(matching_items)} item(s) would have ALL existing tags "
+                    "replaced with their assigned tags"
                 )
             else:
                 for item in matching_items:
@@ -143,10 +147,12 @@ def dry_run_command(
                     ckey = (item.citation_key or "").strip()
                     assigned_tags = assignments.get(ckey, [])
                     logger.info(
-                        f'  - "{title}" (citation key: {ckey})  \u2192  tags: {assigned_tags}'
+                        f'  - "{title}" (citation key: {ckey})  \u2192  '
+                        f"tags: {assigned_tags}"
                     )
                 logger.info(
-                    f"  {len(matching_items)} item(s) would be tagged with their assigned tags"
+                    f"  {len(matching_items)} item(s) would be tagged with "
+                    "their assigned tags"
                 )
         else:
             logger.info("  No items match the configured citation key list")
@@ -159,8 +165,9 @@ def dry_run_command(
         unmatched_keys = [k for k in assignments if k not in discovered_keys]
         logger.info(f"  Unmatched assignment keys: {len(unmatched_keys)}")
         if unmatched_keys:
+            example_count = min(5, len(unmatched_keys))
             logger.info(
-                f"  First {min(5, len(unmatched_keys))} example(s): {unmatched_keys[:5]}"
+                f"  First {example_count} example(s): {unmatched_keys[:5]}"
             )
 
     if cfg.export.attachment_urls.enabled:

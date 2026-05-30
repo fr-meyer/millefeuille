@@ -12,11 +12,11 @@ invocation via ``zotero-docai-pipeline`` (console_scripts) or
    placeholder defaults and require an explicit override.
 """
 
+from collections.abc import Mapping
 import json
 import logging
 import os
 import sys
-from collections.abc import Mapping
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -32,6 +32,10 @@ from zotero_docai_pipeline.clients.pageindex_client import PageIndexClient
 from zotero_docai_pipeline.clients.pageindex_tree_client import PageIndexTreeClient
 from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
 from zotero_docai_pipeline.domain.config import (
+    PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER,
+    PACKAGED_PLACEHOLDER_LIBRARY_ID,
+    PACKAGED_PLACEHOLDER_READ_KEY,
+    PACKAGED_PLACEHOLDER_STORAGE_BASE_DIR,
     AppConfig,
     AttachmentUrlExportConfig,
     AuthQueryConfig,
@@ -40,10 +44,6 @@ from zotero_docai_pipeline.domain.config import (
     DownloadConfig,
     ExportConfig,
     MistralOCRConfig,
-    PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER,
-    PACKAGED_PLACEHOLDER_LIBRARY_ID,
-    PACKAGED_PLACEHOLDER_READ_KEY,
-    PACKAGED_PLACEHOLDER_STORAGE_BASE_DIR,
     PageIndexOCRConfig,
     ProcessingConfig,
     RetryConfig,
@@ -195,12 +195,17 @@ def validate_flags(cfg: AppConfig) -> None:
             "Set processing.dry_run=false or download.enabled=false."
         )
 
-    if not cfg.download.enabled and not cfg.ocr.enabled and not cfg.tag_adding.enabled:
-        if not (cfg.processing.dry_run and cfg.export.attachment_urls.enabled):
-            raise ConfigError(
-                "Invalid configuration: at least one operation must be enabled. "
-                "Set download.enabled=true, ocr.enabled=true, or tag_adding.enabled=true."
-            )
+    if (
+        not cfg.download.enabled
+        and not cfg.ocr.enabled
+        and not cfg.tag_adding.enabled
+        and not (cfg.processing.dry_run and cfg.export.attachment_urls.enabled)
+    ):
+        raise ConfigError(
+            "Invalid configuration: at least one operation must be enabled. "
+            "Set download.enabled=true, ocr.enabled=true, "
+            "or tag_adding.enabled=true."
+        )
 
     read_key = cfg.credentials.read_key
     if (
@@ -220,7 +225,8 @@ def validate_flags(cfg: AppConfig) -> None:
         write_reasons.append("tag_adding.enabled (live run writes tags to Zotero)")
     if cfg.tagging.apply_on_success.values and not cfg.processing.dry_run:
         write_reasons.append(
-            "tagging.apply_on_success is non-empty (live run writes post-processing success tags)"
+            "tagging.apply_on_success is non-empty "
+            "(live run writes post-processing success tags)"
         )
     if (
         cfg.tagging.apply_on_error.values
@@ -228,20 +234,26 @@ def validate_flags(cfg: AppConfig) -> None:
         and not cfg.processing.dry_run
     ):
         write_reasons.append(
-            "tagging.apply_on_error is non-empty and zotero.error_tagging_enabled (live run writes post-processing error tags)"
+            "tagging.apply_on_error is non-empty and "
+            "zotero.error_tagging_enabled "
+            "(live run writes post-processing error tags)"
         )
     if write_reasons:
         wk = cfg.credentials.write_key
         if wk is None or (isinstance(wk, str) and not wk.strip()):
             details = ", ".join(write_reasons)
             raise ConfigError(
-                f"ZOTERO_WRITE_KEY is required when these write features are active: {details}. "
-                "Set a write-capable API key in the environment."
+                "ZOTERO_WRITE_KEY is required when these write features are "
+                f"active: {details}. Set a write-capable API key in the environment."
             )
 
-    if not cfg.credentials.redact_logs and cfg.export.attachment_urls.auth_query.enabled:
+    if (
+        not cfg.credentials.redact_logs
+        and cfg.export.attachment_urls.auth_query.enabled
+    ):
         raise ConfigError(
-            "credentials.redact_logs must be true when export.attachment_urls.auth_query.enabled=true"
+            "credentials.redact_logs must be true when "
+            "export.attachment_urls.auth_query.enabled=true"
         )
 
     logger.debug("Flag configuration validated successfully")
@@ -676,7 +688,8 @@ def main(cfg: DictConfig) -> None:
                         logger.info("Tree structure processing enabled")
                     elif app_cfg.tree_structure.enabled:
                         logger.warning(
-                            "Tree structure processing requested but could not be initialized"
+                            "Tree structure processing requested but could not "
+                            "be initialized"
                         )
                     else:
                         logger.debug("Tree structure processing disabled")
