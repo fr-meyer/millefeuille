@@ -22,4 +22,9 @@ apply_on_error:
   values:
     - docai-error
 
+remove_on_success:
+  values: []
+remove_on_error:
+  values: []
+
 include_abstract: false
