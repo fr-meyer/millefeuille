@@ -79,6 +79,12 @@ class TaggingConfig:
     apply_on_error: TagTargetConfig = field(default_factory=TagTargetConfig)
     """Tags to apply to items after failed processing."""
 
+    remove_on_success: TagTargetConfig = field(default_factory=TagTargetConfig)
+    """Tags to remove from items after successful processing."""
+
+    remove_on_error: TagTargetConfig = field(default_factory=TagTargetConfig)
+    """Tags to remove from items after failed processing."""
+
     include_abstract: bool = False
     """Whether to include the item abstract in processing."""
 
@@ -123,6 +129,14 @@ class TaggingConfig:
             self.apply_on_error.values,
             "tagging.apply_on_error.values",
         )
+        _validate_tag_values(
+            self.remove_on_success.values,
+            "tagging.remove_on_success.values",
+        )
+        _validate_tag_values(
+            self.remove_on_error.values,
+            "tagging.remove_on_error.values",
+        )
 
         self.selection.include.values = _strip_dedup(
             self.selection.include.values,
@@ -140,6 +154,33 @@ class TaggingConfig:
             self.apply_on_error.values,
             "tagging.apply_on_error.values",
         )
+        self.remove_on_success.values = _strip_dedup(
+            self.remove_on_success.values,
+            "tagging.remove_on_success.values",
+        )
+        self.remove_on_error.values = _strip_dedup(
+            self.remove_on_error.values,
+            "tagging.remove_on_error.values",
+        )
+
+        success_overlap = set(self.apply_on_success.values) & set(
+            self.remove_on_success.values
+        )
+        if success_overlap:
+            raise ConfigError(
+                "tagging.apply_on_success and tagging.remove_on_success share "
+                f"conflicting tags: {sorted(success_overlap)!r}. A tag cannot be "
+                "both applied and removed for the same outcome."
+            )
+        error_overlap = set(self.apply_on_error.values) & set(
+            self.remove_on_error.values
+        )
+        if error_overlap:
+            raise ConfigError(
+                "tagging.apply_on_error and tagging.remove_on_error share "
+                f"conflicting tags: {sorted(error_overlap)!r}. A tag cannot be "
+                "both applied and removed for the same outcome."
+            )
 
 
 def _validate_tag_values(values: list[object], field_name: str) -> None:

@@ -238,6 +238,16 @@ def validate_flags(cfg: AppConfig) -> None:
             "zotero.error_tagging_enabled "
             "(live run writes post-processing error tags)"
         )
+    if cfg.tagging.remove_on_success.values and not cfg.processing.dry_run:
+        write_reasons.append(
+            "tagging.remove_on_success is non-empty "
+            "(live run removes post-processing success tags)"
+        )
+    if cfg.tagging.remove_on_error.values and not cfg.processing.dry_run:
+        write_reasons.append(
+            "tagging.remove_on_error is non-empty "
+            "(live run removes post-processing error tags)"
+        )
     if write_reasons:
         wk = cfg.credentials.write_key
         if wk is None or (isinstance(wk, str) and not wk.strip()):
@@ -479,10 +489,18 @@ def build_app_config(cfg: DictConfig) -> AppConfig:
     error_target = TagTargetConfig(
         values=list(cfg.tagging.apply_on_error["values"]),
     )
+    remove_success_target = TagTargetConfig(
+        values=list(cfg.tagging.remove_on_success["values"]),
+    )
+    remove_error_target = TagTargetConfig(
+        values=list(cfg.tagging.remove_on_error["values"]),
+    )
     tagging_config = TaggingConfig(
         selection=selection_cfg,
         apply_on_success=success_target,
         apply_on_error=error_target,
+        remove_on_success=remove_success_target,
+        remove_on_error=remove_error_target,
         include_abstract=cfg.tagging.include_abstract,
     )
 
