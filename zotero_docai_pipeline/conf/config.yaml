@@ -8,6 +8,7 @@ defaults:
   - download: default
   - tag_adding: default
   - tagging: default
+  - selection_tagging: default
   - export: default
   - credentials: default
   - _self_

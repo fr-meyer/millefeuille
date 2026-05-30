@@ -47,6 +47,7 @@ from zotero_docai_pipeline.domain.config import (
     PageIndexOCRConfig,
     ProcessingConfig,
     RetryConfig,
+    SelectionTaggingConfig,
     StorageConfig,
     TagAddingConfig,
     TaggingConfig,
@@ -170,14 +171,14 @@ def validate_flags(cfg: AppConfig) -> None:
        both be True. Dry-run mode is for testing configuration without actual
        operations, while download is an actual operation.
     2. At least one operation enabled: At least one of download.enabled,
-       ocr.enabled, or tag_adding.enabled must be True, except for
-       export-only dry-run (processing.dry_run with export.attachment_urls.enabled).
+       ocr.enabled, or tag_adding.enabled must be True, except for export-only
+       dry-run (processing.dry_run with export.attachment_urls.enabled).
 
     Note:
-        When called from ``main()``, the all-disabled check below may be
-        unreachable because ``main()`` returns early via the help/no-op branch.
-        ``validate_flags()`` keeps this guard so other callers still receive the
-        same validation behavior.
+        ``selection_tagging.enabled`` is wired in config (T1) but is not counted
+        as an operation here until ``Pipeline`` and ``commands.py`` implement it
+        (T2). Do not remove this T2 note or allow standalone
+        ``selection_tagging.enabled=true`` until that runtime lands.
 
     Args:
         cfg: Application configuration object
@@ -193,6 +194,12 @@ def validate_flags(cfg: AppConfig) -> None:
         raise ConfigError(
             "Invalid configuration: dry_run mode cannot be used with download feature. "
             "Set processing.dry_run=false or download.enabled=false."
+        )
+
+    if cfg.selection_tagging.enabled and cfg.tag_adding.enabled:
+        raise ConfigError(
+            "Invalid configuration: selection_tagging and tag_adding cannot both "
+            "be enabled in the same run. Disable one of them."
         )
 
     if (
@@ -223,6 +230,15 @@ def validate_flags(cfg: AppConfig) -> None:
         write_reasons.append("OCR (live run creates Zotero notes)")
     if cfg.tag_adding.enabled and not cfg.processing.dry_run:
         write_reasons.append("tag_adding.enabled (live run writes tags to Zotero)")
+    if (
+        cfg.selection_tagging.enabled
+        and (cfg.selection_tagging.add.values or cfg.selection_tagging.remove.values)
+        and not cfg.processing.dry_run
+    ):
+        write_reasons.append(
+            "selection_tagging.enabled with non-empty add/remove "
+            "(live run writes tags to Zotero)"
+        )
     if cfg.tagging.apply_on_success.values and not cfg.processing.dry_run:
         write_reasons.append(
             "tagging.apply_on_success is non-empty "
@@ -504,6 +520,12 @@ def build_app_config(cfg: DictConfig) -> AppConfig:
         include_abstract=cfg.tagging.include_abstract,
     )
 
+    selection_tagging_config = SelectionTaggingConfig(
+        enabled=cfg.selection_tagging.enabled,
+        add=TagTargetConfig(values=list(cfg.selection_tagging.add["values"])),
+        remove=TagTargetConfig(values=list(cfg.selection_tagging.remove["values"])),
+    )
+
     att_urls = OmegaConf.to_container(
         cfg.export.attachment_urls, resolve=True
     )
@@ -571,6 +593,7 @@ def build_app_config(cfg: DictConfig) -> AppConfig:
         download=DownloadConfig(retry=retry_config, **download_kw),
         tag_adding=tag_adding_config,
         tagging=tagging_config,
+        selection_tagging=selection_tagging_config,
         export=export_config,
     )
 
@@ -640,6 +663,7 @@ def main(cfg: DictConfig) -> None:
         app_cfg = build_app_config(cfg)
 
         # --- No-op help branch (replaces the ConfigError for all-disabled) ---
+        # selection_tagging.enabled is not an operation until T2 runtime lands.
         all_ops_disabled = (
             not app_cfg.download.enabled
             and not app_cfg.ocr.enabled

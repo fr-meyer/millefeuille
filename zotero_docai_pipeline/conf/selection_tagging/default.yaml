@@ -1,0 +1,12 @@
+defaults:
+  - base_default
+  - _self_
+
+# Selection Tagging feature configuration
+# Controls whether and how tags are bulk-added/removed on every selected item
+
+enabled: false
+add:
+  values: []
+remove:
+  values: []
