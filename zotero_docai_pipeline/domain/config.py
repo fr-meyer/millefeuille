@@ -597,13 +597,7 @@ class TagAddingConfig:
 
 @dataclass
 class SelectionTaggingConfig:
-    """Configuration for bulk tag add/remove on selected items.
-
-    T1 wires this config group through Hydra and CLI validation gates. Pipeline
-    and command runtime support (``Pipeline.__init__``, ``Pipeline.run()``
-    early-exit, ``commands.py`` dry-run/preview) is deferred to T2; enabling
-    ``selection_tagging`` alone is not end-to-end runnable until T2 lands.
-    """
+    """Configuration for bulk tag add/remove on selected items."""
 
     enabled: bool = False
     """Whether the Selection Tagging feature is enabled."""

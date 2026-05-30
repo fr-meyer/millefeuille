@@ -171,14 +171,9 @@ def validate_flags(cfg: AppConfig) -> None:
        both be True. Dry-run mode is for testing configuration without actual
        operations, while download is an actual operation.
     2. At least one operation enabled: At least one of download.enabled,
-       ocr.enabled, or tag_adding.enabled must be True, except for export-only
-       dry-run (processing.dry_run with export.attachment_urls.enabled).
-
-    Note:
-        ``selection_tagging.enabled`` is wired in config (T1) but is not counted
-        as an operation here until ``Pipeline`` and ``commands.py`` implement it
-        (T2). Do not remove this T2 note or allow standalone
-        ``selection_tagging.enabled=true`` until that runtime lands.
+       ocr.enabled, tag_adding.enabled, or selection_tagging.enabled must be
+       True, except for export-only dry-run (processing.dry_run with
+       export.attachment_urls.enabled).
 
     Args:
         cfg: Application configuration object
@@ -206,12 +201,13 @@ def validate_flags(cfg: AppConfig) -> None:
         not cfg.download.enabled
         and not cfg.ocr.enabled
         and not cfg.tag_adding.enabled
+        and not cfg.selection_tagging.enabled
         and not (cfg.processing.dry_run and cfg.export.attachment_urls.enabled)
     ):
         raise ConfigError(
             "Invalid configuration: at least one operation must be enabled. "
-            "Set download.enabled=true, ocr.enabled=true, "
-            "or tag_adding.enabled=true."
+            "Set download.enabled=true, ocr.enabled=true, tag_adding.enabled=true, "
+            "or selection_tagging.enabled=true."
         )
 
     read_key = cfg.credentials.read_key
@@ -663,11 +659,11 @@ def main(cfg: DictConfig) -> None:
         app_cfg = build_app_config(cfg)
 
         # --- No-op help branch (replaces the ConfigError for all-disabled) ---
-        # selection_tagging.enabled is not an operation until T2 runtime lands.
         all_ops_disabled = (
             not app_cfg.download.enabled
             and not app_cfg.ocr.enabled
             and not app_cfg.tag_adding.enabled
+            and not app_cfg.selection_tagging.enabled
         )
         export_only_dry_run = (
             app_cfg.processing.dry_run

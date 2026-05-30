@@ -264,6 +264,15 @@ def _determine_exit_code(
         else:
             return 1  # Partial failure (some items succeeded)
 
+    st_item_failed = summary.get("selection_tagging_item_failed", 0)
+    if not isinstance(st_item_failed, int):
+        st_item_failed = 0
+    if st_item_failed > 0:
+        if successful_items == 0:
+            return 2
+        else:
+            return 1
+
     if failed_items == 0:
         return 0  # Success
     elif successful_items > 0:
@@ -424,6 +433,43 @@ def _display_tag_adding_summary(
     logger.info(f"Matched: {matched} | Succeeded: {succeeded} | Failed: {failed}")
 
 
+def _display_selection_tagging_summary(
+    logger: logging.Logger, summary: dict[str, Any]
+) -> None:
+    """Display summary for selection-tagging operations."""
+    logger.info("")
+    formatted_header = _format_with_emoji(
+        "Selection Tagging Summary:", "\U0001f3f7\ufe0f", "[SELECTION TAGGING]"
+    )
+    logger.info(formatted_header)
+
+    selected = summary.get("selection_tagging_selected", 0)
+    item_succeeded = summary.get("selection_tagging_item_succeeded", 0)
+    item_failed = summary.get("selection_tagging_item_failed", 0)
+    add_succeeded = summary.get("selection_tagging_add_succeeded", 0)
+    add_failed = summary.get("selection_tagging_add_failed", 0)
+    remove_succeeded = summary.get("selection_tagging_remove_succeeded", 0)
+    remove_failed = summary.get("selection_tagging_remove_failed", 0)
+
+    table_data = [
+        ["Selected items", selected],
+        ["Retag success items", item_succeeded],
+        ["Retag failure items", item_failed],
+        [
+            "Add ops",
+            f"{add_succeeded} succeeded, {add_failed} failed",
+        ],
+        [
+            "Remove ops",
+            f"{remove_succeeded} succeeded, {remove_failed} failed",
+        ],
+    ]
+
+    tablefmt = "grid" if _supports_unicode() else "simple"
+    table_str = tabulate(table_data, headers=["Metric", "Count"], tablefmt=tablefmt)
+    logger.info(table_str)
+
+
 def process_command(
     cfg: AppConfig,
     logger: logging.Logger,
@@ -462,10 +508,14 @@ def process_command(
         cfg.download,
         cfg.tag_adding,
         cfg.tagging,
+        cfg.selection_tagging,
         tree_processor=tree_processor,
         export_config=cfg.export,
     )
     summary = pipeline.run()
+
+    if cfg.selection_tagging.enabled:
+        _display_selection_tagging_summary(logger, summary)
 
     # Determine which mode is enabled for appropriate summary display
     tag_adding_only = (
@@ -543,6 +593,12 @@ def process_command(
                     "[TAG ADDING]",
                 )
             )
+    elif (
+        cfg.selection_tagging.enabled
+        and not cfg.ocr.enabled
+        and not cfg.download.enabled
+    ):
+        log_timing_summary(logger, summary.get("total_time", 0.0))
     else:
         # OCR-only or OCR + tag-adding
         results = summary.get("results", [])
