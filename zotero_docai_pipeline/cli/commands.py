@@ -15,7 +15,10 @@ from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
 from zotero_docai_pipeline.domain.config import AppConfig
 from zotero_docai_pipeline.domain.models import TagAddingResult
 from zotero_docai_pipeline.domain.tree_processor import TreeStructureProcessor
-from zotero_docai_pipeline.orchestration.pipeline import Pipeline
+from zotero_docai_pipeline.orchestration.pipeline import (
+    Pipeline,
+    _plan_outcome_tags,
+)
 from zotero_docai_pipeline.orchestration.processor import ItemProcessor
 from zotero_docai_pipeline.utils.export import (
     build_export_records,
@@ -83,8 +86,6 @@ def dry_run_command(
         logger.info("Preview of items to be processed:")
         unicode = _supports_unicode()
         sep_char = "\u2500" if unicode else "-"
-        would_apply = cfg.tagging.apply_on_success.values
-
         for idx, item in enumerate(items, start=1):
             pdf_count = count_pdf_attachments(item.attachments)
             header = f" Item {idx}/{len(items)} "
@@ -98,8 +99,21 @@ def dry_run_command(
             logger.info(f"  PDFs        : {pdf_count}")
             current_tags = ", ".join(item.tags) if item.tags else "[none]"
             logger.info(f"  Current tags: {current_tags}")
+            success_plan = _plan_outcome_tags(cfg.tagging, cfg.zotero, "success")
+            failure_plan = _plan_outcome_tags(cfg.tagging, cfg.zotero, "failure")
+            logger.info("  On success:")
             logger.info(
-                f"  Would apply : {', '.join(would_apply) if would_apply else '[none]'}"
+                f"    Would add   : {', '.join(success_plan.tags_to_add) if success_plan.tags_to_add else '[none]'}"
+            )
+            logger.info(
+                f"    Would remove: {', '.join(success_plan.tags_to_remove) if success_plan.tags_to_remove else '[none]'}"
+            )
+            logger.info("  On failure:")
+            logger.info(
+                f"    Would add   : {', '.join(failure_plan.tags_to_add) if failure_plan.tags_to_add else '[none]'}"
+            )
+            logger.info(
+                f"    Would remove: {', '.join(failure_plan.tags_to_remove) if failure_plan.tags_to_remove else '[none]'}"
             )
 
         log_discovery_stats(logger, discovery_stats, total_pdfs)

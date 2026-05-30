@@ -40,6 +40,7 @@ Example usage:
 import json
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
 import re
 import tempfile
@@ -100,6 +101,83 @@ from zotero_docai_pipeline.utils.logging import (
 from zotero_docai_pipeline.utils.progress import ProgressBar
 from zotero_docai_pipeline.utils.redaction import redact_url
 from zotero_docai_pipeline.utils.retry import retry_with_backoff
+
+
+@dataclass
+class OutcomeTagPlan:
+    """Resolved add/remove tag lists for a processing outcome."""
+
+    outcome: str
+    tags_to_add: list[str]
+    tags_to_remove: list[str]
+
+
+@dataclass
+class ProcessingTagResult:
+    """Counts from applying outcome tags to a single item."""
+
+    outcome: str
+    add_attempted: int
+    add_succeeded: int
+    add_failed: int
+    remove_attempted: int
+    remove_succeeded: int
+    remove_failed: int
+
+    @property
+    def has_failures(self) -> bool:
+        return self.add_failed > 0 or self.remove_failed > 0
+
+    @property
+    def had_planned_work(self) -> bool:
+        return self.add_attempted > 0 or self.remove_attempted > 0
+
+    @property
+    def all_operations_succeeded(self) -> bool:
+        """True when every planned tag operation succeeded."""
+        if not self.had_planned_work:
+            return False
+        return not self.has_failures
+
+    @property
+    def had_partial_success(self) -> bool:
+        """True when some operations succeeded and others failed."""
+        if not self.had_planned_work or not self.has_failures:
+            return False
+        return self.add_succeeded > 0 or self.remove_succeeded > 0
+
+    @property
+    def all_operations_failed(self) -> bool:
+        """True when operations were planned but none succeeded."""
+        if not self.had_planned_work:
+            return False
+        return self.add_succeeded == 0 and self.remove_succeeded == 0
+
+
+def _plan_outcome_tags(
+    tagging_config: TaggingConfig,
+    zotero_config: ZoteroConfig,
+    outcome: str,
+) -> OutcomeTagPlan:
+    """Resolve tags to add and remove for a success or failure outcome."""
+    if outcome == "success":
+        tags_to_add = tagging_config.apply_on_success.values
+        tags_to_remove = tagging_config.remove_on_success.values
+    elif outcome == "failure":
+        tags_to_add = (
+            tagging_config.apply_on_error.values
+            if zotero_config.error_tagging_enabled
+            else []
+        )
+        tags_to_remove = tagging_config.remove_on_error.values
+    else:
+        raise ValueError(f"Invalid outcome: {outcome!r}")
+
+    return OutcomeTagPlan(
+        outcome=outcome,
+        tags_to_add=tags_to_add,
+        tags_to_remove=tags_to_remove,
+    )
 
 
 class Pipeline:
@@ -266,47 +344,117 @@ class Pipeline:
                 f"Failed to create or write to upload folder '{upload_folder}': {e}"
             ) from e
 
-    def _apply_processing_tags(self, item_key: str, success: bool) -> bool:
+    def _apply_processing_tags(
+        self, item_key: str, success: bool
+    ) -> ProcessingTagResult:
         """Apply post-processing tags to an item based on success/failure.
 
-        On success, applies all tags from ``tagging_config.apply_on_success``.
-        On failure, applies all tags from ``tagging_config.apply_on_error``
-        only when ``zotero_config.error_tagging_enabled`` is True.
-
-        Each tag application is independently error-isolated so that a single
-        API failure does not prevent remaining tags from being applied.
+        Resolves add/remove tag lists via ``_plan_outcome_tags()``, applies
+        additions first, then removals. Each operation is independently
+        error-isolated so a single API failure does not prevent remaining
+        tags from being updated.
 
         Args:
             item_key: Zotero item key to tag.
             success: Whether the item was processed successfully.
 
         Returns:
-            True when at least one intended tag was applied and every tag
-            addition succeeded, otherwise False.
+            ProcessingTagResult with per-operation counts.
         """
-        if success:
-            tags = self.tagging_config.apply_on_success.values
-        else:
-            if not self.zotero_config.error_tagging_enabled:
-                return False
-            tags = self.tagging_config.apply_on_error.values
+        outcome = "success" if success else "failure"
+        plan = _plan_outcome_tags(
+            self.tagging_config, self.zotero_config, outcome
+        )
+        result = ProcessingTagResult(
+            outcome=outcome,
+            add_attempted=0,
+            add_succeeded=0,
+            add_failed=0,
+            remove_attempted=0,
+            remove_succeeded=0,
+            remove_failed=0,
+        )
 
-        if not tags:
-            return False
-
-        all_succeeded = True
-
-        for tag in tags:
+        for tag in plan.tags_to_add:
+            result.add_attempted += 1
             try:
                 self.zotero_client.add_tag(item_key, tag)
+                result.add_succeeded += 1
                 self.logger.debug(f"Applied tag '{tag}' to item {item_key}")
             except ZoteroClientError as e:
-                all_succeeded = False
+                result.add_failed += 1
                 self.logger.warning(
                     f"Failed to apply tag '{tag}' to item {item_key}: {e}"
                 )
 
-        return all_succeeded
+        for tag in plan.tags_to_remove:
+            result.remove_attempted += 1
+            try:
+                self.zotero_client.remove_tag(item_key, tag)
+                result.remove_succeeded += 1
+                self.logger.debug(f"Removed tag '{tag}' from item {item_key}")
+            except ZoteroClientError as e:
+                result.remove_failed += 1
+                self.logger.warning(
+                    f"Failed to remove tag '{tag}' from item {item_key}: {e}"
+                )
+
+        return result
+
+    @staticmethod
+    def _observe_processing_tag_result(
+        tag_result: ProcessingTagResult,
+        *,
+        succeeded: int,
+        skipped: int,
+        partial_failed: int,
+        fully_failed: int,
+    ) -> tuple[int, int, int, int]:
+        """Update outcome-tag summary counters from a ProcessingTagResult."""
+        if tag_result.all_operations_succeeded:
+            succeeded += 1
+        elif not tag_result.had_planned_work:
+            skipped += 1
+        elif tag_result.had_partial_success:
+            partial_failed += 1
+        else:
+            fully_failed += 1
+        return succeeded, skipped, partial_failed, fully_failed
+
+    @staticmethod
+    def _format_processing_tag_summary(
+        label: str,
+        *,
+        succeeded: int,
+        skipped: int,
+        partial_failed: int,
+        fully_failed: int,
+        add_succeeded: int = 0,
+        add_failed: int = 0,
+        remove_succeeded: int = 0,
+        remove_failed: int = 0,
+    ) -> str:
+        """Build a log line describing outcome-tag post-processing results."""
+        parts: list[str] = []
+        if succeeded:
+            parts.append(f"{succeeded} items {label}")
+        if skipped:
+            parts.append(
+                f"{skipped} items skipped for {label} (no tag operations planned)"
+            )
+        if partial_failed:
+            parts.append(
+                f"{partial_failed} items with partial {label} failures"
+            )
+        if fully_failed:
+            parts.append(f"{fully_failed} items with failed {label}")
+        if not parts:
+            return f"No {label} post-processing operations ran"
+        detail = (
+            f" (add: {add_succeeded} ok/{add_failed} failed, "
+            f"remove: {remove_succeeded} ok/{remove_failed} failed)"
+        )
+        return "; ".join(parts) + detail
 
     @staticmethod
     def _sanitize_filename(filename: str) -> str:
@@ -688,22 +836,91 @@ class Pipeline:
                 failed_item_keys.add(item.key)
 
         # Tag items
-        error_tagged_count = 0
-        processed_tagged_count = 0
+        error_succeeded = 0
+        error_skipped = 0
+        error_partial_failed = 0
+        error_fully_failed = 0
+        error_add_succeeded = 0
+        error_add_failed = 0
+        error_remove_succeeded = 0
+        error_remove_failed = 0
+        processed_succeeded = 0
+        processed_skipped = 0
+        processed_partial_failed = 0
+        processed_fully_failed = 0
+        processed_add_succeeded = 0
+        processed_add_failed = 0
+        processed_remove_succeeded = 0
+        processed_remove_failed = 0
+
+        def _record_error_outcome(tag_result: ProcessingTagResult) -> None:
+            nonlocal error_succeeded, error_skipped, error_partial_failed
+            nonlocal error_fully_failed, error_add_succeeded, error_add_failed
+            nonlocal error_remove_succeeded, error_remove_failed
+            (
+                error_succeeded,
+                error_skipped,
+                error_partial_failed,
+                error_fully_failed,
+            ) = self._observe_processing_tag_result(
+                tag_result,
+                succeeded=error_succeeded,
+                skipped=error_skipped,
+                partial_failed=error_partial_failed,
+                fully_failed=error_fully_failed,
+            )
+            error_add_succeeded += tag_result.add_succeeded
+            error_add_failed += tag_result.add_failed
+            error_remove_succeeded += tag_result.remove_succeeded
+            error_remove_failed += tag_result.remove_failed
+
+        def _record_processed_outcome(tag_result: ProcessingTagResult) -> None:
+            nonlocal processed_succeeded, processed_skipped
+            nonlocal processed_partial_failed, processed_fully_failed
+            nonlocal processed_add_succeeded, processed_add_failed
+            nonlocal processed_remove_succeeded, processed_remove_failed
+            (
+                processed_succeeded,
+                processed_skipped,
+                processed_partial_failed,
+                processed_fully_failed,
+            ) = self._observe_processing_tag_result(
+                tag_result,
+                succeeded=processed_succeeded,
+                skipped=processed_skipped,
+                partial_failed=processed_partial_failed,
+                fully_failed=processed_fully_failed,
+            )
+            processed_add_succeeded += tag_result.add_succeeded
+            processed_add_failed += tag_result.add_failed
+            processed_remove_succeeded += tag_result.remove_succeeded
+            processed_remove_failed += tag_result.remove_failed
 
         for item in items:
             try:
                 if item.key in failed_item_keys:
-                    if self._apply_processing_tags(item.key, success=False):
-                        error_tagged_count += 1
+                    tag_result = self._apply_processing_tags(
+                        item.key, success=False
+                    )
+                    if tag_result.has_failures:
+                        self.logger.warning(
+                            f"Some tag operations failed for item {item.key}"
+                        )
+                    _record_error_outcome(tag_result)
                 elif item.key in success_item_keys:
                     pdf_attachments = [
                         att for att in item.attachments
                         if self._is_pdf_attachment(att)
                     ]
                     if not pdf_attachments:
-                        if self._apply_processing_tags(item.key, success=False):
-                            error_tagged_count += 1
+                        tag_result = self._apply_processing_tags(
+                            item.key, success=False
+                        )
+                        if tag_result.has_failures:
+                            self.logger.warning(
+                                f"Some tag operations failed for item {item.key}"
+                            )
+                        _record_error_outcome(tag_result)
                         continue
                     all_attachments_succeeded = True
                     for attachment in pdf_attachments:
@@ -712,30 +929,59 @@ class Pipeline:
                             all_attachments_succeeded = False
                             break
 
-                    if (
-                        all_attachments_succeeded
-                        and apply_processed_tag
-                        and self._apply_processing_tags(item.key, success=True)
-                    ):
-                        processed_tagged_count += 1
+                    if all_attachments_succeeded and apply_processed_tag:
+                        tag_result = self._apply_processing_tags(
+                            item.key, success=True
+                        )
+                        if tag_result.has_failures:
+                            self.logger.warning(
+                                f"Some tag operations failed for item {item.key}"
+                            )
+                        _record_processed_outcome(tag_result)
                 else:
                     if apply_processed_tag:
                         pdf_attachments = [
                             att for att in item.attachments
                             if self._is_pdf_attachment(att)
                         ]
-                        if (
-                            len(pdf_attachments) == 0
-                            and self._apply_processing_tags(item.key, success=False)
-                        ):
-                            error_tagged_count += 1
+                        if len(pdf_attachments) == 0:
+                            tag_result = self._apply_processing_tags(
+                                item.key, success=False
+                            )
+                            if tag_result.has_failures:
+                                self.logger.warning(
+                                    f"Some tag operations failed for item {item.key}"
+                                )
+                            _record_error_outcome(tag_result)
             except ZoteroClientError as e:
                 self.logger.warning(f"Failed to tag item {item.key}: {e}")
 
         # Log summary
         self.logger.info(
-            f"Tagged {error_tagged_count} items with error tag, "
-            f"{processed_tagged_count} items with processed tag"
+            self._format_processing_tag_summary(
+                "tagged with error outcome tags",
+                succeeded=error_succeeded,
+                skipped=error_skipped,
+                partial_failed=error_partial_failed,
+                fully_failed=error_fully_failed,
+                add_succeeded=error_add_succeeded,
+                add_failed=error_add_failed,
+                remove_succeeded=error_remove_succeeded,
+                remove_failed=error_remove_failed,
+            )
+        )
+        self.logger.info(
+            self._format_processing_tag_summary(
+                "tagged with processed outcome tags",
+                succeeded=processed_succeeded,
+                skipped=processed_skipped,
+                partial_failed=processed_partial_failed,
+                fully_failed=processed_fully_failed,
+                add_succeeded=processed_add_succeeded,
+                add_failed=processed_add_failed,
+                remove_succeeded=processed_remove_succeeded,
+                remove_failed=processed_remove_failed,
+            )
         )
 
     def _apply_tag_adding(
@@ -862,10 +1108,32 @@ class Pipeline:
             item_succeeded = item_matched and not matched_result.tags_failed
 
             if item_matched and not item_succeeded:
-                self._apply_processing_tags(item.key, success=False)
+                tag_result = self._apply_processing_tags(item.key, success=False)
+                if tag_result.has_failures:
+                    self.logger.warning(
+                        f"Some tag operations failed for item {item.key}"
+                    )
             else:
-                if self._apply_processing_tags(item.key, success=True):
+                tag_result = self._apply_processing_tags(item.key, success=True)
+                if tag_result.has_failures:
+                    self.logger.warning(
+                        f"Some tag operations failed for item {item.key}"
+                    )
+                if tag_result.all_operations_succeeded:
                     processed_count += 1
+                elif not tag_result.had_planned_work:
+                    self.logger.debug(
+                        f"Skipped processed outcome tags for item {item.key} "
+                        "(no tag operations planned)"
+                    )
+                elif tag_result.had_partial_success:
+                    self.logger.warning(
+                        f"Partial processed outcome tag failure for item {item.key}"
+                    )
+                else:
+                    self.logger.warning(
+                        f"Processed outcome tagging failed for item {item.key}"
+                    )
 
         return processed_count
 
@@ -2350,12 +2618,46 @@ class Pipeline:
                     )
 
                     if item_matched and not item_succeeded:
-                        self._apply_processing_tags(item.key, success=False)
+                        tag_result = self._apply_processing_tags(
+                            item.key, success=False
+                        )
+                        if tag_result.has_failures:
+                            self.logger.warning(
+                                f"Some tag operations failed for item {item.key}"
+                            )
                     else:
-                        if self._apply_processing_tags(item.key, success=True):
+                        tag_result = self._apply_processing_tags(
+                            item.key, success=True
+                        )
+                        if tag_result.has_failures:
+                            self.logger.warning(
+                                f"Some tag operations failed for item {item.key}"
+                            )
+                        if tag_result.all_operations_succeeded:
                             tag_adding_processed += 1
+                        elif not tag_result.had_planned_work:
+                            self.logger.debug(
+                                f"Skipped processed outcome tags for item "
+                                f"{item.key} (no tag operations planned)"
+                            )
+                        elif tag_result.had_partial_success:
+                            self.logger.warning(
+                                f"Partial processed outcome tag failure for item "
+                                f"{item.key}"
+                            )
+                        else:
+                            self.logger.warning(
+                                f"Processed outcome tagging failed for item "
+                                f"{item.key}"
+                            )
                 else:
-                    self._apply_processing_tags(item.key, success=True)
+                    tag_result = self._apply_processing_tags(
+                        item.key, success=True
+                    )
+                    if tag_result.has_failures:
+                        self.logger.warning(
+                            f"Some tag operations failed for item {item.key}"
+                        )
 
             # Handle failed results
             else:
@@ -2366,7 +2668,13 @@ class Pipeline:
                         f'("{item.title}"): {error_msg}'
                     )
 
-                self._apply_processing_tags(item.key, success=False)
+                tag_result = self._apply_processing_tags(
+                    item.key, success=False
+                )
+                if tag_result.has_failures:
+                    self.logger.warning(
+                        f"Some tag operations failed for item {item.key}"
+                    )
 
             # Optional disk storage
             if self.processing_config.save_to_disk:
