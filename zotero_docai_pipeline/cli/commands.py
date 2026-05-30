@@ -100,7 +100,7 @@ def dry_run_command(
             logger.info(f"  PDFs        : {pdf_count}")
             current_tags = ", ".join(item.tags) if item.tags else "[none]"
             logger.info(f"  Current tags: {current_tags}")
-            if not cfg.selection_tagging.enabled:
+            if cfg.ocr.enabled or cfg.download.enabled:
                 success_plan = _plan_outcome_tags(cfg.tagging, cfg.zotero, "success")
                 failure_plan = _plan_outcome_tags(cfg.tagging, cfg.zotero, "failure")
                 success_add = (

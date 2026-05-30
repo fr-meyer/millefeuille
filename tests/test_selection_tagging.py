@@ -232,6 +232,50 @@ class TestDryRunPreview(unittest.TestCase):
         self.assertLess(st_idx, export_idx)
 
 
+class TestCombinedDryRunPreview(unittest.TestCase):
+    """Tests that combined dry-runs show both selection-tagging and outcome-branch previews."""
+
+    @patch("zotero_docai_pipeline.cli.commands.build_export_records")
+    def test_combined_dry_run_shows_both_preview_sections(self, mock_build_export):
+        mock_build_export.return_value = []
+        cfg = _make_app_config(
+            processing=ProcessingConfig(dry_run=True),
+            selection_tagging=SelectionTaggingConfig(
+                enabled=True,
+                add=TagTargetConfig(values=["add-me"]),
+                remove=TagTargetConfig(values=["remove-me"]),
+            ),
+            download=DownloadConfig(enabled=True),
+            ocr=MistralOCRConfig(enabled=False),
+            tag_adding=TagAddingConfig(enabled=False),
+        )
+        item = _make_item("ITEM1", "Test Paper", tags=["existing"])
+        discovery_stats = _make_discovery_stats()
+        mock_zotero_client = MagicMock()
+        mock_zotero_client.get_items_by_selection.return_value = (
+            [item],
+            discovery_stats,
+        )
+        logger = MagicMock()
+
+        dry_run_command(cfg, logger, mock_zotero_client)
+
+        mock_zotero_client.add_tag.assert_not_called()
+        mock_zotero_client.remove_tag.assert_not_called()
+
+        info_messages = [
+            str(c.args[0]) for c in logger.info.call_args_list if c.args
+        ]
+        joined = " ".join(info_messages)
+        # Selection-tagging preview must be present
+        self.assertIn("Selection Tagging Preview", joined)
+        self.assertIn("Would add", joined)
+        self.assertIn("Would remove", joined)
+        # Outcome-branch preview must also be present (download is enabled)
+        self.assertIn("On success", joined)
+        self.assertIn("On failure", joined)
+
+
 class TestItemsWithoutCitationKey(unittest.TestCase):
     """Tests that selection tagging uses item.key when citation_key is absent."""
 

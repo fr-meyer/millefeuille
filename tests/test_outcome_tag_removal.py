@@ -255,6 +255,7 @@ class TestDryRunTwoBranchPreview(unittest.TestCase):
         cfg = AppConfig(
             zotero=ZoteroConfig(error_tagging_enabled=True),
             ocr=MistralOCRConfig(enabled=False),
+            download=DownloadConfig(enabled=True),
             processing=ProcessingConfig(dry_run=True),
             storage=StorageConfig(),
             credentials=AuthQueryConfig(library_id="123", read_key="read-key"),
