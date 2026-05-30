@@ -514,22 +514,29 @@ class DiscoveredAttachmentExportRecord:
     """Zotero attachment key."""
 
     filename: str
-    """Attachment filename as renamed by Zotero using the formula ``{{ firstCreator suffix=" - " }}{{ year suffix=" - " }}{{ title truncate="125" }}``. See https://www.zotero.org/support/file_renaming."""
+    """Attachment filename as renamed by Zotero using the formula
+    ``{{ firstCreator suffix=" - " }}{{ year suffix=" - " }}``
+    ``{{ title truncate="125" }}``.
+    See https://www.zotero.org/support/file_renaming."""
 
     filename_source: str
-    """Provenance of the filename. Always ``"zotero_attachment"`` for records assembled by this package."""
+    """Provenance of the filename. Always ``"zotero_attachment"`` for records
+    assembled by this package."""
 
     citation_key: str | None
     """Citation key when available."""
 
     zotero_uri: str
-    """Canonical Zotero web URL for the parent item (e.g. ``https://www.zotero.org/users/<id>/items/<key>``)."""
+    """Canonical Zotero web URL for the parent item (e.g.
+    ``https://www.zotero.org/users/<id>/items/<key>``)."""
 
     zotero_uri_web: str
-    """Explicit alias for the canonical web URL form; always identical to ``zotero_uri``."""
+    """Explicit alias for the canonical web URL form; always identical to
+    ``zotero_uri``."""
 
     zotero_uri_select: str
-    """Zotero deep-link / local application URI for opening the item in the Zotero desktop client (e.g. ``zotero://select/library/items/<key>``)."""
+    """Zotero deep-link / local application URI for opening the item in the
+    Zotero desktop client (e.g. ``zotero://select/library/items/<key>``)."""
 
     zotero_file_url: str
     """Zotero file URL for the attachment."""

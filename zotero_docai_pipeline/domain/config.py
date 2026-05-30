@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Configuration dataclasses for the Zotero Document AI Pipeline.
 
@@ -7,6 +5,8 @@ This module defines type-safe configuration schemas using Python dataclasses.
 These schemas are registered with Hydra to enable validation and IDE autocomplete
 support for configuration values.
 """
+
+from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -457,8 +457,10 @@ class TagAddingConfig:
     to apply. Citation key matching is exact and case-sensitive
     (whitespace-trimmed). Keys are resolved from Zotero items using the
     following precedence:
-    1. Native Zotero 8+ field: ``item["data"]["citationKey"]`` (preferred when present and non-empty).
-    2. Legacy Better BibTeX fallback: a ``Citation Key: <key>`` line in ``item["data"]["extra"]``.
+    1. Native Zotero 8+ field: ``item["data"]["citationKey"]`` (preferred when
+       present and non-empty).
+    2. Legacy Better BibTeX fallback: a ``Citation Key: <key>`` line in
+       ``item["data"]["extra"]``.
     """
 
     replace_all_existing_tags: bool = False
@@ -586,8 +588,9 @@ class AttachmentUrlExportConfig:
             self.manifest_path is None or self.manifest_path.strip() == ""
         ):
             raise ConfigError(
-                "export.attachment_urls.manifest_path must be set when write_manifest=true. "
-                "Override with: export.attachment_urls.manifest_path=./path/to/file.json"
+                "export.attachment_urls.manifest_path must be set when "
+                "write_manifest=true. Override with: "
+                "export.attachment_urls.manifest_path=./path/to/file.json"
             )
         if self.format not in {"json"}:
             raise ConfigError(

@@ -211,7 +211,9 @@ class ZoteroClient:
         """
         try:
             logger.debug(f"Fetching items for tag: {tag}")
-            raw_items = self._zotero_read.items(tag=tag)
+            raw_items = self._zotero_read.everything(
+                self._zotero_read.items(tag=tag)
+            )
 
             result: dict[str, dict[str, Any]] = {}
             for item in raw_items:
@@ -224,7 +226,12 @@ class ZoteroClient:
                 if item_key:
                     result[item_key] = item_data
 
-            logger.debug(f"Fetched {len(result)} items for tag '{tag}'")
+            if len(result) > 100:
+                logger.info(
+                    f"Fetched {len(result)} items for tag '{tag}' (paginated)"
+                )
+            else:
+                logger.debug(f"Fetched {len(result)} items for tag '{tag}'")
             return result
 
         except HTTPError as e:
@@ -338,7 +345,9 @@ class ZoteroClient:
             if len(authors) == 1:
                 author_string = _display_name(authors[0])
             elif len(authors) == 2:
-                author_string = f"{_display_name(authors[0])} and {_display_name(authors[1])}"
+                first = _display_name(authors[0])
+                second = _display_name(authors[1])
+                author_string = f"{first} and {second}"
             elif len(authors) >= 3:
                 names = [_display_name(a) for a in authors]
                 author_string = ", ".join(names[:-1]) + ", and " + names[-1]
@@ -413,106 +422,83 @@ class ZoteroClient:
             ZoteroAPIError: If API communication fails.
             ZoteroAuthError: If authentication fails.
         """
-        try:
-            logger.debug(f"Fetching items with tag: {tag}")
-            items = self._zotero_read.items(tag=tag)
+        items_map = self._fetch_items_for_tag(tag)
+        items = [{"key": k, "data": v} for k, v in items_map.items()]
 
-            # Filter out items with exclude_tag
-            if exclude_tag:
-                filtered_items = []
-                for item in items:
-                    if not isinstance(item, dict):
-                        continue
-                    item_data_raw = item.get("data", {})
-                    if not isinstance(item_data_raw, dict):
-                        continue
-                    item_tags = [
-                        t.get("tag", "") for t in item_data_raw.get("tags", [])
-                    ]
-                    if exclude_tag not in item_tags:
-                        filtered_items.append(item)
-                items = filtered_items
-                logger.debug(
-                    f"Filtered to {len(items)} items after excluding tag: {exclude_tag}"
-                )
-
-            # Enrich items with attachment information
-            result = []
-
+        # Filter out items with exclude_tag
+        if exclude_tag:
+            filtered_items = []
             for item in items:
                 if not isinstance(item, dict):
                     continue
                 item_data_raw = item.get("data", {})
                 if not isinstance(item_data_raw, dict):
                     continue
-                item_data = cast(dict[str, Any], item_data_raw)
-                item_key = item.get("key")
-                item_title = item_data.get("title", "Untitled")
-                item_tags = [t.get("tag", "") for t in item_data.get("tags", [])]
+                item_tags = [
+                    t.get("tag", "") for t in item_data_raw.get("tags", [])
+                ]
+                if exclude_tag not in item_tags:
+                    filtered_items.append(item)
+            items = filtered_items
+            logger.debug(
+                f"Filtered to {len(items)} items after excluding tag: {exclude_tag}"
+            )
 
-                # Get child items (attachments)
-                try:
-                    children = self._zotero_read.children(item_key)
-                    pdf_attachments = []
-                    for child in children:
-                        if not isinstance(child, dict):
-                            continue
-                        child_data_raw = child.get("data", {})
-                        if not isinstance(child_data_raw, dict):
-                            continue
-                        child_data = cast(dict[str, Any], child_data_raw)
-                        if (
-                            child_data.get("itemType") == "attachment"
-                            and child_data.get("contentType") == "application/pdf"
-                        ):
-                            pdf_attachments.append(
-                                {
-                                    "key": child.get("key"),
-                                    "filename": child_data.get(
-                                        "filename", "unknown.pdf"
-                                    ),
-                                }
-                            )
-                except Exception as e:
-                    logger.warning(f"Failed to fetch children for item {item_key}: {e}")
-                    pdf_attachments = []
+        # Enrich items with attachment information
+        result = []
 
-                citation_key = ZoteroClient._extract_citation_key(item_data)
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            item_data_raw = item.get("data", {})
+            if not isinstance(item_data_raw, dict):
+                continue
+            item_data = cast(dict[str, Any], item_data_raw)
+            item_key = item.get("key")
+            item_title = item_data.get("title", "Untitled")
+            item_tags = [t.get("tag", "") for t in item_data.get("tags", [])]
 
-                result.append(
-                    {
-                        "key": item_key,
-                        "title": item_title,
-                        "tags": item_tags,
-                        "attachments": pdf_attachments,
-                        "citation_key": citation_key,
-                    }
-                )
+            # Get child items (attachments)
+            try:
+                children = self._zotero_read.children(item_key)
+                pdf_attachments = []
+                for child in children:
+                    if not isinstance(child, dict):
+                        continue
+                    child_data_raw = child.get("data", {})
+                    if not isinstance(child_data_raw, dict):
+                        continue
+                    child_data = cast(dict[str, Any], child_data_raw)
+                    if (
+                        child_data.get("itemType") == "attachment"
+                        and child_data.get("contentType") == "application/pdf"
+                    ):
+                        pdf_attachments.append(
+                            {
+                                "key": child.get("key"),
+                                "filename": child_data.get(
+                                    "filename", "unknown.pdf"
+                                ),
+                            }
+                        )
+            except Exception as e:
+                logger.warning(f"Failed to fetch children for item {item_key}: {e}")
+                pdf_attachments = []
 
-            logger.info(f"Retrieved {len(result)} items with tag '{tag}'")
-            return result
+            citation_key = ZoteroClient._extract_citation_key(item_data)
 
-        except HTTPError as e:
-            if e.code in (401, 403):
-                error_msg = (
-                    f"Authentication failed while fetching items with tag '{tag}'"
-                )
-                logger.error(f"{error_msg}: {e}")
-                raise ZoteroAuthError(error_msg, e) from e
-            else:
-                error_msg = (
-                    f"API error while fetching items with tag '{tag}': HTTP {e.code}"
-                )
-                logger.error(f"{error_msg}: {e}")
-                raise ZoteroAPIError(error_msg, e) from e
-        except URLError as e:
-            error_msg = f"Network error while fetching items with tag '{tag}'"
-            logger.error(f"{error_msg}: {e}")
-            raise ZoteroAPIError(error_msg, e) from e
-        except Exception as e:
-            error_msg = f"Unexpected error while fetching items with tag '{tag}'"
-            logger.error(f"{error_msg}: {e}", exc_info=True)
-            raise ZoteroAPIError(error_msg, e) from e
+            result.append(
+                {
+                    "key": item_key,
+                    "title": item_title,
+                    "tags": item_tags,
+                    "attachments": pdf_attachments,
+                    "citation_key": citation_key,
+                }
+            )
+
+        logger.info(f"Retrieved {len(result)} items with tag '{tag}'")
+        return result
 
     def get_items_by_selection(
         self,
@@ -596,7 +582,7 @@ class ZoteroClient:
                         kept_by_conflict_include_wins += 1
 
         final_keys = [
-            item_key for item_key in candidate_map.keys()
+            item_key for item_key in candidate_map
             if item_key not in excluded_keys
         ]
 
@@ -607,7 +593,8 @@ class ZoteroClient:
         )
         if kept_by_conflict_include_wins > 0:
             logger.info(
-                "Kept %d conflicting item(s) because conflict_resolution='include_wins'",
+                "Kept %d conflicting item(s) because "
+                "conflict_resolution='include_wins'",
                 kept_by_conflict_include_wins,
             )
 

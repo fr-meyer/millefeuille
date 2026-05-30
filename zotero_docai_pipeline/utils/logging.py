@@ -104,7 +104,8 @@ class _RedactingDelegateFormatter(logging.Formatter):
 
 
 def _iter_effective_handlers() -> list[logging.Handler]:
-    """Return distinct handlers: root and any other loggers' handlers (e.g. no-propagate)."""
+    """Return distinct handlers: root and any other loggers' handlers
+    (e.g. no-propagate)."""
     root = logging.getLogger()
     seen: set[int] = set()
     out: list[logging.Handler] = []
@@ -129,7 +130,8 @@ def _iter_effective_handlers() -> list[logging.Handler]:
 
 
 def _ensure_redaction_on_handlers() -> None:
-    """Attach redaction filter and redacting formatter to each effective handler once."""
+    """Attach redaction filter and redacting formatter to each effective handler
+    once."""
     for handler in _iter_effective_handlers():
         if not any(f is _REDACTION_FILTER for f in handler.filters):
             handler.addFilter(_REDACTION_FILTER)
@@ -734,7 +736,10 @@ def log_tag_adding_start(
         item_count: Number of candidate items to process
         tag_count: Number of tags to apply
     """
-    message = f"Tag Adding: processing {item_count} candidate items with {tag_count} tags"
+    message = (
+        f"Tag Adding: processing {item_count} candidate items with "
+        f"{tag_count} tags"
+    )
     formatted_message = _format_with_emoji(message, "🏷️", "[TAG ADDING]")
     logger.info(formatted_message)
 
