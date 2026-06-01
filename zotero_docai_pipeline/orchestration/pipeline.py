@@ -48,7 +48,7 @@ import time
 from typing import Any
 
 try:
-    from hydra.utils import get_original_cwd
+    from hydra.utils import get_original_cwd  # type: ignore[import-untyped]
 except ImportError:
     # Hydra not available (e.g., in tests), fall back to current directory
     def get_original_cwd() -> str:
@@ -67,6 +67,7 @@ from zotero_docai_pipeline.domain.config import (
     ExportConfig,
     OCRProviderConfig,
     ProcessingConfig,
+    SelectionTaggingConfig,
     StorageConfig,
     TagAddingConfig,
     TaggingConfig,
@@ -94,6 +95,7 @@ from zotero_docai_pipeline.utils.logging import (
     log_completion,
     log_disk_save,
     log_error,
+    log_selection_tagging_summary,
     log_startup,
     log_tag_adding_result,
     log_tag_adding_start,
@@ -235,6 +237,7 @@ class Pipeline:
         download_config: DownloadConfig,
         tag_adding_config: TagAddingConfig,
         tagging_config: TaggingConfig,
+        selection_tagging_config: SelectionTaggingConfig,
         tree_processor: TreeStructureProcessor | None = None,
         export_config: ExportConfig | None = None,
     ) -> None:
@@ -255,6 +258,8 @@ class Pipeline:
             tag_adding_config: Configuration for tag adding feature.
             tagging_config: Configuration for tag-based item selection and
                 post-processing tag application.
+            selection_tagging_config: Configuration for bulk add/remove tags on
+                selected items before downstream processing.
             export_config: Configuration for optional export features (e.g.
                 attachment URL manifest). Defaults to a fresh ``ExportConfig()``
                 when ``None``.
@@ -270,6 +275,7 @@ class Pipeline:
         self.download_config = download_config
         self.tag_adding_config = tag_adding_config
         self.tagging_config = tagging_config
+        self.selection_tagging_config = selection_tagging_config
         self.export_config = (
             export_config if export_config is not None else ExportConfig()
         )
@@ -400,6 +406,107 @@ class Pipeline:
                 )
 
         return result
+
+    def _apply_selection_tagging(
+        self, items: list[DiscoveredItem]
+    ) -> tuple[ProcessingTagResult, int, int]:
+        """Apply configured add/remove tags to every selected item.
+
+        Each tag operation is independently error-isolated. Per-item success
+        requires all planned operations for that item to succeed.
+
+        Returns:
+            Tuple of aggregate ``ProcessingTagResult``, item-level success count,
+            and item-level failure count.
+        """
+        item_succeeded = 0
+        item_failed = 0
+        agg = ProcessingTagResult(
+            outcome="selection_tagging",
+            add_attempted=0,
+            add_succeeded=0,
+            add_failed=0,
+            remove_attempted=0,
+            remove_succeeded=0,
+            remove_failed=0,
+        )
+
+        for item in items:
+            item_result = ProcessingTagResult(
+                outcome="selection_tagging",
+                add_attempted=0,
+                add_succeeded=0,
+                add_failed=0,
+                remove_attempted=0,
+                remove_succeeded=0,
+                remove_failed=0,
+            )
+
+            for tag in self.selection_tagging_config.add.values:
+                item_result.add_attempted += 1
+                agg.add_attempted += 1
+                try:
+                    self.zotero_client.add_tag(item.key, tag)
+                    item_result.add_succeeded += 1
+                    agg.add_succeeded += 1
+                except ZoteroClientError as e:
+                    item_result.add_failed += 1
+                    agg.add_failed += 1
+                    self.logger.warning(
+                        f"Failed to add tag '{tag}' to item "
+                        f'"{item.title}": {e}'
+                    )
+
+            for tag in self.selection_tagging_config.remove.values:
+                item_result.remove_attempted += 1
+                agg.remove_attempted += 1
+                try:
+                    self.zotero_client.remove_tag(item.key, tag)
+                    item_result.remove_succeeded += 1
+                    agg.remove_succeeded += 1
+                except ZoteroClientError as e:
+                    item_result.remove_failed += 1
+                    agg.remove_failed += 1
+                    self.logger.warning(
+                        f"Failed to remove tag '{tag}' from item "
+                        f'"{item.title}": {e}'
+                    )
+
+            if item_result.has_failures:
+                item_failed += 1
+            else:
+                item_succeeded += 1
+
+        return agg, item_succeeded, item_failed
+
+    @staticmethod
+    def _build_selection_tagging_summary_fields(
+        *,
+        selected: int,
+        item_succeeded: int,
+        item_failed: int,
+        agg: ProcessingTagResult | None,
+    ) -> dict[str, int]:
+        """Build the seven selection-tagging keys for pipeline summary dicts."""
+        if agg is None:
+            return {
+                "selection_tagging_selected": 0,
+                "selection_tagging_item_succeeded": 0,
+                "selection_tagging_item_failed": 0,
+                "selection_tagging_add_succeeded": 0,
+                "selection_tagging_add_failed": 0,
+                "selection_tagging_remove_succeeded": 0,
+                "selection_tagging_remove_failed": 0,
+            }
+        return {
+            "selection_tagging_selected": selected,
+            "selection_tagging_item_succeeded": item_succeeded,
+            "selection_tagging_item_failed": item_failed,
+            "selection_tagging_add_succeeded": agg.add_succeeded,
+            "selection_tagging_add_failed": agg.add_failed,
+            "selection_tagging_remove_succeeded": agg.remove_succeeded,
+            "selection_tagging_remove_failed": agg.remove_failed,
+        }
 
     @staticmethod
     def _observe_processing_tag_result(
@@ -2081,6 +2188,17 @@ class Pipeline:
         else:
             self.logger.info("Tag Adding: DISABLED")
 
+        # Log selection tagging status
+        if self.selection_tagging_config.enabled:
+            add_count = len(self.selection_tagging_config.add.values)
+            remove_count = len(self.selection_tagging_config.remove.values)
+            self.logger.info(
+                f"Selection Tagging: ENABLED "
+                f"({add_count} tags to add, {remove_count} tags to remove)"
+            )
+        else:
+            self.logger.info("Selection Tagging: DISABLED")
+
         # Validate tree extraction configuration for Mistral OCR (OCR path only)
         if (
             self.tree_structure_config.enabled
@@ -2108,8 +2226,27 @@ class Pipeline:
 
         # Step 1: Discover items
         items, discovery_stats = self._discover_items()
+        items = list(items)
 
-        if self.export_config.attachment_urls.enabled:
+        st_agg: ProcessingTagResult | None = None
+        st_item_succeeded = 0
+        st_item_failed = 0
+        selection_tagging_summary_displayed = False
+
+        def _emit_selection_tagging_summary_before_export() -> None:
+            nonlocal selection_tagging_summary_displayed
+            if (
+                self.selection_tagging_config.enabled
+                and self.export_config.attachment_urls.enabled
+            ):
+                log_selection_tagging_summary(
+                    self.logger, _selection_tagging_fields()
+                )
+                selection_tagging_summary_displayed = True
+
+        def _export_attachment_urls() -> None:
+            if not self.export_config.attachment_urls.enabled:
+                return
             records = build_export_records(items, self.zotero_client)
             if self.export_config.attachment_urls.auth_query.enabled:
                 for rec in records:
@@ -2125,13 +2262,30 @@ class Pipeline:
             if self.export_config.attachment_urls.log:
                 log_export_records(records, self.logger)
             if self.export_config.attachment_urls.write_manifest:
+                assert self.export_config.attachment_urls.manifest_path is not None, (
+                    "manifest_path must be set when write_manifest is enabled"
+                )
                 write_manifest(
                     records, self.export_config.attachment_urls.manifest_path
                 )
 
+        def _selection_tagging_fields(selected: int | None = None) -> dict[str, int]:
+            return self._build_selection_tagging_summary_fields(
+                selected=selected if selected is not None else len(items),
+                item_succeeded=st_item_succeeded,
+                item_failed=st_item_failed,
+                agg=st_agg,
+            )
+
+        if not self.selection_tagging_config.enabled:
+            _export_attachment_urls()
+
         # Step 2: Handle empty list
         if not items:
             self.logger.info("No items found to process")
+            if self.selection_tagging_config.enabled:
+                _emit_selection_tagging_summary_before_export()
+                _export_attachment_urls()
             return {
                 "total_items": 0,
                 "successful_items": 0,
@@ -2151,7 +2305,53 @@ class Pipeline:
                 "tag_adding_eligible": 0,
                 "tag_adding_no_key": 0,
                 "tag_adding_processed": 0,
+                "selection_tagging_summary_displayed": (
+                    selection_tagging_summary_displayed
+                ),
+                **_selection_tagging_fields(selected=0),
             }
+
+        # Early exit for standalone selection-tagging mode
+        if (
+            self.selection_tagging_config.enabled
+            and not self.ocr_config.enabled
+            and not self.download_config.enabled
+        ):
+            self.logger.info(
+                "Standalone selection-tagging mode: OCR and download disabled"
+            )
+            st_agg, st_item_succeeded, st_item_failed = self._apply_selection_tagging(
+                items
+            )
+            _emit_selection_tagging_summary_before_export()
+            _export_attachment_urls()
+            total_time = time.time() - start_time
+            summary = {
+                "total_items": len(items),
+                "successful_items": st_item_succeeded,
+                "failed_items": st_item_failed,
+                "skipped_items": discovery_stats.excluded_count,
+                "matched_items": discovery_stats.matched_count,
+                "excluded_by_rule": discovery_stats.excluded_by_rule,
+                "total_pdfs_processed": 0,
+                "total_pages_extracted": 0,
+                "total_notes_created": 0,
+                "total_time": total_time,
+                "results": [],
+                "tag_adding_results": [],
+                "tag_adding_failed": 0,
+                "tag_adding_matched": 0,
+                "tag_adding_succeeded": 0,
+                "tag_adding_eligible": 0,
+                "tag_adding_no_key": 0,
+                "tag_adding_processed": 0,
+                "selection_tagging_summary_displayed": (
+                    selection_tagging_summary_displayed
+                ),
+                **_selection_tagging_fields(),
+            }
+            log_completion(self.logger)
+            return summary
 
         # Early exit for standalone tag-adding mode
         if (
@@ -2207,6 +2407,7 @@ class Pipeline:
                 "tag_adding_eligible": len(items),
                 "tag_adding_no_key": no_key_count,
                 "tag_adding_processed": tag_adding_processed,
+                **_selection_tagging_fields(),
             }
 
             # Log completion
@@ -2221,6 +2422,16 @@ class Pipeline:
             self.logger.info("=" * 80)
 
             return summary
+
+        if self.selection_tagging_config.enabled:
+            self.logger.info("=" * 80)
+            self.logger.info("Selection Tagging: applying tags to selected items")
+            self.logger.info("=" * 80)
+            st_agg, st_item_succeeded, st_item_failed = self._apply_selection_tagging(
+                items
+            )
+            _emit_selection_tagging_summary_before_export()
+            _export_attachment_urls()
 
         # ========================================================================
         # Phase 1: Collect & Upload PDFs
@@ -2356,6 +2567,10 @@ class Pipeline:
             summary["tag_adding_eligible"] = tag_adding_eligible
             summary["tag_adding_no_key"] = no_key_count
             summary["tag_adding_processed"] = tag_adding_processed
+            summary.update(_selection_tagging_fields())
+            summary["selection_tagging_summary_displayed"] = (
+                selection_tagging_summary_displayed
+            )
 
             # Log completion
             log_completion(self.logger)
@@ -2766,6 +2981,11 @@ class Pipeline:
             summary["tag_adding_eligible"] = 0
             summary["tag_adding_no_key"] = 0
             summary["tag_adding_processed"] = 0
+
+        summary.update(_selection_tagging_fields())
+        summary["selection_tagging_summary_displayed"] = (
+            selection_tagging_summary_displayed
+        )
 
         # Log completion
         log_completion(self.logger)

@@ -596,6 +596,46 @@ class TagAddingConfig:
 
 
 @dataclass
+class SelectionTaggingConfig:
+    """Configuration for bulk tag add/remove on selected items."""
+
+    enabled: bool = False
+    """Whether the Selection Tagging feature is enabled."""
+
+    add: TagTargetConfig = field(default_factory=TagTargetConfig)
+    """Tags to add to every selected item."""
+
+    remove: TagTargetConfig = field(default_factory=TagTargetConfig)
+    """Tags to remove from every selected item."""
+
+    def __post_init__(self) -> None:
+        """Validate and normalize selection tagging configuration."""
+        _validate_tag_values(
+            self.add.values,
+            "selection_tagging.add.values",
+        )
+        _validate_tag_values(
+            self.remove.values,
+            "selection_tagging.remove.values",
+        )
+        self.add.values = _strip_dedup(
+            self.add.values,
+            "selection_tagging.add.values",
+        )
+        self.remove.values = _strip_dedup(
+            self.remove.values,
+            "selection_tagging.remove.values",
+        )
+        overlap = set(self.add.values) & set(self.remove.values)
+        if overlap:
+            raise ConfigError(
+                "selection_tagging.add and selection_tagging.remove share "
+                f"conflicting tags: {sorted(overlap)!r}. A tag cannot be both "
+                "added and removed."
+            )
+
+
+@dataclass
 class AuthQueryHelperConfig:
     """Feature helper flags for the authenticated URL export / auth query path."""
 
@@ -843,6 +883,11 @@ class AppConfig:
     tagging: TaggingConfig = field(default_factory=TaggingConfig)
     """Tag-based item selection and post-processing workflow configuration."""
 
+    selection_tagging: SelectionTaggingConfig = field(
+        default_factory=SelectionTaggingConfig
+    )
+    """Selection Tagging feature configuration."""
+
 
 def register_configs() -> None:
     """Register structured configs with Hydra.
@@ -875,6 +920,9 @@ def register_configs() -> None:
     cs.store(group="tag_adding", name="base_default", node=TagAddingConfig)
     cs.store(group="export", name="base_default", node=ExportConfig)
     cs.store(group="tagging", name="base_default", node=TaggingConfig)
+    cs.store(
+        group="selection_tagging", name="base_default", node=SelectionTaggingConfig
+    )
 
     # Register top-level config
     cs.store(name="base_config", node=AppConfig)

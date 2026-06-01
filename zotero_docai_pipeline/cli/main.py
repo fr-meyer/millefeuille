@@ -47,6 +47,7 @@ from zotero_docai_pipeline.domain.config import (
     PageIndexOCRConfig,
     ProcessingConfig,
     RetryConfig,
+    SelectionTaggingConfig,
     StorageConfig,
     TagAddingConfig,
     TaggingConfig,
@@ -170,14 +171,9 @@ def validate_flags(cfg: AppConfig) -> None:
        both be True. Dry-run mode is for testing configuration without actual
        operations, while download is an actual operation.
     2. At least one operation enabled: At least one of download.enabled,
-       ocr.enabled, or tag_adding.enabled must be True, except for
-       export-only dry-run (processing.dry_run with export.attachment_urls.enabled).
-
-    Note:
-        When called from ``main()``, the all-disabled check below may be
-        unreachable because ``main()`` returns early via the help/no-op branch.
-        ``validate_flags()`` keeps this guard so other callers still receive the
-        same validation behavior.
+       ocr.enabled, tag_adding.enabled, or selection_tagging.enabled must be
+       True, except for export-only dry-run (processing.dry_run with
+       export.attachment_urls.enabled).
 
     Args:
         cfg: Application configuration object
@@ -189,22 +185,33 @@ def validate_flags(cfg: AppConfig) -> None:
     logger = logging.getLogger(__name__)
     logger.debug("Validating flag configuration")
 
-    if cfg.processing.dry_run and cfg.download.enabled:
+    if (
+        cfg.processing.dry_run
+        and cfg.download.enabled
+        and not cfg.selection_tagging.enabled
+    ):
         raise ConfigError(
             "Invalid configuration: dry_run mode cannot be used with download feature. "
             "Set processing.dry_run=false or download.enabled=false."
+        )
+
+    if cfg.selection_tagging.enabled and cfg.tag_adding.enabled:
+        raise ConfigError(
+            "Invalid configuration: selection_tagging and tag_adding cannot both "
+            "be enabled in the same run. Disable one of them."
         )
 
     if (
         not cfg.download.enabled
         and not cfg.ocr.enabled
         and not cfg.tag_adding.enabled
+        and not cfg.selection_tagging.enabled
         and not (cfg.processing.dry_run and cfg.export.attachment_urls.enabled)
     ):
         raise ConfigError(
             "Invalid configuration: at least one operation must be enabled. "
-            "Set download.enabled=true, ocr.enabled=true, "
-            "or tag_adding.enabled=true."
+            "Set download.enabled=true, ocr.enabled=true, tag_adding.enabled=true, "
+            "or selection_tagging.enabled=true."
         )
 
     read_key = cfg.credentials.read_key
@@ -223,6 +230,15 @@ def validate_flags(cfg: AppConfig) -> None:
         write_reasons.append("OCR (live run creates Zotero notes)")
     if cfg.tag_adding.enabled and not cfg.processing.dry_run:
         write_reasons.append("tag_adding.enabled (live run writes tags to Zotero)")
+    if (
+        cfg.selection_tagging.enabled
+        and (cfg.selection_tagging.add.values or cfg.selection_tagging.remove.values)
+        and not cfg.processing.dry_run
+    ):
+        write_reasons.append(
+            "selection_tagging.enabled with non-empty add/remove "
+            "(live run writes tags to Zotero)"
+        )
     if cfg.tagging.apply_on_success.values and not cfg.processing.dry_run:
         write_reasons.append(
             "tagging.apply_on_success is non-empty "
@@ -267,6 +283,27 @@ def validate_flags(cfg: AppConfig) -> None:
         )
 
     logger.debug("Flag configuration validated successfully")
+
+
+def _enforce_explicit_download_upload_folder(app_cfg: AppConfig) -> None:
+    """Reject the packaged download-folder placeholder for live download runs.
+
+    Dry-run preview does not write files, so placeholder paths are allowed when
+    ``processing.dry_run`` is True (e.g. combined selection-tagging + download
+    preview).
+    """
+    if (
+        app_cfg.download.enabled
+        and not app_cfg.processing.dry_run
+        and app_cfg.download.upload_folder.strip()
+        == PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER
+    ):
+        raise ConfigError(
+            "download.upload_folder must be set to an explicit path when "
+            f"download.enabled=true. The packaged default "
+            f"{PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER!r} is not accepted. "
+            "Override with: download.upload_folder=/your/path"
+        )
 
 
 def initialize_tree_processor(
@@ -504,6 +541,12 @@ def build_app_config(cfg: DictConfig) -> AppConfig:
         include_abstract=cfg.tagging.include_abstract,
     )
 
+    selection_tagging_config = SelectionTaggingConfig(
+        enabled=cfg.selection_tagging.enabled,
+        add=TagTargetConfig(values=list(cfg.selection_tagging.add["values"])),
+        remove=TagTargetConfig(values=list(cfg.selection_tagging.remove["values"])),
+    )
+
     att_urls = OmegaConf.to_container(
         cfg.export.attachment_urls, resolve=True
     )
@@ -571,6 +614,7 @@ def build_app_config(cfg: DictConfig) -> AppConfig:
         download=DownloadConfig(retry=retry_config, **download_kw),
         tag_adding=tag_adding_config,
         tagging=tagging_config,
+        selection_tagging=selection_tagging_config,
         export=export_config,
     )
 
@@ -644,6 +688,7 @@ def main(cfg: DictConfig) -> None:
             not app_cfg.download.enabled
             and not app_cfg.ocr.enabled
             and not app_cfg.tag_adding.enabled
+            and not app_cfg.selection_tagging.enabled
         )
         export_only_dry_run = (
             app_cfg.processing.dry_run
@@ -654,17 +699,7 @@ def main(cfg: DictConfig) -> None:
             exit_code = 0
         else:
             # --- Fail-fast path enforcement for download mode ---
-            if (
-                app_cfg.download.enabled
-                and app_cfg.download.upload_folder.strip()
-                == PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER
-            ):
-                raise ConfigError(
-                    "download.upload_folder must be set to an explicit path when "
-                    f"download.enabled=true. The packaged default "
-                    f"{PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER!r} is not accepted. "
-                    "Override with: download.upload_folder=/your/path"
-                )
+            _enforce_explicit_download_upload_folder(app_cfg)
 
             # --- Fail-fast path enforcement for save-to-disk mode ---
             if (
