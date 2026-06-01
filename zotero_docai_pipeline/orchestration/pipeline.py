@@ -73,6 +73,7 @@ from zotero_docai_pipeline.domain.config import (
     TaggingConfig,
     TreeStructureConfig,
     ZoteroConfig,
+    reject_openkb_handoff_if_enabled,
 )
 from zotero_docai_pipeline.domain.models import (
     AttachmentInfo,
@@ -2150,6 +2151,8 @@ class Pipeline:
             management without automatic deletion.
             Set cleanup_uploaded_files=true to restore previous auto-delete behavior.
         """
+        reject_openkb_handoff_if_enabled(self.export_config)
+
         # Step 0: Log startup
         log_startup(self.logger, "Starting Zotero DocAI Pipeline")
 

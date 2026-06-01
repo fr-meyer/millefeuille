@@ -680,6 +680,29 @@ class AttachmentUrlExportConfig:
 
 
 @dataclass
+class OpenKBHandoffExportConfig:
+    """Configuration for OpenKB/DocAI JSONL handoff export.
+
+    Not yet wired into the CLI or pipeline; enabling raises at validation time.
+    """
+
+    enabled: bool = False
+    """Whether OpenKB handoff export is enabled."""
+
+    jsonl_path: str | None = None
+    """Output path for the handoff JSONL file."""
+
+    preview_jsonl_path: str | None = None
+    """Optional preview JSONL path for dry-run or validate-only runs."""
+
+    include_item_type: bool = True
+    """Whether to include parent item type in handoff rows."""
+
+    include_zotero_version: bool = True
+    """Whether to include Zotero item version in handoff rows."""
+
+
+@dataclass
 class ExportConfig:
     """Top-level export feature configuration."""
 
@@ -687,6 +710,22 @@ class ExportConfig:
         default_factory=AttachmentUrlExportConfig
     )
     """Attachment URL export settings."""
+
+    openkb_handoff: OpenKBHandoffExportConfig = field(
+        default_factory=OpenKBHandoffExportConfig
+    )
+    """OpenKB/DocAI JSONL handoff export settings."""
+
+
+def reject_openkb_handoff_if_enabled(export: ExportConfig) -> None:
+    """Reject runs that enable OpenKB handoff until runtime support exists."""
+    if export.openkb_handoff.enabled:
+        raise ConfigError(
+            "export.openkb_handoff.enabled=true is not yet supported. "
+            "OpenKB/DocAI JSONL handoff export is not wired into the CLI "
+            "or pipeline; disable export.openkb_handoff.enabled until "
+            "runtime support lands."
+        )
 
 
 @dataclass

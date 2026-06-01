@@ -12,7 +12,7 @@ from tabulate import tabulate
 
 from zotero_docai_pipeline.clients.ocr_client import OCRClient
 from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
-from zotero_docai_pipeline.domain.config import AppConfig
+from zotero_docai_pipeline.domain.config import AppConfig, reject_openkb_handoff_if_enabled
 from zotero_docai_pipeline.domain.models import TagAddingResult
 from zotero_docai_pipeline.domain.tree_processor import TreeStructureProcessor
 from zotero_docai_pipeline.orchestration.pipeline import (
@@ -72,6 +72,7 @@ def dry_run_command(
     Returns:
         Exit code: 0 for success
     """
+    reject_openkb_handoff_if_enabled(cfg.export)
     logger.info("Dry-run mode enabled - previewing items without processing")
     items, discovery_stats = zotero_client.get_items_by_selection(
         cfg.tagging.selection, cfg.tagging.include_abstract
@@ -518,6 +519,7 @@ def process_command(
     Returns:
         Exit code: 0 for success, 1 for partial failure, 2 for complete failure
     """
+    reject_openkb_handoff_if_enabled(cfg.export)
     logger.info("Starting pipeline execution...")
     processor = ItemProcessor(zotero_client, ocr_client, cfg.processing)
     pipeline = Pipeline(

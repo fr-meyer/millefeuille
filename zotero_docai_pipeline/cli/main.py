@@ -44,6 +44,7 @@ from zotero_docai_pipeline.domain.config import (
     DownloadConfig,
     ExportConfig,
     MistralOCRConfig,
+    OpenKBHandoffExportConfig,
     PageIndexOCRConfig,
     ProcessingConfig,
     RetryConfig,
@@ -57,6 +58,7 @@ from zotero_docai_pipeline.domain.config import (
     TreeStructureConfig,
     ZoteroConfig,
     register_configs,
+    reject_openkb_handoff_if_enabled,
 )
 from zotero_docai_pipeline.domain.tree_processor import TreeStructureProcessor
 from zotero_docai_pipeline.utils.logging import setup_logging
@@ -281,6 +283,8 @@ def validate_flags(cfg: AppConfig) -> None:
             "credentials.redact_logs must be true when "
             "export.attachment_urls.auth_query.enabled=true"
         )
+
+    reject_openkb_handoff_if_enabled(cfg.export)
 
     logger.debug("Flag configuration validated successfully")
 
@@ -558,7 +562,18 @@ def build_app_config(cfg: DictConfig) -> AppConfig:
     attachment_urls_export = AttachmentUrlExportConfig(
         **att_urls, auth_query=AuthQueryHelperConfig(**auth_query_raw)
     )
-    export_config = ExportConfig(attachment_urls=attachment_urls_export)
+
+    openkb_handoff_raw = OmegaConf.to_container(
+        cfg.export.openkb_handoff, resolve=True
+    )
+    if not isinstance(openkb_handoff_raw, dict):
+        raise ConfigError("export.openkb_handoff must resolve to a mapping")
+    openkb_handoff_export = OpenKBHandoffExportConfig(**openkb_handoff_raw)
+
+    export_config = ExportConfig(
+        attachment_urls=attachment_urls_export,
+        openkb_handoff=openkb_handoff_export,
+    )
 
     if not OmegaConf.is_missing(cfg, "credentials"):
         credentials_cfg = cfg.credentials
@@ -690,11 +705,10 @@ def main(cfg: DictConfig) -> None:
             and not app_cfg.tag_adding.enabled
             and not app_cfg.selection_tagging.enabled
         )
-        export_only_dry_run = (
-            app_cfg.processing.dry_run
-            and app_cfg.export.attachment_urls.enabled
+        standalone_export = (
+            app_cfg.processing.dry_run and app_cfg.export.attachment_urls.enabled
         )
-        if all_ops_disabled and not export_only_dry_run:
+        if all_ops_disabled and not standalone_export:
             print(_HELP_TEXT)
             exit_code = 0
         else:

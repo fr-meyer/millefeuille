@@ -625,6 +625,10 @@ class ZoteroClient:
                                 filename=filename,
                                 content_type=child_data.get("contentType"),
                                 link_mode=child_data.get("linkMode"),
+                                file_size_bytes=child_data.get("fileSize"),
+                                md5=child_data.get("md5"),
+                                zotero_version=child_data.get("version"),
+                                item_type=item_data.get("itemType"),
                             )
                         )
             except HTTPError as e:

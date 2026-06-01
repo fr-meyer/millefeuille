@@ -10,3 +10,10 @@ attachment_urls:
   format: json
   auth_query:
     enabled: false
+
+openkb_handoff:
+  enabled: false
+  jsonl_path: null
+  preview_jsonl_path: null
+  include_item_type: true
+  include_zotero_version: true
