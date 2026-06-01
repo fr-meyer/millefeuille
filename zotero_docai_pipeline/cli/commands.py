@@ -247,7 +247,10 @@ def dry_run_command(
         if cfg.export.attachment_urls.log:
             log_export_records(records, logger)
         if cfg.export.attachment_urls.write_manifest:
-            logger.info("  [dry-run] Manifest write suppressed (no writes in dry-run mode)")
+            logger.info(
+                "  [dry-run] Manifest write suppressed "
+                "(no writes in dry-run mode)"
+            )
 
     return 0
 
@@ -326,11 +329,8 @@ def _determine_exit_code(
             st_item_succeeded = 0
         severities.append(_failure_severity(st_item_failed, st_item_succeeded))
 
-    if failed_items > 0:
-        if total_items > 0 or successful_items > 0:
-            severities.append(
-                _failure_severity(failed_items, successful_items)
-            )
+    if failed_items > 0 and (total_items > 0 or successful_items > 0):
+        severities.append(_failure_severity(failed_items, successful_items))
 
     if severities:
         return max(severities)

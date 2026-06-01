@@ -185,7 +185,11 @@ def validate_flags(cfg: AppConfig) -> None:
     logger = logging.getLogger(__name__)
     logger.debug("Validating flag configuration")
 
-    if cfg.processing.dry_run and cfg.download.enabled and not cfg.selection_tagging.enabled:
+    if (
+        cfg.processing.dry_run
+        and cfg.download.enabled
+        and not cfg.selection_tagging.enabled
+    ):
         raise ConfigError(
             "Invalid configuration: dry_run mode cannot be used with download feature. "
             "Set processing.dry_run=false or download.enabled=false."

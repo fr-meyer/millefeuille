@@ -1,4 +1,4 @@
-"""Unit tests for selection tagging planning, application, dry-run preview, and validation."""
+"""Tests for selection tagging planning and validation flows."""
 
 import unittest
 from unittest.mock import MagicMock, patch
@@ -14,12 +14,12 @@ from zotero_docai_pipeline.cli.main import (
 )
 from zotero_docai_pipeline.clients.exceptions import ZoteroClientError
 from zotero_docai_pipeline.domain.config import (
+    PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER,
     AppConfig,
     AttachmentUrlExportConfig,
     AuthQueryConfig,
     ConfigError,
     DownloadConfig,
-    PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER,
     ExportConfig,
     MistralOCRConfig,
     ProcessingConfig,
@@ -38,7 +38,10 @@ from zotero_docai_pipeline.domain.models import (
     DiscoveryStats,
     PaperMetadata,
 )
-from zotero_docai_pipeline.orchestration.pipeline import Pipeline, ProcessingTagResult
+from zotero_docai_pipeline.orchestration.pipeline import (
+    Pipeline,
+    ProcessingTagResult,
+)
 
 
 def _make_app_config(**overrides):
@@ -226,7 +229,9 @@ class TestDryRunPreview(unittest.TestCase):
             "export preview should coexist with selection tagging preview",
         )
         st_idx = next(
-            i for i, msg in enumerate(info_messages) if "Selection Tagging Preview" in msg
+            i
+            for i, msg in enumerate(info_messages)
+            if "Selection Tagging Preview" in msg
         )
         export_idx = next(
             i
@@ -279,12 +284,15 @@ class TestDryRunManifestSuppression(unittest.TestCase):
         ]
         self.assertTrue(
             any("[dry-run] Manifest write suppressed" in msg for msg in info_messages),
-            "dry-run should log manifest write suppression when write_manifest is enabled",
+            (
+                "dry-run should log manifest write suppression "
+                "when write_manifest is enabled"
+            ),
         )
 
 
 class TestCombinedDryRunPreview(unittest.TestCase):
-    """Tests that combined dry-runs show both selection-tagging and outcome-branch previews."""
+    """Tests combined dry-run output for selection and outcome previews."""
 
     @patch("zotero_docai_pipeline.cli.commands.build_export_records")
     def test_combined_dry_run_shows_both_preview_sections(self, mock_build_export):
@@ -328,9 +336,11 @@ class TestCombinedDryRunPreview(unittest.TestCase):
 
 
 class TestCombinedDryRunValidation(unittest.TestCase):
-    """Tests validate_flags allows dry_run + download when selection_tagging is enabled."""
+    """Tests validate_flags for dry_run + download with selection tagging."""
 
-    def test_combined_dry_run_with_download_allowed_when_selection_tagging_enabled(self):
+    def test_combined_dry_run_with_download_allowed_when_selection_tagging_enabled(
+        self,
+    ):
         cfg = _make_app_config(
             processing=ProcessingConfig(dry_run=True),
             selection_tagging=SelectionTaggingConfig(
@@ -364,7 +374,7 @@ class TestCombinedDryRunValidation(unittest.TestCase):
 
 
 class TestCombinedDryRunMainPreflight(unittest.TestCase):
-    """Tests packaged CLI preflight for combined selection-tagging + download dry-run."""
+    """Tests packaged CLI preflight for combined selection-tagging dry-run."""
 
     @patch("zotero_docai_pipeline.cli.commands.build_export_records")
     def test_dry_run_with_placeholder_download_folder_reaches_dry_run_path(
@@ -603,25 +613,29 @@ class TestLiveSelectionTaggingExportLogOrder(unittest.TestCase):
             remove_failed=0,
         )
 
-        with patch.object(
-            pipeline, "_discover_items", return_value=([item], discovery_stats)
-        ):
-            with patch.object(
+        with (
+            patch.object(
+                pipeline, "_discover_items", return_value=([item], discovery_stats)
+            ),
+            patch.object(
                 pipeline,
                 "_apply_selection_tagging",
                 return_value=(tag_result, 1, 0),
-            ):
-                with patch(
-                    "zotero_docai_pipeline.orchestration.pipeline.build_export_records",
-                    return_value=[],
-                ):
-                    summary = pipeline.run()
+            ),
+            patch(
+                "zotero_docai_pipeline.orchestration.pipeline.build_export_records",
+                return_value=[],
+            ),
+        ):
+            summary = pipeline.run()
 
         info_messages = [
             str(c.args[0]) for c in pipeline.logger.info.call_args_list if c.args
         ]
         summary_idx = next(
-            i for i, msg in enumerate(info_messages) if "Selection Tagging Summary" in msg
+            i
+            for i, msg in enumerate(info_messages)
+            if "Selection Tagging Summary" in msg
         )
         export_idx = next(
             i
@@ -675,17 +689,19 @@ class TestLiveExportRunsAfterSelectionTagging(unittest.TestCase):
             call_order.append("export")
             return []
 
-        with patch.object(
-            pipeline, "_discover_items", return_value=([item], discovery_stats)
-        ):
-            with patch.object(
+        with (
+            patch.object(
+                pipeline, "_discover_items", return_value=([item], discovery_stats)
+            ),
+            patch.object(
                 pipeline, "_apply_selection_tagging", side_effect=track_apply
-            ):
-                with patch(
-                    "zotero_docai_pipeline.orchestration.pipeline.build_export_records",
-                    side_effect=track_export,
-                ):
-                    pipeline.run()
+            ),
+            patch(
+                "zotero_docai_pipeline.orchestration.pipeline.build_export_records",
+                side_effect=track_export,
+            ),
+        ):
+            pipeline.run()
 
         self.assertEqual(call_order, ["selection_tagging", "export"])
 
@@ -727,7 +743,7 @@ class TestDetermineExitCode(unittest.TestCase):
         self.assertEqual(_determine_exit_code(summary), 2)
 
     def test_combined_run_worst_case_when_downstream_succeeds(self):
-        """Full selection-tagging failure must return 2 even if OCR/download succeeded."""
+        """Full selection-tagging failure returns 2 even when OCR/download pass."""
         summary = {
             "selection_tagging_selected": 3,
             "selection_tagging_item_succeeded": 0,
@@ -740,7 +756,7 @@ class TestDetermineExitCode(unittest.TestCase):
 
 
 class TestProcessCommandSummaryOrdering(unittest.TestCase):
-    """Tests that live-run summaries emit selection tagging before downstream sections."""
+    """Tests live-run ordering for selection tagging before downstream sections."""
 
     @patch("zotero_docai_pipeline.cli.commands.Pipeline")
     @patch("zotero_docai_pipeline.cli.commands.ItemProcessor")
