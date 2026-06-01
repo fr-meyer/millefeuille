@@ -223,6 +223,14 @@ class TestValidateOpenkbHandoffRows(unittest.TestCase):
             any(isinstance(f, AttachmentIdentityError) for f in report.failures)
         )
 
+    def test_unknown_fallback_filename_reported(self):
+        row = _make_valid_row(canonical_filename="unknown.pdf")
+        report = validate_openkb_handoff_rows([row], mode="test")
+        self.assertFalse(report.is_clean)
+        self.assertTrue(
+            any(isinstance(f, AttachmentIdentityError) for f in report.failures)
+        )
+
     def test_duplicate_filename_same_item_reported(self):
         row1 = _make_valid_row(
             attachment_key="ATT1", canonical_filename="Smith - 2024 - Title.pdf"

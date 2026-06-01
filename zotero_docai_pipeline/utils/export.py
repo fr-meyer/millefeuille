@@ -41,6 +41,8 @@ _GENERIC_FILENAMES: frozenset[str] = frozenset({
     "file.pdf",
     "document",
     "document.pdf",
+    "unknown",
+    "unknown.pdf",
 })
 
 _VALID_VERIFICATION_STRENGTHS: frozenset[str] = frozenset({
