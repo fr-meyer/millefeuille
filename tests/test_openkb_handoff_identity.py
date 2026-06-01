@@ -27,6 +27,7 @@ def _make_attachment(
     content_type="application/pdf",
     link_mode="imported_file",
     md5=None,
+    sha256=None,
     file_size_bytes=None,
     zotero_version=None,
     item_type=None,
@@ -37,6 +38,7 @@ def _make_attachment(
         content_type=content_type,
         link_mode=link_mode,
         md5=md5,
+        sha256=sha256,
         file_size_bytes=file_size_bytes,
         zotero_version=zotero_version,
         item_type=item_type,
@@ -62,6 +64,7 @@ def _make_item(
 def _make_zotero_client(library_id="123456"):
     client = object.__new__(ZoteroClient)
     client.credentials = MagicMock(library_id=library_id)
+    client.download_pdf = MagicMock()
     return client
 
 
@@ -159,6 +162,40 @@ class TestBuildOpenkbHandoffRows(unittest.TestCase):
         )
         self.assertIsNone(rows[0].sha256)
         self.assertNotEqual(rows[0].verification_strength, "full")
+
+    def test_computed_sha256_gives_full_verification_strength(self):
+        attachment = _make_attachment(md5="abc123")
+        item = _make_item(attachments=[attachment])
+        client = _make_zotero_client()
+        client.download_pdf.return_value = b"%PDF-1.7 example"
+
+        rows = build_openkb_handoff_rows(
+            [item],
+            client,
+            _make_config(compute_sha256=True),
+        )
+
+        self.assertEqual(
+            rows[0].sha256,
+            "7b90830743ea12df73f6631d1437ab6d80f6f972b642bb6dc6bfda3c203fcc0f",
+        )
+        self.assertEqual(rows[0].verification_strength, "full")
+        client.download_pdf.assert_called_once_with("ITEM1", "ATT1")
+
+    def test_existing_sha256_gives_full_without_download(self):
+        attachment = _make_attachment(sha256="existing-sha")
+        item = _make_item(attachments=[attachment])
+        client = _make_zotero_client()
+
+        rows = build_openkb_handoff_rows(
+            [item],
+            client,
+            _make_config(compute_sha256=True),
+        )
+
+        self.assertEqual(rows[0].sha256, "existing-sha")
+        self.assertEqual(rows[0].verification_strength, "full")
+        client.download_pdf.assert_not_called()
 
     def test_no_auth_url_in_recovery(self):
         attachment = _make_attachment()

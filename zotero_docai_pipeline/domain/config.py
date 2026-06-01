@@ -698,6 +698,9 @@ class OpenKBHandoffExportConfig:
     include_zotero_version: bool = True
     """Whether to include Zotero item version in handoff rows."""
 
+    compute_sha256: bool = False
+    """Whether to transiently fetch PDF bytes and compute SHA-256 hashes."""
+
 
 @dataclass
 class ExportConfig:

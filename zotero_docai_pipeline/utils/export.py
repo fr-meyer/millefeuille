@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -218,7 +219,14 @@ def build_openkb_handoff_rows(
             ):
                 continue
 
-            if attachment.md5 is not None:
+            sha256 = attachment.sha256
+            if sha256 is None and config.compute_sha256:
+                pdf_bytes = zotero_client.download_pdf(item.key, attachment.key)
+                sha256 = hashlib.sha256(pdf_bytes).hexdigest()
+
+            if sha256 is not None:
+                verification_strength = "full"
+            elif attachment.md5 is not None:
                 verification_strength = "hash-only"
             elif attachment.file_size_bytes is not None:
                 verification_strength = "metadata-only"
@@ -264,7 +272,7 @@ def build_openkb_handoff_rows(
                     is_pdf=True,
                     file_size_bytes=attachment.file_size_bytes,
                     md5=attachment.md5,
-                    sha256=None,
+                    sha256=sha256,
                     verification_strength=verification_strength,
                     recovery=recovery,
                     openkb_policy_hints=openkb_policy_hints,

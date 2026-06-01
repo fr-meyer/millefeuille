@@ -373,6 +373,9 @@ Produces a durable, credential-free JSONL file (`openkb-docai-handoff/v0.1`) tha
 - `ZOTERO_READ_KEY` is sufficient — no write key needed.
 - No OCR provider key required.
 - Recovery uses Zotero API keys only; no pre-built URLs are stored.
+- Optional `export.openkb_handoff.compute_sha256=true` transiently fetches
+  attachment bytes in memory to compute SHA-256 and upgrade row verification
+  to `full`; no PDF payload is written or stored.
 - Live export runs the same validators as dry-run and fails closed on unsafe rows.
 - Dry-run first is **recommended** but **not required** by the CLI.
 
@@ -415,6 +418,7 @@ python -m zotero_docai_pipeline \
 | `export.openkb_handoff.preview_jsonl_path` | string | `null` | Preview output path (dry-run only) |
 | `export.openkb_handoff.include_item_type` | bool | `true` | Include parent item type |
 | `export.openkb_handoff.include_zotero_version` | bool | `true` | Include Zotero item version |
+| `export.openkb_handoff.compute_sha256` | bool | `false` | Transiently fetch PDF bytes and compute SHA-256 for `full` verification |
 
 ## Extraction Modes
 

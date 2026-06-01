@@ -53,6 +53,9 @@ class AttachmentInfo:
     md5: str | None = None
     """MD5 checksum from Zotero metadata, when available."""
 
+    sha256: str | None = None
+    """SHA-256 checksum computed from attachment bytes, when available."""
+
     zotero_version: int | None = None
     """Zotero item version number, when available."""
 
@@ -637,7 +640,7 @@ class OpenKBHandoffRow:
     """MD5 checksum from Zotero metadata, when available."""
 
     sha256: str | None = None
-    """SHA-256 checksum; reserved for future use (``None`` in v0.1)."""
+    """SHA-256 checksum computed from attachment bytes, when available."""
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise to a JSON-friendly dict, omitting ``None`` scalar fields."""

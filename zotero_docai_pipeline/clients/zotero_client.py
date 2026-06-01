@@ -729,7 +729,19 @@ class ZoteroClient:
             logger.debug(
                 f"Downloading PDF: item_key={item_key}, attachment_key={attachment_key}"
             )
-            pdf_bytes_raw = self._zotero_read.file(attachment_key)
+            # PyZotero follows Zotero's signed storage redirect for file
+            # downloads. Suppress httpx INFO request logging while fetching so
+            # transient signed URLs never appear in operator logs.
+            httpx_logger = logging.getLogger("httpx")
+            previous_httpx_level = httpx_logger.level
+            changed_httpx_level = previous_httpx_level < logging.WARNING
+            if changed_httpx_level:
+                httpx_logger.setLevel(logging.WARNING)
+            try:
+                pdf_bytes_raw = self._zotero_read.file(attachment_key)
+            finally:
+                if changed_httpx_level:
+                    httpx_logger.setLevel(previous_httpx_level)
             # Ensure return type is bytes
             if isinstance(pdf_bytes_raw, bytes):
                 pdf_bytes = pdf_bytes_raw

@@ -17,3 +17,4 @@ openkb_handoff:
   preview_jsonl_path: null
   include_item_type: true
   include_zotero_version: true
+  compute_sha256: false
