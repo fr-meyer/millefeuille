@@ -352,6 +352,17 @@ class HandoffSecurityError(Exception):
         return self.message
 
 
+class OpenKBHandoffValidationError(Exception):
+    """Raised when aggregated OpenKB handoff row validation fails before export."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+
 class AttachmentIdentityError(Exception):
     """Raised when an attachment fails identity verification for handoff export."""
 

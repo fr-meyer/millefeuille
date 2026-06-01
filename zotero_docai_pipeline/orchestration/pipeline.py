@@ -56,6 +56,7 @@ except ImportError:
 
 
 from zotero_docai_pipeline.clients.exceptions import (
+    OpenKBHandoffValidationError,
     TreeStructureProcessingError,
     ZoteroClientError,
 )
@@ -73,7 +74,6 @@ from zotero_docai_pipeline.domain.config import (
     TaggingConfig,
     TreeStructureConfig,
     ZoteroConfig,
-    reject_openkb_handoff_if_enabled,
 )
 from zotero_docai_pipeline.domain.models import (
     AttachmentInfo,
@@ -89,8 +89,11 @@ from zotero_docai_pipeline.domain.tree_processor import TreeStructureProcessor
 from zotero_docai_pipeline.orchestration.processor import ItemProcessor
 from zotero_docai_pipeline.utils.export import (
     build_export_records,
+    build_openkb_handoff_rows,
     log_export_records,
+    validate_openkb_handoff_rows,
     write_manifest,
+    write_openkb_jsonl,
 )
 from zotero_docai_pipeline.utils.logging import (
     log_completion,
@@ -2151,8 +2154,6 @@ class Pipeline:
             management without automatic deletion.
             Set cleanup_uploaded_files=true to restore previous auto-delete behavior.
         """
-        reject_openkb_handoff_if_enabled(self.export_config)
-
         # Step 0: Log startup
         log_startup(self.logger, "Starting Zotero DocAI Pipeline")
 
@@ -2272,6 +2273,27 @@ class Pipeline:
                     records, self.export_config.attachment_urls.manifest_path
                 )
 
+        def _export_openkb_handoff() -> None:
+            if not self.export_config.openkb_handoff.enabled:
+                return
+            rows = build_openkb_handoff_rows(
+                items, self.zotero_client, self.export_config.openkb_handoff
+            )
+            report = validate_openkb_handoff_rows(
+                rows, mode="live", source_items=items
+            )
+            if not report.is_clean:
+                for failure in report.failures:
+                    self.logger.error(str(failure))
+                raise OpenKBHandoffValidationError(
+                    f"OpenKB handoff export aborted: {len(report.failures)} "
+                    "validation failure(s). No JSONL written."
+                )
+            assert self.export_config.openkb_handoff.jsonl_path is not None
+            write_openkb_jsonl(
+                rows, self.export_config.openkb_handoff.jsonl_path
+            )
+
         def _selection_tagging_fields(selected: int | None = None) -> dict[str, int]:
             return self._build_selection_tagging_summary_fields(
                 selected=selected if selected is not None else len(items),
@@ -2282,6 +2304,7 @@ class Pipeline:
 
         if not self.selection_tagging_config.enabled:
             _export_attachment_urls()
+            _export_openkb_handoff()
 
         # Step 2: Handle empty list
         if not items:
@@ -2289,6 +2312,7 @@ class Pipeline:
             if self.selection_tagging_config.enabled:
                 _emit_selection_tagging_summary_before_export()
                 _export_attachment_urls()
+                _export_openkb_handoff()
             return {
                 "total_items": 0,
                 "successful_items": 0,
@@ -2328,6 +2352,7 @@ class Pipeline:
             )
             _emit_selection_tagging_summary_before_export()
             _export_attachment_urls()
+            _export_openkb_handoff()
             total_time = time.time() - start_time
             summary = {
                 "total_items": len(items),
@@ -2435,6 +2460,7 @@ class Pipeline:
             )
             _emit_selection_tagging_summary_before_export()
             _export_attachment_urls()
+            _export_openkb_handoff()
 
         # ========================================================================
         # Phase 1: Collect & Upload PDFs

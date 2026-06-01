@@ -24,6 +24,7 @@ from omegaconf import DictConfig, OmegaConf
 from zotero_docai_pipeline.cli.commands import dry_run_command, process_command
 from zotero_docai_pipeline.clients.exceptions import (
     OCRClientError,
+    OpenKBHandoffValidationError,
     ZoteroClientError,
 )
 from zotero_docai_pipeline.clients.mistral_client import MistralClient
@@ -58,7 +59,6 @@ from zotero_docai_pipeline.domain.config import (
     TreeStructureConfig,
     ZoteroConfig,
     register_configs,
-    reject_openkb_handoff_if_enabled,
 )
 from zotero_docai_pipeline.domain.tree_processor import TreeStructureProcessor
 from zotero_docai_pipeline.utils.logging import setup_logging
@@ -174,8 +174,9 @@ def validate_flags(cfg: AppConfig) -> None:
        operations, while download is an actual operation.
     2. At least one operation enabled: At least one of download.enabled,
        ocr.enabled, tag_adding.enabled, or selection_tagging.enabled must be
-       True, except for export-only dry-run (processing.dry_run with
-       export.attachment_urls.enabled).
+       True, except for standalone export modes (export.openkb_handoff.enabled
+       for dry-run or live export; export.attachment_urls.enabled with
+       processing.dry_run).
 
     Args:
         cfg: Application configuration object
@@ -203,12 +204,16 @@ def validate_flags(cfg: AppConfig) -> None:
             "be enabled in the same run. Disable one of them."
         )
 
+    standalone_export = (
+        cfg.export.openkb_handoff.enabled
+        or (cfg.processing.dry_run and cfg.export.attachment_urls.enabled)
+    )
     if (
         not cfg.download.enabled
         and not cfg.ocr.enabled
         and not cfg.tag_adding.enabled
         and not cfg.selection_tagging.enabled
-        and not (cfg.processing.dry_run and cfg.export.attachment_urls.enabled)
+        and not standalone_export
     ):
         raise ConfigError(
             "Invalid configuration: at least one operation must be enabled. "
@@ -284,7 +289,26 @@ def validate_flags(cfg: AppConfig) -> None:
             "export.attachment_urls.auth_query.enabled=true"
         )
 
-    reject_openkb_handoff_if_enabled(cfg.export)
+    handoff = cfg.export.openkb_handoff
+    if handoff.enabled:
+        if (
+            not cfg.processing.dry_run
+            and (handoff.jsonl_path is None or not str(handoff.jsonl_path).strip())
+        ):
+            raise ConfigError(
+                "export.openkb_handoff.jsonl_path is required for live export "
+                "when export.openkb_handoff.enabled=true"
+            )
+        if handoff.preview_jsonl_path is not None:
+            if not str(handoff.preview_jsonl_path).strip():
+                raise ConfigError(
+                    "export.openkb_handoff.preview_jsonl_path cannot be empty"
+                )
+            if handoff.preview_jsonl_path == handoff.jsonl_path:
+                raise ConfigError(
+                    "export.openkb_handoff.preview_jsonl_path must differ from "
+                    "export.openkb_handoff.jsonl_path"
+                )
 
     logger.debug("Flag configuration validated successfully")
 
@@ -706,7 +730,11 @@ def main(cfg: DictConfig) -> None:
             and not app_cfg.selection_tagging.enabled
         )
         standalone_export = (
-            app_cfg.processing.dry_run and app_cfg.export.attachment_urls.enabled
+            app_cfg.export.openkb_handoff.enabled
+            or (
+                app_cfg.processing.dry_run
+                and app_cfg.export.attachment_urls.enabled
+            )
         )
         if all_ops_disabled and not standalone_export:
             print(_HELP_TEXT)
@@ -770,6 +798,9 @@ def main(cfg: DictConfig) -> None:
                     app_cfg, logger, zotero_client, ocr_client, tree_processor
                 )
 
+    except OpenKBHandoffValidationError as e:
+        logger.error(f"OpenKB handoff validation failed: {redact_message(str(e))}")
+        exit_code = 2
     except ConfigError as e:
         logger.error(f"Configuration error: {redact_message(str(e))}")
         exit_code = 3

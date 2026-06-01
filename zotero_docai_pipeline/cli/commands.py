@@ -12,7 +12,7 @@ from tabulate import tabulate
 
 from zotero_docai_pipeline.clients.ocr_client import OCRClient
 from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
-from zotero_docai_pipeline.domain.config import AppConfig, reject_openkb_handoff_if_enabled
+from zotero_docai_pipeline.domain.config import AppConfig
 from zotero_docai_pipeline.domain.models import TagAddingResult
 from zotero_docai_pipeline.domain.tree_processor import TreeStructureProcessor
 from zotero_docai_pipeline.orchestration.pipeline import (
@@ -22,7 +22,10 @@ from zotero_docai_pipeline.orchestration.pipeline import (
 from zotero_docai_pipeline.orchestration.processor import ItemProcessor
 from zotero_docai_pipeline.utils.export import (
     build_export_records,
+    build_openkb_handoff_rows,
     log_export_records,
+    validate_openkb_handoff_rows,
+    write_openkb_jsonl,
 )
 from zotero_docai_pipeline.utils.logging import (
     _format_with_emoji,
@@ -72,7 +75,6 @@ def dry_run_command(
     Returns:
         Exit code: 0 for success
     """
-    reject_openkb_handoff_if_enabled(cfg.export)
     logger.info("Dry-run mode enabled - previewing items without processing")
     items, discovery_stats = zotero_client.get_items_by_selection(
         cfg.tagging.selection, cfg.tagging.include_abstract
@@ -251,6 +253,31 @@ def dry_run_command(
             logger.info(
                 "  [dry-run] Manifest write suppressed "
                 "(no writes in dry-run mode)"
+            )
+
+    if cfg.export.openkb_handoff.enabled:
+        rows = build_openkb_handoff_rows(
+            items, zotero_client, cfg.export.openkb_handoff
+        )
+        report = validate_openkb_handoff_rows(
+            rows, mode="dry_run", source_items=items
+        )
+        if report.failures:
+            for failure in report.failures:
+                logger.error(str(failure))
+            return 2
+        if cfg.export.openkb_handoff.preview_jsonl_path:
+            write_openkb_jsonl(
+                rows, cfg.export.openkb_handoff.preview_jsonl_path
+            )
+            logger.info(
+                "Non-authoritative OpenKB handoff preview written to "
+                f"{cfg.export.openkb_handoff.preview_jsonl_path}"
+            )
+        else:
+            logger.info(
+                f"[DRY-RUN] OpenKB handoff JSONL write suppressed "
+                f"({len(rows)} rows validated)"
             )
 
     return 0
@@ -519,7 +546,6 @@ def process_command(
     Returns:
         Exit code: 0 for success, 1 for partial failure, 2 for complete failure
     """
-    reject_openkb_handoff_if_enabled(cfg.export)
     logger.info("Starting pipeline execution...")
     processor = ItemProcessor(zotero_client, ocr_client, cfg.processing)
     pipeline = Pipeline(
