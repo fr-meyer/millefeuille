@@ -627,7 +627,7 @@ class ZoteroClient:
                                 link_mode=child_data.get("linkMode"),
                                 file_size_bytes=child_data.get("fileSize"),
                                 md5=child_data.get("md5"),
-                                zotero_version=child_data.get("version"),
+                                zotero_version=item_data.get("version"),
                                 item_type=item_data.get("itemType"),
                             )
                         )

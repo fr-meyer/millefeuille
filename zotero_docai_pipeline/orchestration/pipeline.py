@@ -2273,9 +2273,9 @@ class Pipeline:
                     records, self.export_config.attachment_urls.manifest_path
                 )
 
-        def _export_openkb_handoff() -> None:
+        def _export_openkb_handoff() -> int:
             if not self.export_config.openkb_handoff.enabled:
-                return
+                return 0
             rows = build_openkb_handoff_rows(
                 items, self.zotero_client, self.export_config.openkb_handoff
             )
@@ -2293,6 +2293,7 @@ class Pipeline:
             write_openkb_jsonl(
                 rows, self.export_config.openkb_handoff.jsonl_path
             )
+            return len(rows)
 
         def _selection_tagging_fields(selected: int | None = None) -> dict[str, int]:
             return self._build_selection_tagging_summary_fields(
@@ -2302,9 +2303,10 @@ class Pipeline:
                 agg=st_agg,
             )
 
+        openkb_handoff_rows_written = 0
         if not self.selection_tagging_config.enabled:
             _export_attachment_urls()
-            _export_openkb_handoff()
+            openkb_handoff_rows_written = _export_openkb_handoff()
 
         # Step 2: Handle empty list
         if not items:
@@ -2335,8 +2337,50 @@ class Pipeline:
                 "selection_tagging_summary_displayed": (
                     selection_tagging_summary_displayed
                 ),
+                "openkb_handoff_rows_written": openkb_handoff_rows_written,
                 **_selection_tagging_fields(selected=0),
             }
+
+        # Early exit for standalone OpenKB handoff export mode
+        if (
+            self.export_config.openkb_handoff.enabled
+            and not self.ocr_config.enabled
+            and not self.download_config.enabled
+            and not self.tag_adding_config.enabled
+            and not self.selection_tagging_config.enabled
+        ):
+            self.logger.info(
+                "Standalone OpenKB handoff mode: OCR, download, tag adding, "
+                "and selection tagging disabled"
+            )
+            total_time = time.time() - start_time
+            summary = {
+                "total_items": len(items),
+                "successful_items": len(items),
+                "failed_items": 0,
+                "skipped_items": discovery_stats.excluded_count,
+                "matched_items": discovery_stats.matched_count,
+                "excluded_by_rule": discovery_stats.excluded_by_rule,
+                "total_pdfs_processed": 0,
+                "total_pages_extracted": 0,
+                "total_notes_created": 0,
+                "total_time": total_time,
+                "results": [],
+                "tag_adding_results": [],
+                "tag_adding_failed": 0,
+                "tag_adding_matched": 0,
+                "tag_adding_succeeded": 0,
+                "tag_adding_eligible": 0,
+                "tag_adding_no_key": 0,
+                "tag_adding_processed": 0,
+                "selection_tagging_summary_displayed": (
+                    selection_tagging_summary_displayed
+                ),
+                "openkb_handoff_rows_written": openkb_handoff_rows_written,
+                **_selection_tagging_fields(),
+            }
+            log_completion(self.logger)
+            return summary
 
         # Early exit for standalone selection-tagging mode
         if (
