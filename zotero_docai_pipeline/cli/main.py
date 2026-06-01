@@ -246,31 +246,34 @@ def validate_flags(cfg: AppConfig) -> None:
             "selection_tagging.enabled with non-empty add/remove "
             "(live run writes tags to Zotero)"
         )
-    if cfg.tagging.apply_on_success.values and not cfg.processing.dry_run:
-        write_reasons.append(
-            "tagging.apply_on_success is non-empty "
-            "(live run writes post-processing success tags)"
-        )
-    if (
-        cfg.tagging.apply_on_error.values
-        and cfg.zotero.error_tagging_enabled
-        and not cfg.processing.dry_run
-    ):
-        write_reasons.append(
-            "tagging.apply_on_error is non-empty and "
-            "zotero.error_tagging_enabled "
-            "(live run writes post-processing error tags)"
-        )
-    if cfg.tagging.remove_on_success.values and not cfg.processing.dry_run:
-        write_reasons.append(
-            "tagging.remove_on_success is non-empty "
-            "(live run removes post-processing success tags)"
-        )
-    if cfg.tagging.remove_on_error.values and not cfg.processing.dry_run:
-        write_reasons.append(
-            "tagging.remove_on_error is non-empty "
-            "(live run removes post-processing error tags)"
-        )
+    can_reach_outcome_tag_mutations = not cfg.processing.dry_run and (
+        cfg.ocr.enabled or cfg.download.enabled or cfg.tag_adding.enabled
+    )
+    if can_reach_outcome_tag_mutations:
+        if cfg.tagging.apply_on_success.values:
+            write_reasons.append(
+                "tagging.apply_on_success is non-empty "
+                "(live run writes post-processing success tags)"
+            )
+        if (
+            cfg.tagging.apply_on_error.values
+            and cfg.zotero.error_tagging_enabled
+        ):
+            write_reasons.append(
+                "tagging.apply_on_error is non-empty and "
+                "zotero.error_tagging_enabled "
+                "(live run writes post-processing error tags)"
+            )
+        if cfg.tagging.remove_on_success.values:
+            write_reasons.append(
+                "tagging.remove_on_success is non-empty "
+                "(live run removes post-processing success tags)"
+            )
+        if cfg.tagging.remove_on_error.values:
+            write_reasons.append(
+                "tagging.remove_on_error is non-empty "
+                "(live run removes post-processing error tags)"
+            )
     if write_reasons:
         wk = cfg.credentials.write_key
         if wk is None or (isinstance(wk, str) and not wk.strip()):

@@ -3,18 +3,26 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from zotero_docai_pipeline.cli.main import validate_flags
 from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
 from zotero_docai_pipeline.domain.config import (
+    AppConfig,
+    AuthQueryConfig,
+    ConfigError,
     DownloadConfig,
     ExportConfig,
     MistralOCRConfig,
     OpenKBHandoffExportConfig,
     ProcessingConfig,
     SelectionTaggingConfig,
+    StorageConfig,
     TagAddingConfig,
     TagRuleConfig,
     TagSelectionConfig,
+    TagTargetConfig,
+    TaggingConfig,
     TreeStructureConfig,
+    ZoteroConfig,
 )
 from zotero_docai_pipeline.domain.models import (
     AttachmentInfo,
@@ -53,6 +61,43 @@ def _make_item(key="ITEM1", title="Paper", attachments=None):
         attachments=attachments or [],
         citation_key=None,
         paper_metadata=PaperMetadata(),
+    )
+
+
+def _make_default_outcome_tagging_config() -> TaggingConfig:
+    """Tagging config matching packaged defaults (non-empty outcome tags)."""
+    return TaggingConfig(
+        selection=TagSelectionConfig(
+            include=TagRuleConfig(values=["docai"]),
+            exclude=TagRuleConfig(values=["docai-processed"]),
+        ),
+        apply_on_success=TagTargetConfig(values=["docai-processed"]),
+        apply_on_error=TagTargetConfig(values=["docai-error"]),
+    )
+
+
+def _make_standalone_handoff_app_config(*, dry_run: bool) -> AppConfig:
+    """Standalone OpenKB handoff with default outcome tags and no write key."""
+    return AppConfig(
+        zotero=ZoteroConfig(),
+        ocr=MistralOCRConfig(enabled=False),
+        processing=ProcessingConfig(dry_run=dry_run),
+        storage=StorageConfig(),
+        credentials=AuthQueryConfig(
+            library_id="123456",
+            read_key="read-key",
+            write_key=None,
+        ),
+        download=DownloadConfig(enabled=False),
+        tag_adding=TagAddingConfig(enabled=False),
+        selection_tagging=SelectionTaggingConfig(enabled=False),
+        tagging=_make_default_outcome_tagging_config(),
+        export=ExportConfig(
+            openkb_handoff=OpenKBHandoffExportConfig(
+                enabled=True,
+                jsonl_path="./handoff.jsonl",
+            )
+        ),
     )
 
 
@@ -149,6 +194,24 @@ class TestStandaloneOpenkbHandoffPipeline(unittest.TestCase):
         self.assertTrue(
             any("Standalone OpenKB handoff mode" in msg for msg in info_messages)
         )
+
+
+class TestStandaloneOpenkbHandoffValidateFlags(unittest.TestCase):
+    """Standalone handoff must not require ZOTERO_WRITE_KEY for default outcome tags."""
+
+    def test_live_standalone_handoff_without_write_key_passes_validation(self):
+        cfg = _make_standalone_handoff_app_config(dry_run=False)
+        try:
+            validate_flags(cfg)
+        except ConfigError:
+            self.fail("validate_flags raised ConfigError unexpectedly")
+
+    def test_dry_run_standalone_handoff_without_write_key_passes_validation(self):
+        cfg = _make_standalone_handoff_app_config(dry_run=True)
+        try:
+            validate_flags(cfg)
+        except ConfigError:
+            self.fail("validate_flags raised ConfigError unexpectedly")
 
 
 class TestOpenkbHandoffParentZoteroVersion(unittest.TestCase):
