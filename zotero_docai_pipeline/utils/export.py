@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 import re
 import tempfile
+from typing import Any
 from urllib.parse import parse_qsl, urlparse
 
 from zotero_docai_pipeline.clients.exceptions import (
@@ -69,6 +70,8 @@ _OPENKB_POLICY_HINT_REQUIRED_KEYS: tuple[str, ...] = (
     "verification_required",
     "source_type",
 )
+
+_OPENKB_PREVIEW_SCHEMA_VERSION = "openkb-docai-handoff-preview/v0.1"
 
 
 def _is_generic_filename(filename: str) -> bool:
@@ -418,13 +421,89 @@ def log_openkb_weak_verification_warnings(
         )
 
 
-def write_openkb_jsonl(
+def _redact_preview_identifier(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if len(text) <= 4:
+        return "<redacted>"
+    if len(text) <= 12:
+        return f"{text[:2]}...{text[-2:]}"
+    return f"{text[:6]}...{text[-4:]}"
+
+
+def build_openkb_handoff_preview_rows(
     rows: list[OpenKBHandoffRow],
-    jsonl_path: str,
-) -> None:
-    """Write handoff rows to a UTF-8 JSONL file (atomic replace)."""
+) -> list[dict[str, Any]]:
+    """Build non-authoritative preview rows for dry-run inspection.
+
+    Preview rows intentionally do not mirror the durable handoff schema. They
+    preserve operator-visible shape and validation state while redacting exact
+    Zotero identifiers and omitting recovery/hash values that downstream systems
+    would treat as authoritative.
+    """
+    preview_rows: list[dict[str, Any]] = []
     for row in rows:
-        sanitize_handoff_row(row.to_dict())
+        preview_row = {
+            "schema_version": _OPENKB_PREVIEW_SCHEMA_VERSION,
+            "preview": True,
+            "authoritative": False,
+            "source_type": row.source_type,
+            "discovered_at": row.discovered_at,
+            "canonical_filename": row.canonical_filename,
+            "content_type": row.content_type,
+            "is_pdf": row.is_pdf,
+            "file_size_bytes": row.file_size_bytes,
+            "verification_strength": row.verification_strength,
+            "identity": {
+                "library_id": _redact_preview_identifier(
+                    row.recovery.get("library_id")
+                ),
+                "library_type": row.recovery.get("library_type"),
+                "item_key": _redact_preview_identifier(row.item_key),
+                "attachment_key": _redact_preview_identifier(
+                    row.attachment_key
+                ),
+                "item_type": row.item_type,
+                "zotero_version": row.zotero_version,
+            },
+            "hashes": {
+                "md5_present": row.md5 is not None,
+                "sha256_present": row.sha256 is not None,
+            },
+            "recovery": {
+                "method": row.recovery.get("method"),
+                "available": True,
+                "redacted": True,
+            },
+            "openkb_policy_hints": row.openkb_policy_hints,
+            "omitted_fields": [
+                "item_key",
+                "attachment_key",
+                "citation_key",
+                "item_title",
+                "md5",
+                "sha256",
+                "recovery.library_id",
+                "recovery.item_key",
+                "recovery.attachment_key",
+            ],
+        }
+        sanitize_handoff_row(preview_row)
+        preview_rows.append(preview_row)
+    return preview_rows
+
+
+def _write_jsonl_dicts(
+    records: list[dict[str, Any]],
+    jsonl_path: str,
+    *,
+    log_label: str,
+) -> None:
+    for record in records:
+        sanitize_handoff_row(record)
 
     path = Path(jsonl_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -438,10 +517,8 @@ def write_openkb_jsonl(
             delete=False,
         ) as tmp:
             tmp_path = tmp.name
-            for row in rows:
-                line = json.dumps(
-                    row.to_dict(), ensure_ascii=False
-                ) + "\n"
+            for record in records:
+                line = json.dumps(record, ensure_ascii=False) + "\n"
                 tmp.write(line)
             tmp.flush()
         Path(tmp_path).replace(path)
@@ -453,8 +530,31 @@ def write_openkb_jsonl(
                     leftover.unlink()
             except OSError:
                 pass
-    _logger.info(
-        f"Handoff manifest written to {jsonl_path} ({len(rows)} rows)."
+    _logger.info(f"{log_label} written to {jsonl_path} ({len(records)} rows).")
+
+
+def write_openkb_jsonl(
+    rows: list[OpenKBHandoffRow],
+    jsonl_path: str,
+) -> None:
+    """Write handoff rows to a UTF-8 JSONL file (atomic replace)."""
+    records = [row.to_dict() for row in rows]
+    _write_jsonl_dicts(
+        records,
+        jsonl_path,
+        log_label="Handoff manifest",
+    )
+
+
+def write_openkb_preview_jsonl(
+    rows: list[OpenKBHandoffRow],
+    jsonl_path: str,
+) -> None:
+    """Write non-authoritative preview rows to a UTF-8 JSONL file."""
+    _write_jsonl_dicts(
+        build_openkb_handoff_preview_rows(rows),
+        jsonl_path,
+        log_label="Handoff preview",
     )
 
 

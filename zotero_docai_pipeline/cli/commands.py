@@ -26,7 +26,7 @@ from zotero_docai_pipeline.utils.export import (
     log_export_records,
     log_openkb_weak_verification_warnings,
     validate_openkb_handoff_rows,
-    write_openkb_jsonl,
+    write_openkb_preview_jsonl,
 )
 from zotero_docai_pipeline.utils.logging import (
     _format_with_emoji,
@@ -271,7 +271,7 @@ def dry_run_command(
                 logger.error(str(failure))
             return 2
         if cfg.export.openkb_handoff.preview_jsonl_path:
-            write_openkb_jsonl(
+            write_openkb_preview_jsonl(
                 rows, cfg.export.openkb_handoff.preview_jsonl_path
             )
             logger.info(

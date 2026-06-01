@@ -1,5 +1,8 @@
-"""Tests for standalone OpenKB handoff pipeline behavior and parent version semantics."""
+"""Tests for standalone OpenKB handoff behavior and parent version semantics."""
 
+import json
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -22,10 +25,10 @@ from zotero_docai_pipeline.domain.config import (
     SelectionTaggingConfig,
     StorageConfig,
     TagAddingConfig,
+    TaggingConfig,
     TagRuleConfig,
     TagSelectionConfig,
     TagTargetConfig,
-    TaggingConfig,
     TreeStructureConfig,
     ZoteroConfig,
 )
@@ -39,7 +42,9 @@ from zotero_docai_pipeline.domain.models import (
 from zotero_docai_pipeline.orchestration.pipeline import Pipeline
 from zotero_docai_pipeline.utils.export import (
     ValidationReport,
+    build_openkb_handoff_preview_rows,
     build_openkb_handoff_rows,
+    write_openkb_preview_jsonl,
 )
 
 
@@ -477,15 +482,112 @@ class TestOpenkbWeakVerificationWarningLogs(unittest.TestCase):
             patch(
                 "zotero_docai_pipeline.orchestration.pipeline.write_openkb_jsonl",
             ) as mock_write,
+            self.assertRaises(OpenKBHandoffValidationError),
         ):
-            with self.assertRaises(OpenKBHandoffValidationError):
-                pipeline.run()
+            pipeline.run()
 
         _assert_weak_warning_messages(
             self, pipeline.logger, weak_rows=weak_rows
         )
         pipeline.logger.error.assert_called()
         mock_write.assert_not_called()
+
+
+class TestOpenkbHandoffPreviewSerialization(unittest.TestCase):
+    """Dry-run preview must not write authoritative handoff rows."""
+
+    def test_preview_rows_are_non_authoritative_and_redacted(self):
+        row = _make_handoff_row()
+        row.item_title = "Private Paper Title"
+        row.citation_key = "PrivateCitation2024"
+        row.file_size_bytes = 12345
+        row.md5 = "0123456789abcdef"
+        row.sha256 = "abcdef0123456789"
+
+        preview = build_openkb_handoff_preview_rows([row])[0]
+        live = row.to_dict()
+
+        self.assertNotEqual(preview, live)
+        self.assertEqual(
+            preview["schema_version"],
+            "openkb-docai-handoff-preview/v0.1",
+        )
+        self.assertTrue(preview["preview"])
+        self.assertFalse(preview["authoritative"])
+        self.assertNotIn("item_key", preview)
+        self.assertNotIn("attachment_key", preview)
+        self.assertNotIn("md5", preview)
+        self.assertNotIn("sha256", preview)
+        self.assertNotIn("citation_key", preview)
+        self.assertNotIn("item_title", preview)
+        self.assertEqual(
+            preview["hashes"],
+            {"md5_present": True, "sha256_present": True},
+        )
+        self.assertNotEqual(preview["identity"]["item_key"], row.item_key)
+        self.assertNotEqual(
+            preview["identity"]["attachment_key"],
+            row.attachment_key,
+        )
+        self.assertNotIn("item_key", preview["recovery"])
+        self.assertNotIn("attachment_key", preview["recovery"])
+        self.assertTrue(preview["recovery"]["redacted"])
+
+    def test_preview_writer_serializes_preview_payload(self):
+        row = _make_handoff_row()
+        row.md5 = "0123456789abcdef"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "handoff.preview.jsonl"
+            write_openkb_preview_jsonl([row], str(path))
+
+            payload = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            payload["schema_version"],
+            "openkb-docai-handoff-preview/v0.1",
+        )
+        self.assertTrue(payload["preview"])
+        self.assertFalse(payload["authoritative"])
+        self.assertNotIn("md5", payload)
+        self.assertTrue(payload["hashes"]["md5_present"])
+
+    def test_dry_run_preview_writes_preview_payload_not_live_payload(self):
+        cfg = _make_standalone_handoff_app_config(dry_run=True)
+        logger = MagicMock()
+        mock_zotero = MagicMock()
+        mock_zotero.get_items_by_selection.return_value = (
+            [_make_item()],
+            _make_discovery_stats(),
+        )
+        report = ValidationReport(total_rows=1, clean_rows=1, failures=[])
+        row = _make_handoff_row()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "preview.jsonl"
+            cfg.export.openkb_handoff.preview_jsonl_path = str(path)
+
+            with (
+                patch(
+                    "zotero_docai_pipeline.cli.commands.build_openkb_handoff_rows",
+                    return_value=[row],
+                ),
+                patch(
+                    "zotero_docai_pipeline.cli.commands.validate_openkb_handoff_rows",
+                    return_value=report,
+                ),
+            ):
+                exit_code = dry_run_command(cfg, logger, mock_zotero)
+
+            payload = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertEqual(exit_code, 0)
+        self.assertNotEqual(payload, row.to_dict())
+        self.assertEqual(
+            payload["schema_version"],
+            "openkb-docai-handoff-preview/v0.1",
+        )
+        self.assertFalse(payload["authoritative"])
 
 
 class TestStandaloneOpenkbHandoffValidateFlags(unittest.TestCase):

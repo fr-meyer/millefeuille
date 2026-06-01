@@ -349,7 +349,9 @@ Optional step that downloads PDFs from Zotero items to local disk (used as an in
 - Retry is configurable via `download.retry.*` (see `zotero_docai_pipeline/conf/download/default.yaml`).
 
 ### Important constraint
-- `processing.dry_run=true` cannot be combined with `download.enabled=true`.
+- `processing.dry_run=true` does not download PDFs. It can be combined with
+  `download.enabled=true` only for selection-tagging preview workflows where
+  `selection_tagging.enabled=true`.
 
 Examples:
 ```bash
