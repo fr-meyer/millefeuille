@@ -400,6 +400,23 @@ python -m zotero_docai_pipeline \
 
 Note: the preview file is non-authoritative and written only to `preview_jsonl_path`. The live `jsonl_path` is never written in dry-run.
 
+**Strong verification preview/readiness run:**
+
+Use this for merge readiness, dogfood, or production verification when Zotero-hosted PDFs should produce `verification_strength=full` and no weak-verification warning. It transiently fetches each PDF in memory to compute SHA-256, but does not write or store PDF payloads.
+
+```bash
+python -m zotero_docai_pipeline \
+  processing.dry_run=true \
+  ocr.enabled=false \
+  download.enabled=false \
+  tag_adding.enabled=false \
+  selection_tagging.enabled=false \
+  export.openkb_handoff.enabled=true \
+  export.openkb_handoff.compute_sha256=true \
+  export.openkb_handoff.preview_jsonl_path=./handoff-dry-run.preview.jsonl \
+  "tagging.selection.include.values=[docai-test]"
+```
+
 **Live export:**
 
 ```bash
@@ -408,6 +425,8 @@ python -m zotero_docai_pipeline \
   export.openkb_handoff.jsonl_path=./handoff.jsonl \
   "tagging.selection.include.values=[docai]"
 ```
+
+For production-grade handoff verification, include `export.openkb_handoff.compute_sha256=true` in the live command as well.
 
 **Configuration reference:**
 
