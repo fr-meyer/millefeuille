@@ -662,6 +662,51 @@ class TestOpenkbHandoffParentZoteroVersion(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].zotero_version, parent_version)
 
+    def test_child_note_without_filename_is_not_treated_as_pdf(self):
+        client, mock_zr = _make_client()
+        item_data = {
+            "key": "ITEM1",
+            "title": "A Paper",
+            "tags": [],
+            "version": 42,
+            "itemType": "journalArticle",
+        }
+
+        def fetch_side_effect(tag):
+            return {"ITEM1": item_data}
+
+        mock_zr.children.return_value = [
+            {
+                "key": "ATT1",
+                "data": {
+                    "itemType": "attachment",
+                    "filename": "Smith - 2024 - Title.pdf",
+                    "contentType": "application/pdf",
+                    "linkMode": "imported_file",
+                },
+            },
+            {
+                "key": "NOTE1",
+                "data": {
+                    "itemType": "note",
+                },
+            },
+        ]
+
+        selection = TagSelectionConfig(
+            include=TagRuleConfig(values=["docai"], operator="or"),
+        )
+        with patch.object(
+            client, "_fetch_items_for_tag", side_effect=fetch_side_effect
+        ):
+            discovered, _ = client.get_items_by_selection(
+                selection, include_abstract=False
+            )
+
+        self.assertEqual(len(discovered), 1)
+        self.assertEqual(len(discovered[0].attachments), 1)
+        self.assertEqual(discovered[0].attachments[0].key, "ATT1")
+
 
 if __name__ == "__main__":
     unittest.main()

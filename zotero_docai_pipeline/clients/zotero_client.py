@@ -476,9 +476,7 @@ class ZoteroClient:
                         pdf_attachments.append(
                             {
                                 "key": child.get("key"),
-                                "filename": child_data.get(
-                                    "filename", "unknown.pdf"
-                                ),
+                                "filename": child_data.get("filename") or "",
                             }
                         )
             except Exception as e:
@@ -615,14 +613,17 @@ class ZoteroClient:
                     child_data = child.get("data")
                     if not isinstance(child_data, dict):
                         continue
-                    filename = child_data.get("filename", "unknown.pdf")
+                    filename_raw = child_data.get("filename")
+                    filename = (
+                        filename_raw if isinstance(filename_raw, str) else None
+                    )
                     if self._is_pdf_attachment(
                         child_data.get("contentType"), filename
                     ):
                         attachments.append(
                             AttachmentInfo(
                                 key=child.get("key", ""),
-                                filename=filename,
+                                filename=filename or "",
                                 content_type=child_data.get("contentType"),
                                 link_mode=child_data.get("linkMode"),
                                 file_size_bytes=child_data.get("fileSize"),
