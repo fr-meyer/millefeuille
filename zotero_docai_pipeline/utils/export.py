@@ -49,6 +49,12 @@ _VALID_VERIFICATION_STRENGTHS: frozenset[str] = frozenset({
     "key-only",
 })
 
+_WEAK_VERIFICATION_STRENGTHS: frozenset[str] = frozenset({
+    "hash-only",
+    "metadata-only",
+    "key-only",
+})
+
 _RECOVERY_REQUIRED_KEYS: tuple[str, ...] = (
     "method",
     "library_id",
@@ -93,6 +99,7 @@ class ValidationReport:
     total_rows: int
     clean_rows: int
     failures: list[Exception] = field(default_factory=list)
+    weak_verification_rows: list[dict] = field(default_factory=list)
 
     @property
     def is_clean(self) -> bool:
@@ -268,6 +275,7 @@ def validate_openkb_handoff_rows(
 ) -> ValidationReport:
     """Validate handoff rows; ``mode`` is reserved for future behaviour."""
     failures: list[Exception] = []
+    weak_rows: list[dict] = []
     clean_count = 0
 
     source_attachment_map: dict[str, AttachmentInfo] = {}
@@ -363,17 +371,51 @@ def validate_openkb_handoff_rows(
         failures.extend(row_failures)
         if not row_failures:
             clean_count += 1
+            if row.verification_strength in _WEAK_VERIFICATION_STRENGTHS:
+                weak_rows.append({
+                    "item_key": row.item_key,
+                    "attachment_key": row.attachment_key,
+                    "canonical_filename": row.canonical_filename,
+                    "verification_strength": row.verification_strength,
+                })
 
     report = ValidationReport(
         total_rows=len(rows),
         clean_rows=clean_count,
         failures=failures,
+        weak_verification_rows=weak_rows,
     )
     _logger.info(
         f"[{mode.upper()}] OpenKB handoff validation: {report.total_rows} "
         f"rows, {report.clean_rows} clean, {len(report.failures)} failure(s)."
     )
     return report
+
+
+def log_openkb_weak_verification_warnings(
+    logger: logging.Logger,
+    weak_verification_rows: list[dict],
+) -> None:
+    """Log operator-visible warnings for clean rows with weak verification strength."""
+    if not weak_verification_rows:
+        return
+    logger.warning(
+        "[OPENKB HANDOFF] %d row(s) have weak verification strength:",
+        len(weak_verification_rows),
+    )
+    for entry in weak_verification_rows[:10]:
+        logger.warning(
+            "  item_key=%s attachment_key=%s filename=%s strength=%s",
+            entry["item_key"],
+            entry["attachment_key"],
+            entry["canonical_filename"],
+            entry["verification_strength"],
+        )
+    if len(weak_verification_rows) > 10:
+        logger.warning(
+            "  ... and %d more row(s) with weak verification strength.",
+            len(weak_verification_rows) - 10,
+        )
 
 
 def write_openkb_jsonl(

@@ -24,6 +24,7 @@ from zotero_docai_pipeline.utils.export import (
     build_export_records,
     build_openkb_handoff_rows,
     log_export_records,
+    log_openkb_weak_verification_warnings,
     validate_openkb_handoff_rows,
     write_openkb_jsonl,
 )
@@ -261,6 +262,9 @@ def dry_run_command(
         )
         report = validate_openkb_handoff_rows(
             rows, mode="dry_run", source_items=items
+        )
+        log_openkb_weak_verification_warnings(
+            logger, report.weak_verification_rows
         )
         if report.failures:
             for failure in report.failures:

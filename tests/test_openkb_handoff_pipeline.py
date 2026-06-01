@@ -3,7 +3,12 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from zotero_docai_pipeline.cli.commands import dry_run_command
 from zotero_docai_pipeline.cli.main import validate_flags
+from zotero_docai_pipeline.clients.exceptions import (
+    AttachmentIdentityError,
+    OpenKBHandoffValidationError,
+)
 from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
 from zotero_docai_pipeline.domain.config import (
     AppConfig,
@@ -36,6 +41,72 @@ from zotero_docai_pipeline.utils.export import (
     ValidationReport,
     build_openkb_handoff_rows,
 )
+
+
+def _weak_row(index: int) -> dict:
+    return {
+        "item_key": f"ITEM{index}",
+        "attachment_key": f"ATT{index}",
+        "canonical_filename": f"paper-{index}.pdf",
+        "verification_strength": "key-only",
+    }
+
+
+def _make_weak_rows(count: int) -> list[dict]:
+    return [_weak_row(i) for i in range(1, count + 1)]
+
+
+def _format_log_messages(mock_logger, level: str) -> list[str]:
+    calls = getattr(mock_logger, level).call_args_list
+    messages: list[str] = []
+    for call in calls:
+        if not call.args:
+            continue
+        if len(call.args) == 1:
+            messages.append(str(call.args[0]))
+        else:
+            messages.append(call.args[0] % call.args[1:])
+    return messages
+
+
+def _assert_weak_warning_messages(
+    test_case: unittest.TestCase,
+    logger: MagicMock,
+    *,
+    weak_rows: list[dict],
+) -> None:
+    warnings = _format_log_messages(logger, "warning")
+    test_case.assertTrue(
+        any(
+            msg.startswith("[OPENKB HANDOFF]")
+            and "weak verification strength" in msg
+            and str(len(weak_rows)) in msg
+            for msg in warnings
+        ),
+        f"expected weak-verification header in warnings: {warnings}",
+    )
+    for entry in weak_rows[:10]:
+        test_case.assertTrue(
+            any(
+                entry["item_key"] in msg
+                and entry["attachment_key"] in msg
+                and entry["canonical_filename"] in msg
+                and entry["verification_strength"] in msg
+                for msg in warnings
+            ),
+            f"expected row detail for {entry['item_key']} in warnings: {warnings}",
+        )
+    if len(weak_rows) > 10:
+        overflow = len(weak_rows) - 10
+        test_case.assertTrue(
+            any(
+                "... and" in msg
+                and str(overflow) in msg
+                and "weak verification strength" in msg
+                for msg in warnings
+            ),
+            f"expected overflow summary in warnings: {warnings}",
+        )
 
 
 def _make_client():
@@ -194,6 +265,227 @@ class TestStandaloneOpenkbHandoffPipeline(unittest.TestCase):
         self.assertTrue(
             any("Standalone OpenKB handoff mode" in msg for msg in info_messages)
         )
+
+
+class TestOpenkbWeakVerificationWarningLogs(unittest.TestCase):
+    """Operator-visible weak-verification warnings in dry-run and live export."""
+
+    def test_dry_run_logs_weak_verification_warnings(self):
+        cfg = _make_standalone_handoff_app_config(dry_run=True)
+        logger = MagicMock()
+        mock_zotero = MagicMock()
+        mock_zotero.get_items_by_selection.return_value = (
+            [_make_item()],
+            _make_discovery_stats(),
+        )
+        weak_rows = _make_weak_rows(2)
+        report = ValidationReport(
+            total_rows=2,
+            clean_rows=2,
+            failures=[],
+            weak_verification_rows=weak_rows,
+        )
+
+        with (
+            patch(
+                "zotero_docai_pipeline.cli.commands.build_openkb_handoff_rows",
+                return_value=[_make_handoff_row()],
+            ),
+            patch(
+                "zotero_docai_pipeline.cli.commands.validate_openkb_handoff_rows",
+                return_value=report,
+            ),
+        ):
+            exit_code = dry_run_command(cfg, logger, mock_zotero)
+
+        self.assertEqual(exit_code, 0)
+        _assert_weak_warning_messages(self, logger, weak_rows=weak_rows)
+
+    def test_dry_run_truncates_weak_verification_warnings_after_ten_rows(self):
+        cfg = _make_standalone_handoff_app_config(dry_run=True)
+        logger = MagicMock()
+        mock_zotero = MagicMock()
+        mock_zotero.get_items_by_selection.return_value = (
+            [_make_item()],
+            _make_discovery_stats(),
+        )
+        weak_rows = _make_weak_rows(11)
+        report = ValidationReport(
+            total_rows=11,
+            clean_rows=11,
+            failures=[],
+            weak_verification_rows=weak_rows,
+        )
+
+        with (
+            patch(
+                "zotero_docai_pipeline.cli.commands.build_openkb_handoff_rows",
+                return_value=[_make_handoff_row()],
+            ),
+            patch(
+                "zotero_docai_pipeline.cli.commands.validate_openkb_handoff_rows",
+                return_value=report,
+            ),
+        ):
+            dry_run_command(cfg, logger, mock_zotero)
+
+        detail_warnings = [
+            msg
+            for msg in _format_log_messages(logger, "warning")
+            if msg.startswith("  item_key=")
+        ]
+        self.assertEqual(len(detail_warnings), 10)
+        _assert_weak_warning_messages(self, logger, weak_rows=weak_rows)
+
+    def test_dry_run_logs_weak_warnings_before_failure_exit(self):
+        cfg = _make_standalone_handoff_app_config(dry_run=True)
+        logger = MagicMock()
+        mock_zotero = MagicMock()
+        mock_zotero.get_items_by_selection.return_value = (
+            [_make_item()],
+            _make_discovery_stats(),
+        )
+        weak_rows = _make_weak_rows(1)
+        report = ValidationReport(
+            total_rows=2,
+            clean_rows=1,
+            failures=[AttachmentIdentityError("canonical_filename: duplicate")],
+            weak_verification_rows=weak_rows,
+        )
+
+        with (
+            patch(
+                "zotero_docai_pipeline.cli.commands.build_openkb_handoff_rows",
+                return_value=[_make_handoff_row()],
+            ),
+            patch(
+                "zotero_docai_pipeline.cli.commands.validate_openkb_handoff_rows",
+                return_value=report,
+            ),
+        ):
+            exit_code = dry_run_command(cfg, logger, mock_zotero)
+
+        self.assertEqual(exit_code, 2)
+        _assert_weak_warning_messages(self, logger, weak_rows=weak_rows)
+        logger.error.assert_called()
+
+    def test_live_export_logs_weak_verification_warnings(self):
+        pipeline = TestStandaloneOpenkbHandoffPipeline()._make_standalone_pipeline()
+        item = _make_item()
+        discovery_stats = _make_discovery_stats()
+        weak_rows = _make_weak_rows(2)
+        report = ValidationReport(
+            total_rows=2,
+            clean_rows=2,
+            failures=[],
+            weak_verification_rows=weak_rows,
+        )
+
+        with (
+            patch.object(
+                pipeline,
+                "_discover_items",
+                return_value=([item], discovery_stats),
+            ),
+            patch(
+                "zotero_docai_pipeline.orchestration.pipeline.build_openkb_handoff_rows",
+                return_value=[_make_handoff_row()],
+            ),
+            patch(
+                "zotero_docai_pipeline.orchestration.pipeline.validate_openkb_handoff_rows",
+                return_value=report,
+            ),
+            patch(
+                "zotero_docai_pipeline.orchestration.pipeline.write_openkb_jsonl",
+            ),
+        ):
+            summary = pipeline.run()
+
+        self.assertEqual(summary["openkb_handoff_rows_written"], 1)
+        _assert_weak_warning_messages(
+            self, pipeline.logger, weak_rows=weak_rows
+        )
+
+    def test_live_export_truncates_weak_verification_warnings_after_ten_rows(self):
+        pipeline = TestStandaloneOpenkbHandoffPipeline()._make_standalone_pipeline()
+        item = _make_item()
+        discovery_stats = _make_discovery_stats()
+        weak_rows = _make_weak_rows(11)
+        report = ValidationReport(
+            total_rows=11,
+            clean_rows=11,
+            failures=[],
+            weak_verification_rows=weak_rows,
+        )
+
+        with (
+            patch.object(
+                pipeline,
+                "_discover_items",
+                return_value=([item], discovery_stats),
+            ),
+            patch(
+                "zotero_docai_pipeline.orchestration.pipeline.build_openkb_handoff_rows",
+                return_value=[_make_handoff_row()],
+            ),
+            patch(
+                "zotero_docai_pipeline.orchestration.pipeline.validate_openkb_handoff_rows",
+                return_value=report,
+            ),
+            patch(
+                "zotero_docai_pipeline.orchestration.pipeline.write_openkb_jsonl",
+            ),
+        ):
+            pipeline.run()
+
+        detail_warnings = [
+            msg
+            for msg in _format_log_messages(pipeline.logger, "warning")
+            if msg.startswith("  item_key=")
+        ]
+        self.assertEqual(len(detail_warnings), 10)
+        _assert_weak_warning_messages(
+            self, pipeline.logger, weak_rows=weak_rows
+        )
+
+    def test_live_export_logs_weak_warnings_before_validation_abort(self):
+        pipeline = TestStandaloneOpenkbHandoffPipeline()._make_standalone_pipeline()
+        item = _make_item()
+        discovery_stats = _make_discovery_stats()
+        weak_rows = _make_weak_rows(1)
+        report = ValidationReport(
+            total_rows=2,
+            clean_rows=1,
+            failures=[AttachmentIdentityError("canonical_filename: duplicate")],
+            weak_verification_rows=weak_rows,
+        )
+
+        with (
+            patch.object(
+                pipeline,
+                "_discover_items",
+                return_value=([item], discovery_stats),
+            ),
+            patch(
+                "zotero_docai_pipeline.orchestration.pipeline.build_openkb_handoff_rows",
+                return_value=[_make_handoff_row()],
+            ),
+            patch(
+                "zotero_docai_pipeline.orchestration.pipeline.validate_openkb_handoff_rows",
+                return_value=report,
+            ),
+            patch(
+                "zotero_docai_pipeline.orchestration.pipeline.write_openkb_jsonl",
+            ) as mock_write,
+        ):
+            with self.assertRaises(OpenKBHandoffValidationError):
+                pipeline.run()
+
+        _assert_weak_warning_messages(
+            self, pipeline.logger, weak_rows=weak_rows
+        )
+        pipeline.logger.error.assert_called()
+        mock_write.assert_not_called()
 
 
 class TestStandaloneOpenkbHandoffValidateFlags(unittest.TestCase):

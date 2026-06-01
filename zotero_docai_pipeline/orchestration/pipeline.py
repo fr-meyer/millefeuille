@@ -91,6 +91,7 @@ from zotero_docai_pipeline.utils.export import (
     build_export_records,
     build_openkb_handoff_rows,
     log_export_records,
+    log_openkb_weak_verification_warnings,
     validate_openkb_handoff_rows,
     write_manifest,
     write_openkb_jsonl,
@@ -2281,6 +2282,9 @@ class Pipeline:
             )
             report = validate_openkb_handoff_rows(
                 rows, mode="live", source_items=items
+            )
+            log_openkb_weak_verification_warnings(
+                self.logger, report.weak_verification_rows
             )
             if not report.is_clean:
                 for failure in report.failures:

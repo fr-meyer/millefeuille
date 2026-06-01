@@ -292,5 +292,68 @@ class TestValidateOpenkbHandoffRows(unittest.TestCase):
         )
 
 
+class TestWeakVerificationRows(unittest.TestCase):
+    def test_key_only_appears_in_weak_rows(self):
+        rows = _build_rows(_make_attachment())
+        self.assertEqual(rows[0].verification_strength, "key-only")
+        report = validate_openkb_handoff_rows(rows, mode="test")
+        self.assertEqual(len(report.weak_verification_rows), 1)
+        self.assertEqual(
+            report.weak_verification_rows[0]["verification_strength"],
+            "key-only",
+        )
+
+    def test_metadata_only_appears_in_weak_rows(self):
+        rows = _build_rows(_make_attachment(file_size_bytes=1024))
+        self.assertEqual(rows[0].verification_strength, "metadata-only")
+        report = validate_openkb_handoff_rows(rows, mode="test")
+        self.assertEqual(len(report.weak_verification_rows), 1)
+        self.assertEqual(
+            report.weak_verification_rows[0]["verification_strength"],
+            "metadata-only",
+        )
+
+    def test_hash_only_appears_in_weak_rows(self):
+        rows = _build_rows(_make_attachment(md5="abc123"))
+        self.assertEqual(rows[0].verification_strength, "hash-only")
+        report = validate_openkb_handoff_rows(rows, mode="test")
+        self.assertEqual(len(report.weak_verification_rows), 1)
+        self.assertEqual(
+            report.weak_verification_rows[0]["verification_strength"],
+            "hash-only",
+        )
+
+    def test_full_strength_not_in_weak_rows(self):
+        row = _make_valid_row(verification_strength="full")
+        report = validate_openkb_handoff_rows([row], mode="test")
+        self.assertEqual(report.weak_verification_rows, [])
+
+    def test_weak_rows_do_not_cause_failure(self):
+        rows = _build_rows(_make_attachment())
+        report = validate_openkb_handoff_rows(rows, mode="test")
+        self.assertTrue(report.is_clean)
+        self.assertTrue(report.weak_verification_rows)
+
+    def test_failed_row_not_in_weak_rows(self):
+        row = _make_valid_row(canonical_filename="file.pdf")
+        report = validate_openkb_handoff_rows([row], mode="test")
+        self.assertFalse(report.is_clean)
+        self.assertEqual(report.weak_verification_rows, [])
+
+    def test_weak_row_dict_has_expected_keys(self):
+        rows = _build_rows(_make_attachment())
+        report = validate_openkb_handoff_rows(rows, mode="test")
+        self.assertEqual(len(report.weak_verification_rows), 1)
+        self.assertEqual(
+            set(report.weak_verification_rows[0].keys()),
+            {
+                "item_key",
+                "attachment_key",
+                "canonical_filename",
+                "verification_strength",
+            },
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
