@@ -47,6 +47,21 @@ class AttachmentInfo:
     link_mode: str | None = None
     """Zotero link mode, e.g. 'imported_file' or 'linked_url'."""
 
+    file_size_bytes: int | None = None
+    """File size in bytes from Zotero metadata, when available."""
+
+    md5: str | None = None
+    """MD5 checksum from Zotero metadata, when available."""
+
+    sha256: str | None = None
+    """SHA-256 checksum computed from attachment bytes, when available."""
+
+    zotero_version: int | None = None
+    """Zotero item version number, when available."""
+
+    item_type: str | None = None
+    """Parent item type from Zotero metadata, when available."""
+
 
 @dataclass
 class PaperMetadata:
@@ -562,3 +577,78 @@ class DiscoveredAttachmentExportRecord:
     def to_dict(self) -> dict[str, Any]:
         """Serialise all fields to a dict, including ``None`` values."""
         return {f.name: getattr(self, f.name) for f in fields(self)}
+
+
+@dataclass
+class OpenKBHandoffRow:
+    """Handoff row schema for openkb-docai-handoff/v0.1.
+
+    Parallel to :class:`DiscoveredAttachmentExportRecord` but purpose-built for
+    OpenKB/DocAI JSONL handoff without authenticated URLs.
+    """
+
+    schema_version: str
+    """Always ``\"openkb-docai-handoff/v0.1\"``."""
+
+    source_type: str
+    """Always ``\"zotero\"``."""
+
+    discovered_at: str
+    """ISO-8601 UTC timestamp when the attachment was discovered."""
+
+    item_key: str
+    """Zotero parent item key."""
+
+    attachment_key: str
+    """Zotero attachment key."""
+
+    canonical_filename: str
+    """Canonical attachment filename for handoff."""
+
+    is_pdf: bool
+    """Whether the attachment is a PDF."""
+
+    verification_strength: str
+    """Identity verification level: ``full``, ``hash-only``, ``metadata-only``,
+    or ``key-only``."""
+
+    recovery: dict[str, str]
+    """Recovery hints for downstream re-identification."""
+
+    openkb_policy_hints: dict[str, object]
+    """OpenKB policy hints for downstream processing."""
+
+    item_type: str | None = None
+    """Parent item type, when available."""
+
+    item_title: str | None = None
+    """Parent item title, when available."""
+
+    citation_key: str | None = None
+    """Citation key when available."""
+
+    zotero_version: int | None = None
+    """Zotero item version number, when available."""
+
+    content_type: str | None = None
+    """Attachment MIME type, when available."""
+
+    file_size_bytes: int | None = None
+    """File size in bytes from Zotero metadata, when available."""
+
+    md5: str | None = None
+    """MD5 checksum from Zotero metadata, when available."""
+
+    sha256: str | None = None
+    """SHA-256 checksum computed from attachment bytes, when available."""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a JSON-friendly dict, omitting ``None`` scalar fields."""
+        result: dict[str, Any] = {}
+        always_include = {"recovery", "openkb_policy_hints"}
+        for field_info in fields(self):
+            val = getattr(self, field_info.name)
+            if val is None and field_info.name not in always_include:
+                continue
+            result[field_info.name] = val
+        return result

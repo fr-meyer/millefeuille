@@ -680,6 +680,29 @@ class AttachmentUrlExportConfig:
 
 
 @dataclass
+class OpenKBHandoffExportConfig:
+    """Configuration for OpenKB/DocAI JSONL handoff export."""
+
+    enabled: bool = False
+    """Whether OpenKB handoff export is enabled."""
+
+    jsonl_path: str | None = None
+    """Output path for the handoff JSONL file."""
+
+    preview_jsonl_path: str | None = None
+    """Optional preview JSONL path for dry-run or validate-only runs."""
+
+    include_item_type: bool = True
+    """Whether to include parent item type in handoff rows."""
+
+    include_zotero_version: bool = True
+    """Whether to include Zotero item version in handoff rows."""
+
+    compute_sha256: bool = False
+    """Whether to transiently fetch PDF bytes and compute SHA-256 hashes."""
+
+
+@dataclass
 class ExportConfig:
     """Top-level export feature configuration."""
 
@@ -687,6 +710,11 @@ class ExportConfig:
         default_factory=AttachmentUrlExportConfig
     )
     """Attachment URL export settings."""
+
+    openkb_handoff: OpenKBHandoffExportConfig = field(
+        default_factory=OpenKBHandoffExportConfig
+    )
+    """OpenKB/DocAI JSONL handoff export settings."""
 
 
 @dataclass

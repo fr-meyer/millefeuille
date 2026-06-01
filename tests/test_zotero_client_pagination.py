@@ -200,6 +200,32 @@ class TestFetchItemsForTagErrors(unittest.TestCase):
             client._fetch_items_for_tag("docai")
 
 
+class TestDownloadPdfLogging(unittest.TestCase):
+    """PDF download logging must not expose transient signed storage URLs."""
+
+    def test_httpx_info_logging_suppressed_and_restored(self):
+        client, mock_zr = _make_client()
+        observed_httpx_levels = []
+
+        def file_side_effect(_attachment_key):
+            observed_httpx_levels.append(logging.getLogger("httpx").level)
+            return b"%PDF-1.7"
+
+        mock_zr.file.side_effect = file_side_effect
+        httpx_logger = logging.getLogger("httpx")
+        previous_level = httpx_logger.level
+        try:
+            httpx_logger.setLevel(logging.INFO)
+
+            pdf_bytes = client.download_pdf("ITEM1", "ATT1")
+
+            self.assertEqual(pdf_bytes, b"%PDF-1.7")
+            self.assertEqual(observed_httpx_levels, [logging.WARNING])
+            self.assertEqual(httpx_logger.level, logging.INFO)
+        finally:
+            httpx_logger.setLevel(previous_level)
+
+
 def _item_data(key, tags=None):
     data = {"key": key, "title": f"Title {key}", "tags": tags or []}
     return data

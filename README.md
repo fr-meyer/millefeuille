@@ -16,6 +16,7 @@ Automate PDF-to-Markdown extraction for Zotero attachments using OCR providers (
 - [Item Selection & Tagging](#item-selection--tagging)
 - [Tag Adding](#tag-adding)
 - [PDF Download](#pdf-download)
+- [OpenKB/DocAI Handoff Export](#openkbdocai-handoff-export)
 - [Extraction Modes](#extraction-modes)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
@@ -69,6 +70,18 @@ python -m zotero_docai_pipeline processing.dry_run=true export.attachment_urls.e
 ```
 
 This mode does **not** require `PAGEINDEX_API_KEY` or `MISTRAL_API_KEY`. It runs discovery, logs one `[DISCOVERY URL]` record per PDF attachment, and exits — no bytes are downloaded, no notes are written, and no OCR credentials are needed.
+
+### Safe Subset Workflow
+
+Use this five-step staging-tag pattern to validate configuration on a small subset before running on your full library:
+
+1. Tag 2–5 items in Zotero with a staging tag (e.g. `docai-test`).
+2. Override `tagging.selection.include.values=[docai-test]` on the CLI.
+3. Run with `processing.dry_run=true` to preview.
+4. Confirm output, then run live on the subset.
+5. Only then widen to the full `docai` tag set.
+
+This pattern applies to selection-retagging, OCR, download, and the OpenKB handoff export.
 
 ## Installation
 
@@ -268,6 +281,35 @@ zotero-docai-pipeline "tagging.selection.include.values=[my-tag]"
 # or: python -m zotero_docai_pipeline "tagging.selection.include.values=[my-tag]"
 ```
 
+### Selection-Based Retagging
+
+Use `selection_tagging` to add and remove tags on items matched by `tagging.selection` without running OCR or download:
+
+- **`selection_tagging.enabled`** — enable selection-based retagging.
+- **`selection_tagging.add.values`** — tags to add to each matched item.
+- **`selection_tagging.remove.values`** — tags to remove from each matched item.
+
+Dry-run preview:
+
+```bash
+python -m zotero_docai_pipeline \
+  processing.dry_run=true \
+  selection_tagging.enabled=true \
+  "selection_tagging.add.values=[docai-v2]" \
+  "selection_tagging.remove.values=[docai]"
+```
+
+Live run (same command without `processing.dry_run=true`):
+
+```bash
+python -m zotero_docai_pipeline \
+  selection_tagging.enabled=true \
+  "selection_tagging.add.values=[docai-v2]" \
+  "selection_tagging.remove.values=[docai]"
+```
+
+`selection_tagging` and `tag_adding` are **mutually exclusive** — the CLI exits with a config error if both are enabled. A live run with `selection_tagging` requires `ZOTERO_WRITE_KEY`.
+
 ## Tag Adding
 
 Optional step that applies Zotero tags to items by matching their **citation keys** (no OCR/notes are created in tag-adding-only mode).
@@ -307,7 +349,9 @@ Optional step that downloads PDFs from Zotero items to local disk (used as an in
 - Retry is configurable via `download.retry.*` (see `zotero_docai_pipeline/conf/download/default.yaml`).
 
 ### Important constraint
-- `processing.dry_run=true` cannot be combined with `download.enabled=true`.
+- `processing.dry_run=true` does not download PDFs. It can be combined with
+  `download.enabled=true` only for selection-tagging preview workflows where
+  `selection_tagging.enabled=true`.
 
 Examples:
 ```bash
@@ -319,6 +363,81 @@ zotero-docai-pipeline download.enabled=true download.upload_folder=/path/to/down
 zotero-docai-pipeline download.enabled=true download.upload_folder=/path/to/downloads ocr.enabled=true
 # or: python -m zotero_docai_pipeline download.enabled=true download.upload_folder=/path/to/downloads ocr.enabled=true
 ```
+
+## OpenKB/DocAI Handoff Export
+
+Produces a durable, credential-free JSONL file (`openkb-docai-handoff/v0.1`) that an external OpenKB/DocAI helper can consume to recover and verify Zotero PDF attachments. No authenticated URLs, API keys, or file payloads are stored.
+
+**Key facts:**
+
+- `ZOTERO_READ_KEY` is sufficient — no write key needed.
+- No OCR provider key required.
+- Recovery uses Zotero API keys only; no pre-built URLs are stored.
+- Optional `export.openkb_handoff.compute_sha256=true` transiently fetches
+  attachment bytes in memory to compute SHA-256 and upgrade row verification
+  to `full`; no PDF payload is written or stored.
+- Live export runs the same validators as dry-run and fails closed on unsafe rows.
+- Dry-run first is **recommended** but **not required** by the CLI.
+
+**Validate-only dry-run (no output file):**
+
+```bash
+python -m zotero_docai_pipeline \
+  processing.dry_run=true \
+  export.openkb_handoff.enabled=true \
+  "tagging.selection.include.values=[docai-test]"
+```
+
+**Explicit preview mode (writes a non-authoritative preview file):**
+
+```bash
+python -m zotero_docai_pipeline \
+  processing.dry_run=true \
+  export.openkb_handoff.enabled=true \
+  export.openkb_handoff.preview_jsonl_path=./handoff-dry-run.preview.jsonl \
+  "tagging.selection.include.values=[docai-test]"
+```
+
+Note: the preview file is non-authoritative and written only to `preview_jsonl_path`. The live `jsonl_path` is never written in dry-run.
+
+**Strong verification preview/readiness run:**
+
+Use this for merge readiness, dogfood, or production verification when Zotero-hosted PDFs should produce `verification_strength=full` and no weak-verification warning. It transiently fetches each PDF in memory to compute SHA-256, but does not write or store PDF payloads.
+
+```bash
+python -m zotero_docai_pipeline \
+  processing.dry_run=true \
+  ocr.enabled=false \
+  download.enabled=false \
+  tag_adding.enabled=false \
+  selection_tagging.enabled=false \
+  export.openkb_handoff.enabled=true \
+  export.openkb_handoff.compute_sha256=true \
+  export.openkb_handoff.preview_jsonl_path=./handoff-dry-run.preview.jsonl \
+  "tagging.selection.include.values=[docai-test]"
+```
+
+**Live export:**
+
+```bash
+python -m zotero_docai_pipeline \
+  export.openkb_handoff.enabled=true \
+  export.openkb_handoff.jsonl_path=./handoff.jsonl \
+  "tagging.selection.include.values=[docai]"
+```
+
+For production-grade handoff verification, include `export.openkb_handoff.compute_sha256=true` in the live command as well.
+
+**Configuration reference:**
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `export.openkb_handoff.enabled` | bool | `false` | Enable handoff export |
+| `export.openkb_handoff.jsonl_path` | string | `null` | Live output path (required for live export) |
+| `export.openkb_handoff.preview_jsonl_path` | string | `null` | Preview output path (dry-run only) |
+| `export.openkb_handoff.include_item_type` | bool | `true` | Include parent item type |
+| `export.openkb_handoff.include_zotero_version` | bool | `true` | Include Zotero item version |
+| `export.openkb_handoff.compute_sha256` | bool | `false` | Transiently fetch PDF bytes and compute SHA-256 for `full` verification |
 
 ## Extraction Modes
 

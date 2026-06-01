@@ -56,6 +56,7 @@ except ImportError:
 
 
 from zotero_docai_pipeline.clients.exceptions import (
+    OpenKBHandoffValidationError,
     TreeStructureProcessingError,
     ZoteroClientError,
 )
@@ -88,8 +89,12 @@ from zotero_docai_pipeline.domain.tree_processor import TreeStructureProcessor
 from zotero_docai_pipeline.orchestration.processor import ItemProcessor
 from zotero_docai_pipeline.utils.export import (
     build_export_records,
+    build_openkb_handoff_rows,
     log_export_records,
+    log_openkb_weak_verification_warnings,
+    validate_openkb_handoff_rows,
     write_manifest,
+    write_openkb_jsonl,
 )
 from zotero_docai_pipeline.utils.logging import (
     log_completion,
@@ -2269,6 +2274,31 @@ class Pipeline:
                     records, self.export_config.attachment_urls.manifest_path
                 )
 
+        def _export_openkb_handoff() -> int:
+            if not self.export_config.openkb_handoff.enabled:
+                return 0
+            rows = build_openkb_handoff_rows(
+                items, self.zotero_client, self.export_config.openkb_handoff
+            )
+            report = validate_openkb_handoff_rows(
+                rows, mode="live", source_items=items
+            )
+            log_openkb_weak_verification_warnings(
+                self.logger, report.weak_verification_rows
+            )
+            if not report.is_clean:
+                for failure in report.failures:
+                    self.logger.error(str(failure))
+                raise OpenKBHandoffValidationError(
+                    f"OpenKB handoff export aborted: {len(report.failures)} "
+                    "validation failure(s). No JSONL written."
+                )
+            assert self.export_config.openkb_handoff.jsonl_path is not None
+            write_openkb_jsonl(
+                rows, self.export_config.openkb_handoff.jsonl_path
+            )
+            return len(rows)
+
         def _selection_tagging_fields(selected: int | None = None) -> dict[str, int]:
             return self._build_selection_tagging_summary_fields(
                 selected=selected if selected is not None else len(items),
@@ -2277,8 +2307,10 @@ class Pipeline:
                 agg=st_agg,
             )
 
+        openkb_handoff_rows_written = 0
         if not self.selection_tagging_config.enabled:
             _export_attachment_urls()
+            openkb_handoff_rows_written = _export_openkb_handoff()
 
         # Step 2: Handle empty list
         if not items:
@@ -2286,6 +2318,7 @@ class Pipeline:
             if self.selection_tagging_config.enabled:
                 _emit_selection_tagging_summary_before_export()
                 _export_attachment_urls()
+                _export_openkb_handoff()
             return {
                 "total_items": 0,
                 "successful_items": 0,
@@ -2308,8 +2341,50 @@ class Pipeline:
                 "selection_tagging_summary_displayed": (
                     selection_tagging_summary_displayed
                 ),
+                "openkb_handoff_rows_written": openkb_handoff_rows_written,
                 **_selection_tagging_fields(selected=0),
             }
+
+        # Early exit for standalone OpenKB handoff export mode
+        if (
+            self.export_config.openkb_handoff.enabled
+            and not self.ocr_config.enabled
+            and not self.download_config.enabled
+            and not self.tag_adding_config.enabled
+            and not self.selection_tagging_config.enabled
+        ):
+            self.logger.info(
+                "Standalone OpenKB handoff mode: OCR, download, tag adding, "
+                "and selection tagging disabled"
+            )
+            total_time = time.time() - start_time
+            summary = {
+                "total_items": len(items),
+                "successful_items": len(items),
+                "failed_items": 0,
+                "skipped_items": discovery_stats.excluded_count,
+                "matched_items": discovery_stats.matched_count,
+                "excluded_by_rule": discovery_stats.excluded_by_rule,
+                "total_pdfs_processed": 0,
+                "total_pages_extracted": 0,
+                "total_notes_created": 0,
+                "total_time": total_time,
+                "results": [],
+                "tag_adding_results": [],
+                "tag_adding_failed": 0,
+                "tag_adding_matched": 0,
+                "tag_adding_succeeded": 0,
+                "tag_adding_eligible": 0,
+                "tag_adding_no_key": 0,
+                "tag_adding_processed": 0,
+                "selection_tagging_summary_displayed": (
+                    selection_tagging_summary_displayed
+                ),
+                "openkb_handoff_rows_written": openkb_handoff_rows_written,
+                **_selection_tagging_fields(),
+            }
+            log_completion(self.logger)
+            return summary
 
         # Early exit for standalone selection-tagging mode
         if (
@@ -2325,6 +2400,7 @@ class Pipeline:
             )
             _emit_selection_tagging_summary_before_export()
             _export_attachment_urls()
+            _export_openkb_handoff()
             total_time = time.time() - start_time
             summary = {
                 "total_items": len(items),
@@ -2432,6 +2508,7 @@ class Pipeline:
             )
             _emit_selection_tagging_summary_before_export()
             _export_attachment_urls()
+            _export_openkb_handoff()
 
         # ========================================================================
         # Phase 1: Collect & Upload PDFs

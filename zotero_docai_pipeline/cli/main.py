@@ -24,6 +24,7 @@ from omegaconf import DictConfig, OmegaConf
 from zotero_docai_pipeline.cli.commands import dry_run_command, process_command
 from zotero_docai_pipeline.clients.exceptions import (
     OCRClientError,
+    OpenKBHandoffValidationError,
     ZoteroClientError,
 )
 from zotero_docai_pipeline.clients.mistral_client import MistralClient
@@ -44,6 +45,7 @@ from zotero_docai_pipeline.domain.config import (
     DownloadConfig,
     ExportConfig,
     MistralOCRConfig,
+    OpenKBHandoffExportConfig,
     PageIndexOCRConfig,
     ProcessingConfig,
     RetryConfig,
@@ -172,8 +174,9 @@ def validate_flags(cfg: AppConfig) -> None:
        operations, while download is an actual operation.
     2. At least one operation enabled: At least one of download.enabled,
        ocr.enabled, tag_adding.enabled, or selection_tagging.enabled must be
-       True, except for export-only dry-run (processing.dry_run with
-       export.attachment_urls.enabled).
+       True, except for standalone export modes (export.openkb_handoff.enabled
+       for dry-run or live export; export.attachment_urls.enabled with
+       processing.dry_run).
 
     Args:
         cfg: Application configuration object
@@ -201,12 +204,16 @@ def validate_flags(cfg: AppConfig) -> None:
             "be enabled in the same run. Disable one of them."
         )
 
+    standalone_export = (
+        cfg.export.openkb_handoff.enabled
+        or (cfg.processing.dry_run and cfg.export.attachment_urls.enabled)
+    )
     if (
         not cfg.download.enabled
         and not cfg.ocr.enabled
         and not cfg.tag_adding.enabled
         and not cfg.selection_tagging.enabled
-        and not (cfg.processing.dry_run and cfg.export.attachment_urls.enabled)
+        and not standalone_export
     ):
         raise ConfigError(
             "Invalid configuration: at least one operation must be enabled. "
@@ -239,31 +246,34 @@ def validate_flags(cfg: AppConfig) -> None:
             "selection_tagging.enabled with non-empty add/remove "
             "(live run writes tags to Zotero)"
         )
-    if cfg.tagging.apply_on_success.values and not cfg.processing.dry_run:
-        write_reasons.append(
-            "tagging.apply_on_success is non-empty "
-            "(live run writes post-processing success tags)"
-        )
-    if (
-        cfg.tagging.apply_on_error.values
-        and cfg.zotero.error_tagging_enabled
-        and not cfg.processing.dry_run
-    ):
-        write_reasons.append(
-            "tagging.apply_on_error is non-empty and "
-            "zotero.error_tagging_enabled "
-            "(live run writes post-processing error tags)"
-        )
-    if cfg.tagging.remove_on_success.values and not cfg.processing.dry_run:
-        write_reasons.append(
-            "tagging.remove_on_success is non-empty "
-            "(live run removes post-processing success tags)"
-        )
-    if cfg.tagging.remove_on_error.values and not cfg.processing.dry_run:
-        write_reasons.append(
-            "tagging.remove_on_error is non-empty "
-            "(live run removes post-processing error tags)"
-        )
+    can_reach_outcome_tag_mutations = not cfg.processing.dry_run and (
+        cfg.ocr.enabled or cfg.download.enabled or cfg.tag_adding.enabled
+    )
+    if can_reach_outcome_tag_mutations:
+        if cfg.tagging.apply_on_success.values:
+            write_reasons.append(
+                "tagging.apply_on_success is non-empty "
+                "(live run writes post-processing success tags)"
+            )
+        if (
+            cfg.tagging.apply_on_error.values
+            and cfg.zotero.error_tagging_enabled
+        ):
+            write_reasons.append(
+                "tagging.apply_on_error is non-empty and "
+                "zotero.error_tagging_enabled "
+                "(live run writes post-processing error tags)"
+            )
+        if cfg.tagging.remove_on_success.values:
+            write_reasons.append(
+                "tagging.remove_on_success is non-empty "
+                "(live run removes post-processing success tags)"
+            )
+        if cfg.tagging.remove_on_error.values:
+            write_reasons.append(
+                "tagging.remove_on_error is non-empty "
+                "(live run removes post-processing error tags)"
+            )
     if write_reasons:
         wk = cfg.credentials.write_key
         if wk is None or (isinstance(wk, str) and not wk.strip()):
@@ -281,6 +291,27 @@ def validate_flags(cfg: AppConfig) -> None:
             "credentials.redact_logs must be true when "
             "export.attachment_urls.auth_query.enabled=true"
         )
+
+    handoff = cfg.export.openkb_handoff
+    if handoff.enabled:
+        if (
+            not cfg.processing.dry_run
+            and (handoff.jsonl_path is None or not str(handoff.jsonl_path).strip())
+        ):
+            raise ConfigError(
+                "export.openkb_handoff.jsonl_path is required for live export "
+                "when export.openkb_handoff.enabled=true"
+            )
+        if handoff.preview_jsonl_path is not None:
+            if not str(handoff.preview_jsonl_path).strip():
+                raise ConfigError(
+                    "export.openkb_handoff.preview_jsonl_path cannot be empty"
+                )
+            if handoff.preview_jsonl_path == handoff.jsonl_path:
+                raise ConfigError(
+                    "export.openkb_handoff.preview_jsonl_path must differ from "
+                    "export.openkb_handoff.jsonl_path"
+                )
 
     logger.debug("Flag configuration validated successfully")
 
@@ -558,7 +589,18 @@ def build_app_config(cfg: DictConfig) -> AppConfig:
     attachment_urls_export = AttachmentUrlExportConfig(
         **att_urls, auth_query=AuthQueryHelperConfig(**auth_query_raw)
     )
-    export_config = ExportConfig(attachment_urls=attachment_urls_export)
+
+    openkb_handoff_raw = OmegaConf.to_container(
+        cfg.export.openkb_handoff, resolve=True
+    )
+    if not isinstance(openkb_handoff_raw, dict):
+        raise ConfigError("export.openkb_handoff must resolve to a mapping")
+    openkb_handoff_export = OpenKBHandoffExportConfig(**openkb_handoff_raw)
+
+    export_config = ExportConfig(
+        attachment_urls=attachment_urls_export,
+        openkb_handoff=openkb_handoff_export,
+    )
 
     if not OmegaConf.is_missing(cfg, "credentials"):
         credentials_cfg = cfg.credentials
@@ -690,11 +732,14 @@ def main(cfg: DictConfig) -> None:
             and not app_cfg.tag_adding.enabled
             and not app_cfg.selection_tagging.enabled
         )
-        export_only_dry_run = (
-            app_cfg.processing.dry_run
-            and app_cfg.export.attachment_urls.enabled
+        standalone_export = (
+            app_cfg.export.openkb_handoff.enabled
+            or (
+                app_cfg.processing.dry_run
+                and app_cfg.export.attachment_urls.enabled
+            )
         )
-        if all_ops_disabled and not export_only_dry_run:
+        if all_ops_disabled and not standalone_export:
             print(_HELP_TEXT)
             exit_code = 0
         else:
@@ -756,6 +801,9 @@ def main(cfg: DictConfig) -> None:
                     app_cfg, logger, zotero_client, ocr_client, tree_processor
                 )
 
+    except OpenKBHandoffValidationError as e:
+        logger.error(f"OpenKB handoff validation failed: {redact_message(str(e))}")
+        exit_code = 2
     except ConfigError as e:
         logger.error(f"Configuration error: {redact_message(str(e))}")
         exit_code = 3

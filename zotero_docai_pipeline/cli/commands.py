@@ -22,7 +22,11 @@ from zotero_docai_pipeline.orchestration.pipeline import (
 from zotero_docai_pipeline.orchestration.processor import ItemProcessor
 from zotero_docai_pipeline.utils.export import (
     build_export_records,
+    build_openkb_handoff_rows,
     log_export_records,
+    log_openkb_weak_verification_warnings,
+    validate_openkb_handoff_rows,
+    write_openkb_preview_jsonl,
 )
 from zotero_docai_pipeline.utils.logging import (
     _format_with_emoji,
@@ -250,6 +254,34 @@ def dry_run_command(
             logger.info(
                 "  [dry-run] Manifest write suppressed "
                 "(no writes in dry-run mode)"
+            )
+
+    if cfg.export.openkb_handoff.enabled:
+        rows = build_openkb_handoff_rows(
+            items, zotero_client, cfg.export.openkb_handoff
+        )
+        report = validate_openkb_handoff_rows(
+            rows, mode="dry_run", source_items=items
+        )
+        log_openkb_weak_verification_warnings(
+            logger, report.weak_verification_rows
+        )
+        if report.failures:
+            for failure in report.failures:
+                logger.error(str(failure))
+            return 2
+        if cfg.export.openkb_handoff.preview_jsonl_path:
+            write_openkb_preview_jsonl(
+                rows, cfg.export.openkb_handoff.preview_jsonl_path
+            )
+            logger.info(
+                "Non-authoritative OpenKB handoff preview written to "
+                f"{cfg.export.openkb_handoff.preview_jsonl_path}"
+            )
+        else:
+            logger.info(
+                f"[DRY-RUN] OpenKB handoff JSONL write suppressed "
+                f"({len(rows)} rows validated)"
             )
 
     return 0
