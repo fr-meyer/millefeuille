@@ -12,6 +12,7 @@ import tempfile
 from urllib.parse import parse_qsl, urlparse
 
 from zotero_docai_pipeline.clients.exceptions import (
+    AttachmentIdentityError,
     HandoffSecurityError,
 )
 from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
@@ -80,7 +81,7 @@ _SENSITIVE_QUERY_PARAMS: frozenset[str] = frozenset({
     "expires",
 })
 
-_CREDENTIAL_HEADER_RE = re.compile(r"(?i)(Authorization:|Bearer |Basic )")
+_CREDENTIAL_HEADER_RE = re.compile(r"(?i)^\s*(Authorization:|Bearer |Basic )")
 _SESSION_COOKIE_RE = re.compile(r"(?i)(Cookie:|Set-Cookie:|session=|sessionid=)")
 _LARGE_BASE64_RE = re.compile(r"[A-Za-z0-9+/]{512,}={0,2}")
 
@@ -91,7 +92,7 @@ class ValidationReport:
 
     total_rows: int
     clean_rows: int
-    failures: list[str] = field(default_factory=list)
+    failures: list[Exception] = field(default_factory=list)
 
     @property
     def is_clean(self) -> bool:
@@ -266,7 +267,7 @@ def validate_openkb_handoff_rows(
     source_items: list[DiscoveredItem] | None = None,
 ) -> ValidationReport:
     """Validate handoff rows; ``mode`` is reserved for future behaviour."""
-    failures: list[str] = []
+    failures: list[Exception] = []
     clean_count = 0
 
     source_attachment_map: dict[str, AttachmentInfo] = {}
@@ -278,27 +279,41 @@ def validate_openkb_handoff_rows(
     canonical_filename_seen: dict[str, set[str]] = {}
 
     for row in rows:
-        row_failures: list[str] = []
+        row_failures: list[Exception] = []
 
         if not row.item_key:
-            failures.append("item_key: missing required field")
+            failures.append(
+                AttachmentIdentityError("item_key: missing required field")
+            )
             continue
         if not row.attachment_key:
-            failures.append("attachment_key: missing required field")
+            failures.append(
+                AttachmentIdentityError(
+                    "attachment_key: missing required field"
+                )
+            )
             continue
 
         if source_items is not None:
             attachment = source_attachment_map.get(row.attachment_key)
             if attachment is not None and attachment.link_mode == "linked_url":
                 row_failures.append(
-                    "link_mode: attachment uses linked URL mode"
+                    AttachmentIdentityError(
+                        "link_mode: attachment uses linked URL mode"
+                    )
                 )
 
         if not (row.canonical_filename or "").strip():
-            row_failures.append("canonical_filename: missing required field")
+            row_failures.append(
+                AttachmentIdentityError(
+                    "canonical_filename: missing required field"
+                )
+            )
         elif _is_generic_filename(row.canonical_filename):
             row_failures.append(
-                "canonical_filename: generic filename not allowed"
+                AttachmentIdentityError(
+                    "canonical_filename: generic filename not allowed"
+                )
             )
 
         if (
@@ -306,13 +321,17 @@ def validate_openkb_handoff_rows(
             or row.verification_strength not in _VALID_VERIFICATION_STRENGTHS
         ):
             row_failures.append(
-                "verification_strength: missing or invalid value"
+                AttachmentIdentityError(
+                    "verification_strength: missing or invalid value"
+                )
             )
 
         seen = canonical_filename_seen.setdefault(row.item_key, set())
         if row.canonical_filename in seen:
             row_failures.append(
-                "canonical_filename: duplicate on same item"
+                AttachmentIdentityError(
+                    "canonical_filename: duplicate on same item"
+                )
             )
         else:
             seen.add(row.canonical_filename)
@@ -324,18 +343,22 @@ def validate_openkb_handoff_rows(
         ):
             if not getattr(row, req_field, None):
                 row_failures.append(
-                    f"{req_field}: missing required field"
+                    AttachmentIdentityError(
+                        f"{req_field}: missing required field"
+                    )
                 )
 
-        row_failures.extend(_validate_recovery_object(row.recovery))
-        row_failures.extend(
-            _validate_openkb_policy_hints_object(row.openkb_policy_hints)
-        )
+        for msg in _validate_recovery_object(row.recovery):
+            row_failures.append(AttachmentIdentityError(msg))
+        for msg in _validate_openkb_policy_hints_object(
+            row.openkb_policy_hints
+        ):
+            row_failures.append(AttachmentIdentityError(msg))
 
         try:
             sanitize_handoff_row(row.to_dict())
         except HandoffSecurityError as e:
-            row_failures.append(str(e))
+            row_failures.append(e)
 
         failures.extend(row_failures)
         if not row_failures:
