@@ -1,0 +1,94 @@
+schema_version: 0.1
+project: Zotero DocAI Pipeline
+workflow: speculoos-v1
+canonical_task: pr-036-speculoos-millefeuille-bootstrap
+repository:
+  upstream: null
+  fork: fr-meyer/zotero-docai-pipeline
+  local_path: /home/node/.openclaw/repos/zotero-docai-pipeline
+  base_branch: dev
+  working_branch: chore/pr-036-speculoos-millefeuille-bootstrap
+status:
+  phase: implementation
+  pret_a_coder: satisfied-local
+  blocker_summary: []
+release_policy:
+  branch_model: feature-branch-to-dev
+  stable_branch: main
+  integration_branch: dev
+  tag_policy: no-release-in-bootstrap
+  release_gate: separate-explicit-approval
+validation:
+  unit_tests:
+    status: passed
+    command: .venv/bin/python -m unittest discover -v
+    result: 123 passed, 0 failed
+  lint:
+    status: passed
+    command: .venv/bin/ruff check .
+    result: all checks passed
+  metadata:
+    status: passed
+    command: ruby -ryaml -rjson -e 'Dir[".speculoos/**/*.yaml"].sort.each { |p| Psych.parse_file(p) }; JSON.parse(File.read(".speculoos/review-evidence.json")); puts "metadata ok"'
+    result: metadata ok
+commit_identity:
+  default_mode: human_approved_agent_assisted
+  public_email_policy: repo-local-configured-email
+  scan_commits: branch_since_base
+  human_author:
+    name: public repository maintainer
+    email: franck.meyer@kaist.ac.kr
+  co_authored_by:
+    required: true
+    name: mergeguez[bot]
+    email: 285669409+mergeguez[bot]@users.noreply.github.com
+    source: github_bot_user_api
+surfaces:
+  manifest:
+    enabled: true
+    authority: canonical
+  github_issue:
+    enabled: planned
+    status: not-yet-used
+    file: .speculoos/surfaces/github.yaml
+  github_project:
+    enabled: planned
+    status: pending-broker-link
+    file: .speculoos/surfaces/github.yaml
+  github_pull_request:
+    enabled: true
+    status: not-yet-open
+    number: null
+    url: null
+    base_branch: dev
+    head_branch: chore/pr-036-speculoos-millefeuille-bootstrap
+    head_sha: null
+    merge_commit: null
+    project_status: In Progress
+  vibe_kanban:
+    enabled: readback-only
+    status: no-local-repo-mapping-yet
+    file: .speculoos/surfaces/vibe-kanban.yaml
+lanes:
+  codex_review:
+    enabled: true
+    role: implementation-and-review
+  mergeguez_review:
+    enabled: true
+    role: exact-head-pr-review
+  cursor_worker:
+    enabled: false
+    role: not-used-for-bootstrap
+gates:
+  before_publish:
+    - clean-dev-based-branch
+    - tests-pass
+    - ruff-pass
+    - metadata-parse-pass
+    - changed-file-private-data-scan-pass
+    - publish-check-pass
+  before_merge:
+    - exact-head-mergeguez-review
+    - github-checks-pass
+    - review-evidence-ready
+    - no-live-credential-or-provider-write
