@@ -1,0 +1,39 @@
+schema_version: 0.1
+changed_files:
+  required: true
+  headings:
+    - Changed Files
+    - Changed Files For Publish
+release_flow:
+  canonical_phrases:
+    - "feature PRs target `dev`"
+    - "release/promotion PRs target `main`"
+  forbidden_phrases:
+    - "release PRs promote `dev` to `main`"
+    - "release PRs into main"
+publication_boundary:
+  required_terms:
+    - Publication Boundary
+    - Zotero
+    - OCR
+    - OpenKB
+    - credential
+    - release
+    - approval
+planning_only:
+  markers:
+    - Planning/docs/metadata only
+    - spec/audit only
+  forbidden_overclaim_patterns:
+    - "\\bimplements? live Zotero\\b"
+    - "\\bruns? OCR\\b"
+    - "\\bwrites? source packs?\\b"
+    - "\\bcuts? a release\\b"
+    - "\\bpublishes? a release\\b"
+scrub_patterns:
+  - name: bearer-token
+    regex: "Bearer\\s+[A-Za-z0-9._~+/-]{8,}"
+  - name: raw-pdf-marker
+    regex: "%PDF-"
+  - name: zotero-api-key-looking-token
+    regex: "\\b[A-Za-z0-9]{24}\\b"

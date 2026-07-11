@@ -1,0 +1,25 @@
+surface: github
+status: repo-present
+repository: fr-meyer/zotero-docai-pipeline
+url: https://github.com/fr-meyer/zotero-docai-pipeline
+default_branch: dev
+write_path: mergeguez
+project:
+  status: pending-broker-link
+  number: null
+  url: null
+  preferred_path: mergeguez_project_lane
+  note: Project surfaces should use the constrained broker path if linked.
+notes:
+  - Container gh is intentionally not the GitHub write path.
+  - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
+  - This bootstrap PR is planning/docs/metadata only.
+current_task:
+  id: pr-036-speculoos-millefeuille-bootstrap
+  pull_request: null
+  project_item: null
+  pull_request_project_item: null
+  branch: chore/pr-036-speculoos-millefeuille-bootstrap
+  status: In Progress
+  project_status: In Progress
+pull_request: null

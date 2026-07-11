@@ -1,0 +1,55 @@
+id: pr-036-speculoos-millefeuille-bootstrap
+title: Bootstrap Speculoos Millefeuille planning
+status: implementation
+branch: chore/pr-036-speculoos-millefeuille-bootstrap
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+scope:
+  - add repo-local Speculoos metadata baseline
+  - define a bounded Millefeuille spec/audit plan for Zotero to OpenKB handoff work
+  - preserve existing offline OpenKB handoff fixture evidence as the first acceptance base
+  - document no-live-credential and no-provider-write boundaries for the next implementation slice
+non_goals:
+  - live Zotero API calls
+  - Zotero tag, note, or attachment writes
+  - Mistral, PageIndex, OpenKB, or OCR provider calls
+  - creating, modifying, or deleting source packs
+  - model route, credential, ruleset, app-permission, or release changes
+  - package-index publication
+acceptance:
+  - .speculoos metadata identifies repo, dev branch, current task, review policy, and surfaces
+  - spec/audit docs define the next Millefeuille implementation gates using existing offline fixtures
+  - validation passes without credentials, network-only dependencies, live Zotero reads, OCR calls, or OpenKB writes
+  - changed files contain no secrets, signed URLs, bearer tokens, cookies, raw PDF payload markers, or unredacted Zotero credentials
+validation:
+  - .venv/bin/ruff check .
+  - .venv/bin/python -m unittest discover -v
+  - ruby -ryaml -rjson -e 'Dir[".speculoos/**/*.yaml"].sort.each { |p| Psych.parse_file(p) }; JSON.parse(File.read(".speculoos/review-evidence.json")); puts "metadata ok"'
+  - git diff --check
+  - speculoos status --json
+  - speculoos plancha-status --json
+  - speculoos validate --task pr-036-speculoos-millefeuille-bootstrap --validation "git diff --check" --json
+  - speculoos publish-check
+evidence:
+  - existing docai-test fixture covers three successful Zotero PDF handoff rows and one no-PDF skip
+  - existing tests cover OpenKB handoff identity, security sanitization, preview rows, standalone handoff behavior, and outcome fixture accounting
+  - prior dogfood debrief is memory/pageindex/zotero-docai-test-dogfood-debrief-2026-06-05.md
+  - Ruff passed with all checks
+  - unit tests passed with 123 tests
+  - .speculoos YAML and review-evidence JSON parse passed
+  - git diff --check passed
+  - speculoos validate passed with git diff check, private-data scan, metadata-closeout residue gate, and commit identity checks
+  - speculoos publish-check passed against the draft PR body and commit message
+  - changed-file private-data scan passed for new .speculoos and specs files
+links:
+  prior_dogfood_debrief: memory/pageindex/zotero-docai-test-dogfood-debrief-2026-06-05.md
+  openkb_runbook: memory/pageindex/openkb-docai-mvp-runbook-2026-05-27.md
+notes:
+  - This PR intentionally plans the next live-capable slice without executing it.
+  - Use a separate approval gate before any live Zotero/OCR/OpenKB operation.

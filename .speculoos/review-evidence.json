@@ -1,0 +1,54 @@
+{
+  "schema_version": "0.1",
+  "requirements": {
+    "required_sources": ["local_validation", "github_checks"],
+    "optional_sources": ["self_managed", "mergeguez_review"],
+    "reviewers": {
+      "self_managed": {
+        "policy": "optional"
+      },
+      "mergeguez_review": {
+        "policy": "optional"
+      }
+    },
+    "reviewer_groups": {
+      "required_pr_review": {
+        "policy": "required",
+        "primary": ["mergeguez_review"],
+        "fallback_any_of": ["self_managed"],
+        "summary": "Mergeguez review evidence is the primary required PR-review source.",
+        "fallback_summary": "Self-managed evidence is accepted only if hosted Mergeguez review is unavailable."
+      }
+    }
+  },
+  "sources": {
+    "local_validation": {
+      "kind": "local_validation",
+      "status": "passed",
+      "summary": "Local validation passed for Ruff, 123 unit tests, metadata parse, git diff check, Speculoos validate, publish-check, Plancha readback, and changed-file private-data scan.",
+      "evidence_ref": ".speculoos/tasks/pr-036-speculoos-millefeuille-bootstrap.yaml",
+      "updated_at": "pr-036-speculoos-millefeuille-bootstrap"
+    },
+    "github_checks": {
+      "kind": "github_checks",
+      "status": "pending-live-read",
+      "summary": "Live GitHub checks must be read through the broker before merge execution.",
+      "evidence_ref": "broker:mergeguez pr-state --json",
+      "updated_at": "pr-036-speculoos-millefeuille-bootstrap"
+    },
+    "self_managed": {
+      "kind": "self_managed",
+      "status": "pending",
+      "summary": "Ignored local self-managed reviewer artifact is the emergency fallback if hosted Mergeguez review is unavailable.",
+      "evidence_ref": ".speculoos/reviews/pr-036-speculoos-millefeuille-bootstrap/self-review.json",
+      "updated_at": "pr-036-speculoos-millefeuille-bootstrap"
+    },
+    "mergeguez_review": {
+      "kind": "mergeguez_review",
+      "status": "pending-live-read",
+      "summary": "Live @mergeguez review evidence is the primary required reviewer source when exact-head and clean.",
+      "evidence_ref": "broker:mergeguez pr-state --json",
+      "updated_at": "pr-036-speculoos-millefeuille-bootstrap"
+    }
+  }
+}
