@@ -17,7 +17,7 @@
       "push_actor": "mergeguez_branch_broker",
       "pr_actor": "franck_user_pr_author",
       "review_actor": "mergeguez_review",
-      "merge_actor": "user_api",
+      "merge_actor": "mergeguez_dev_merge",
       "native_review_requires_distinct_author": true,
       "exact_pr_base_head_sha_required": true,
       "auto_merge": {
@@ -83,6 +83,28 @@
       "requires_explicit_approval": false,
       "secrets_in_repo": false,
       "attribution": "native GitHub PR review and check-run evidence only"
+    },
+    "mergeguez_dev_merge": {
+      "kind": "github_app_installation_broker",
+      "roles": ["merge_actor"],
+      "status": "available_host_broker",
+      "bot_login": "mergeguez[bot]",
+      "allowed_base_refs": ["dev"],
+      "allowed_head_patterns": ["chore/pr-*", "docs/pr-*", "feat/pr-*", "fix/pr-*", "test/pr-*"],
+      "credential_location": "host_broker",
+      "requires_explicit_approval": false,
+      "exact_pr_base_head_sha_required": true,
+      "secrets_in_repo": false,
+      "attribution": "policy-gated app auto-merge for clean exact-head dev-target feature PRs",
+      "required_live_checks": [
+        "exact_pr_number",
+        "exact_base_branch",
+        "exact_head_branch",
+        "exact_head_sha",
+        "required_mergeguez_review_and_checks",
+        "zero_blocking_mergeguez_findings",
+        "merged_by_verification"
+      ]
     },
     "user_api": {
       "kind": "github_app_user_access_token",

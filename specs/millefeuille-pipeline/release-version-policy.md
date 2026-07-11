@@ -6,8 +6,8 @@ remain manual gates.
 ## Branches
 
 - Feature branches target `dev`.
-- Feature PRs to `dev` may be auto-merged after clean exact-head Mergeguez
-  review and checks.
+- Feature PRs to `dev` may be auto-merged by `mergeguez_dev_merge` after
+  clean exact-head Mergeguez review and checks.
 - Stable promotion uses a separate PR from `dev` to `main`.
 - No direct feature branch should target `main`.
 
@@ -42,7 +42,7 @@ Current version: `0.4.0`.
 ## Manual Gates
 
 - GitHub publication and PR creation.
-- Merge to `dev`.
+- Merge to `dev` unless the dev-lane auto-merge policy has passed cleanly.
 - `dev` to `main` promotion.
 - Release tag.
 - Package publication.

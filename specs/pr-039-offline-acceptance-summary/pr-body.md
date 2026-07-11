@@ -56,7 +56,7 @@ This branch:
 - `git diff --check`
 - `speculoos status --json`
 - `speculoos actors --json`
-- `speculoos validate --task pr-039-offline-acceptance-summary --validation "git diff --check HEAD~3..HEAD" --json`
+- `speculoos validate --task pr-039-offline-acceptance-summary --validation "git diff --check" --json`
 
 # Publication Boundary
 
@@ -69,9 +69,9 @@ publication, or stable-branch promotion is included.
 
 Feature PRs target `dev`; release/promotion PRs target `main`.
 
-GitHub publication, PR creation, Mergeguez review request, and merge are
-approved for this `dev`-target feature PR only after clean exact-head
-Mergeguez review and checks.
+GitHub publication, PR creation, Mergeguez review request, and
+`mergeguez_dev_merge` auto-merge are approved for this `dev`-target feature PR
+only after clean exact-head Mergeguez review and checks.
 
 `dev` to `main` promotion, release tags, package publication, and live
 provider/data actions all remain separate approval gates.
