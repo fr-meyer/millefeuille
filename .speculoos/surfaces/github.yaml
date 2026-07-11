@@ -15,11 +15,22 @@ notes:
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - This bootstrap PR is planning/docs/metadata only.
 current_task:
-  id: pr-036-speculoos-millefeuille-bootstrap
+  id: pr-037-pr36-closeout-metadata
   pull_request: null
   project_item: null
   pull_request_project_item: null
-  branch: chore/pr-036-speculoos-millefeuille-bootstrap
+  branch: chore/pr-037-pr36-closeout-metadata
   status: In Progress
   project_status: In Progress
 pull_request: null
+completed_pull_requests:
+  - id: pr-036-speculoos-millefeuille-bootstrap
+    number: 36
+    url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36
+    status: merged
+    base_branch: dev
+    head_branch: chore/pr-036-speculoos-millefeuille-bootstrap
+    head_sha: 2458264fdc99f82578fe6ad4a110b87b93ec11d5
+    merge_commit: 6511030c73bd834e6536e4d5dee88648bb2aae29
+    mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36#pullrequestreview-4676349739
+    mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86505824602

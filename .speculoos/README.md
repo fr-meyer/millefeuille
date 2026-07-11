@@ -11,6 +11,7 @@ Current boundary:
 
 - Feature work targets `dev`.
 - GitHub writes use the approved Mergeguez/broker path.
+- Actor and branch policy lives in `.speculoos/actors.json`.
 - Default validation must stay offline and credential-free.
 - Live Zotero, OCR, OpenKB, PageIndex, Mistral, and source-pack writes require
   a separate explicit operator approval.

@@ -1,0 +1,48 @@
+id: pr-037-pr36-closeout-metadata
+title: Close PR 36 metadata and add actor policy
+status: implementation
+branch: chore/pr-037-pr36-closeout-metadata
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+scope:
+  - mark PR #36 bootstrap metadata as merged
+  - record PR #36 exact head, Mergeguez review, and merge commit evidence
+  - add repo-local actor and branch policy metadata
+  - harden publish policy for future offline-first Millefeuille slices
+  - keep future merge-plan live checks free of missing actor-profile blockers
+non_goals:
+  - live Zotero API calls
+  - Zotero tag, note, or attachment writes
+  - Mistral, PageIndex, OpenKB, OCR, or model calls
+  - creating, modifying, deleting, or importing source packs
+  - model route, credential, ruleset, GitHub App permission, release, or package-index changes
+acceptance:
+  - .speculoos/actors.json defines push, PR, review, and merge actor profiles without storing secrets
+  - PR #36 is recorded as merged with exact head, review URL, check URL, and merge commit
+  - current task metadata points to this closeout branch
+  - publish policy states the no-live-provider boundary and actor policy expectations
+  - validation passes without credentials, live Zotero reads, OCR calls, or OpenKB writes
+validation:
+  - ruby -ryaml -rjson -e 'Dir[".speculoos/**/*.yaml"].sort.each { |p| Psych.parse_file(p) }; Dir[".speculoos/**/*.json"].sort.each { |p| JSON.parse(File.read(p)) }; puts "metadata ok"'
+  - git diff --check
+  - speculoos status --json
+  - speculoos actors --json
+  - speculoos validate --task pr-037-pr36-closeout-metadata --validation "git diff --check" --json
+  - speculoos merge-plan --repo . --repo-slug fr-meyer/zotero-docai-pipeline --base dev --pr <PR> --expected-head-sha <SHA> --expected-base dev --expected-head-branch chore/pr-037-pr36-closeout-metadata --actor user_api --live-check --broker-command /home/node/.openclaw/bin/mergeguez --broker-repo zotero-docai-pipeline --json
+evidence:
+  - PR #36 merged to dev at 6511030c73bd834e6536e4d5dee88648bb2aae29
+  - PR #36 exact head was 2458264fdc99f82578fe6ad4a110b87b93ec11d5
+  - Mergeguez review approved PR #36 with 0 blocking findings
+links:
+  pr36: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36
+  pr36_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36#pullrequestreview-4676349739
+  pr36_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86505824602
+notes:
+  - This PR is metadata and policy only.
+  - Live Zotero/OCR/OpenKB work remains behind a separate approval gate.
