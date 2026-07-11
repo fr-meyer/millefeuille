@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Zotero DocAI Pipeline
 workflow: speculoos-v1
-canonical_task: pr-039-offline-acceptance-summary
+canonical_task: null
 repository:
   upstream: null
   fork: fr-meyer/zotero-docai-pipeline
   local_path: /home/node/.openclaw/repos/zotero-docai-pipeline
   base_branch: dev
-  working_branch: test/pr-039-offline-acceptance-summary
+  working_branch: null
 status:
-  phase: offline-implementation
-  pret_a_coder: satisfied-local
+  phase: idle
+  pret_a_coder: idle
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,11 +57,11 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
+    status: none-active
     number: 39
     url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/39
     base_branch: dev
-    head_branch: test/pr-039-offline-acceptance-summary
+    head_branch: null
     head_sha: null
     merge_commit: null
     project_status: In Progress

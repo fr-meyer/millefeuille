@@ -1,6 +1,6 @@
 id: pr-039-offline-acceptance-summary
 title: Add offline OpenKB acceptance summary and multi-attachment coverage
-status: implementation
+status: merged
 branch: test/pr-039-offline-acceptance-summary
 base_branch: dev
 github:
@@ -8,10 +8,11 @@ github:
   pull_request: 39
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
   url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/39
   head_sha: null
+  merge_commit: c8e97cfbfca38542cf472e581c672980d82a33b7
 post_merge_expected:
   pull_request: 39
   base_branch: dev
@@ -65,6 +66,9 @@ evidence:
   - git diff --check passed
   - speculoos status, actors, and validate passed with only expected local unpublished/dirty warnings before commit
   - fixture/contract/docs marker scan found no credential, signed URL, or PDF payload markers
+  - 'PR #39 merged with merge commit c8e97cfbfca38542cf472e581c672980d82a33b7'
+  - Project item unavailable; closeout recorded without ProjectV2 mutation
+  - surface-sync --close-merged-task cleared repo-local active task metadata
 publication_boundary:
   statement: "Offline implementation/test slice only; no live Zotero, PDF download, OCR, Mistral, PageIndex, OpenKB write, source-pack write, main-branch merge, release, tag, or package publication. GitHub publication and auto-merge are approved only for this dev-target feature PR after clean exact-head Mergeguez review and checks."
 links:
