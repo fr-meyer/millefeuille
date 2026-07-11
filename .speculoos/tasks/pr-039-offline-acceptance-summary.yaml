@@ -23,6 +23,7 @@ non_goals:
   - Mistral, PageIndex, OpenKB, OCR, model, or provider calls
   - creating, modifying, deleting, or importing source packs
   - credential, model route, GitHub App permission, release, package-index, main-branch, or production change
+  - auto-merge for any target other than dev
 acceptance:
   - acceptance summary status is pass when every OpenKB import has exactly one handoff row and one duplicate-scan evidence row
   - no-PDF and non-PDF skips are counted explicitly by event
@@ -56,12 +57,13 @@ evidence:
   - speculoos status, actors, and validate passed with only expected local unpublished/dirty warnings before commit
   - fixture/contract/docs marker scan found no credential, signed URL, or PDF payload markers
 publication_boundary:
-  statement: "Offline implementation/test slice only; no live Zotero, PDF download, OCR, Mistral, PageIndex, OpenKB write, source-pack write, GitHub publication, or merge without separate approval."
+  statement: "Offline implementation/test slice only; no live Zotero, PDF download, OCR, Mistral, PageIndex, OpenKB write, source-pack write, main-branch merge, release, tag, or package publication. GitHub publication and auto-merge are approved only for this dev-target feature PR after clean exact-head Mergeguez review and checks."
 links:
   helper: zotero_docai_pipeline/utils/export.py
   docai_fixture: tests/fixtures/openkb_handoff_docai_test/
   multi_attachment_fixture: tests/fixtures/openkb_handoff_multi_attachment/
   pipeline_contract: specs/millefeuille-pipeline/
 notes:
-  - This local branch is intentionally stopped before push, PR, Mergeguez review, or merge.
+  - Dev-target feature PR publication and auto-merge are approved after clean exact-head Mergeguez review and checks.
+  - Main-target promotion, releases, tags, package publication, and live provider/data actions remain separately gated.
   - Duplicate-scan evidence is represented by redacted JSONL fixture rows, not live OpenKB reads.

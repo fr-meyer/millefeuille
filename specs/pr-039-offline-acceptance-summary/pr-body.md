@@ -16,6 +16,7 @@ This branch:
 # Changed Files
 
 - `.speculoos/manifest.yaml`
+- `.speculoos/actors.json`
 - `.speculoos/review-evidence.json`
 - `.speculoos/surfaces/github.yaml`
 - `.speculoos/tasks/pr-038-openkb-source-version-drift.yaml`
@@ -68,6 +69,9 @@ publication, or stable-branch promotion is included.
 
 Feature PRs target `dev`; release/promotion PRs target `main`.
 
-GitHub publication, PR creation, Mergeguez review request, merge to `dev`,
-`dev` to `main` promotion, release tags, and package publication all remain
-separate approval gates.
+GitHub publication, PR creation, Mergeguez review request, and merge are
+approved for this `dev`-target feature PR only after clean exact-head
+Mergeguez review and checks.
+
+`dev` to `main` promotion, release tags, package publication, and live
+provider/data actions all remain separate approval gates.

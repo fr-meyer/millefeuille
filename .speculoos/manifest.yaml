@@ -92,6 +92,7 @@ gates:
     - github-checks-pass
     - review-evidence-ready
     - no-live-credential-or-provider-write
+    - auto-merge-allowed-only-for-dev-target
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap

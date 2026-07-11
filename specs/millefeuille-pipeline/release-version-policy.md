@@ -6,6 +6,8 @@ remain manual gates.
 ## Branches
 
 - Feature branches target `dev`.
+- Feature PRs to `dev` may be auto-merged after clean exact-head Mergeguez
+  review and checks.
 - Stable promotion uses a separate PR from `dev` to `main`.
 - No direct feature branch should target `main`.
 

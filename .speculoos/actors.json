@@ -21,7 +21,7 @@
       "native_review_requires_distinct_author": true,
       "exact_pr_base_head_sha_required": true,
       "auto_merge": {
-        "enabled": false,
+        "enabled": true,
         "delete_branch_after_merge": true
       }
     },
