@@ -405,6 +405,39 @@ def validate_openkb_handoff_rows(
     return report
 
 
+def verify_openkb_handoff_recovered_bytes(
+    row: OpenKBHandoffRow,
+    recovered_bytes: bytes,
+) -> str:
+    """Verify recovered attachment bytes against a handoff row SHA-256.
+
+    This is the offline-safe intake guard for detecting source-version drift
+    after handoff export: the caller already has recovered bytes in memory, and
+    this function only compares hashes. It never serializes or logs payload
+    bytes.
+    """
+    expected_sha256 = (row.sha256 or "").strip().lower()
+    if not expected_sha256:
+        raise AttachmentIdentityError(
+            "sha256: required for recovered byte verification"
+        )
+
+    actual_sha256 = hashlib.sha256(recovered_bytes).hexdigest()
+    if actual_sha256 != expected_sha256:
+        context = (
+            f"item_key={row.item_key!r} "
+            f"attachment_key={row.attachment_key!r} "
+            f"filename={row.canonical_filename!r}"
+        )
+        if row.zotero_version is not None:
+            context = f"{context} zotero_version={row.zotero_version!r}"
+        raise AttachmentIdentityError(
+            "sha256: recovered bytes do not match handoff row "
+            f"({context}; expected={expected_sha256}; actual={actual_sha256})"
+        )
+    return actual_sha256
+
+
 def log_openkb_weak_verification_warnings(
     logger: logging.Logger,
     weak_verification_rows: list[dict],

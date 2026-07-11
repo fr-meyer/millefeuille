@@ -1,0 +1,47 @@
+id: pr-038-openkb-source-version-drift
+title: Add offline source-version drift guard for OpenKB handoff
+status: implementation
+branch: test/pr-038-openkb-source-drift-guard
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+scope:
+  - add an offline verifier that compares recovered attachment bytes against a handoff SHA-256
+  - add a redacted source-version-drift fixture with matching and drifted byte samples
+  - test successful verification, drift failure, missing-hash failure, and fixture payload safety
+  - mark the bootstrap source-version-drift next-slice candidate as completed
+non_goals:
+  - live Zotero API calls or PDF downloads
+  - Zotero tag, note, attachment, or library writes
+  - Mistral, PageIndex, OpenKB, OCR, model, or provider calls
+  - creating, modifying, deleting, or importing source packs
+  - credential, model route, GitHub App permission, release, or package-index changes
+acceptance:
+  - recovered bytes matching a handoff SHA-256 pass verification and return the computed hash
+  - recovered bytes that differ from the handoff SHA-256 raise AttachmentIdentityError with row identity context
+  - rows without SHA-256 are rejected by the recovered-byte verifier
+  - fixture files remain redacted and contain no PDF payloads, signed URLs, credentials, or source-pack content
+  - validation passes without credentials, live Zotero reads, OCR calls, OpenKB writes, or source-pack writes
+validation:
+  - .venv/bin/python -m unittest -v tests.test_openkb_source_version_drift
+  - .venv/bin/python -m unittest discover -v
+  - .venv/bin/ruff check .
+  - ruby -ryaml -rjson -e 'Dir[".speculoos/**/*.yaml"].sort.each { |p| Psych.parse_file(p) }; Dir[".speculoos/**/*.json"].sort.each { |p| JSON.parse(File.read(p)) }; puts "metadata ok"'
+  - git diff --check
+  - speculoos status --json
+  - speculoos actors --json
+  - speculoos validate --task pr-038-openkb-source-version-drift --validation "git diff --check" --json
+  - speculoos merge-plan --repo . --repo-slug fr-meyer/zotero-docai-pipeline --base dev --pr <PR> --expected-head-sha <SHA> --expected-base dev --expected-head-branch test/pr-038-openkb-source-drift-guard --actor user_api --live-check --broker-command /home/node/.openclaw/bin/mergeguez --broker-repo zotero-docai-pipeline --json
+publication_boundary:
+  statement: "Offline implementation/test slice only; no live Zotero, PDF download, OCR, Mistral, PageIndex, OpenKB write, or source-pack write."
+links:
+  fixture: tests/fixtures/openkb_source_version_drift/source-version-drift.json
+  verifier: zotero_docai_pipeline/utils/export.py
+notes:
+  - The verifier assumes the caller already recovered bytes in memory.
+  - The committed fixture uses short UTF-8 placeholders, not real PDFs.

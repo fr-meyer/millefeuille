@@ -25,30 +25,30 @@
     "local_validation": {
       "kind": "local_validation",
       "status": "passed",
-      "summary": "Closeout validation passed for metadata parse, actor policy readback, git diff check, Speculoos validate, and private-data scan.",
-      "evidence_ref": ".speculoos/tasks/pr-037-pr36-closeout-metadata.yaml",
-      "updated_at": "pr-037-pr36-closeout-metadata"
+      "summary": "PR #38 local validation passed: offline source-version-drift tests, 127-test full unit suite, Ruff, metadata parse, git diff check, Speculoos validate, and private-data scan.",
+      "evidence_ref": ".speculoos/tasks/pr-038-openkb-source-version-drift.yaml",
+      "updated_at": "pr-038-openkb-source-version-drift"
     },
     "github_checks": {
       "kind": "github_checks",
       "status": "pending-live-read",
       "summary": "Live GitHub checks must be read through the broker before merge execution.",
       "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-037-pr36-closeout-metadata"
+      "updated_at": "pr-038-openkb-source-version-drift"
     },
     "self_managed": {
       "kind": "self_managed",
       "status": "pending",
       "summary": "Ignored local self-managed reviewer artifact is the emergency fallback if hosted Mergeguez review is unavailable.",
-      "evidence_ref": ".speculoos/reviews/pr-037-pr36-closeout-metadata/self-review.json",
-      "updated_at": "pr-037-pr36-closeout-metadata"
+      "evidence_ref": ".speculoos/reviews/pr-038-openkb-source-version-drift/self-review.json",
+      "updated_at": "pr-038-openkb-source-version-drift"
     },
     "mergeguez_review": {
       "kind": "mergeguez_review",
       "status": "pending-live-read",
       "summary": "Live @mergeguez review evidence is the primary required reviewer source when exact-head and clean.",
       "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-037-pr36-closeout-metadata"
+      "updated_at": "pr-038-openkb-source-version-drift"
     }
   }
 }
