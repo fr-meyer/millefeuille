@@ -75,6 +75,9 @@ _OPENKB_POLICY_HINT_REQUIRED_KEYS: tuple[str, ...] = (
 )
 
 _OPENKB_PREVIEW_SCHEMA_VERSION = "openkb-docai-handoff-preview/v0.1"
+_OPENKB_ACCEPTANCE_SUMMARY_SCHEMA_VERSION = (
+    "openkb-docai-acceptance-summary/v0.1"
+)
 
 
 def _is_generic_filename(filename: str) -> bool:
@@ -436,6 +439,214 @@ def verify_openkb_handoff_recovered_bytes(
             f"({context}; expected={expected_sha256}; actual={actual_sha256})"
         )
     return actual_sha256
+
+
+def _copy_handoff_record(row: OpenKBHandoffRow | dict[str, Any]) -> dict[str, Any]:
+    if isinstance(row, OpenKBHandoffRow):
+        return row.to_dict()
+    return dict(row)
+
+
+def _copy_record(record: dict[str, Any]) -> dict[str, Any]:
+    return dict(record)
+
+
+def _group_records_by_field(
+    records: list[dict[str, Any]],
+    field_name: str,
+) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for record in records:
+        value = record.get(field_name)
+        if isinstance(value, str) and value.strip():
+            grouped.setdefault(value, []).append(record)
+    return grouped
+
+
+def _skip_counts_by_event(records: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        event = str(record.get("event", "unknown"))
+        counts[event] = counts.get(event, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _project_duplicate_scan(record: dict[str, Any] | None) -> dict[str, Any] | None:
+    if record is None:
+        return None
+    projected: dict[str, Any] = {}
+    for key in (
+        "event",
+        "document_slug",
+        "canonical_filename",
+        "scan_result",
+        "matched_existing",
+        "match_count",
+        "verification_result",
+    ):
+        if key in record:
+            projected[key] = record[key]
+    return projected
+
+
+def build_openkb_acceptance_summary(
+    handoff_rows: list[OpenKBHandoffRow | dict[str, Any]],
+    outcome_records: list[dict[str, Any]],
+    duplicate_scan_records: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Join offline handoff, OpenKB outcome, skip, and duplicate-scan evidence.
+
+    The summary is intentionally source-neutral and payload-free: callers pass
+    already-materialized fixture or manifest rows, and this helper only compares
+    record identity. It does not read Zotero, recover PDFs, call OCR providers,
+    inspect OpenKB state, or write source packs.
+    """
+    handoff = [_copy_handoff_record(row) for row in handoff_rows]
+    outcomes = [_copy_record(record) for record in outcome_records]
+    duplicate_scans = [
+        _copy_record(record) for record in (duplicate_scan_records or [])
+    ]
+
+    for record in [*handoff, *outcomes, *duplicate_scans]:
+        sanitize_handoff_row(record)
+
+    imports = [
+        record for record in outcomes if record.get("event") == "openkb-added"
+    ]
+    skips = [
+        record
+        for record in outcomes
+        if str(record.get("event", "")).startswith("skipped-")
+    ]
+
+    handoff_by_filename = _group_records_by_field(handoff, "canonical_filename")
+    duplicate_scans_by_slug = _group_records_by_field(
+        duplicate_scans, "document_slug"
+    )
+
+    joined_imports: list[dict[str, Any]] = []
+    import_join_failures: list[dict[str, Any]] = []
+
+    for imported in imports:
+        filename = imported.get("canonical_filename")
+        document_slug = imported.get("document_slug")
+        handoff_matches = (
+            handoff_by_filename.get(filename, [])
+            if isinstance(filename, str)
+            else []
+        )
+        duplicate_matches = (
+            duplicate_scans_by_slug.get(document_slug, [])
+            if isinstance(document_slug, str)
+            else []
+        )
+        handoff_match = handoff_matches[0] if len(handoff_matches) == 1 else None
+        duplicate_scan = (
+            duplicate_matches[0] if len(duplicate_matches) == 1 else None
+        )
+
+        entry = {
+            "canonical_filename": filename,
+            "document_slug": document_slug,
+            "source_type": imported.get("source_type"),
+            "selected_route": imported.get("selected_route"),
+            "verification_result": imported.get("verification_result"),
+            "handoff": {
+                "matched": handoff_match is not None,
+                "match_count": len(handoff_matches),
+            },
+            "duplicate_scan": {
+                "matched": duplicate_scan is not None,
+                "match_count": len(duplicate_matches),
+                "evidence": _project_duplicate_scan(duplicate_scan),
+            },
+        }
+        if handoff_match is not None:
+            entry["handoff"].update({
+                "attachment_key": handoff_match.get("attachment_key"),
+                "verification_strength": handoff_match.get(
+                    "verification_strength"
+                ),
+                "sha256_present": handoff_match.get("sha256") is not None,
+            })
+        joined_imports.append(entry)
+
+        if len(handoff_matches) != 1 or len(duplicate_matches) != 1:
+            import_join_failures.append({
+                "canonical_filename": filename,
+                "document_slug": document_slug,
+                "handoff_match_count": len(handoff_matches),
+                "duplicate_scan_match_count": len(duplicate_matches),
+            })
+
+    import_filenames = {
+        record["canonical_filename"]
+        for record in imports
+        if isinstance(record.get("canonical_filename"), str)
+    }
+    import_slugs = {
+        record["document_slug"]
+        for record in imports
+        if isinstance(record.get("document_slug"), str)
+    }
+    unmatched_handoff_rows = [
+        {
+            "canonical_filename": record.get("canonical_filename"),
+            "attachment_key": record.get("attachment_key"),
+            "verification_strength": record.get("verification_strength"),
+        }
+        for record in handoff
+        if record.get("canonical_filename") not in import_filenames
+    ]
+    unmatched_duplicate_scans = [
+        {
+            "document_slug": record.get("document_slug"),
+            "canonical_filename": record.get("canonical_filename"),
+            "scan_result": record.get("scan_result"),
+        }
+        for record in duplicate_scans
+        if record.get("document_slug") not in import_slugs
+    ]
+
+    duplicate_scan_review_rows = [
+        record
+        for record in duplicate_scans
+        if record.get("matched_existing")
+        or record.get("match_count", 0) not in (0, None)
+    ]
+    status = (
+        "pass"
+        if not import_join_failures
+        and not unmatched_handoff_rows
+        and not unmatched_duplicate_scans
+        and not duplicate_scan_review_rows
+        else "needs-review"
+    )
+    summary = {
+        "schema_version": _OPENKB_ACCEPTANCE_SUMMARY_SCHEMA_VERSION,
+        "status": status,
+        "counts": {
+            "handoff_rows": len(handoff),
+            "openkb_added": len(imports),
+            "skipped_total": len(skips),
+            "skipped_by_event": _skip_counts_by_event(skips),
+            "duplicate_scans": len(duplicate_scans),
+            "joined_imports": len(joined_imports),
+            "import_join_failures": len(import_join_failures),
+            "unmatched_handoff_rows": len(unmatched_handoff_rows),
+            "unmatched_duplicate_scans": len(unmatched_duplicate_scans),
+            "duplicate_scan_review_rows": len(duplicate_scan_review_rows),
+        },
+        "imports": joined_imports,
+        "skips": skips,
+        "unmatched": {
+            "imports": import_join_failures,
+            "handoff_rows": unmatched_handoff_rows,
+            "duplicate_scans": unmatched_duplicate_scans,
+        },
+    }
+    sanitize_handoff_row(summary)
+    return summary
 
 
 def log_openkb_weak_verification_warnings(

@@ -1,13 +1,13 @@
 schema_version: 0.1
 project: Zotero DocAI Pipeline
 workflow: speculoos-v1
-canonical_task: pr-038-openkb-source-version-drift
+canonical_task: pr-039-offline-acceptance-summary
 repository:
   upstream: null
   fork: fr-meyer/zotero-docai-pipeline
   local_path: /home/node/.openclaw/repos/zotero-docai-pipeline
   base_branch: dev
-  working_branch: test/pr-038-openkb-source-drift-guard
+  working_branch: test/pr-039-offline-acceptance-summary
 status:
   phase: offline-implementation
   pret_a_coder: satisfied-local
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 127 passed, 0 failed
+    result: 131 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -61,7 +61,7 @@ surfaces:
     number: null
     url: null
     base_branch: dev
-    head_branch: test/pr-038-openkb-source-drift-guard
+    head_branch: test/pr-039-offline-acceptance-summary
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -116,3 +116,14 @@ history:
       merged_by: fr-meyer
       mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/37#pullrequestreview-4676384838
       mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86507359772
+    - id: pr-038-openkb-source-version-drift
+      status: merged
+      branch: test/pr-038-openkb-source-drift-guard
+      base_branch: dev
+      pull_request: 38
+      url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/38
+      head_sha: 5d8d2ca1b31ddf2190946636f323cc9e1e1d5ac0
+      merge_commit: 0e9c5ad6ec0e05d675bd455292d32a4a8c4b086a
+      merged_by: fr-meyer
+      mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/38#pullrequestreview-4676416510
+      mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86508434593

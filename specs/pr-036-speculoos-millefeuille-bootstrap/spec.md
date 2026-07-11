@@ -50,19 +50,25 @@ The default acceptance suite should remain offline and credential-free:
 - `tests/test_openkb_handoff_security.py`
 - `tests/test_openkb_handoff_pipeline.py`
 - `tests/test_openkb_docai_test_fixture.py`
+- `tests/test_openkb_handoff_multi_attachment_fixture.py`
 - `tests/fixtures/openkb_handoff_docai_test/`
+- `tests/fixtures/openkb_handoff_multi_attachment/`
 
 These tests are the initial non-live gate for future Millefeuille changes.
+
+The offline acceptance-summary contract is
+`openkb-docai-acceptance-summary/v0.1`. It joins handoff rows, OpenKB outcomes,
+skip rows, and duplicate-scan evidence without live Zotero reads, PDF recovery,
+OCR calls, OpenKB writes, or source-pack writes.
 
 ## Audit Questions For The Next Implementation Slice
 
 - Can the current handoff schema represent source-version drift when a Zotero
   attachment changes after a prior source-pack import?
-- Can the pipeline produce a machine-readable acceptance summary that combines
-  handoff rows, skipped items, source-pack outcomes, and duplicate-scan results?
-- Are multi-attachment items represented clearly enough for later source-pack
-  recovery and de-duplication?
-- Are non-PDF attachments skipped with enough evidence to avoid silent loss?
+- Can the acceptance summary stay stable as the source-pack outcome schema
+  grows beyond the current offline fixture shape?
+- Should skipped item and skipped attachment rows become a first-class emitted
+  manifest in a later CLI contract?
 - Is there a clean handoff from this repo into the source-neutral OpenKB helper
   without reviving the old PageIndex MCP/cloud bridge?
 - Which live checks must remain behind explicit operator approval because they
