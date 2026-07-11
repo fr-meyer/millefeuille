@@ -9,6 +9,7 @@ import unittest
 
 from zotero_docai_pipeline.domain.models import OpenKBHandoffRow
 from zotero_docai_pipeline.utils.export import (
+    build_openkb_acceptance_summary,
     build_openkb_handoff_preview_rows,
     sanitize_handoff_row,
     validate_openkb_handoff_rows,
@@ -179,6 +180,91 @@ class TestDocaiTestOpenKBHandoffFixture(unittest.TestCase):
             self.assertTrue(row["openkb_raw_doc"].endswith(".md"))
 
         self._assert_no_secret_or_payload_leakage(outcomes)
+
+    def test_acceptance_summary_joins_handoff_outcomes_and_duplicate_scans(self):
+        live_rows = _load_jsonl("handoff.live.jsonl")
+        outcomes = _load_jsonl("openkb_outcomes.jsonl")
+        duplicate_scans = _load_jsonl("duplicate_scans.jsonl")
+
+        summary = build_openkb_acceptance_summary(
+            [OpenKBHandoffRow(**row) for row in live_rows],
+            outcomes,
+            duplicate_scans,
+        )
+
+        self.assertEqual(
+            summary["schema_version"],
+            "openkb-docai-acceptance-summary/v0.1",
+        )
+        self.assertEqual(summary["status"], "pass")
+        self.assertEqual(summary["counts"]["handoff_rows"], 3)
+        self.assertEqual(summary["counts"]["openkb_added"], 3)
+        self.assertEqual(summary["counts"]["skipped_total"], 1)
+        self.assertEqual(
+            summary["counts"]["skipped_by_event"], {"skipped-no-pdf": 1}
+        )
+        self.assertEqual(summary["counts"]["duplicate_scans"], 3)
+        self.assertEqual(summary["counts"]["joined_imports"], 3)
+        self.assertEqual(summary["counts"]["import_join_failures"], 0)
+        self.assertEqual(summary["counts"]["unmatched_handoff_rows"], 0)
+        self.assertEqual(summary["counts"]["unmatched_duplicate_scans"], 0)
+        self.assertEqual(summary["counts"]["duplicate_scan_review_rows"], 0)
+        self.assertEqual(len(summary["imports"]), 3)
+        for entry in summary["imports"]:
+            self.assertTrue(entry["handoff"]["matched"])
+            self.assertEqual(entry["handoff"]["match_count"], 1)
+            self.assertEqual(entry["handoff"]["verification_strength"], "full")
+            self.assertTrue(entry["handoff"]["sha256_present"])
+            self.assertTrue(entry["duplicate_scan"]["matched"])
+            self.assertEqual(entry["duplicate_scan"]["match_count"], 1)
+            self.assertEqual(
+                entry["duplicate_scan"]["evidence"]["scan_result"],
+                "unique",
+            )
+        self.assertEqual(
+            summary["skips"][0]["citation_key"], "fixtureNoPdfSampleD2026"
+        )
+        self.assertEqual(
+            summary["unmatched"],
+            {"imports": [], "handoff_rows": [], "duplicate_scans": []},
+        )
+
+        self._assert_no_secret_or_payload_leakage([summary])
+
+    def test_acceptance_summary_marks_incomplete_or_duplicate_evidence_for_review(self):
+        live_rows = _load_jsonl("handoff.live.jsonl")
+        typed_rows = [OpenKBHandoffRow(**row) for row in live_rows]
+        outcomes = _load_jsonl("openkb_outcomes.jsonl")
+        duplicate_scans = _load_jsonl("duplicate_scans.jsonl")
+
+        missing_scan_summary = build_openkb_acceptance_summary(
+            typed_rows,
+            outcomes,
+            duplicate_scans[:-1],
+        )
+        self.assertEqual(missing_scan_summary["status"], "needs-review")
+        self.assertEqual(
+            missing_scan_summary["counts"]["import_join_failures"], 1
+        )
+        self.assertEqual(
+            missing_scan_summary["unmatched"]["imports"][0][
+                "duplicate_scan_match_count"
+            ],
+            0,
+        )
+
+        duplicate_scans[0]["matched_existing"] = True
+        duplicate_scans[0]["match_count"] = 1
+        duplicate_found_summary = build_openkb_acceptance_summary(
+            typed_rows,
+            outcomes,
+            duplicate_scans,
+        )
+        self.assertEqual(duplicate_found_summary["status"], "needs-review")
+        self.assertEqual(
+            duplicate_found_summary["counts"]["duplicate_scan_review_rows"],
+            1,
+        )
 
     def test_attachment_keys_are_stable_idempotency_keys(self):
         live_rows = _load_jsonl("handoff.live.jsonl")

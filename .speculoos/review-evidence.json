@@ -25,30 +25,30 @@
     "local_validation": {
       "kind": "local_validation",
       "status": "passed",
-      "summary": "PR #38 local validation passed: offline source-version-drift tests, 127-test full unit suite, Ruff, metadata parse, git diff check, Speculoos validate, and private-data scan.",
-      "evidence_ref": ".speculoos/tasks/pr-038-openkb-source-version-drift.yaml",
-      "updated_at": "pr-038-openkb-source-version-drift"
+      "summary": "PR #39 local validation passed: targeted acceptance-summary tests, Millefeuille contract tests, 142-test full unit suite, Ruff, metadata parse, git diff check, Speculoos validate, and private-data/payload scans.",
+      "evidence_ref": ".speculoos/tasks/pr-039-offline-acceptance-summary.yaml",
+      "updated_at": "pr-039-offline-acceptance-summary"
     },
     "github_checks": {
       "kind": "github_checks",
       "status": "pending-live-read",
       "summary": "Live GitHub checks must be read through the broker before merge execution.",
       "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-038-openkb-source-version-drift"
+      "updated_at": "pr-039-offline-acceptance-summary"
     },
     "self_managed": {
       "kind": "self_managed",
       "status": "pending",
       "summary": "Ignored local self-managed reviewer artifact is the emergency fallback if hosted Mergeguez review is unavailable.",
-      "evidence_ref": ".speculoos/reviews/pr-038-openkb-source-version-drift/self-review.json",
-      "updated_at": "pr-038-openkb-source-version-drift"
+      "evidence_ref": ".speculoos/reviews/pr-039-offline-acceptance-summary/self-review.json",
+      "updated_at": "pr-039-offline-acceptance-summary"
     },
     "mergeguez_review": {
       "kind": "mergeguez_review",
       "status": "pending-live-read",
       "summary": "Live @mergeguez review evidence is the primary required reviewer source when exact-head and clean.",
       "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-038-openkb-source-version-drift"
+      "updated_at": "pr-039-offline-acceptance-summary"
     }
   }
 }

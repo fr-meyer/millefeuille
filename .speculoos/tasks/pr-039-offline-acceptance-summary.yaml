@@ -1,0 +1,78 @@
+id: pr-039-offline-acceptance-summary
+title: Add offline OpenKB acceptance summary and multi-attachment coverage
+status: implementation
+branch: test/pr-039-offline-acceptance-summary
+base_branch: dev
+github:
+  issue: null
+  pull_request: 39
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+  url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/39
+  head_sha: null
+post_merge_expected:
+  pull_request: 39
+  base_branch: dev
+  head_branch: test/pr-039-offline-acceptance-summary
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - add an offline acceptance summary that joins handoff rows, OpenKB outcomes, skip rows, and duplicate-scan evidence
+  - add redacted duplicate-scan evidence for the docai-test fixture
+  - add multi-attachment and non-PDF fixture coverage
+  - add the remaining-work pipeline, live-run plan, CLI contract, stage-manifest schema, tag-state machine, OCR backend contract, and release/version policy
+  - add executable offline contract models for stage manifests, manual gates, tag transitions, and OCR evidence records
+  - close out stale PR #38 repo-local metadata as merged
+non_goals:
+  - live Zotero API calls or PDF downloads
+  - Zotero tag, note, attachment, or library writes
+  - Mistral, PageIndex, OpenKB, OCR, model, or provider calls
+  - creating, modifying, deleting, or importing source packs
+  - credential, model route, GitHub App permission, release, package-index, main-branch, or production change
+  - auto-merge for any target other than dev
+acceptance:
+  - acceptance summary status is pass when every OpenKB import has exactly one handoff row and one duplicate-scan evidence row
+  - no-PDF and non-PDF skips are counted explicitly by event
+  - unmatched handoff rows, OpenKB import rows, and duplicate-scan rows are surfaced as review items
+  - duplicate-scan evidence that reports an existing match marks the summary as needing review
+  - multi-attachment fixtures keep per-attachment identity stable and skip non-PDF attachments before handoff export
+  - Millefeuille contract artifacts stay parseable and keep manual gates explicit
+  - executable contract models stay aligned with the stage-manifest schema
+  - release/tag/package flow is documented as Speculoos-governed and separately approved
+  - fixture files remain redacted and contain no PDF payloads, signed URLs, credentials, provider payloads, or source-pack content
+validation:
+  - .venv/bin/python -m unittest -v tests.test_openkb_docai_test_fixture tests.test_openkb_handoff_multi_attachment_fixture
+  - .venv/bin/python -m unittest -v tests.test_millefeuille_contract_artifacts
+  - .venv/bin/python -m unittest -v tests.test_millefeuille_contract_models
+  - .venv/bin/python -m unittest discover -v
+  - .venv/bin/ruff check .
+  - ruby -ryaml -rjson -e 'Dir[".speculoos/**/*.yaml"].sort.each { |p| Psych.parse_file(p) }; Dir[".speculoos/**/*.json"].sort.each { |p| JSON.parse(File.read(p)) }; puts "metadata ok"'
+  - git diff --check
+  - speculoos status --json
+  - speculoos actors --json
+  - speculoos validate --task pr-039-offline-acceptance-summary --validation "git diff --check" --json
+  - changed-file private-data and payload scan
+evidence:
+  - targeted acceptance-summary and multi-attachment fixture tests passed, 8 tests
+  - Millefeuille contract artifact tests passed, 3 tests
+  - Millefeuille executable contract model tests passed, 8 tests
+  - full unittest discovery passed, 142 tests
+  - Ruff passed
+  - metadata parse passed
+  - git diff --check passed
+  - speculoos status, actors, and validate passed with only expected local unpublished/dirty warnings before commit
+  - fixture/contract/docs marker scan found no credential, signed URL, or PDF payload markers
+publication_boundary:
+  statement: "Offline implementation/test slice only; no live Zotero, PDF download, OCR, Mistral, PageIndex, OpenKB write, source-pack write, main-branch merge, release, tag, or package publication. GitHub publication and auto-merge are approved only for this dev-target feature PR after clean exact-head Mergeguez review and checks."
+links:
+  helper: zotero_docai_pipeline/utils/export.py
+  docai_fixture: tests/fixtures/openkb_handoff_docai_test/
+  multi_attachment_fixture: tests/fixtures/openkb_handoff_multi_attachment/
+  pipeline_contract: specs/millefeuille-pipeline/
+notes:
+  - Dev-target feature PR publication and auto-merge are approved after clean exact-head Mergeguez review and checks.
+  - Main-target promotion, releases, tags, package publication, and live provider/data actions remain separately gated.
+  - Duplicate-scan evidence is represented by redacted JSONL fixture rows, not live OpenKB reads.

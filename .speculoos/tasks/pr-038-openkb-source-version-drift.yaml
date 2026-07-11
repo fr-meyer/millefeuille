@@ -1,14 +1,14 @@
 id: pr-038-openkb-source-version-drift
 title: Add offline source-version drift guard for OpenKB handoff
-status: implementation
+status: merged
 branch: test/pr-038-openkb-source-drift-guard
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 38
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
 scope:
   - add an offline verifier that compares recovered attachment bytes against a handoff SHA-256
@@ -37,9 +37,16 @@ validation:
   - speculoos actors --json
   - speculoos validate --task pr-038-openkb-source-version-drift --validation "git diff --check" --json
   - speculoos merge-plan --repo . --repo-slug fr-meyer/zotero-docai-pipeline --base dev --pr <PR> --expected-head-sha <SHA> --expected-base dev --expected-head-branch test/pr-038-openkb-source-drift-guard --actor user_api --live-check --broker-command /home/node/.openclaw/bin/mergeguez --broker-repo zotero-docai-pipeline --json
+evidence:
+  - PR #38 merged to dev at 0e9c5ad6ec0e05d675bd455292d32a4a8c4b086a
+  - PR #38 exact head was 5d8d2ca1b31ddf2190946636f323cc9e1e1d5ac0
+  - Mergeguez review approved PR #38 with 0 blocking findings
 publication_boundary:
   statement: "Offline implementation/test slice only; no live Zotero, PDF download, OCR, Mistral, PageIndex, OpenKB write, or source-pack write."
 links:
+  pr38: https://github.com/fr-meyer/zotero-docai-pipeline/pull/38
+  pr38_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/38#pullrequestreview-4676416510
+  pr38_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86508434593
   fixture: tests/fixtures/openkb_source_version_drift/source-version-drift.json
   verifier: zotero_docai_pipeline/utils/export.py
 notes:

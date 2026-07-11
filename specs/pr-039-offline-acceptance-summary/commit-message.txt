@@ -1,0 +1,8 @@
+test: add offline Millefeuille acceptance contracts
+
+Add offline OpenKB acceptance summary support, redacted duplicate-scan and
+multi-attachment fixtures, Millefeuille pipeline contract docs, and executable
+contract models for stage manifests, manual gates, tag transitions, and OCR
+evidence records.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

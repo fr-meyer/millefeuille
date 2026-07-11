@@ -23,7 +23,9 @@
 ## Next-Slice Candidates
 
 - [x] Source-version-drift fixture for changed Zotero attachment bytes.
-- [ ] Acceptance summary that joins handoff rows, skip rows, OpenKB outcomes,
+- [x] Acceptance summary that joins handoff rows, skip rows, OpenKB outcomes,
   and duplicate-scan results.
-- [ ] Multi-attachment and non-PDF fixture coverage.
-- [ ] Live-run plan artifact with an explicit separate approval gate.
+- [x] Multi-attachment and non-PDF fixture coverage.
+- [x] Live-run plan artifact with an explicit separate approval gate.
+- [x] Remaining-work pipeline, CLI contract, stage-manifest schema, tag-state
+  machine, OCR backend contract, and release/version policy.
