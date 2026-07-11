@@ -61,6 +61,10 @@ The offline acceptance-summary contract is
 skip rows, and duplicate-scan evidence without live Zotero reads, PDF recovery,
 OCR calls, OpenKB writes, or source-pack writes.
 
+The remaining pipeline contract lives in `specs/millefeuille-pipeline/` and
+covers the CLI contract, stage manifest schema, tag-state machine, OCR backend
+contract, live-run approval plan, and release/version policy.
+
 ## Audit Questions For The Next Implementation Slice
 
 - Can the current handoff schema represent source-version drift when a Zotero
@@ -71,6 +75,8 @@ OCR calls, OpenKB writes, or source-pack writes.
   manifest in a later CLI contract?
 - Is there a clean handoff from this repo into the source-neutral OpenKB helper
   without reviving the old PageIndex MCP/cloud bridge?
+- Which stage-manifest fields should become code-owned dataclasses rather than
+  docs-owned schema contracts?
 - Which live checks must remain behind explicit operator approval because they
   require Zotero credentials, PDF bytes, OCR calls, or OpenKB writes?
 

@@ -25,7 +25,7 @@
     "local_validation": {
       "kind": "local_validation",
       "status": "passed",
-      "summary": "PR #39 local validation passed: targeted acceptance-summary tests, 131-test full unit suite, Ruff, metadata parse, git diff check, Speculoos validate, and private-data/payload scans.",
+      "summary": "PR #39 local validation passed: targeted acceptance-summary tests, Millefeuille contract tests, 134-test full unit suite, Ruff, metadata parse, git diff check, Speculoos validate, and private-data/payload scans.",
       "evidence_ref": ".speculoos/tasks/pr-039-offline-acceptance-summary.yaml",
       "updated_at": "pr-039-offline-acceptance-summary"
     },

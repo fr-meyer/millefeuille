@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/zotero-docai-pipeline/specs/millefeuille-pipeline/stage-manifest.schema.json",
+  "title": "Millefeuille Stage Manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "source_type",
+    "mode",
+    "manual_gates",
+    "stages"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-stage-manifest/v0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_type": {
+      "const": "zotero"
+    },
+    "mode": {
+      "enum": ["preview", "read-only-live", "approved-live"]
+    },
+    "manual_gates": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "github_publication",
+          "zotero_read",
+          "zotero_write",
+          "pdf_recovery",
+          "ocr_provider_call",
+          "source_pack_write",
+          "openkb_write",
+          "stable_branch_promotion",
+          "release_tag",
+          "package_publication"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "inputs",
+          "outputs",
+          "manual_gate_required"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "enum": [
+              "discover",
+              "handoff",
+              "recover",
+              "source-pack",
+              "extract-native",
+              "extract-ocr",
+              "route",
+              "openkb-add",
+              "acceptance",
+              "classify",
+              "release"
+            ]
+          },
+          "status": {
+            "enum": [
+              "not-started",
+              "skipped",
+              "passed",
+              "failed",
+              "needs-review",
+              "manual-gate"
+            ]
+          },
+          "inputs": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "outputs": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "manual_gate_required": {
+            "type": "boolean"
+          },
+          "gate": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}
