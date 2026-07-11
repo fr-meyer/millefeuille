@@ -14,24 +14,8 @@ notes:
   - Container gh is intentionally not the GitHub write path.
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #39 is an offline implementation/test slice only.
-current_task:
-  id: pr-039-offline-acceptance-summary
-  pull_request: 39
-  project_item: null
-  pull_request_project_item: null
-  branch: test/pr-039-offline-acceptance-summary
-  status: In Progress
-  project_status: In Progress
-pull_request:
-  number: 39
-  url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/39
-  status: open
-  base_branch: dev
-  head_branch: test/pr-039-offline-acceptance-summary
-  head_sha: null
-  merge_commit: null
-  mergeguez_review: null
-  mergeguez_check_run: null
+current_task: null
+pull_request: null
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36

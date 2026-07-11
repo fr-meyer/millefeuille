@@ -13,3 +13,8 @@ notes:
   - Local Plancha/Vibe is status UI only.
   - No Vibe cloud or org API is configured for this repo.
   - Bootstrap should not depend on Vibe reachability.
+task:
+  status: idle
+  id: null
+  speculoos_task: null
+  command: null

@@ -1,0 +1,9 @@
+chore: close PR 39 metadata
+
+Record the PR #39 merge outcome in repo-local Speculoos metadata and clear the
+active task/PR surfaces so the repository returns to an idle governed state.
+
+No live Zotero, PDF, OCR, PageIndex, OpenKB, source-pack, main-branch,
+release, tag, or package-publication action is included.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>
