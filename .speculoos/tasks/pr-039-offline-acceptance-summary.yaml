@@ -5,11 +5,13 @@ branch: test/pr-039-offline-acceptance-summary
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 39
   issue_project_item: null
   pull_request_project_item: null
   project_status: In Progress
   project_item: null
+  url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/39
+  head_sha: null
 scope:
   - add an offline acceptance summary that joins handoff rows, OpenKB outcomes, skip rows, and duplicate-scan evidence
   - add redacted duplicate-scan evidence for the docai-test fixture

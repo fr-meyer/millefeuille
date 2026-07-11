@@ -6,8 +6,8 @@
 - PR #36 bootstrapped the Millefeuille spec packet.
 - PR #37 added actor and branch policy metadata.
 - PR #38 added offline source-version drift verification.
-- Local unpublished PR #39 adds offline acceptance summary and
-  multi-attachment/non-PDF fixture coverage.
+- PR #39 adds offline acceptance summary and multi-attachment/non-PDF fixture
+  coverage.
 - Current integration branch is `dev`; stable branch is `main`.
 - Current package version is `0.4.0`.
 

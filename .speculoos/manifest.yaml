@@ -57,9 +57,9 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: pending-open
-    number: null
-    url: null
+    status: open
+    number: 39
+    url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/39
     base_branch: dev
     head_branch: test/pr-039-offline-acceptance-summary
     head_sha: null
