@@ -1,0 +1,126 @@
+{
+  "schema_version": "0.2",
+  "defaults": {
+    "commit_actor": "human_approved_agent_assisted",
+    "push_actor": "mergeguez_branch_broker",
+    "pr_actor": "franck_user_pr_author",
+    "review_actor": "mergeguez_review",
+    "merge_actor": "user_api",
+    "promotion_merge_actor": "user_api",
+    "release_actor": "human_web"
+  },
+  "branch_policies": [
+    {
+      "name": "feature_to_dev",
+      "base_refs": ["dev"],
+      "head_patterns": ["chore/pr-*", "docs/pr-*", "feat/pr-*", "fix/pr-*", "test/pr-*"],
+      "push_actor": "mergeguez_branch_broker",
+      "pr_actor": "franck_user_pr_author",
+      "review_actor": "mergeguez_review",
+      "merge_actor": "user_api",
+      "native_review_requires_distinct_author": true,
+      "exact_pr_base_head_sha_required": true,
+      "auto_merge": {
+        "enabled": false,
+        "delete_branch_after_merge": true
+      }
+    },
+    {
+      "name": "dev_to_stable",
+      "base_refs": ["main"],
+      "head_refs": ["dev"],
+      "pr_actor": "franck_user_pr_author",
+      "review_actor": "mergeguez_review",
+      "merge_actor": "user_api",
+      "native_review_requires_distinct_author": true,
+      "exact_pr_base_head_sha_required": true,
+      "auto_merge": {
+        "enabled": false,
+        "delete_branch_after_merge": false
+      }
+    }
+  ],
+  "profiles": {
+    "human_approved_agent_assisted": {
+      "kind": "git_identity",
+      "roles": ["commit_actor"],
+      "status": "available",
+      "credential_location": "repo_git_config",
+      "requires_explicit_approval": true,
+      "secrets_in_repo": false,
+      "attribution": "human author plus mergeguez bot co-author trailer"
+    },
+    "mergeguez_branch_broker": {
+      "kind": "github_app_installation_broker",
+      "roles": ["push_actor"],
+      "status": "available_host_broker",
+      "bot_login": "mergeguez[bot]",
+      "allowed_base_refs": ["dev"],
+      "allowed_head_patterns": ["chore/pr-*", "docs/pr-*", "feat/pr-*", "fix/pr-*", "test/pr-*"],
+      "credential_location": "host_broker",
+      "requires_explicit_approval": true,
+      "exact_pr_base_head_sha_required": true,
+      "secrets_in_repo": false,
+      "attribution": "policy-gated branch publication through the Mergeguez broker"
+    },
+    "franck_user_pr_author": {
+      "kind": "github_app_user_access_token",
+      "roles": ["pr_actor"],
+      "status": "available_private_host_config",
+      "expected_login": "fr-meyer",
+      "credential_location": "private_host_config",
+      "requires_explicit_approval": true,
+      "secrets_in_repo": false,
+      "attribution": "GitHub user-authored pull requests for native Mergeguez review compatibility"
+    },
+    "mergeguez_review": {
+      "kind": "github_app_installation_broker",
+      "roles": ["review_actor"],
+      "status": "available_host_broker",
+      "bot_login": "mergeguez[bot]",
+      "forbidden_pr_author_logins_for_native_review": ["mergeguez[bot]"],
+      "credential_location": "host_broker",
+      "requires_explicit_approval": false,
+      "secrets_in_repo": false,
+      "attribution": "native GitHub PR review and check-run evidence only"
+    },
+    "user_api": {
+      "kind": "github_app_user_access_token",
+      "roles": ["merge_actor", "promotion_merge_actor"],
+      "status": "available_private_host_config",
+      "expected_login": "fr-meyer",
+      "credential_location": "private_host_config",
+      "requires_explicit_approval": true,
+      "secrets_in_repo": false,
+      "attribution": "approving GitHub user recorded by GitHub as merge actor",
+      "live_execution_status": "broker_user_merge_available",
+      "required_live_checks": [
+        "exact_pr_number",
+        "exact_base_branch",
+        "exact_head_branch",
+        "exact_head_sha",
+        "required_mergeguez_review_and_checks",
+        "explicit_approval",
+        "merged_by_verification"
+      ]
+    },
+    "human_web": {
+      "kind": "github_web_ui",
+      "roles": ["release_actor"],
+      "status": "available_manual_fallback",
+      "credential_location": "human_browser_session",
+      "requires_explicit_approval": true,
+      "secrets_in_repo": false,
+      "attribution": "human-only release or stable-promotion fallback"
+    },
+    "self_managed_reviewer": {
+      "kind": "review_service",
+      "roles": ["review_actor"],
+      "status": "available_emergency_fallback",
+      "credential_location": "private_byok_runtime",
+      "requires_explicit_approval": false,
+      "secrets_in_repo": false,
+      "attribution": "ignored local reviewer evidence only; no push, publish, or merge authority"
+    }
+  }
+}

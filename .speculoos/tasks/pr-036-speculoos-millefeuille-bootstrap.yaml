@@ -1,15 +1,20 @@
 id: pr-036-speculoos-millefeuille-bootstrap
 title: Bootstrap Speculoos Millefeuille planning
-status: implementation
+status: merged
 branch: chore/pr-036-speculoos-millefeuille-bootstrap
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 36
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
+  url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36
+  head_sha: 2458264fdc99f82578fe6ad4a110b87b93ec11d5
+  merge_commit: 6511030c73bd834e6536e4d5dee88648bb2aae29
+  mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36#pullrequestreview-4676349739
+  mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86505824602
 scope:
   - add repo-local Speculoos metadata baseline
   - define a bounded Millefeuille spec/audit plan for Zotero to OpenKB handoff work
@@ -53,3 +58,4 @@ links:
 notes:
   - This PR intentionally plans the next live-capable slice without executing it.
   - Use a separate approval gate before any live Zotero/OCR/OpenKB operation.
+  - Merged to dev by fr-meyer through the exact-head user-merge-pr broker lane.

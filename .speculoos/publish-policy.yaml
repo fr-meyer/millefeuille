@@ -20,6 +20,31 @@ publication_boundary:
     - credential
     - release
     - approval
+actor_policy:
+  required_files:
+    - .speculoos/actors.json
+  required_profiles:
+    - human_approved_agent_assisted
+    - mergeguez_branch_broker
+    - franck_user_pr_author
+    - mergeguez_review
+    - user_api
+  required_branch_policy:
+    base_branch: dev
+    head_patterns:
+      - chore/pr-*
+      - docs/pr-*
+      - feat/pr-*
+      - fix/pr-*
+      - test/pr-*
+  merge_requirements:
+    - exact_pr_number
+    - exact_base_branch
+    - exact_head_branch
+    - exact_head_sha
+    - exact_head_mergeguez_review
+    - live_github_checks
+    - user_api_merge_actor
 planning_only:
   markers:
     - Planning/docs/metadata only

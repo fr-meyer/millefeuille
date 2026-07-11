@@ -1,15 +1,15 @@
 schema_version: 0.1
 project: Zotero DocAI Pipeline
 workflow: speculoos-v1
-canonical_task: pr-036-speculoos-millefeuille-bootstrap
+canonical_task: pr-037-pr36-closeout-metadata
 repository:
   upstream: null
   fork: fr-meyer/zotero-docai-pipeline
   local_path: /home/node/.openclaw/repos/zotero-docai-pipeline
   base_branch: dev
-  working_branch: chore/pr-036-speculoos-millefeuille-bootstrap
+  working_branch: chore/pr-037-pr36-closeout-metadata
 status:
-  phase: implementation
+  phase: closeout-metadata
   pret_a_coder: satisfied-local
   blocker_summary: []
 release_policy:
@@ -57,11 +57,11 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: not-yet-open
+    status: pending-open
     number: null
     url: null
     base_branch: dev
-    head_branch: chore/pr-036-speculoos-millefeuille-bootstrap
+    head_branch: chore/pr-037-pr36-closeout-metadata
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -92,3 +92,16 @@ gates:
     - github-checks-pass
     - review-evidence-ready
     - no-live-credential-or-provider-write
+history:
+  completed_tasks:
+    - id: pr-036-speculoos-millefeuille-bootstrap
+      status: merged
+      branch: chore/pr-036-speculoos-millefeuille-bootstrap
+      base_branch: dev
+      pull_request: 36
+      url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36
+      head_sha: 2458264fdc99f82578fe6ad4a110b87b93ec11d5
+      merge_commit: 6511030c73bd834e6536e4d5dee88648bb2aae29
+      merged_by: fr-meyer
+      mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36#pullrequestreview-4676349739
+      mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86505824602

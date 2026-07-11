@@ -25,30 +25,30 @@
     "local_validation": {
       "kind": "local_validation",
       "status": "passed",
-      "summary": "Local validation passed for Ruff, 123 unit tests, metadata parse, git diff check, Speculoos validate, publish-check, Plancha readback, and changed-file private-data scan.",
-      "evidence_ref": ".speculoos/tasks/pr-036-speculoos-millefeuille-bootstrap.yaml",
-      "updated_at": "pr-036-speculoos-millefeuille-bootstrap"
+      "summary": "Closeout validation passed for metadata parse, actor policy readback, git diff check, Speculoos validate, and private-data scan.",
+      "evidence_ref": ".speculoos/tasks/pr-037-pr36-closeout-metadata.yaml",
+      "updated_at": "pr-037-pr36-closeout-metadata"
     },
     "github_checks": {
       "kind": "github_checks",
       "status": "pending-live-read",
       "summary": "Live GitHub checks must be read through the broker before merge execution.",
       "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-036-speculoos-millefeuille-bootstrap"
+      "updated_at": "pr-037-pr36-closeout-metadata"
     },
     "self_managed": {
       "kind": "self_managed",
       "status": "pending",
       "summary": "Ignored local self-managed reviewer artifact is the emergency fallback if hosted Mergeguez review is unavailable.",
-      "evidence_ref": ".speculoos/reviews/pr-036-speculoos-millefeuille-bootstrap/self-review.json",
-      "updated_at": "pr-036-speculoos-millefeuille-bootstrap"
+      "evidence_ref": ".speculoos/reviews/pr-037-pr36-closeout-metadata/self-review.json",
+      "updated_at": "pr-037-pr36-closeout-metadata"
     },
     "mergeguez_review": {
       "kind": "mergeguez_review",
       "status": "pending-live-read",
       "summary": "Live @mergeguez review evidence is the primary required reviewer source when exact-head and clean.",
       "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-036-speculoos-millefeuille-bootstrap"
+      "updated_at": "pr-037-pr36-closeout-metadata"
     }
   }
 }
