@@ -22,7 +22,7 @@
 
 ## Next-Slice Candidates
 
-- [ ] Source-version-drift fixture for changed Zotero attachment bytes.
+- [x] Source-version-drift fixture for changed Zotero attachment bytes.
 - [ ] Acceptance summary that joins handoff rows, skip rows, OpenKB outcomes,
   and duplicate-scan results.
 - [ ] Multi-attachment and non-PDF fixture coverage.

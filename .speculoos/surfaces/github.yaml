@@ -13,13 +13,13 @@ project:
 notes:
   - Container gh is intentionally not the GitHub write path.
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
-  - This bootstrap PR is planning/docs/metadata only.
+  - PR #38 is an offline implementation/test slice only.
 current_task:
-  id: pr-037-pr36-closeout-metadata
+  id: pr-038-openkb-source-version-drift
   pull_request: null
   project_item: null
   pull_request_project_item: null
-  branch: chore/pr-037-pr36-closeout-metadata
+  branch: test/pr-038-openkb-source-drift-guard
   status: In Progress
   project_status: In Progress
 pull_request: null
@@ -34,3 +34,13 @@ completed_pull_requests:
     merge_commit: 6511030c73bd834e6536e4d5dee88648bb2aae29
     mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36#pullrequestreview-4676349739
     mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86505824602
+  - id: pr-037-pr36-closeout-metadata
+    number: 37
+    url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/37
+    status: merged
+    base_branch: dev
+    head_branch: chore/pr-037-pr36-closeout-metadata
+    head_sha: 817075375b2435e211db1f839c7d6bc18a43955b
+    merge_commit: 6157062541ca08c81410f222f3266562e3bedb9e
+    mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/37#pullrequestreview-4676384838
+    mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86507359772

@@ -1,0 +1,37 @@
+{
+  "schema_version": "openkb-source-version-drift-fixture/v0.1",
+  "matching_recovered_bytes_utf8": "redacted recovered source bytes v1\n",
+  "drifted_recovered_bytes_utf8": "redacted recovered source bytes v2\n",
+  "expected_matching_sha256": "beaec055606d788c49b6f8a2a2197f853dc2a2482adc98ce293e721e4fe44873",
+  "expected_drifted_sha256": "f2a098931d3775e9387eb7b20c914c0c92f87d7b72aa6bfbecff65c900f1bfdd",
+  "handoff_row": {
+    "schema_version": "openkb-docai-handoff/v0.1",
+    "source_type": "zotero",
+    "discovered_at": "2026-07-11T00:00:00+00:00",
+    "item_key": "DRIFTITEM1",
+    "item_type": "journalArticle",
+    "item_title": "Redacted Drift Fixture Paper",
+    "citation_key": "redactedDriftFixture2026",
+    "zotero_version": 42,
+    "attachment_key": "DRIFTATT1",
+    "canonical_filename": "Redacted - 2026 - Drift fixture.pdf",
+    "content_type": "application/pdf",
+    "is_pdf": true,
+    "file_size_bytes": 35,
+    "sha256": "beaec055606d788c49b6f8a2a2197f853dc2a2482adc98ce293e721e4fe44873",
+    "verification_strength": "full",
+    "recovery": {
+      "method": "zotero_api_attachment",
+      "library_id": "123456",
+      "library_type": "user",
+      "item_key": "DRIFTITEM1",
+      "attachment_key": "DRIFTATT1"
+    },
+    "openkb_policy_hints": {
+      "no_auth_url": true,
+      "prefer_canonical_filename": true,
+      "verification_required": true,
+      "source_type": "zotero"
+    }
+  }
+}
