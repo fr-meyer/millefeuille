@@ -15,6 +15,11 @@ Files:
 - `release-version-policy.md` - Speculoos-governed release and version path.
 - `live-run-plan.md` - future live dogfood plan, still requiring approval.
 
+Executable offline contract models live in
+`zotero_docai_pipeline/domain/millefeuille.py`. They cover stage manifests,
+manual gates, tag-state transitions, and OCR evidence records without changing
+live CLI behavior.
+
 Manual gates remain explicit: live Zotero reads/writes, PDF recovery/download,
 OCR/Mistral/PageIndex calls, OpenKB writes, source-pack writes, GitHub
 publication/merge, `dev` to `main` promotion, release tags, and package
