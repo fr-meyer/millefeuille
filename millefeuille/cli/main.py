@@ -228,8 +228,8 @@ def validate_flags(cfg: AppConfig) -> None:
         or read_key == PACKAGED_PLACEHOLDER_READ_KEY
     ):
         raise ConfigError(
-            "ZOTERO_READ_KEY must be set. Obtain a read-only API key from "
-            "https://www.zotero.org/settings/keys"
+            "ZOTERO_READ_KEY is required for Zotero read operations. "
+            "Set it to a Zotero API key with read access."
         )
 
     write_reasons: list[str] = []
@@ -279,8 +279,8 @@ def validate_flags(cfg: AppConfig) -> None:
         if wk is None or (isinstance(wk, str) and not wk.strip()):
             details = ", ".join(write_reasons)
             raise ConfigError(
-                "ZOTERO_WRITE_KEY is required when these write features are "
-                f"active: {details}. Set a write-capable API key in the environment."
+                "ZOTERO_WRITE_KEY is required for Zotero write operations: "
+                f"{details}. Set it to a Zotero API key with write access."
             )
 
     if (
@@ -677,9 +677,9 @@ Entry points:
 
 Required environment variables:
   ZOTERO_LIBRARY_ID   Your Zotero user-library numeric ID
-  ZOTERO_READ_KEY     Zotero read-only API key — required for all runs
+  ZOTERO_READ_KEY     Zotero API key with read access — required for all runs
                       (https://www.zotero.org/settings/keys)
-  ZOTERO_WRITE_KEY    Zotero write-capable API key — required only when write
+  ZOTERO_WRITE_KEY    Zotero API key with write access — required only when write
                       features are enabled (OCR note creation, tag_adding,
                       post-processing tag writes)
   OCR provider key    MISTRAL_API_KEY or PAGEINDEX_API_KEY — required only when

@@ -1,15 +1,15 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-044-pr43-closeout-metadata
+canonical_task: pr-045-zotero-credential-guidance
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: chore/pr-044-pr43-closeout-metadata
+  working_branch: fix/pr-045-zotero-credential-guidance
 status:
-  phase: closeout-metadata
+  phase: implementation
   pret_a_coder: in-progress
   blocker_summary: []
 release_policy:
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 146 passed, 0 failed
+    result: 152 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -57,11 +57,11 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: not-yet-open
-    number: null
-    url: null
+    status: open
+    number: 45
+    url: https://github.com/fr-meyer/millefeuille/pull/45
     base_branch: dev
-    head_branch: chore/pr-044-pr43-closeout-metadata
+    head_branch: fix/pr-045-zotero-credential-guidance
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -150,3 +150,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: mergeguez-review-43-8adeba3dd53c
       mergeguez_check_run: mergeguez-check-run-86617278621
+    - id: pr-044-pr43-closeout-metadata
+      status: merged
+      branch: chore/pr-044-pr43-closeout-metadata
+      base_branch: dev
+      pull_request: 44
+      url: https://github.com/fr-meyer/millefeuille/pull/44
+      head_sha: 39c9d543d190ed125407d9a4593601c817469038
+      merge_commit: ad5e58ddc22642068bf067a6f77e3e1ab270e58b
+      merged_by: mergeguez[bot]
+      mergeguez_review: null
+      mergeguez_check_run: null

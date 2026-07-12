@@ -243,8 +243,8 @@ class AuthQueryConfig:
             or self.read_key == PACKAGED_PLACEHOLDER_READ_KEY
         ):
             raise ConfigError(
-                "ZOTERO_READ_KEY must be set. Obtain a read-only API key from "
-                "https://www.zotero.org/settings/keys"
+                "ZOTERO_READ_KEY is required for Zotero read operations. "
+                "Set it to a Zotero API key with read access."
             )
 
 
