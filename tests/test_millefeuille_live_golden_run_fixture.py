@@ -71,7 +71,7 @@ class TestMillefeuilleLiveGoldenRunFixture(unittest.TestCase):
             data["schema_version"], "millefeuille-live-golden-run/v0.1"
         )
         self.assertEqual(
-            data["run_id"], "zotero-docai-pipeline-live-20260711-2345-kst"
+            data["run_id"], "millefeuille-live-20260711-2345-kst"
         )
         self.assertEqual(data["captured_from"], "approved-live-run-aggregate")
         self.assertEqual(data["discovery"]["matched_items"], 1)
@@ -110,9 +110,9 @@ class TestMillefeuilleLiveGoldenRunFixture(unittest.TestCase):
             plan["execution_status"], "blocked-missing-zotero-write-key"
         )
         self.assertEqual(plan["required_credential"], "ZOTERO_WRITE_KEY")
-        self.assertEqual(plan["remove_tags"], ["docai"])
-        self.assertIn("docai-classified", plan["add_tags"])
-        self.assertIn("docai-processed", plan["add_tags"])
+        self.assertEqual(plan["remove_tags"], ["millefeuille"])
+        self.assertIn("millefeuille-classified", plan["add_tags"])
+        self.assertIn("millefeuille-processed", plan["add_tags"])
         self.assertEqual(
             plan["classification_destination"],
             "Methods · Normalization & training dynamics",

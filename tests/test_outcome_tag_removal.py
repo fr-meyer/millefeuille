@@ -3,11 +3,11 @@
 import unittest
 from unittest.mock import MagicMock, call
 
-from zotero_docai_pipeline.cli.commands import dry_run_command
-from zotero_docai_pipeline.cli.main import validate_flags
-from zotero_docai_pipeline.clients.exceptions import ZoteroClientError
-from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
-from zotero_docai_pipeline.domain.config import (
+from millefeuille.cli.commands import dry_run_command
+from millefeuille.cli.main import validate_flags
+from millefeuille.clients.exceptions import ZoteroClientError
+from millefeuille.clients.zotero_client import ZoteroClient
+from millefeuille.domain.config import (
     AppConfig,
     AttachmentUrlExportConfig,
     AuthQueryConfig,
@@ -24,12 +24,12 @@ from zotero_docai_pipeline.domain.config import (
     TagTargetConfig,
     ZoteroConfig,
 )
-from zotero_docai_pipeline.domain.models import (
+from millefeuille.domain.models import (
     DiscoveredItem,
     DiscoveryStats,
     PaperMetadata,
 )
-from zotero_docai_pipeline.orchestration.pipeline import Pipeline, _plan_outcome_tags
+from millefeuille.orchestration.pipeline import Pipeline, _plan_outcome_tags
 
 
 def _make_tagging_config(**kwargs) -> TaggingConfig:
@@ -46,7 +46,7 @@ def _make_tagging_config(**kwargs) -> TaggingConfig:
         else:
             tag_fields[key] = value
     return TaggingConfig(
-        selection=TagSelectionConfig(include=TagRuleConfig(values=["docai"])),
+        selection=TagSelectionConfig(include=TagRuleConfig(values=["millefeuille"])),
         **tag_fields,
     )
 
@@ -97,10 +97,10 @@ class TestTaggingConfigValidation(unittest.TestCase):
         with self.assertRaises(ConfigError) as ctx:
             TaggingConfig(
                 selection=TagSelectionConfig(
-                    include=TagRuleConfig(values=["docai"])
+                    include=TagRuleConfig(values=["millefeuille"])
                 ),
-                apply_on_success=TagTargetConfig(values=["docai"]),
-                remove_on_success=TagTargetConfig(values=["docai"]),
+                apply_on_success=TagTargetConfig(values=["millefeuille"]),
+                remove_on_success=TagTargetConfig(values=["millefeuille"]),
             )
         self.assertIn("conflicting tags", str(ctx.exception))
 
@@ -108,21 +108,21 @@ class TestTaggingConfigValidation(unittest.TestCase):
         with self.assertRaises(ConfigError) as ctx:
             TaggingConfig(
                 selection=TagSelectionConfig(
-                    include=TagRuleConfig(values=["docai"])
+                    include=TagRuleConfig(values=["millefeuille"])
                 ),
-                apply_on_error=TagTargetConfig(values=["docai"]),
-                remove_on_error=TagTargetConfig(values=["docai"]),
+                apply_on_error=TagTargetConfig(values=["millefeuille"]),
+                remove_on_error=TagTargetConfig(values=["millefeuille"]),
             )
         self.assertIn("conflicting tags", str(ctx.exception))
 
     def test_cross_outcome_overlap_is_allowed(self):
         cfg = TaggingConfig(
-            selection=TagSelectionConfig(include=TagRuleConfig(values=["docai"])),
-            apply_on_success=TagTargetConfig(values=["docai"]),
-            remove_on_error=TagTargetConfig(values=["docai"]),
+            selection=TagSelectionConfig(include=TagRuleConfig(values=["millefeuille"])),
+            apply_on_success=TagTargetConfig(values=["millefeuille"]),
+            remove_on_error=TagTargetConfig(values=["millefeuille"]),
         )
-        self.assertEqual(cfg.apply_on_success.values, ["docai"])
-        self.assertEqual(cfg.remove_on_error.values, ["docai"])
+        self.assertEqual(cfg.apply_on_success.values, ["millefeuille"])
+        self.assertEqual(cfg.remove_on_error.values, ["millefeuille"])
 
 
 class TestApplyProcessingTagsSuccess(unittest.TestCase):
@@ -264,7 +264,7 @@ class TestDryRunTwoBranchPreview(unittest.TestCase):
         item = DiscoveredItem(
             key="ITEM1",
             title="Test Paper",
-            tags=["docai"],
+            tags=["millefeuille"],
             attachments=[],
             citation_key="test2024",
             paper_metadata=PaperMetadata(

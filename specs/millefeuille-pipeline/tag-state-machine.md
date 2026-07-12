@@ -5,59 +5,59 @@ secondary to handoff/source-pack/OpenKB evidence.
 
 ## Suggested Tags
 
-- `docai`
+- `millefeuille`
   - Operator-selected candidate.
 
-- `docai-previewed`
+- `millefeuille-previewed`
   - Discovery or handoff preview was generated.
 
-- `docai-handoff-exported`
+- `millefeuille-handoff-exported`
   - Authoritative handoff row exists.
 
-- `docai-source-verified`
+- `millefeuille-source-verified`
   - Recovered attachment bytes matched the handoff SHA-256.
 
-- `docai-source-packed`
+- `millefeuille-source-packed`
   - Source pack was created or updated.
 
-- `docai-extracted-native`
+- `millefeuille-extracted-native`
   - Native extraction evidence exists.
 
-- `docai-extracted-ocr`
+- `millefeuille-extracted-ocr`
   - OCR extraction evidence exists.
 
-- `docai-openkb-added`
+- `millefeuille-openkb-added`
   - Selected Markdown was added to OpenKB.
 
-- `docai-acceptance-passed`
+- `millefeuille-acceptance-passed`
   - Acceptance summary passed with no unmatched rows or duplicate review rows.
 
-- `docai-ready-for-classification`
+- `millefeuille-ready-for-classification`
   - Classification may begin.
 
-- `docai-classified`
+- `millefeuille-classified`
   - Evidence-backed classification decision is complete.
 
-- `docai-needs-review`
+- `millefeuille-needs-review`
   - The item needs manual review.
 
-- `docai-error`
+- `millefeuille-error`
   - The item failed a stage.
 
 ## Allowed Transitions
 
-1. `docai` -> `docai-previewed`
-2. `docai-previewed` -> `docai-handoff-exported`
-3. `docai-handoff-exported` -> `docai-source-verified`
-4. `docai-source-verified` -> `docai-source-packed`
-5. `docai-source-packed` -> `docai-extracted-native`
-6. `docai-source-packed` -> `docai-extracted-ocr`
-7. any extraction-complete state -> `docai-openkb-added`
-8. `docai-openkb-added` -> `docai-acceptance-passed`
-9. `docai-acceptance-passed` -> `docai-ready-for-classification`
-10. `docai-ready-for-classification` -> `docai-classified`
-11. any state -> `docai-needs-review`
-12. any state -> `docai-error`
+1. `millefeuille` -> `millefeuille-previewed`
+2. `millefeuille-previewed` -> `millefeuille-handoff-exported`
+3. `millefeuille-handoff-exported` -> `millefeuille-source-verified`
+4. `millefeuille-source-verified` -> `millefeuille-source-packed`
+5. `millefeuille-source-packed` -> `millefeuille-extracted-native`
+6. `millefeuille-source-packed` -> `millefeuille-extracted-ocr`
+7. any extraction-complete state -> `millefeuille-openkb-added`
+8. `millefeuille-openkb-added` -> `millefeuille-acceptance-passed`
+9. `millefeuille-acceptance-passed` -> `millefeuille-ready-for-classification`
+10. `millefeuille-ready-for-classification` -> `millefeuille-classified`
+11. any state -> `millefeuille-needs-review`
+12. any state -> `millefeuille-error`
 
 ## Rules
 

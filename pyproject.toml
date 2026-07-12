@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "zotero-docai-pipeline"
+name = "millefeuille"
 version = "0.4.0"
-description = "Automate PDF-to-Markdown extraction for Zotero attachments using OCR providers (PageIndex or Mistral). Results are saved as rich text Zotero notes ready for Notero/Notion sync, with optional hierarchical tree structure extraction."
+description = "Run the source-pack, extraction, OpenKB handoff, acceptance, and classification lifecycle for research-paper attachments discovered from Zotero."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -39,17 +39,17 @@ dependencies = [
 ]
 
 [project.scripts]
-zotero-docai-pipeline = "zotero_docai_pipeline.cli.main:main"
+millefeuille = "millefeuille.cli.main:main"
 
 [tool.setuptools]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["zotero_docai_pipeline*"]
+include = ["millefeuille*"]
 exclude = ["tests*", "*.tests*", "*.tests.*", "tests.*"]
 
 [tool.setuptools.package-data]
-zotero_docai_pipeline = ["conf/**/*.yaml"]
+millefeuille = ["conf/**/*.yaml"]
 
 [tool.ruff]
 target-version = "py311"
@@ -83,7 +83,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["zotero_docai_pipeline"]
+known-first-party = ["millefeuille"]
 force-sort-within-sections = true
 split-on-trailing-comma = true
 
@@ -92,4 +92,3 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
-

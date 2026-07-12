@@ -1,4 +1,4 @@
-name: zotero-docai-pipeline
+name: millefeuille
 channels:
   - conda-forge
   - defaults

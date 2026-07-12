@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import unittest
 
-from zotero_docai_pipeline.domain.millefeuille import (
+from millefeuille.domain.millefeuille import (
     AttachmentEvidenceIdentity,
     ManualGate,
     MillefeuilleContractError,

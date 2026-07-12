@@ -1,6 +1,6 @@
 # Millefeuille Pipeline Contract Packet
 
-This packet records the remaining `zotero-docai-pipeline` work as an
+This packet records the remaining `millefeuille` work as an
 offline-first contract. It is safe to review and test without Zotero
 credentials, PDF bytes, OCR providers, OpenKB writes, source-pack writes,
 GitHub publication, releases, or package-index changes.
@@ -16,7 +16,7 @@ Files:
 - `live-run-plan.md` - future live dogfood plan, still requiring approval.
 
 Executable offline contract models live in
-`zotero_docai_pipeline/domain/millefeuille.py`. They cover stage manifests,
+`millefeuille/domain/millefeuille.py`. They cover stage manifests,
 manual gates, tag-state transitions, and OCR evidence records without changing
 live CLI behavior.
 

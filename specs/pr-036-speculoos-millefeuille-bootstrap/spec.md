@@ -2,7 +2,7 @@
 
 ## Objective
 
-Bootstrap repo-local Speculoos metadata for `zotero-docai-pipeline` and define a
+Bootstrap repo-local Speculoos metadata for `millefeuille` and define a
 bounded Millefeuille spec/audit plan for the Zotero to OpenKB handoff path.
 
 The slice is planning/docs/metadata only. It must not run live Zotero
@@ -11,16 +11,16 @@ or change credentials, model routes, rulesets, releases, or package indexes.
 
 ## Context
 
-`zotero-docai-pipeline` already supports an OpenKB/DocAI handoff export:
+`millefeuille` already supports an OpenKB/Millefeuille handoff export:
 
-- `openkb-docai-handoff/v0.1` live rows;
-- `openkb-docai-handoff-preview/v0.1` dry-run rows;
+- `openkb-millefeuille-handoff/v0.1` live rows;
+- `openkb-millefeuille-handoff-preview/v0.1` dry-run rows;
 - strong SHA-256 verification with transient in-memory attachment reads;
 - recovery metadata instead of authenticated URLs or stored PDF payloads;
 - offline fixture coverage under
-  `tests/fixtures/openkb_handoff_docai_test/`.
+  `tests/fixtures/openkb_handoff_millefeuille_test/`.
 
-The June 2026 `docai-test` dogfood proved the first full lifecycle for three
+The June 2026 `millefeuille-test` dogfood proved the first full lifecycle for three
 research PDFs: Zotero identity, strong handoff rows, source-pack creation,
 native plus Mistral OCR evidence, route `merged-dual`, OpenKB add, duplicate
 scan, and one visible no-PDF skip.
@@ -49,15 +49,15 @@ The default acceptance suite should remain offline and credential-free:
 - `tests/test_openkb_handoff_identity.py`
 - `tests/test_openkb_handoff_security.py`
 - `tests/test_openkb_handoff_pipeline.py`
-- `tests/test_openkb_docai_test_fixture.py`
+- `tests/test_openkb_millefeuille_test_fixture.py`
 - `tests/test_openkb_handoff_multi_attachment_fixture.py`
-- `tests/fixtures/openkb_handoff_docai_test/`
+- `tests/fixtures/openkb_handoff_millefeuille_test/`
 - `tests/fixtures/openkb_handoff_multi_attachment/`
 
 These tests are the initial non-live gate for future Millefeuille changes.
 
 The offline acceptance-summary contract is
-`openkb-docai-acceptance-summary/v0.1`. It joins handoff rows, OpenKB outcomes,
+`openkb-millefeuille-acceptance-summary/v0.1`. It joins handoff rows, OpenKB outcomes,
 skip rows, and duplicate-scan evidence without live Zotero reads, PDF recovery,
 OCR calls, OpenKB writes, or source-pack writes.
 
@@ -65,7 +65,7 @@ The remaining pipeline contract lives in `specs/millefeuille-pipeline/` and
 covers the CLI contract, stage manifest schema, tag-state machine, OCR backend
 contract, live-run approval plan, and release/version policy.
 Executable offline contract models live in
-`zotero_docai_pipeline/domain/millefeuille.py`.
+`millefeuille/domain/millefeuille.py`.
 
 ## Audit Questions For The Next Implementation Slice
 

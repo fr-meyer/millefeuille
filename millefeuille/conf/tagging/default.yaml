@@ -1,0 +1,30 @@
+defaults:
+  - base_default
+  - _self_
+
+# Tagging workflow configuration
+selection:
+  include:
+    values:
+      - millefeuille
+    operator: "or"
+  exclude:
+    values:
+      - millefeuille-processed
+    operator: "or"
+  conflict_resolution: "exclude_wins"
+
+apply_on_success:
+  values:
+    - millefeuille-processed
+
+apply_on_error:
+  values:
+    - millefeuille-error
+
+remove_on_success:
+  values: []
+remove_on_error:
+  values: []
+
+include_abstract: false

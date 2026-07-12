@@ -12,8 +12,8 @@ boundaries harder to cross accidentally.
   - Default mode: dry-run/read-only.
 
 - `handoff`
-  - Build `openkb-docai-handoff/v0.1` rows.
-  - Build `openkb-docai-handoff-preview/v0.1` rows in dry-run mode.
+  - Build `openkb-millefeuille-handoff/v0.1` rows.
+  - Build `openkb-millefeuille-handoff-preview/v0.1` rows in dry-run mode.
   - Optionally compute SHA-256 only after the PDF recovery gate is approved.
 
 - `recover`
@@ -43,7 +43,7 @@ boundaries harder to cross accidentally.
 
 - `acceptance`
   - Join handoff, skip, OpenKB outcome, and duplicate-scan evidence.
-  - Emit `openkb-docai-acceptance-summary/v0.1`.
+  - Emit `openkb-millefeuille-acceptance-summary/v0.1`.
 
 - `classify`
   - Start only after acceptance evidence is complete.

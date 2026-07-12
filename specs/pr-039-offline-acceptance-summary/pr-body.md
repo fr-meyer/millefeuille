@@ -1,10 +1,10 @@
 # Summary
 
-Adds the next offline Millefeuille slice for `zotero-docai-pipeline`.
+Adds the next offline Millefeuille slice for `millefeuille`.
 
 This branch:
 
-- adds `openkb-docai-acceptance-summary/v0.1` support;
+- adds `openkb-millefeuille-acceptance-summary/v0.1` support;
 - adds redacted duplicate-scan fixture evidence;
 - adds multi-attachment and non-PDF fixture coverage;
 - records the remaining Zotero -> OpenKB -> classification pipeline;
@@ -33,22 +33,22 @@ This branch:
 - `specs/pr-036-speculoos-millefeuille-bootstrap/tasks.md`
 - `specs/pr-039-offline-acceptance-summary/commit-message.txt`
 - `specs/pr-039-offline-acceptance-summary/pr-body.md`
-- `tests/fixtures/openkb_handoff_docai_test/README.md`
-- `tests/fixtures/openkb_handoff_docai_test/duplicate_scans.jsonl`
+- `tests/fixtures/openkb_handoff_millefeuille_test/README.md`
+- `tests/fixtures/openkb_handoff_millefeuille_test/duplicate_scans.jsonl`
 - `tests/fixtures/openkb_handoff_multi_attachment/README.md`
 - `tests/fixtures/openkb_handoff_multi_attachment/duplicate_scans.jsonl`
 - `tests/fixtures/openkb_handoff_multi_attachment/handoff.live.jsonl`
 - `tests/fixtures/openkb_handoff_multi_attachment/openkb_outcomes.jsonl`
 - `tests/test_millefeuille_contract_artifacts.py`
 - `tests/test_millefeuille_contract_models.py`
-- `tests/test_openkb_docai_test_fixture.py`
+- `tests/test_openkb_millefeuille_test_fixture.py`
 - `tests/test_openkb_handoff_multi_attachment_fixture.py`
-- `zotero_docai_pipeline/domain/millefeuille.py`
-- `zotero_docai_pipeline/utils/export.py`
+- `millefeuille/domain/millefeuille.py`
+- `millefeuille/utils/export.py`
 
 # Validation
 
-- `.venv/bin/python -m unittest -v tests.test_openkb_docai_test_fixture tests.test_openkb_handoff_multi_attachment_fixture`
+- `.venv/bin/python -m unittest -v tests.test_openkb_millefeuille_test_fixture tests.test_openkb_handoff_multi_attachment_fixture`
 - `.venv/bin/python -m unittest -v tests.test_millefeuille_contract_artifacts tests.test_millefeuille_contract_models`
 - `.venv/bin/python -m unittest discover -v`
 - `.venv/bin/ruff check .`

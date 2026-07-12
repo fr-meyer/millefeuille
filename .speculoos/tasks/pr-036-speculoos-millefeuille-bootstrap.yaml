@@ -10,11 +10,11 @@ github:
   pull_request_project_item: null
   project_status: Done
   project_item: null
-  url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36
+  url: https://github.com/fr-meyer/millefeuille/pull/36
   head_sha: 2458264fdc99f82578fe6ad4a110b87b93ec11d5
   merge_commit: 6511030c73bd834e6536e4d5dee88648bb2aae29
-  mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36#pullrequestreview-4676349739
-  mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86505824602
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/36#pullrequestreview-4676349739
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86505824602
 scope:
   - add repo-local Speculoos metadata baseline
   - define a bounded Millefeuille spec/audit plan for Zotero to OpenKB handoff work
@@ -42,9 +42,9 @@ validation:
   - speculoos validate --task pr-036-speculoos-millefeuille-bootstrap --validation "git diff --check" --json
   - speculoos publish-check
 evidence:
-  - existing docai-test fixture covers three successful Zotero PDF handoff rows and one no-PDF skip
+  - existing millefeuille-test fixture covers three successful Zotero PDF handoff rows and one no-PDF skip
   - existing tests cover OpenKB handoff identity, security sanitization, preview rows, standalone handoff behavior, and outcome fixture accounting
-  - prior dogfood debrief is memory/pageindex/zotero-docai-test-dogfood-debrief-2026-06-05.md
+  - prior dogfood debrief is memory/pageindex/zotero-millefeuille-test-dogfood-debrief-2026-06-05.md
   - Ruff passed with all checks
   - unit tests passed with 123 tests
   - .speculoos YAML and review-evidence JSON parse passed
@@ -53,8 +53,8 @@ evidence:
   - speculoos publish-check passed against the draft PR body and commit message
   - changed-file private-data scan passed for new .speculoos and specs files
 links:
-  prior_dogfood_debrief: memory/pageindex/zotero-docai-test-dogfood-debrief-2026-06-05.md
-  openkb_runbook: memory/pageindex/openkb-docai-mvp-runbook-2026-05-27.md
+  prior_dogfood_debrief: memory/pageindex/zotero-millefeuille-test-dogfood-debrief-2026-06-05.md
+  openkb_runbook: memory/pageindex/openkb-millefeuille-mvp-runbook-2026-05-27.md
 notes:
   - This PR intentionally plans the next live-capable slice without executing it.
   - Use a separate approval gate before any live Zotero/OCR/OpenKB operation.

@@ -3,19 +3,19 @@
 import unittest
 from unittest.mock import MagicMock
 
-from zotero_docai_pipeline.clients.exceptions import (
+from millefeuille.clients.exceptions import (
     AttachmentIdentityError,
     HandoffSecurityError,
 )
-from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
-from zotero_docai_pipeline.domain.config import OpenKBHandoffExportConfig
-from zotero_docai_pipeline.domain.models import (
+from millefeuille.clients.zotero_client import ZoteroClient
+from millefeuille.domain.config import OpenKBHandoffExportConfig
+from millefeuille.domain.models import (
     AttachmentInfo,
     DiscoveredItem,
     OpenKBHandoffRow,
     PaperMetadata,
 )
-from zotero_docai_pipeline.utils.export import (
+from millefeuille.utils.export import (
     build_openkb_handoff_rows,
     validate_openkb_handoff_rows,
 )
@@ -94,7 +94,7 @@ def _make_valid_row(**overrides):
         "source_type": "zotero",
     }
     defaults = {
-        "schema_version": "openkb-docai-handoff/v0.1",
+        "schema_version": "openkb-millefeuille-handoff/v0.1",
         "source_type": "zotero",
         "discovered_at": "2024-01-01T00:00:00+00:00",
         "item_key": "ITEM1",

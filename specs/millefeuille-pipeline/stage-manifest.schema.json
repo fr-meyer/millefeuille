@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/fr-meyer/zotero-docai-pipeline/specs/millefeuille-pipeline/stage-manifest.schema.json",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/stage-manifest.schema.json",
   "title": "Millefeuille Stage Manifest",
   "type": "object",
   "required": [

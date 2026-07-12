@@ -1,11 +1,12 @@
-# zotero-docai-pipeline
+# Millefeuille
 
 ![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/fr-meyer/zotero-docai-pipeline?utm_source=oss&utm_medium=github&utm_campaign=fr-meyer%2Fzotero-docai-pipeline&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/fr-meyer/millefeuille?utm_source=oss&utm_medium=github&utm_campaign=fr-meyer%2Fmillefeuille&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
-Automate PDF-to-Markdown extraction for Zotero attachments using OCR providers (PageIndex or Mistral). Results are saved as rich text Zotero notes ready for Notero/Notion sync, with optional hierarchical tree structure extraction.
+Millefeuille runs the source-pack, extraction, OpenKB handoff, acceptance, and
+classification lifecycle for research-paper attachments discovered from Zotero.
 
 ## Table of Contents
 
@@ -16,7 +17,7 @@ Automate PDF-to-Markdown extraction for Zotero attachments using OCR providers (
 - [Item Selection & Tagging](#item-selection--tagging)
 - [Tag Adding](#tag-adding)
 - [PDF Download](#pdf-download)
-- [OpenKB/DocAI Handoff Export](#openkbdocai-handoff-export)
+- [OpenKB/Millefeuille Handoff Export](#openkbmillefeuille-handoff-export)
 - [Extraction Modes](#extraction-modes)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
@@ -27,26 +28,26 @@ Automate PDF-to-Markdown extraction for Zotero attachments using OCR providers (
 Complete the [Installation](#installation) and [Runtime Prerequisites](#runtime-prerequisites) steps first, then follow this workflow:
 
 1. **Tag items in Zotero:**
-   - Tag items you want to process with the configured include tag (default: `docai`)
+   - Tag items you want to process with the configured include tag (default: `millefeuille`)
 
 2. **Run the pipeline:**
    ```bash
-   zotero-docai-pipeline ocr.enabled=true
+   millefeuille ocr.enabled=true
    # or equivalently:
-   python -m zotero_docai_pipeline ocr.enabled=true
+   python -m millefeuille ocr.enabled=true
    ```
 
 3. **Verify results:**
    - Check your Zotero library for newly created notes
-   - Successfully processed items are tagged with the configured success tag(s) (default: `docai-processed`)
+   - Successfully processed items are tagged with the configured success tag(s) (default: `millefeuille-processed`)
 
 ### Dry-Run Mode
 
 Test your configuration without creating notes:
 ```bash
-zotero-docai-pipeline processing.dry_run=true ocr.enabled=true
+millefeuille processing.dry_run=true ocr.enabled=true
 # or equivalently:
-python -m zotero_docai_pipeline processing.dry_run=true ocr.enabled=true
+python -m millefeuille processing.dry_run=true ocr.enabled=true
 ```
 
 Dry-run mode performs the full item-selection logic but **does not write any tags or notes** to Zotero. For every matched item the following details are logged:
@@ -64,9 +65,9 @@ A summary line is printed at the end showing the total matched items, total PDFs
 **Export-only dry-run (no OCR key required):** To validate discovery and log attachment URLs without OCR, use:
 
 ```bash
-zotero-docai-pipeline processing.dry_run=true export.attachment_urls.enabled=true
+millefeuille processing.dry_run=true export.attachment_urls.enabled=true
 # or equivalently:
-python -m zotero_docai_pipeline processing.dry_run=true export.attachment_urls.enabled=true
+python -m millefeuille processing.dry_run=true export.attachment_urls.enabled=true
 ```
 
 This mode does **not** require `PAGEINDEX_API_KEY` or `MISTRAL_API_KEY`. It runs discovery, logs one `[DISCOVERY URL]` record per PDF attachment, and exits — no bytes are downloaded, no notes are written, and no OCR credentials are needed.
@@ -75,11 +76,11 @@ This mode does **not** require `PAGEINDEX_API_KEY` or `MISTRAL_API_KEY`. It runs
 
 Use this five-step staging-tag pattern to validate configuration on a small subset before running on your full library:
 
-1. Tag 2–5 items in Zotero with a staging tag (e.g. `docai-test`).
-2. Override `tagging.selection.include.values=[docai-test]` on the CLI.
+1. Tag 2–5 items in Zotero with a staging tag (e.g. `millefeuille-test`).
+2. Override `tagging.selection.include.values=[millefeuille-test]` on the CLI.
 3. Run with `processing.dry_run=true` to preview.
 4. Confirm output, then run live on the subset.
-5. Only then widen to the full `docai` tag set.
+5. Only then widen to the full `millefeuille` tag set.
 
 This pattern applies to selection-retagging, OCR, download, and the OpenKB handoff export.
 
@@ -92,9 +93,9 @@ pip install .        # standard install
 pip install -e .     # editable / development install
 ```
 
-After installation, `zotero-docai-pipeline` is available on `PATH` and can be verified from any directory:
+After installation, `millefeuille` is available on `PATH` and can be verified from any directory:
 ```bash
-zotero-docai-pipeline --help
+millefeuille --help
 ```
 
 ### Optional: conda environment
@@ -102,7 +103,7 @@ zotero-docai-pipeline --help
 If you prefer using conda for dependency isolation:
 ```bash
 conda env create -f environment.yml
-conda activate zotero-docai-pipeline
+conda activate millefeuille
 pip install .
 ```
 
@@ -131,7 +132,7 @@ export MISTRAL_API_KEY="your-mistral-api-key"      # For Mistral OCR
 ```
 
 **Provider Setup:**
-- **PageIndex:** Obtain API key from [PageIndex dashboard](https://docs.pageindex.ai). Optional SDK mode: install with `pip install pageindex` and set `use_sdk: true` in `zotero_docai_pipeline/conf/ocr/pageindex.yaml`.
+- **PageIndex:** Obtain API key from [PageIndex dashboard](https://docs.pageindex.ai). Optional SDK mode: install with `pip install pageindex` and set `use_sdk: true` in `millefeuille/conf/ocr/pageindex.yaml`.
 - **Mistral:** Obtain API key from [Mistral platform](https://docs.mistral.ai).
 
 > **Note:** `PAGEINDEX_API_KEY` and `MISTRAL_API_KEY` are required **only** when `ocr.enabled=true`. The following run modes work **without** any OCR provider key: export-only dry-run (`processing.dry_run=true export.attachment_urls.enabled=true`), tag-adding-only (`tag_adding.enabled=true`), and download-only (`download.enabled=true`).
@@ -153,12 +154,12 @@ The pipeline uses Hydra for configuration management. Most settings can be overr
 | `tree_structure.enabled` | boolean | `true` | Enable hierarchical tree structure extraction |
 | `processing.extraction_mode` | string | `all_at_once` | Note organization mode (`all_at_once` or `page_by_page`) |
 | `processing.batch_size` | integer | varies | Batch processing size (provider-dependent) |
-| `tagging.selection.include.values` | list | `[docai]` | Tags items must match to be selected for processing |
+| `tagging.selection.include.values` | list | `[millefeuille]` | Tags items must match to be selected for processing |
 | `tagging.selection.include.operator` | string | `or` | How include tags are combined (`and` / `or`) |
-| `tagging.selection.exclude.values` | list | `[docai-processed]` | Tags that disqualify items from selection |
+| `tagging.selection.exclude.values` | list | `[millefeuille-processed]` | Tags that disqualify items from selection |
 | `tagging.selection.exclude.operator` | string | `or` | How exclude tags are combined (`and` / `or`) |
-| `tagging.apply_on_success.values` | list | `[docai-processed]` | Tags added to items on successful processing |
-| `tagging.apply_on_error.values` | list | `[docai-error]` | Tags added to items on failed processing |
+| `tagging.apply_on_success.values` | list | `[millefeuille-processed]` | Tags added to items on successful processing |
+| `tagging.apply_on_error.values` | list | `[millefeuille-error]` | Tags added to items on failed processing |
 | `tagging.include_abstract` | boolean | `false` | Include abstract in `paper_metadata` passed to OCR |
 | `zotero.error_tagging_enabled` | boolean | `true` | Whether error tags are applied on failure |
 | `download.upload_folder` | string | — | Example: `./downloads`. Must be set to an explicit path when `download.enabled=true` (packaged placeholders are rejected). |
@@ -190,20 +191,20 @@ The pipeline supports two OCR providers:
 Override configuration from the command line:
 ```bash
 # Change OCR provider
-zotero-docai-pipeline ocr=pageindex ocr.enabled=true
-# or: python -m zotero_docai_pipeline ocr=pageindex ocr.enabled=true
+millefeuille ocr=pageindex ocr.enabled=true
+# or: python -m millefeuille ocr=pageindex ocr.enabled=true
 
 # Enable/disable tree extraction
-zotero-docai-pipeline tree_structure.enabled=true ocr.enabled=true
-# or: python -m zotero_docai_pipeline tree_structure.enabled=true ocr.enabled=true
+millefeuille tree_structure.enabled=true ocr.enabled=true
+# or: python -m millefeuille tree_structure.enabled=true ocr.enabled=true
 
 # Change extraction mode
-zotero-docai-pipeline processing.extraction_mode=page_by_page ocr.enabled=true
-# or: python -m zotero_docai_pipeline processing.extraction_mode=page_by_page ocr.enabled=true
+millefeuille processing.extraction_mode=page_by_page ocr.enabled=true
+# or: python -m millefeuille processing.extraction_mode=page_by_page ocr.enabled=true
 
 # Multiple overrides
-zotero-docai-pipeline ocr=pageindex tree_structure.enabled=true processing.dry_run=true ocr.enabled=true
-# or: python -m zotero_docai_pipeline ocr=pageindex tree_structure.enabled=true processing.dry_run=true ocr.enabled=true
+millefeuille ocr=pageindex tree_structure.enabled=true processing.dry_run=true ocr.enabled=true
+# or: python -m millefeuille ocr=pageindex tree_structure.enabled=true processing.dry_run=true ocr.enabled=true
 ```
 
 ## Item Selection & Tagging
@@ -224,8 +225,8 @@ Items are selected for processing based on **include** and **exclude** tag rules
 
 After processing, the pipeline applies outcome-based tags:
 
-- **`apply_on_success.values`** — tags added to items that were processed successfully (default: `[docai-processed]`).
-- **`apply_on_error.values`** — tags added to items that failed during processing (default: `[docai-error]`). Error tagging can be disabled globally by setting `zotero.error_tagging_enabled: false`.
+- **`apply_on_success.values`** — tags added to items that were processed successfully (default: `[millefeuille-processed]`).
+- **`apply_on_error.values`** — tags added to items that failed during processing (default: `[millefeuille-error]`). Error tagging can be disabled globally by setting `zotero.error_tagging_enabled: false`.
 
 ### Rich Metadata
 
@@ -246,28 +247,28 @@ Each processed item's entry in `processing_summary.json` contains a nested **`pa
 
 ### Default Configuration
 
-The full default tagging configuration (`zotero_docai_pipeline/conf/tagging/default.yaml`):
+The full default tagging configuration (`millefeuille/conf/tagging/default.yaml`):
 
 ```yaml
 # Tagging workflow configuration
 selection:
   include:
     values:
-      - docai
+      - millefeuille
     operator: "or"
   exclude:
     values:
-      - docai-processed
+      - millefeuille-processed
     operator: "or"
   conflict_resolution: "exclude_wins"
 
 apply_on_success:
   values:
-    - docai-processed
+    - millefeuille-processed
 
 apply_on_error:
   values:
-    - docai-error
+    - millefeuille-error
 
 include_abstract: false
 ```
@@ -277,8 +278,8 @@ include_abstract: false
 Override tagging settings from the command line:
 
 ```bash
-zotero-docai-pipeline "tagging.selection.include.values=[my-tag]"
-# or: python -m zotero_docai_pipeline "tagging.selection.include.values=[my-tag]"
+millefeuille "tagging.selection.include.values=[my-tag]"
+# or: python -m millefeuille "tagging.selection.include.values=[my-tag]"
 ```
 
 ### Selection-Based Retagging
@@ -292,20 +293,20 @@ Use `selection_tagging` to add and remove tags on items matched by `tagging.sele
 Dry-run preview:
 
 ```bash
-python -m zotero_docai_pipeline \
+python -m millefeuille \
   processing.dry_run=true \
   selection_tagging.enabled=true \
-  "selection_tagging.add.values=[docai-v2]" \
-  "selection_tagging.remove.values=[docai]"
+  "selection_tagging.add.values=[millefeuille-v2]" \
+  "selection_tagging.remove.values=[millefeuille]"
 ```
 
 Live run (same command without `processing.dry_run=true`):
 
 ```bash
-python -m zotero_docai_pipeline \
+python -m millefeuille \
   selection_tagging.enabled=true \
-  "selection_tagging.add.values=[docai-v2]" \
-  "selection_tagging.remove.values=[docai]"
+  "selection_tagging.add.values=[millefeuille-v2]" \
+  "selection_tagging.remove.values=[millefeuille]"
 ```
 
 `selection_tagging` and `tag_adding` are **mutually exclusive** — the CLI exits with a config error if both are enabled. A live run with `selection_tagging` requires `ZOTERO_WRITE_KEY`.
@@ -330,9 +331,9 @@ Optional step that applies Zotero tags to items by matching their **citation key
 
 Example:
 ```bash
-export TAG_ADDING_ASSIGNMENTS_JSON='{"Smith2020":["docai-tag1","docai-tag2"]}'
-zotero-docai-pipeline tag_adding.enabled=true
-# or: python -m zotero_docai_pipeline tag_adding.enabled=true
+export TAG_ADDING_ASSIGNMENTS_JSON='{"Smith2020":["millefeuille-tag1","millefeuille-tag2"]}'
+millefeuille tag_adding.enabled=true
+# or: python -m millefeuille tag_adding.enabled=true
 ```
 
 ## PDF Download
@@ -346,7 +347,7 @@ Optional step that downloads PDFs from Zotero items to local disk (used as an in
 - `download.create_subfolders`: whether to create subfolders under `upload_folder` (default: `false`).
 - `download.skip_existing`: whether to skip PDFs that already exist locally (default: `true`).
 - `download.max_concurrent_downloads`: maximum number of concurrent downloads (default: `5`).
-- Retry is configurable via `download.retry.*` (see `zotero_docai_pipeline/conf/download/default.yaml`).
+- Retry is configurable via `download.retry.*` (see `millefeuille/conf/download/default.yaml`).
 
 ### Important constraint
 - `processing.dry_run=true` does not download PDFs. It can be combined with
@@ -356,17 +357,17 @@ Optional step that downloads PDFs from Zotero items to local disk (used as an in
 Examples:
 ```bash
 # Download-only (explicit output path required)
-zotero-docai-pipeline download.enabled=true download.upload_folder=/path/to/downloads
-# or: python -m zotero_docai_pipeline download.enabled=true download.upload_folder=/path/to/downloads
+millefeuille download.enabled=true download.upload_folder=/path/to/downloads
+# or: python -m millefeuille download.enabled=true download.upload_folder=/path/to/downloads
 
 # Download + OCR
-zotero-docai-pipeline download.enabled=true download.upload_folder=/path/to/downloads ocr.enabled=true
-# or: python -m zotero_docai_pipeline download.enabled=true download.upload_folder=/path/to/downloads ocr.enabled=true
+millefeuille download.enabled=true download.upload_folder=/path/to/downloads ocr.enabled=true
+# or: python -m millefeuille download.enabled=true download.upload_folder=/path/to/downloads ocr.enabled=true
 ```
 
-## OpenKB/DocAI Handoff Export
+## OpenKB/Millefeuille Handoff Export
 
-Produces a durable, credential-free JSONL file (`openkb-docai-handoff/v0.1`) that an external OpenKB/DocAI helper can consume to recover and verify Zotero PDF attachments. No authenticated URLs, API keys, or file payloads are stored.
+Produces a durable, credential-free JSONL file (`openkb-millefeuille-handoff/v0.1`) that an external OpenKB/Millefeuille helper can consume to recover and verify Zotero PDF attachments. No authenticated URLs, API keys, or file payloads are stored.
 
 **Key facts:**
 
@@ -382,20 +383,20 @@ Produces a durable, credential-free JSONL file (`openkb-docai-handoff/v0.1`) tha
 **Validate-only dry-run (no output file):**
 
 ```bash
-python -m zotero_docai_pipeline \
+python -m millefeuille \
   processing.dry_run=true \
   export.openkb_handoff.enabled=true \
-  "tagging.selection.include.values=[docai-test]"
+  "tagging.selection.include.values=[millefeuille-test]"
 ```
 
 **Explicit preview mode (writes a non-authoritative preview file):**
 
 ```bash
-python -m zotero_docai_pipeline \
+python -m millefeuille \
   processing.dry_run=true \
   export.openkb_handoff.enabled=true \
   export.openkb_handoff.preview_jsonl_path=./handoff-dry-run.preview.jsonl \
-  "tagging.selection.include.values=[docai-test]"
+  "tagging.selection.include.values=[millefeuille-test]"
 ```
 
 Note: the preview file is non-authoritative and written only to `preview_jsonl_path`. The live `jsonl_path` is never written in dry-run.
@@ -405,7 +406,7 @@ Note: the preview file is non-authoritative and written only to `preview_jsonl_p
 Use this for merge readiness, dogfood, or production verification when Zotero-hosted PDFs should produce `verification_strength=full` and no weak-verification warning. It transiently fetches each PDF in memory to compute SHA-256, but does not write or store PDF payloads.
 
 ```bash
-python -m zotero_docai_pipeline \
+python -m millefeuille \
   processing.dry_run=true \
   ocr.enabled=false \
   download.enabled=false \
@@ -414,16 +415,16 @@ python -m zotero_docai_pipeline \
   export.openkb_handoff.enabled=true \
   export.openkb_handoff.compute_sha256=true \
   export.openkb_handoff.preview_jsonl_path=./handoff-dry-run.preview.jsonl \
-  "tagging.selection.include.values=[docai-test]"
+  "tagging.selection.include.values=[millefeuille-test]"
 ```
 
 **Live export:**
 
 ```bash
-python -m zotero_docai_pipeline \
+python -m millefeuille \
   export.openkb_handoff.enabled=true \
   export.openkb_handoff.jsonl_path=./handoff.jsonl \
-  "tagging.selection.include.values=[docai]"
+  "tagging.selection.include.values=[millefeuille]"
 ```
 
 For production-grade handoff verification, include `export.openkb_handoff.compute_sha256=true` in the live command as well.
@@ -468,8 +469,8 @@ These keys are only required when `ocr.enabled=true`; non-OCR runs (export-only 
 ### No Items Found
 
 Verify:
-- Items are tagged with the configured include tag(s) (see `tagging.selection.include.values`, default: `docai`)
-- Items are not already tagged with the configured exclude tag(s) (see `tagging.selection.exclude.values`, default: `docai-processed`)
+- Items are tagged with the configured include tag(s) (see `tagging.selection.include.values`, default: `millefeuille`)
+- Items are not already tagged with the configured exclude tag(s) (see `tagging.selection.exclude.values`, default: `millefeuille-processed`)
 - `ZOTERO_LIBRARY_ID` env var is set to your correct numeric library ID
 - `ZOTERO_READ_KEY` has read access to the specified library
 

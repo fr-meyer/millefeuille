@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 import unittest
 
-from zotero_docai_pipeline.clients.exceptions import AttachmentIdentityError
-from zotero_docai_pipeline.domain.models import OpenKBHandoffRow
-from zotero_docai_pipeline.utils.export import (
+from millefeuille.clients.exceptions import AttachmentIdentityError
+from millefeuille.domain.models import OpenKBHandoffRow
+from millefeuille.utils.export import (
     sanitize_handoff_row,
     verify_openkb_handoff_recovered_bytes,
 )

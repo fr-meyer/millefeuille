@@ -1,0 +1,11 @@
+feat: hard rename project to Millefeuille
+
+Rename the Python package, distribution, CLI, documentation, fixtures, and
+Speculoos identity to Millefeuille with no compatibility shim for the previous
+project name.
+
+Migrate the default lifecycle tags and OpenKB handoff schema labels to the
+Millefeuille namespace, then add a regression guard that rejects tracked
+source hits for the retired package and CLI identity.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

@@ -57,7 +57,7 @@
 8. **Route Selection And OpenKB Write**
    - Choose the auditable route: `native`, `ocr`, or `merged-dual`.
    - Add selected Markdown to OpenKB.
-   - Run duplicate scan and emit `openkb-docai-acceptance-summary/v0.1`.
+   - Run duplicate scan and emit `openkb-millefeuille-acceptance-summary/v0.1`.
    - Manual gate: OpenKB write and duplicate scan against live OpenKB state.
 
 9. **Classification**

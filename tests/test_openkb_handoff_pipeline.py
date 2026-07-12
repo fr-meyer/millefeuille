@@ -6,14 +6,14 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from zotero_docai_pipeline.cli.commands import dry_run_command
-from zotero_docai_pipeline.cli.main import validate_flags
-from zotero_docai_pipeline.clients.exceptions import (
+from millefeuille.cli.commands import dry_run_command
+from millefeuille.cli.main import validate_flags
+from millefeuille.clients.exceptions import (
     AttachmentIdentityError,
     OpenKBHandoffValidationError,
 )
-from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
-from zotero_docai_pipeline.domain.config import (
+from millefeuille.clients.zotero_client import ZoteroClient
+from millefeuille.domain.config import (
     AppConfig,
     AuthQueryConfig,
     ConfigError,
@@ -32,15 +32,15 @@ from zotero_docai_pipeline.domain.config import (
     TreeStructureConfig,
     ZoteroConfig,
 )
-from zotero_docai_pipeline.domain.models import (
+from millefeuille.domain.models import (
     AttachmentInfo,
     DiscoveredItem,
     DiscoveryStats,
     OpenKBHandoffRow,
     PaperMetadata,
 )
-from zotero_docai_pipeline.orchestration.pipeline import Pipeline
-from zotero_docai_pipeline.utils.export import (
+from millefeuille.orchestration.pipeline import Pipeline
+from millefeuille.utils.export import (
     ValidationReport,
     build_openkb_handoff_preview_rows,
     build_openkb_handoff_rows,
@@ -144,11 +144,11 @@ def _make_default_outcome_tagging_config() -> TaggingConfig:
     """Tagging config matching packaged defaults (non-empty outcome tags)."""
     return TaggingConfig(
         selection=TagSelectionConfig(
-            include=TagRuleConfig(values=["docai"]),
-            exclude=TagRuleConfig(values=["docai-processed"]),
+            include=TagRuleConfig(values=["millefeuille"]),
+            exclude=TagRuleConfig(values=["millefeuille-processed"]),
         ),
-        apply_on_success=TagTargetConfig(values=["docai-processed"]),
-        apply_on_error=TagTargetConfig(values=["docai-error"]),
+        apply_on_success=TagTargetConfig(values=["millefeuille-processed"]),
+        apply_on_error=TagTargetConfig(values=["millefeuille-error"]),
     )
 
 
@@ -192,7 +192,7 @@ def _make_handoff_row():
         "source_type": "zotero",
     }
     return OpenKBHandoffRow(
-        schema_version="openkb-docai-handoff/v0.1",
+        schema_version="openkb-millefeuille-handoff/v0.1",
         source_type="zotero",
         discovered_at="2024-01-01T00:00:00+00:00",
         item_key="ITEM1",
@@ -243,15 +243,15 @@ class TestStandaloneOpenkbHandoffPipeline(unittest.TestCase):
             patch.object(pipeline, "_upload_pdfs_batch") as mock_upload,
             patch.object(pipeline, "_poll_ocr_results_batch") as mock_poll,
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.build_openkb_handoff_rows",
+                "millefeuille.orchestration.pipeline.build_openkb_handoff_rows",
                 return_value=[_make_handoff_row()],
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.validate_openkb_handoff_rows",
+                "millefeuille.orchestration.pipeline.validate_openkb_handoff_rows",
                 return_value=clean_report,
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.write_openkb_jsonl",
+                "millefeuille.orchestration.pipeline.write_openkb_jsonl",
             ),
         ):
             summary = pipeline.run()
@@ -293,11 +293,11 @@ class TestOpenkbWeakVerificationWarningLogs(unittest.TestCase):
 
         with (
             patch(
-                "zotero_docai_pipeline.cli.commands.build_openkb_handoff_rows",
+                "millefeuille.cli.commands.build_openkb_handoff_rows",
                 return_value=[_make_handoff_row()],
             ),
             patch(
-                "zotero_docai_pipeline.cli.commands.validate_openkb_handoff_rows",
+                "millefeuille.cli.commands.validate_openkb_handoff_rows",
                 return_value=report,
             ),
         ):
@@ -324,11 +324,11 @@ class TestOpenkbWeakVerificationWarningLogs(unittest.TestCase):
 
         with (
             patch(
-                "zotero_docai_pipeline.cli.commands.build_openkb_handoff_rows",
+                "millefeuille.cli.commands.build_openkb_handoff_rows",
                 return_value=[_make_handoff_row()],
             ),
             patch(
-                "zotero_docai_pipeline.cli.commands.validate_openkb_handoff_rows",
+                "millefeuille.cli.commands.validate_openkb_handoff_rows",
                 return_value=report,
             ),
         ):
@@ -360,11 +360,11 @@ class TestOpenkbWeakVerificationWarningLogs(unittest.TestCase):
 
         with (
             patch(
-                "zotero_docai_pipeline.cli.commands.build_openkb_handoff_rows",
+                "millefeuille.cli.commands.build_openkb_handoff_rows",
                 return_value=[_make_handoff_row()],
             ),
             patch(
-                "zotero_docai_pipeline.cli.commands.validate_openkb_handoff_rows",
+                "millefeuille.cli.commands.validate_openkb_handoff_rows",
                 return_value=report,
             ),
         ):
@@ -393,15 +393,15 @@ class TestOpenkbWeakVerificationWarningLogs(unittest.TestCase):
                 return_value=([item], discovery_stats),
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.build_openkb_handoff_rows",
+                "millefeuille.orchestration.pipeline.build_openkb_handoff_rows",
                 return_value=[_make_handoff_row()],
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.validate_openkb_handoff_rows",
+                "millefeuille.orchestration.pipeline.validate_openkb_handoff_rows",
                 return_value=report,
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.write_openkb_jsonl",
+                "millefeuille.orchestration.pipeline.write_openkb_jsonl",
             ),
         ):
             summary = pipeline.run()
@@ -430,15 +430,15 @@ class TestOpenkbWeakVerificationWarningLogs(unittest.TestCase):
                 return_value=([item], discovery_stats),
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.build_openkb_handoff_rows",
+                "millefeuille.orchestration.pipeline.build_openkb_handoff_rows",
                 return_value=[_make_handoff_row()],
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.validate_openkb_handoff_rows",
+                "millefeuille.orchestration.pipeline.validate_openkb_handoff_rows",
                 return_value=report,
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.write_openkb_jsonl",
+                "millefeuille.orchestration.pipeline.write_openkb_jsonl",
             ),
         ):
             pipeline.run()
@@ -472,15 +472,15 @@ class TestOpenkbWeakVerificationWarningLogs(unittest.TestCase):
                 return_value=([item], discovery_stats),
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.build_openkb_handoff_rows",
+                "millefeuille.orchestration.pipeline.build_openkb_handoff_rows",
                 return_value=[_make_handoff_row()],
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.validate_openkb_handoff_rows",
+                "millefeuille.orchestration.pipeline.validate_openkb_handoff_rows",
                 return_value=report,
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.write_openkb_jsonl",
+                "millefeuille.orchestration.pipeline.write_openkb_jsonl",
             ) as mock_write,
             self.assertRaises(OpenKBHandoffValidationError),
         ):
@@ -510,7 +510,7 @@ class TestOpenkbHandoffPreviewSerialization(unittest.TestCase):
         self.assertNotEqual(preview, live)
         self.assertEqual(
             preview["schema_version"],
-            "openkb-docai-handoff-preview/v0.1",
+            "openkb-millefeuille-handoff-preview/v0.1",
         )
         self.assertTrue(preview["preview"])
         self.assertFalse(preview["authoritative"])
@@ -545,7 +545,7 @@ class TestOpenkbHandoffPreviewSerialization(unittest.TestCase):
 
         self.assertEqual(
             payload["schema_version"],
-            "openkb-docai-handoff-preview/v0.1",
+            "openkb-millefeuille-handoff-preview/v0.1",
         )
         self.assertTrue(payload["preview"])
         self.assertFalse(payload["authoritative"])
@@ -569,11 +569,11 @@ class TestOpenkbHandoffPreviewSerialization(unittest.TestCase):
 
             with (
                 patch(
-                    "zotero_docai_pipeline.cli.commands.build_openkb_handoff_rows",
+                    "millefeuille.cli.commands.build_openkb_handoff_rows",
                     return_value=[row],
                 ),
                 patch(
-                    "zotero_docai_pipeline.cli.commands.validate_openkb_handoff_rows",
+                    "millefeuille.cli.commands.validate_openkb_handoff_rows",
                     return_value=report,
                 ),
             ):
@@ -585,7 +585,7 @@ class TestOpenkbHandoffPreviewSerialization(unittest.TestCase):
         self.assertNotEqual(payload, row.to_dict())
         self.assertEqual(
             payload["schema_version"],
-            "openkb-docai-handoff-preview/v0.1",
+            "openkb-millefeuille-handoff-preview/v0.1",
         )
         self.assertFalse(payload["authoritative"])
 
@@ -639,7 +639,7 @@ class TestOpenkbHandoffParentZoteroVersion(unittest.TestCase):
         ]
 
         selection = TagSelectionConfig(
-            include=TagRuleConfig(values=["docai"], operator="or"),
+            include=TagRuleConfig(values=["millefeuille"], operator="or"),
         )
         with patch.object(
             client, "_fetch_items_for_tag", side_effect=fetch_side_effect
@@ -694,7 +694,7 @@ class TestOpenkbHandoffParentZoteroVersion(unittest.TestCase):
         ]
 
         selection = TagSelectionConfig(
-            include=TagRuleConfig(values=["docai"], operator="or"),
+            include=TagRuleConfig(values=["millefeuille"], operator="or"),
         )
         with patch.object(
             client, "_fetch_items_for_tag", side_effect=fetch_side_effect

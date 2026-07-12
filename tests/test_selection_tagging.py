@@ -3,17 +3,17 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from zotero_docai_pipeline.cli.commands import (
+from millefeuille.cli.commands import (
     _determine_exit_code,
     dry_run_command,
     process_command,
 )
-from zotero_docai_pipeline.cli.main import (
+from millefeuille.cli.main import (
     _enforce_explicit_download_upload_folder,
     validate_flags,
 )
-from zotero_docai_pipeline.clients.exceptions import ZoteroClientError
-from zotero_docai_pipeline.domain.config import (
+from millefeuille.clients.exceptions import ZoteroClientError
+from millefeuille.domain.config import (
     PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER,
     AppConfig,
     AttachmentUrlExportConfig,
@@ -33,12 +33,12 @@ from zotero_docai_pipeline.domain.config import (
     TreeStructureConfig,
     ZoteroConfig,
 )
-from zotero_docai_pipeline.domain.models import (
+from millefeuille.domain.models import (
     DiscoveredItem,
     DiscoveryStats,
     PaperMetadata,
 )
-from zotero_docai_pipeline.orchestration.pipeline import (
+from millefeuille.orchestration.pipeline import (
     Pipeline,
     ProcessingTagResult,
 )
@@ -74,7 +74,7 @@ def _make_app_config(**overrides):
             "tagging",
             TaggingConfig(
                 selection=TagSelectionConfig(
-                    include=TagRuleConfig(values=["docai"])
+                    include=TagRuleConfig(values=["millefeuille"])
                 )
             ),
         ),
@@ -183,7 +183,7 @@ class TestAddAndRemoveCombined(unittest.TestCase):
 class TestDryRunPreview(unittest.TestCase):
     """Tests for dry-run selection tagging preview without writes."""
 
-    @patch("zotero_docai_pipeline.cli.commands.build_export_records")
+    @patch("millefeuille.cli.commands.build_export_records")
     def test_dry_run_preview_without_tag_writes(self, mock_build_export):
         mock_build_export.return_value = []
         cfg = _make_app_config(
@@ -244,8 +244,8 @@ class TestDryRunPreview(unittest.TestCase):
 class TestDryRunManifestSuppression(unittest.TestCase):
     """Tests that dry-run suppresses manifest writes while still logging exports."""
 
-    @patch("zotero_docai_pipeline.cli.commands.log_export_records")
-    @patch("zotero_docai_pipeline.cli.commands.write_manifest", create=True)
+    @patch("millefeuille.cli.commands.log_export_records")
+    @patch("millefeuille.cli.commands.write_manifest", create=True)
     def test_dry_run_suppresses_manifest_write(
         self, mock_write_manifest, mock_log_export_records
     ):
@@ -294,7 +294,7 @@ class TestDryRunManifestSuppression(unittest.TestCase):
 class TestCombinedDryRunPreview(unittest.TestCase):
     """Tests combined dry-run output for selection and outcome previews."""
 
-    @patch("zotero_docai_pipeline.cli.commands.build_export_records")
+    @patch("millefeuille.cli.commands.build_export_records")
     def test_combined_dry_run_shows_both_preview_sections(self, mock_build_export):
         mock_build_export.return_value = []
         cfg = _make_app_config(
@@ -376,7 +376,7 @@ class TestCombinedDryRunValidation(unittest.TestCase):
 class TestCombinedDryRunMainPreflight(unittest.TestCase):
     """Tests packaged CLI preflight for combined selection-tagging dry-run."""
 
-    @patch("zotero_docai_pipeline.cli.commands.build_export_records")
+    @patch("millefeuille.cli.commands.build_export_records")
     def test_dry_run_with_placeholder_download_folder_reaches_dry_run_path(
         self, mock_build_export
     ):
@@ -536,8 +536,8 @@ class TestAlreadyPresentAddAndAbsentRemoveAreNoOps(unittest.TestCase):
 class TestLiveSelectionTaggingExportLogOrder(unittest.TestCase):
     """Tests visible log order for live selection-tagging plus export runs."""
 
-    @patch("zotero_docai_pipeline.cli.commands.Pipeline")
-    @patch("zotero_docai_pipeline.cli.commands.ItemProcessor")
+    @patch("millefeuille.cli.commands.Pipeline")
+    @patch("millefeuille.cli.commands.ItemProcessor")
     def test_selection_tagging_summary_before_export_logs(
         self, mock_processor_cls, mock_pipeline_cls
     ):
@@ -623,7 +623,7 @@ class TestLiveSelectionTaggingExportLogOrder(unittest.TestCase):
                 return_value=(tag_result, 1, 0),
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.build_export_records",
+                "millefeuille.orchestration.pipeline.build_export_records",
                 return_value=[],
             ),
         ):
@@ -697,7 +697,7 @@ class TestLiveExportRunsAfterSelectionTagging(unittest.TestCase):
                 pipeline, "_apply_selection_tagging", side_effect=track_apply
             ),
             patch(
-                "zotero_docai_pipeline.orchestration.pipeline.build_export_records",
+                "millefeuille.orchestration.pipeline.build_export_records",
                 side_effect=track_export,
             ),
         ):
@@ -758,10 +758,10 @@ class TestDetermineExitCode(unittest.TestCase):
 class TestProcessCommandSummaryOrdering(unittest.TestCase):
     """Tests live-run ordering for selection tagging before downstream sections."""
 
-    @patch("zotero_docai_pipeline.cli.commands.Pipeline")
-    @patch("zotero_docai_pipeline.cli.commands.ItemProcessor")
-    @patch("zotero_docai_pipeline.cli.commands._display_download_summary")
-    @patch("zotero_docai_pipeline.cli.commands._display_selection_tagging_summary")
+    @patch("millefeuille.cli.commands.Pipeline")
+    @patch("millefeuille.cli.commands.ItemProcessor")
+    @patch("millefeuille.cli.commands._display_download_summary")
+    @patch("millefeuille.cli.commands._display_selection_tagging_summary")
     def test_selection_tagging_summary_before_download_summary(
         self,
         mock_display_selection,

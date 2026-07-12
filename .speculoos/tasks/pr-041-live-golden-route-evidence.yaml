@@ -10,7 +10,7 @@ github:
   pull_request_project_item: null
   project_status: Done
   project_item: null
-  url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41
+  url: https://github.com/fr-meyer/millefeuille/pull/41
   head_sha: 6b6a42ef52823e171bda58a111607858008dbc82
   merge_commit: e8f205b88948c2ee88276db2b6e4aea3a0273da1
 post_merge_expected:
@@ -54,10 +54,10 @@ evidence:
   - Speculoos status, actors, and validate passed with only expected local unpublished/dirty warnings before commit
   - changed-file private-data and payload scan passed
   - OpenKB local proxy route smoke passed outside the repo with model openai/openkb-qwen
-  - live Zotero read-only queue check found only the already-processed Picard candidate still tagged docai, so the next edge-case dogfood batch remains input-gated
+  - live Zotero read-only queue check found only the already-processed Picard candidate still tagged millefeuille, so the next edge-case dogfood batch remains input-gated
   - 'PR #41 merged with merge commit e8f205b88948c2ee88276db2b6e4aea3a0273da1'
-  - 'Mergeguez review approved exact head 6b6a42ef52823e171bda58a111607858008dbc82 with 0 blockers: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41#pullrequestreview-4679383311'
-  - 'Mergeguez review check passed: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86613438575'
+  - 'Mergeguez review approved exact head 6b6a42ef52823e171bda58a111607858008dbc82 with 0 blockers: https://github.com/fr-meyer/millefeuille/pull/41#pullrequestreview-4679383311'
+  - 'Mergeguez review check passed: https://github.com/fr-meyer/millefeuille/runs/86613438575'
   - Remote PR branch deleted after merge through branch-cleanup-execute
   - Project item unavailable; closeout recorded without ProjectV2 mutation
 publication_boundary:
@@ -65,7 +65,7 @@ publication_boundary:
 links:
   golden_fixture: tests/fixtures/millefeuille_live_golden_run/golden-run.json
   golden_fixture_test: tests/test_millefeuille_live_golden_run_fixture.py
-  live_private_report: zotero-docai-pipeline-live-20260711-2345-kst/run-report.md
+  live_private_report: millefeuille-live-20260711-2345-kst/run-report.md
 notes:
   - Zotero writeback was operator-approved but could not be executed in this environment because no ZOTERO_WRITE_KEY exists.
   - The live run used dashscope/qwen3.7-max before the follow-up local proxy route switch.
