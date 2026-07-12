@@ -1,0 +1,49 @@
+id: pr-044-pr43-closeout-metadata
+title: Close PR 43 hard-rename metadata
+status: implementation
+branch: chore/pr-044-pr43-closeout-metadata
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+post_merge_expected:
+  pull_request: 44
+  base_branch: dev
+  head_branch: chore/pr-044-pr43-closeout-metadata
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - mark PR #43 hard-rename metadata as merged
+  - record PR #43 exact head, merge commit, and Mergeguez evidence ids
+  - add PR #43 to completed Speculoos history
+  - move current repo-local surfaces to this metadata closeout branch
+non_goals:
+  - compatibility shims or legacy command/import aliases
+  - live Zotero reads or writes
+  - PDF recovery, OCR/Mistral/PageIndex provider calls, OpenKB writes, or source-pack writes
+  - credential changes, dev-to-main promotion, release tag, or package publication
+  - remote repository slug administration
+acceptance:
+  - PR #43 is recorded as merged with exact head and merge commit
+  - active Speculoos task points at this metadata closeout branch
+  - no retired package, CLI, import, schema, or default tag identity strings are reintroduced
+  - validation passes without live provider or credential activity
+validation:
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\"].sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\"].sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-044-pr43-closeout-metadata --validation \"git diff --check\" --json"
+  - "hard-rename identity scan"
+evidence:
+  - PR #43 merged to dev at e35a7acd279fb85fe4ab26294893a0c837425835
+  - PR #43 exact head was 8adeba3dd53cf7daf4f162c69da404095be178a6
+  - Mergeguez review approved PR #43 with zero findings
+publication_boundary:
+  statement: "Metadata-only closeout PR; no live Zotero writeback, PDF recovery, OCR/Mistral/PageIndex provider call, OpenKB write, source-pack write, credential change, main-branch merge, release tag, package publication, compatibility shim, or legacy alias."
+notes:
+  - Remote repository slug administration remains outside this code-closeout PR because no approved rename command is exposed in the current broker or connector tools.

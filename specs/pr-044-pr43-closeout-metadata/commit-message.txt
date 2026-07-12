@@ -1,0 +1,11 @@
+chore: close PR 43 metadata
+
+Record the PR #43 hard-rename merge outcome in repo-local Speculoos metadata and
+update the completed PR ledgers after the Millefeuille identity migration
+landed on dev.
+
+No live Zotero, PDF, OCR, PageIndex, OpenKB, source-pack, credential,
+main-branch, release, tag, package-publication, compatibility shim, or legacy
+alias action is included.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

@@ -15,11 +15,11 @@ notes:
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
-  id: pr-043-millefeuille-hard-rename
+  id: pr-044-pr43-closeout-metadata
   pull_request: null
   project_item: null
   pull_request_project_item: null
-  branch: feat/pr-043-millefeuille-hard-rename
+  branch: chore/pr-044-pr43-closeout-metadata
   status: In Progress
   project_status: In Progress
 pull_request:
@@ -27,7 +27,7 @@ pull_request:
   url: null
   status: not-yet-open
   base_branch: dev
-  head_branch: feat/pr-043-millefeuille-hard-rename
+  head_branch: chore/pr-044-pr43-closeout-metadata
   head_sha: null
   merge_commit: null
   mergeguez_review: null
@@ -73,3 +73,13 @@ completed_pull_requests:
     merge_commit: e8f205b88948c2ee88276db2b6e4aea3a0273da1
     mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/41#pullrequestreview-4679383311
     mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86613438575
+  - id: pr-043-millefeuille-hard-rename
+    number: 43
+    url: https://github.com/fr-meyer/millefeuille/pull/43
+    status: merged
+    base_branch: dev
+    head_branch: feat/pr-043-millefeuille-hard-rename
+    head_sha: 8adeba3dd53cf7daf4f162c69da404095be178a6
+    merge_commit: e35a7acd279fb85fe4ab26294893a0c837425835
+    mergeguez_review: mergeguez-review-43-8adeba3dd53c
+    mergeguez_check_run: mergeguez-check-run-86617278621
