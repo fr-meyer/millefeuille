@@ -1,16 +1,16 @@
 schema_version: 0.1
-project: Zotero DocAI Pipeline
+project: Millefeuille
 workflow: speculoos-v1
-canonical_task: null
+canonical_task: pr-043-millefeuille-hard-rename
 repository:
   upstream: null
-  fork: fr-meyer/zotero-docai-pipeline
-  local_path: /home/node/.openclaw/repos/zotero-docai-pipeline
+  fork: fr-meyer/millefeuille
+  local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: null
+  working_branch: feat/pr-043-millefeuille-hard-rename
 status:
-  phase: idle
-  pret_a_coder: idle
+  phase: identity-migration
+  pret_a_coder: in-progress
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,14 +57,14 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: none-active
-    number: 41
-    url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41
+    status: not-yet-open
+    number: null
+    url: null
     base_branch: dev
-    head_branch: null
-    head_sha: 6b6a42ef52823e171bda58a111607858008dbc82
-    merge_commit: e8f205b88948c2ee88276db2b6e4aea3a0273da1
-    project_status: Done
+    head_branch: feat/pr-043-millefeuille-hard-rename
+    head_sha: null
+    merge_commit: null
+    project_status: In Progress
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet
@@ -100,42 +100,42 @@ history:
       branch: chore/pr-036-speculoos-millefeuille-bootstrap
       base_branch: dev
       pull_request: 36
-      url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36
+      url: https://github.com/fr-meyer/millefeuille/pull/36
       head_sha: 2458264fdc99f82578fe6ad4a110b87b93ec11d5
       merge_commit: 6511030c73bd834e6536e4d5dee88648bb2aae29
       merged_by: fr-meyer
-      mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36#pullrequestreview-4676349739
-      mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86505824602
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/36#pullrequestreview-4676349739
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86505824602
     - id: pr-037-pr36-closeout-metadata
       status: merged
       branch: chore/pr-037-pr36-closeout-metadata
       base_branch: dev
       pull_request: 37
-      url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/37
+      url: https://github.com/fr-meyer/millefeuille/pull/37
       head_sha: 817075375b2435e211db1f839c7d6bc18a43955b
       merge_commit: 6157062541ca08c81410f222f3266562e3bedb9e
       merged_by: fr-meyer
-      mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/37#pullrequestreview-4676384838
-      mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86507359772
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/37#pullrequestreview-4676384838
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86507359772
     - id: pr-038-openkb-source-version-drift
       status: merged
       branch: test/pr-038-openkb-source-drift-guard
       base_branch: dev
       pull_request: 38
-      url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/38
+      url: https://github.com/fr-meyer/millefeuille/pull/38
       head_sha: 5d8d2ca1b31ddf2190946636f323cc9e1e1d5ac0
       merge_commit: 0e9c5ad6ec0e05d675bd455292d32a4a8c4b086a
       merged_by: fr-meyer
-      mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/38#pullrequestreview-4676416510
-      mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86508434593
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/38#pullrequestreview-4676416510
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86508434593
     - id: pr-041-live-golden-route-evidence
       status: merged
       branch: test/pr-041-live-golden-route-evidence
       base_branch: dev
       pull_request: 41
-      url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41
+      url: https://github.com/fr-meyer/millefeuille/pull/41
       head_sha: 6b6a42ef52823e171bda58a111607858008dbc82
       merge_commit: e8f205b88948c2ee88276db2b6e4aea3a0273da1
       merged_by: mergeguez[bot]
-      mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41#pullrequestreview-4679383311
-      mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86613438575
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/41#pullrequestreview-4679383311
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86613438575

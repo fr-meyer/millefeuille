@@ -5,14 +5,14 @@ from pathlib import Path
 import unittest
 from unittest.mock import MagicMock
 
-from zotero_docai_pipeline.domain.config import OpenKBHandoffExportConfig
-from zotero_docai_pipeline.domain.models import (
+from millefeuille.domain.config import OpenKBHandoffExportConfig
+from millefeuille.domain.models import (
     AttachmentInfo,
     DiscoveredItem,
     OpenKBHandoffRow,
     PaperMetadata,
 )
-from zotero_docai_pipeline.utils.export import (
+from millefeuille.utils.export import (
     build_openkb_acceptance_summary,
     build_openkb_handoff_rows,
     sanitize_handoff_row,
@@ -39,7 +39,7 @@ def _make_item(attachments: list[AttachmentInfo]) -> DiscoveredItem:
     return DiscoveredItem(
         key="MULTIITEM1",
         title="Redacted Multi-Attachment Fixture Paper",
-        tags=["docai-test"],
+        tags=["millefeuille-test"],
         attachments=attachments,
         citation_key="redactedMultiAttachment2026",
         paper_metadata=PaperMetadata(),

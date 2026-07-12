@@ -2,13 +2,13 @@
 
 import unittest
 
-from zotero_docai_pipeline.clients.exceptions import HandoffSecurityError
-from zotero_docai_pipeline.utils.export import sanitize_handoff_row
+from millefeuille.clients.exceptions import HandoffSecurityError
+from millefeuille.utils.export import sanitize_handoff_row
 
 
 def _row(**overrides):
     base = {
-        "schema_version": "openkb-docai-handoff/v0.1",
+        "schema_version": "openkb-millefeuille-handoff/v0.1",
         "source_type": "zotero",
         "discovered_at": "2024-01-01T00:00:00+00:00",
         "item_key": "ITEM1",

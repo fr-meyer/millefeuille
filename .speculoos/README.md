@@ -1,7 +1,7 @@
 # Speculoos Metadata
 
 This directory is the repo-local Speculoos control plane for
-`fr-meyer/zotero-docai-pipeline`.
+`fr-meyer/millefeuille`.
 
 The committed metadata is canonical for task status and planned surfaces.
 GitHub and local Plancha/Vibe are readback or cockpit surfaces only. They do

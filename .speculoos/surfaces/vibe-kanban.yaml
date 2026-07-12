@@ -14,7 +14,7 @@ notes:
   - No Vibe cloud or org API is configured for this repo.
   - Bootstrap should not depend on Vibe reachability.
 task:
-  status: idle
+  status: in-progress
   id: null
-  speculoos_task: null
-  command: null
+  speculoos_task: pr-043-millefeuille-hard-rename
+  command: hard rename to Millefeuille without compatibility aliases

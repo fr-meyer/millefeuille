@@ -34,7 +34,7 @@ validation:
   - speculoos status --json
   - speculoos actors --json
   - speculoos validate --task pr-037-pr36-closeout-metadata --validation "git diff --check" --json
-  - speculoos merge-plan --repo . --repo-slug fr-meyer/zotero-docai-pipeline --base dev --pr <PR> --expected-head-sha <SHA> --expected-base dev --expected-head-branch chore/pr-037-pr36-closeout-metadata --actor user_api --live-check --broker-command /home/node/.openclaw/bin/mergeguez --broker-repo zotero-docai-pipeline --json
+  - speculoos merge-plan --repo . --repo-slug fr-meyer/millefeuille --base dev --pr <PR> --expected-head-sha <SHA> --expected-base dev --expected-head-branch chore/pr-037-pr36-closeout-metadata --actor user_api --live-check --broker-command /home/node/.openclaw/bin/mergeguez --broker-repo millefeuille --json
 evidence:
   - PR #36 merged to dev at 6511030c73bd834e6536e4d5dee88648bb2aae29
   - PR #36 exact head was 2458264fdc99f82578fe6ad4a110b87b93ec11d5
@@ -43,12 +43,12 @@ evidence:
   - PR #37 exact head was 817075375b2435e211db1f839c7d6bc18a43955b
   - Mergeguez review approved PR #37 with 0 blocking findings
 links:
-  pr36: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36
-  pr36_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/36#pullrequestreview-4676349739
-  pr36_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86505824602
-  pr37: https://github.com/fr-meyer/zotero-docai-pipeline/pull/37
-  pr37_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/37#pullrequestreview-4676384838
-  pr37_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86507359772
+  pr36: https://github.com/fr-meyer/millefeuille/pull/36
+  pr36_review: https://github.com/fr-meyer/millefeuille/pull/36#pullrequestreview-4676349739
+  pr36_check_run: https://github.com/fr-meyer/millefeuille/runs/86505824602
+  pr37: https://github.com/fr-meyer/millefeuille/pull/37
+  pr37_review: https://github.com/fr-meyer/millefeuille/pull/37#pullrequestreview-4676384838
+  pr37_check_run: https://github.com/fr-meyer/millefeuille/runs/86507359772
 notes:
   - This PR is metadata and policy only.
   - Live Zotero/OCR/OpenKB work remains behind a separate approval gate.

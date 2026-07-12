@@ -5,9 +5,9 @@ import unittest
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError, URLError
 
-from zotero_docai_pipeline.clients.exceptions import ZoteroAPIError, ZoteroAuthError
-from zotero_docai_pipeline.clients.zotero_client import ZoteroClient
-from zotero_docai_pipeline.domain.config import TagRuleConfig, TagSelectionConfig
+from millefeuille.clients.exceptions import ZoteroAPIError, ZoteroAuthError
+from millefeuille.clients.zotero_client import ZoteroClient
+from millefeuille.domain.config import TagRuleConfig, TagSelectionConfig
 
 
 def _make_client():
@@ -37,9 +37,9 @@ class TestFetchItemsForTagContract(unittest.TestCase):
         items_iter = object()
         mock_zr.items.return_value = items_iter
 
-        client._fetch_items_for_tag("docai")
+        client._fetch_items_for_tag("millefeuille")
 
-        mock_zr.items.assert_called_once_with(tag="docai")
+        mock_zr.items.assert_called_once_with(tag="millefeuille")
         mock_zr.everything.assert_called_once_with(items_iter)
 
     def test_complete_result_set_mapped(self):
@@ -47,7 +47,7 @@ class TestFetchItemsForTagContract(unittest.TestCase):
         raw = [_make_raw_item(f"K{i}", {"title": f"T{i}"}) for i in range(1, 4)]
         mock_zr.everything.return_value = raw
 
-        result = client._fetch_items_for_tag("docai")
+        result = client._fetch_items_for_tag("millefeuille")
 
         self.assertEqual(len(result), 3)
         for i in range(1, 4):
@@ -61,7 +61,7 @@ class TestFetchItemsForTagContract(unittest.TestCase):
             _make_raw_item("K1", {"title": "second"}),
         ]
 
-        result = client._fetch_items_for_tag("docai")
+        result = client._fetch_items_for_tag("millefeuille")
 
         self.assertEqual(len(result), 1)
         self.assertIn("K1", result)
@@ -75,7 +75,7 @@ class TestFetchItemsForTagContract(unittest.TestCase):
             _make_raw_item("K1"),
         ]
 
-        result = client._fetch_items_for_tag("docai")
+        result = client._fetch_items_for_tag("millefeuille")
 
         self.assertEqual(list(result.keys()), ["K1"])
 
@@ -86,7 +86,7 @@ class TestFetchItemsForTagContract(unittest.TestCase):
             _make_raw_item("K2"),
         ]
 
-        result = client._fetch_items_for_tag("docai")
+        result = client._fetch_items_for_tag("millefeuille")
 
         self.assertEqual(list(result.keys()), ["K2"])
 
@@ -97,7 +97,7 @@ class TestFetchItemsForTagContract(unittest.TestCase):
             _make_raw_item("K1"),
         ]
 
-        result = client._fetch_items_for_tag("docai")
+        result = client._fetch_items_for_tag("millefeuille")
 
         self.assertEqual(list(result.keys()), ["K1"])
 
@@ -112,9 +112,9 @@ class TestFetchItemsForTagLogging(unittest.TestCase):
         ]
 
         with self.assertLogs(
-            "zotero_docai_pipeline.clients.zotero_client", level="DEBUG"
+            "millefeuille.clients.zotero_client", level="DEBUG"
         ) as logs:
-            client._fetch_items_for_tag("docai")
+            client._fetch_items_for_tag("millefeuille")
 
         def is_fetch_completion(record):
             msg = record.getMessage()
@@ -135,7 +135,7 @@ class TestFetchItemsForTagLogging(unittest.TestCase):
         self.assertEqual(len(debug_completion), 1)
         self.assertEqual(
             debug_completion[0].getMessage(),
-            "Fetched 5 items for tag 'docai'",
+            "Fetched 5 items for tag 'millefeuille'",
         )
 
     def test_large_result_emits_info_log(self):
@@ -145,7 +145,7 @@ class TestFetchItemsForTagLogging(unittest.TestCase):
         ]
 
         with self.assertLogs(
-            "zotero_docai_pipeline.clients.zotero_client", level="DEBUG"
+            "millefeuille.clients.zotero_client", level="DEBUG"
         ) as logs:
             client._fetch_items_for_tag("mytag")
 
@@ -169,7 +169,7 @@ class TestFetchItemsForTagErrors(unittest.TestCase):
             url=None, code=401, msg="Unauthorized", hdrs=None, fp=None
         )
         with self.assertRaises(ZoteroAuthError):
-            client._fetch_items_for_tag("docai")
+            client._fetch_items_for_tag("millefeuille")
 
     def test_http_403_raises_zotero_auth_error(self):
         client, mock_zr = _make_client()
@@ -177,7 +177,7 @@ class TestFetchItemsForTagErrors(unittest.TestCase):
             url=None, code=403, msg="Forbidden", hdrs=None, fp=None
         )
         with self.assertRaises(ZoteroAuthError):
-            client._fetch_items_for_tag("docai")
+            client._fetch_items_for_tag("millefeuille")
 
     def test_http_500_raises_zotero_api_error(self):
         client, mock_zr = _make_client()
@@ -185,19 +185,19 @@ class TestFetchItemsForTagErrors(unittest.TestCase):
             url=None, code=500, msg="Server Error", hdrs=None, fp=None
         )
         with self.assertRaises(ZoteroAPIError):
-            client._fetch_items_for_tag("docai")
+            client._fetch_items_for_tag("millefeuille")
 
     def test_url_error_raises_zotero_api_error(self):
         client, mock_zr = _make_client()
         mock_zr.everything.side_effect = URLError(reason="timeout")
         with self.assertRaises(ZoteroAPIError):
-            client._fetch_items_for_tag("docai")
+            client._fetch_items_for_tag("millefeuille")
 
     def test_unexpected_error_raises_zotero_api_error(self):
         client, mock_zr = _make_client()
         mock_zr.everything.side_effect = RuntimeError("boom")
         with self.assertRaises(ZoteroAPIError):
-            client._fetch_items_for_tag("docai")
+            client._fetch_items_for_tag("millefeuille")
 
 
 class TestDownloadPdfLogging(unittest.TestCase):
@@ -325,10 +325,10 @@ class TestGetItemsByTagLegacyPath(unittest.TestCase):
             "_fetch_items_for_tag",
             return_value={"K1": {"title": "T", "tags": []}},
         ) as mock_fetch:
-            result = client.get_items_by_tag("docai")
+            result = client.get_items_by_tag("millefeuille")
 
         self.assertTrue(len(result) > 0)
-        mock_fetch.assert_called_once_with("docai")
+        mock_fetch.assert_called_once_with("millefeuille")
 
     def test_propagates_zotero_auth_error(self):
         client, _ = _make_client()
@@ -338,7 +338,7 @@ class TestGetItemsByTagLegacyPath(unittest.TestCase):
             "_fetch_items_for_tag",
             side_effect=auth_error,
         ), self.assertRaises(ZoteroAuthError) as cm:
-            client.get_items_by_tag("docai")
+            client.get_items_by_tag("millefeuille")
         self.assertIs(cm.exception, auth_error)
 
     def test_propagates_zotero_api_error(self):
@@ -349,7 +349,7 @@ class TestGetItemsByTagLegacyPath(unittest.TestCase):
             "_fetch_items_for_tag",
             side_effect=api_error,
         ), self.assertRaises(ZoteroAPIError) as cm:
-            client.get_items_by_tag("docai")
+            client.get_items_by_tag("millefeuille")
         self.assertIs(cm.exception, api_error)
 
 

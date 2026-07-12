@@ -1,6 +1,6 @@
 {
   "include": [
-    "zotero_docai_pipeline",
+    "millefeuille",
     "main.py"
   ],
   "exclude": [

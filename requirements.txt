@@ -1,4 +1,4 @@
-# Python dependencies for zotero-docai-pipeline
+# Python dependencies for millefeuille
 # This file mirrors the pip dependencies from environment.yml
 # For conda-based installation, use: conda env create -f environment.yml
 

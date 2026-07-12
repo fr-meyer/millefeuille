@@ -5,7 +5,7 @@
   "expected_matching_sha256": "beaec055606d788c49b6f8a2a2197f853dc2a2482adc98ce293e721e4fe44873",
   "expected_drifted_sha256": "f2a098931d3775e9387eb7b20c914c0c92f87d7b72aa6bfbecff65c900f1bfdd",
   "handoff_row": {
-    "schema_version": "openkb-docai-handoff/v0.1",
+    "schema_version": "openkb-millefeuille-handoff/v0.1",
     "source_type": "zotero",
     "discovered_at": "2026-07-11T00:00:00+00:00",
     "item_key": "DRIFTITEM1",

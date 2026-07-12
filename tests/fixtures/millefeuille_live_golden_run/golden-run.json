@@ -1,6 +1,6 @@
 {
   "schema_version": "millefeuille-live-golden-run/v0.1",
-  "run_id": "zotero-docai-pipeline-live-20260711-2345-kst",
+  "run_id": "millefeuille-live-20260711-2345-kst",
   "captured_from": "approved-live-run-aggregate",
   "sanitization": {
     "profile": "public-safe-aggregate",
@@ -26,8 +26,8 @@
     "source_sha256": "14381e48ae7c94965b2792f8dace53c2d13c3dbbeafe091a947d9554c0d596ab"
   },
   "discovery": {
-    "include_tag": "docai",
-    "exclude_tag": "docai-processed",
+    "include_tag": "millefeuille",
+    "exclude_tag": "millefeuille-processed",
     "conflict_resolution": "exclude_wins",
     "matched_items": 1,
     "attachments_total": 2,
@@ -108,7 +108,7 @@
     }
   },
   "acceptance": {
-    "schema_version": "openkb-docai-acceptance-summary/v0.1",
+    "schema_version": "openkb-millefeuille-acceptance-summary/v0.1",
     "status": "pass",
     "handoff_rows": 1,
     "openkb_added": 1,
@@ -133,14 +133,14 @@
     "execution_status": "blocked-missing-zotero-write-key",
     "required_credential": "ZOTERO_WRITE_KEY",
     "add_tags": [
-      "docai-openkb-added",
-      "docai-acceptance-passed",
-      "docai-ready-for-classification",
-      "docai-classified",
-      "docai-processed"
+      "millefeuille-openkb-added",
+      "millefeuille-acceptance-passed",
+      "millefeuille-ready-for-classification",
+      "millefeuille-classified",
+      "millefeuille-processed"
     ],
     "remove_tags": [
-      "docai"
+      "millefeuille"
     ],
     "classification_destination": "Methods · Normalization & training dynamics"
   },
