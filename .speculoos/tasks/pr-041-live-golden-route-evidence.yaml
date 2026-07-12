@@ -1,0 +1,67 @@
+id: pr-041-live-golden-route-evidence
+title: Record live golden-run evidence and OpenKB proxy route
+status: in_progress
+branch: test/pr-041-live-golden-route-evidence
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+  url: null
+  head_sha: null
+  merge_commit: null
+post_merge_expected:
+  pull_request: 41
+  base_branch: dev
+  head_branch: test/pr-041-live-golden-route-evidence
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - add a public-safe aggregate fixture for the first approved live Millefeuille run
+  - preserve live-run counts, route choice, model provenance, classification, and writeback gate state
+  - document that the live run used direct DashScope while follow-up smoke selected the local proxy route
+  - add tests that guard against private paths, credentials, provider payloads, PDF bytes, signed URLs, and raw text
+non_goals:
+  - committing PDFs, OCR/provider JSON, OpenKB raw Markdown, source-pack content, or Zotero item keys
+  - performing Zotero writeback without ZOTERO_WRITE_KEY
+  - renaming the package or GitHub repository
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - golden-run fixture records one matched item, two attachments, one PDF, one skipped non-PDF, verified SHA, merged-dual route, OpenKB add, acceptance pass, and high-confidence classification
+  - model provenance distinguishes the live direct DashScope run from the follow-up local proxy route smoke
+  - writeback plan is explicit and remains blocked unless ZOTERO_WRITE_KEY exists
+  - fixture scan finds no secrets, authenticated URLs, private filesystem paths, PDF bytes, provider payloads, source-pack content, or raw extracted text
+validation:
+  - .venv/bin/python -m unittest -v tests.test_millefeuille_live_golden_run_fixture
+  - .venv/bin/python -m unittest discover -v
+  - .venv/bin/ruff check .
+  - ruby -ryaml -rjson -e 'Dir[".speculoos/**/*.yaml"].sort.each { |p| Psych.parse_file(p) }; Dir[".speculoos/**/*.json"].sort.each { |p| JSON.parse(File.read(p)) }; puts "metadata ok"'
+  - git diff --check
+  - speculoos status --json
+  - speculoos actors --json
+  - speculoos validate --task pr-041-live-golden-route-evidence --validation "git diff --check" --json
+  - changed-file private-data and payload scan
+evidence:
+  - targeted golden-run fixture test passed, 4 tests
+  - full unittest discovery passed, 146 tests
+  - Ruff passed
+  - metadata parse passed
+  - git diff --check passed
+  - Speculoos status, actors, and validate passed with only expected local unpublished/dirty warnings before commit
+  - changed-file private-data and payload scan passed
+  - OpenKB local proxy route smoke passed outside the repo with model openai/openkb-qwen
+  - live Zotero read-only queue check found only the already-processed Picard candidate still tagged docai, so the next edge-case dogfood batch remains input-gated
+publication_boundary:
+  statement: "Fixture/test/docs slice only; no live Zotero writeback, PDF recovery, OCR/Mistral/PageIndex provider call, OpenKB write, source-pack write, main-branch merge, release tag, or package publication. GitHub publication and dev-lane merge are allowed only after clean validation and exact-head review."
+links:
+  golden_fixture: tests/fixtures/millefeuille_live_golden_run/golden-run.json
+  golden_fixture_test: tests/test_millefeuille_live_golden_run_fixture.py
+  live_private_report: zotero-docai-pipeline-live-20260711-2345-kst/run-report.md
+notes:
+  - Zotero writeback was operator-approved but could not be executed in this environment because no ZOTERO_WRITE_KEY exists.
+  - The live run used dashscope/qwen3.7-max before the follow-up local proxy route switch.
+  - A repository rename toward Millefeuille remains a separate migration PR because it affects GitHub URL, package/import names, Speculoos metadata, Mergeguez allowlists, workflows, docs, and local scripts.
