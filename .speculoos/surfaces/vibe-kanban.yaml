@@ -16,5 +16,5 @@ notes:
 task:
   status: in-progress
   id: null
-  speculoos_task: pr-043-millefeuille-hard-rename
-  command: hard rename to Millefeuille without compatibility aliases
+  speculoos_task: pr-044-pr43-closeout-metadata
+  command: close PR 43 metadata after the Millefeuille hard rename

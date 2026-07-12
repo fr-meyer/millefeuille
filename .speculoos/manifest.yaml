@@ -1,15 +1,15 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-043-millefeuille-hard-rename
+canonical_task: pr-044-pr43-closeout-metadata
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: feat/pr-043-millefeuille-hard-rename
+  working_branch: chore/pr-044-pr43-closeout-metadata
 status:
-  phase: identity-migration
+  phase: closeout-metadata
   pret_a_coder: in-progress
   blocker_summary: []
 release_policy:
@@ -61,7 +61,7 @@ surfaces:
     number: null
     url: null
     base_branch: dev
-    head_branch: feat/pr-043-millefeuille-hard-rename
+    head_branch: chore/pr-044-pr43-closeout-metadata
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -139,3 +139,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/41#pullrequestreview-4679383311
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86613438575
+    - id: pr-043-millefeuille-hard-rename
+      status: merged
+      branch: feat/pr-043-millefeuille-hard-rename
+      base_branch: dev
+      pull_request: 43
+      url: https://github.com/fr-meyer/millefeuille/pull/43
+      head_sha: 8adeba3dd53cf7daf4f162c69da404095be178a6
+      merge_commit: e35a7acd279fb85fe4ab26294893a0c837425835
+      merged_by: mergeguez[bot]
+      mergeguez_review: mergeguez-review-43-8adeba3dd53c
+      mergeguez_check_run: mergeguez-check-run-86617278621

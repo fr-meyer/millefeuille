@@ -1,18 +1,18 @@
 id: pr-043-millefeuille-hard-rename
 title: Hard rename project identity to Millefeuille
-status: implementation
+status: merged
 branch: feat/pr-043-millefeuille-hard-rename
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 43
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
-  url: null
-  head_sha: null
-  merge_commit: null
+  url: https://github.com/fr-meyer/millefeuille/pull/43
+  head_sha: 8adeba3dd53cf7daf4f162c69da404095be178a6
+  merge_commit: e35a7acd279fb85fe4ab26294893a0c837425835
 post_merge_expected:
   pull_request: 43
   base_branch: dev
@@ -52,6 +52,11 @@ validation:
   - "speculoos validate --task pr-043-millefeuille-hard-rename --validation \"git diff --check\" --json"
   - "old package/CLI/import identity scan"
 evidence: []
+closeout:
+  merged_by: mergeguez[bot]
+  remote_branch_deleted: true
+  mergeguez_review: mergeguez-review-43-8adeba3dd53c
+  mergeguez_check_run: mergeguez-check-run-86617278621
 publication_boundary:
   statement: "Hard rename/code-metadata PR only; no live Zotero writeback, PDF recovery, OCR/Mistral/PageIndex provider call, OpenKB write, source-pack write, credential change, remote GitHub repository rename, main-branch merge, release tag, or package publication. GitHub publication and dev-lane merge are allowed only after clean validation and exact-head review."
 notes:
