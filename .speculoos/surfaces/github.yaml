@@ -13,7 +13,7 @@ project:
 notes:
   - Container gh is intentionally not the GitHub write path.
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
-  - PR #39 is an offline implementation/test slice only.
+  - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task: null
 pull_request: null
 completed_pull_requests:
@@ -47,3 +47,13 @@ completed_pull_requests:
     merge_commit: 0e9c5ad6ec0e05d675bd455292d32a4a8c4b086a
     mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/38#pullrequestreview-4676416510
     mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86508434593
+  - id: pr-041-live-golden-route-evidence
+    number: 41
+    url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41
+    status: merged
+    base_branch: dev
+    head_branch: test/pr-041-live-golden-route-evidence
+    head_sha: 6b6a42ef52823e171bda58a111607858008dbc82
+    merge_commit: e8f205b88948c2ee88276db2b6e4aea3a0273da1
+    mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41#pullrequestreview-4679383311
+    mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86613438575

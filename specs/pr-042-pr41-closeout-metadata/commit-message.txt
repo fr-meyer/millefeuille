@@ -1,0 +1,10 @@
+chore: close PR 41 metadata
+
+Record the PR #41 merge outcome in repo-local Speculoos metadata and update the
+completed PR ledgers after the live golden-run fixture landed on dev.
+
+No live Zotero, PDF, OCR, PageIndex, OpenKB, source-pack, credential,
+main-branch, release, tag, package-publication, or repo rename action is
+included.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>
