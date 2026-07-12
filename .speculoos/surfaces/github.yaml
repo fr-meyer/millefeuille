@@ -15,19 +15,19 @@ notes:
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
-  id: pr-044-pr43-closeout-metadata
-  pull_request: null
+  id: pr-045-zotero-credential-guidance
+  pull_request: 46
   project_item: null
   pull_request_project_item: null
-  branch: chore/pr-044-pr43-closeout-metadata
+  branch: fix/pr-045-zotero-credential-guidance
   status: In Progress
   project_status: In Progress
 pull_request:
-  number: null
-  url: null
-  status: not-yet-open
+  number: 46
+  url: https://github.com/fr-meyer/millefeuille/pull/46
+  status: open
   base_branch: dev
-  head_branch: chore/pr-044-pr43-closeout-metadata
+  head_branch: fix/pr-045-zotero-credential-guidance
   head_sha: null
   merge_commit: null
   mergeguez_review: null
@@ -83,3 +83,13 @@ completed_pull_requests:
     merge_commit: e35a7acd279fb85fe4ab26294893a0c837425835
     mergeguez_review: mergeguez-review-43-8adeba3dd53c
     mergeguez_check_run: mergeguez-check-run-86617278621
+  - id: pr-044-pr43-closeout-metadata
+    number: 44
+    url: https://github.com/fr-meyer/millefeuille/pull/44
+    status: merged
+    base_branch: dev
+    head_branch: chore/pr-044-pr43-closeout-metadata
+    head_sha: 39c9d543d190ed125407d9a4593601c817469038
+    merge_commit: ad5e58ddc22642068bf067a6f77e3e1ab270e58b
+    mergeguez_review: null
+    mergeguez_check_run: null

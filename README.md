@@ -117,11 +117,36 @@ The following environment variables must be set **before running** the pipeline.
 
 ```bash
 export ZOTERO_LIBRARY_ID="your-numeric-library-id"
-export ZOTERO_READ_KEY="your-read-only-zotero-api-key"   # required for all runs
-export ZOTERO_WRITE_KEY="your-write-capable-zotero-api-key"  # required only for write-capable runs
+export ZOTERO_READ_KEY="your-zotero-read-api-key"
 ```
 
-**Zotero split keys:** `ZOTERO_LIBRARY_ID` is your numeric user library ID, visible in your Zotero web library URL (`https://www.zotero.org/users/{id}`). `ZOTERO_READ_KEY` is required for **all** runs (discovery, export, dry-run); use a dedicated read-only API key (least privilege). `ZOTERO_WRITE_KEY` is required only when write-capable features are active: tag adding (`tag_adding.enabled=true`), note creation (`ocr.enabled=true`), and success/error tagging. You may omit `ZOTERO_WRITE_KEY` for read-only or export-only runs. Obtain both keys from [Zotero key settings](https://www.zotero.org/settings/keys). Using a dedicated read-only key for `ZOTERO_READ_KEY` is strongly recommended.
+`ZOTERO_LIBRARY_ID` is your numeric user library ID, visible in your Zotero web
+library URL (`https://www.zotero.org/users/{id}`). `ZOTERO_READ_KEY` is
+required for discovery, export, dry-run, and other read operations.
+
+Use one of these credential patterns:
+
+```bash
+# Read-only
+export ZOTERO_LIBRARY_ID="your-numeric-library-id"
+export ZOTERO_READ_KEY="your-zotero-read-api-key"
+
+# Writeback
+export ZOTERO_LIBRARY_ID="your-numeric-library-id"
+export ZOTERO_READ_KEY="your-zotero-read-api-key"
+export ZOTERO_WRITE_KEY="your-zotero-write-api-key"
+
+# Single-key writeback
+export ZOTERO_LIBRARY_ID="your-numeric-library-id"
+export ZOTERO_READ_KEY="your-zotero-write-api-key"
+export ZOTERO_WRITE_KEY="your-zotero-write-api-key"
+```
+
+`ZOTERO_WRITE_KEY` is required only when write-capable features are active:
+tag adding (`tag_adding.enabled=true`), note creation (`ocr.enabled=true`),
+selection tagging, and success/error tagging. You may omit `ZOTERO_WRITE_KEY`
+for read-only or export-only runs. Obtain API keys from
+[Zotero key settings](https://www.zotero.org/settings/keys).
 
 ### OCR provider key (required only when OCR is enabled)
 
