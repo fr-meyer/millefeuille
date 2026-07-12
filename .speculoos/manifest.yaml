@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 142 passed, 0 failed
+    result: 146 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -58,13 +58,13 @@ surfaces:
   github_pull_request:
     enabled: true
     status: none-active
-    number: 39
-    url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/39
+    number: 41
+    url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41
     base_branch: dev
     head_branch: null
-    head_sha: null
-    merge_commit: null
-    project_status: In Progress
+    head_sha: 6b6a42ef52823e171bda58a111607858008dbc82
+    merge_commit: e8f205b88948c2ee88276db2b6e4aea3a0273da1
+    project_status: Done
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet
@@ -128,3 +128,14 @@ history:
       merged_by: fr-meyer
       mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/38#pullrequestreview-4676416510
       mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86508434593
+    - id: pr-041-live-golden-route-evidence
+      status: merged
+      branch: test/pr-041-live-golden-route-evidence
+      base_branch: dev
+      pull_request: 41
+      url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41
+      head_sha: 6b6a42ef52823e171bda58a111607858008dbc82
+      merge_commit: e8f205b88948c2ee88276db2b6e4aea3a0273da1
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41#pullrequestreview-4679383311
+      mergeguez_check_run: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86613438575

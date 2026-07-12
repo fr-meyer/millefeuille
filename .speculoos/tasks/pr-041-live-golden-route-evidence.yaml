@@ -1,18 +1,18 @@
 id: pr-041-live-golden-route-evidence
 title: Record live golden-run evidence and OpenKB proxy route
-status: in_progress
+status: merged
 branch: test/pr-041-live-golden-route-evidence
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 41
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
-  url: null
-  head_sha: null
-  merge_commit: null
+  url: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41
+  head_sha: 6b6a42ef52823e171bda58a111607858008dbc82
+  merge_commit: e8f205b88948c2ee88276db2b6e4aea3a0273da1
 post_merge_expected:
   pull_request: 41
   base_branch: dev
@@ -55,6 +55,11 @@ evidence:
   - changed-file private-data and payload scan passed
   - OpenKB local proxy route smoke passed outside the repo with model openai/openkb-qwen
   - live Zotero read-only queue check found only the already-processed Picard candidate still tagged docai, so the next edge-case dogfood batch remains input-gated
+  - 'PR #41 merged with merge commit e8f205b88948c2ee88276db2b6e4aea3a0273da1'
+  - 'Mergeguez review approved exact head 6b6a42ef52823e171bda58a111607858008dbc82 with 0 blockers: https://github.com/fr-meyer/zotero-docai-pipeline/pull/41#pullrequestreview-4679383311'
+  - 'Mergeguez review check passed: https://github.com/fr-meyer/zotero-docai-pipeline/runs/86613438575'
+  - Remote PR branch deleted after merge through branch-cleanup-execute
+  - Project item unavailable; closeout recorded without ProjectV2 mutation
 publication_boundary:
   statement: "Fixture/test/docs slice only; no live Zotero writeback, PDF recovery, OCR/Mistral/PageIndex provider call, OpenKB write, source-pack write, main-branch merge, release tag, or package publication. GitHub publication and dev-lane merge are allowed only after clean validation and exact-head review."
 links:
