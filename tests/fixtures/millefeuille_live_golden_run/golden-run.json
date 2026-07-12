@@ -1,0 +1,152 @@
+{
+  "schema_version": "millefeuille-live-golden-run/v0.1",
+  "run_id": "zotero-docai-pipeline-live-20260711-2345-kst",
+  "captured_from": "approved-live-run-aggregate",
+  "sanitization": {
+    "profile": "public-safe-aggregate",
+    "omitted": [
+      "zotero_library_id",
+      "zotero_item_key",
+      "zotero_attachment_key",
+      "private_filesystem_paths",
+      "pdf_bytes",
+      "provider_payloads",
+      "ocr_text",
+      "openkb_raw_markdown",
+      "authenticated_urls",
+      "credentials"
+    ]
+  },
+  "paper": {
+    "title": "Torch.manual_seed(3407) is all you need: On the influence of random seeds in deep learning architectures for computer vision",
+    "author": "David Picard",
+    "year": 2023,
+    "doi_present": false,
+    "canonical_filename": "Picard - 2023 - Torch.manual_seed(3407) is all you need On the influence of random seeds in deep learning architectures for computer vision.pdf",
+    "source_sha256": "14381e48ae7c94965b2792f8dace53c2d13c3dbbeafe091a947d9554c0d596ab"
+  },
+  "discovery": {
+    "include_tag": "docai",
+    "exclude_tag": "docai-processed",
+    "conflict_resolution": "exclude_wins",
+    "matched_items": 1,
+    "attachments_total": 2,
+    "pdf_attachments": 1,
+    "non_pdf_attachments": 1,
+    "multi_attachment_items": 1,
+    "ambiguous_or_degraded_attachments": 0,
+    "handoff_rows": 1,
+    "skips": [
+      {
+        "event": "skipped-non-pdf-attachment",
+        "canonical_filename": "2109.html",
+        "content_type": "text/html",
+        "verification_result": "skipped"
+      }
+    ]
+  },
+  "recovery": {
+    "downloaded_bytes": 1754626,
+    "verification_strength": "full",
+    "sha256_verified": true,
+    "errors": 0
+  },
+  "source_pack": {
+    "source_type": "zotero",
+    "document_slug": "picard-2023-torch-manual-seed-3407-is-all-you-need-on-the-influence-of-r-14381e48ae7c",
+    "written": true,
+    "private_path_omitted": true
+  },
+  "native_extraction": {
+    "tool": "PyPDF2",
+    "status": "ok",
+    "pages": 9,
+    "character_count": 23225,
+    "empty_pages": 0
+  },
+  "ocr_extraction": {
+    "backend": "mistral-ocr",
+    "requested_model": "mistral-ocr-latest",
+    "provider_model": "mistral-ocr-latest",
+    "status": "ok",
+    "confidence_scores_granularity": "word",
+    "table_format": "markdown",
+    "image_policy": "metadata-only",
+    "provider_upload_deleted": true,
+    "raw_provider_json_retained_private": true,
+    "pages": 9,
+    "character_count": 23308,
+    "word_confidence_scores": 3717,
+    "low_word_confidence_under_0_80": 4,
+    "low_word_confidence_under_0_95": 25,
+    "tables": 2,
+    "image_regions_metadata_only": 6
+  },
+  "route": {
+    "selected_route": "merged-dual",
+    "status": "ok",
+    "pages": 9,
+    "character_count": 25495,
+    "dual_extraction_complete": true
+  },
+  "openkb": {
+    "add_status": "added",
+    "model_at_live_run": "dashscope/qwen3.7-max",
+    "model_route_after_followup_smoke": "openai/openkb-qwen",
+    "local_proxy_smoke_status": "passed",
+    "raw_doc_written": true,
+    "summary_written": true,
+    "concepts_created": [
+      "reproducibility-in-deep-learning",
+      "random-seed-variance"
+    ],
+    "post_add_status": {
+      "zotero_source_packs": 4,
+      "zotero_registry_rows": 7,
+      "document_registry_rows": 324,
+      "intake_registry_rows": 443
+    }
+  },
+  "acceptance": {
+    "schema_version": "openkb-docai-acceptance-summary/v0.1",
+    "status": "pass",
+    "handoff_rows": 1,
+    "openkb_added": 1,
+    "skipped_non_pdf_attachments": 1,
+    "duplicate_scans": 1,
+    "duplicate_candidates": 0,
+    "duplicate_groups": 0,
+    "missing_text_fingerprints": 0,
+    "import_join_failures": 0,
+    "unmatched_handoff_rows": 0,
+    "unmatched_duplicate_scans": 0,
+    "duplicate_scan_review_rows": 0
+  },
+  "classification": {
+    "parent_collection": "Methods",
+    "subcollection": "Methods · Normalization & training dynamics",
+    "confidence": "high",
+    "zotero_write_status": "not-written"
+  },
+  "zotero_writeback_plan": {
+    "approval_status": "approved-by-operator",
+    "execution_status": "blocked-missing-zotero-write-key",
+    "required_credential": "ZOTERO_WRITE_KEY",
+    "add_tags": [
+      "docai-openkb-added",
+      "docai-acceptance-passed",
+      "docai-ready-for-classification",
+      "docai-classified",
+      "docai-processed"
+    ],
+    "remove_tags": [
+      "docai"
+    ],
+    "classification_destination": "Methods · Normalization & training dynamics"
+  },
+  "release_boundary": {
+    "main_promotion": false,
+    "release_tag": false,
+    "package_publication": false
+  }
+}
