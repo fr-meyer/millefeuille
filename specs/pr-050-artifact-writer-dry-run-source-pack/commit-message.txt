@@ -1,0 +1,5 @@
+feat: write dry-run artifact indexes
+
+Wire the dry-run discovery and OpenKB handoff preview path to create
+per-paper artifact-index and stage-manifest files under an explicit artifact
+root, without live provider writes.

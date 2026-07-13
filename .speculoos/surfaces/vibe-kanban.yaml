@@ -14,7 +14,7 @@ notes:
   - No Vibe cloud or org API is configured for this repo.
   - Bootstrap should not depend on Vibe reachability.
 task:
-  status: idle
-  id: null
-  speculoos_task: null
+  status: in_review
+  id: pr-050-artifact-writer-dry-run-source-pack
+  speculoos_task: .speculoos/tasks/pr-050-artifact-writer-dry-run-source-pack.yaml
   command: null

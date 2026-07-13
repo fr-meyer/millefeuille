@@ -238,6 +238,21 @@ millefeuille status --index /path/to/artifact-index.json --json
 blocking stage, index, or approved-live writeback states such as `failed`,
 `needs-review`, `manual-gate`, or `not-started`.
 
+Dry-run artifact writing can seed the artifact/status surface from the existing
+Zotero discovery and OpenKB handoff preview path:
+
+```bash
+millefeuille --artifact-root /path/to/millefeuille-artifacts --run-id dry-run-demo \
+  processing.dry_run=true export.openkb_handoff.enabled=true
+```
+
+This writes `stage-manifest.json` and `artifact-index.json` under
+`<artifact-root>/<paper-id>/<run-id>/` for each discovered paper. It does not
+download PDFs, recover source packs, call OCR/model/index providers, write
+OpenKB/PageIndex/ConDB/ChatIndex data, or mutate Zotero. The reserved
+`source-pack` artifact root is rejected until the source-pack writer exists; use
+an explicit filesystem path for this dry-run slice.
+
 ### Command-Line Configuration
 
 Override configuration from the command line:

@@ -1,0 +1,46 @@
+id: pr-050-artifact-writer-dry-run-source-pack
+title: Wire dry-run artifact indexes into the source-pack pipeline path
+status: in_review
+branch: feat/pr-050-artifact-writer-dry-run-source-pack
+base_branch: dev
+github:
+  issue: null
+  pull_request: 50
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+  url: https://github.com/fr-meyer/millefeuille/pull/50
+  head_sha: ea60c95f12c86fba1835307bbeee131ebe84f35c
+scope:
+  - add an explicit artifact export configuration and CLI alias for `--artifact-root`
+  - write per-paper `stage-manifest.json` and `artifact-index.json` from dry-run discovery plus OpenKB handoff preview evidence
+  - keep artifact output under `<artifact-root>/<paper-id>/<run-id>/`
+  - record manual gates for PDF recovery and source-pack writing without performing either stage
+  - reject the reserved `source-pack` artifact root until the source-pack writer exists
+  - carry forward PR #49 closeout merge facts in repo-local Speculoos ledgers
+non_goals:
+  - live Zotero writes or lifecycle tag mutation
+  - PDF recovery, source-pack creation, OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or index writes
+  - implementing hierarchical summaries, paper cards, classification, or retrieval-index population
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - dry-run with `--artifact-root` writes artifact indexes and stage manifests for discovered papers
+  - output includes Zotero source identity, handoff preview provenance, source hash when available, and manual gates for source-pack work
+  - live artifact writes are rejected until a later slice explicitly supports them
+  - the reserved `source-pack` artifact root is rejected until the source-pack writer exists
+  - no live provider, OpenKB, index, source-pack, PDF download, or Zotero write calls are made by this slice
+  - focused artifact writer and artifact command tests, full unittest discovery, Ruff, metadata parse, diff check, and Speculoos validate pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_artifact_writer tests.test_millefeuille_artifact_commands"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-050-artifact-writer-dry-run-source-pack --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Dry-run artifact writer only; no live Zotero write, lifecycle tag mutation, PDF recovery, source-pack creation, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+notes:
+  - "PR #49 merged PR #48 closeout metadata to dev at 380fea3f40b9ad1118ba49363a780a7252a75460; this PR records that completed closeout while opening the artifact-writer implementation slice."
