@@ -1,6 +1,6 @@
 id: pr-052-source-pack-artifact-root
 title: Add source-pack artifact-root writing
-status: in_review
+status: merged
 branch: feat/pr-052-source-pack-artifact-root
 base_branch: dev
 github:
@@ -8,10 +8,11 @@ github:
   pull_request: 52
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
   url: https://github.com/fr-meyer/millefeuille/pull/52
-  head_sha: 1b0c8a893faa6ef54967f45253e63548f2c78689
+  head_sha: 9cbae6344321013ba2df30cafbde35ccdc14d1e1
+  merge_commit: 92166efe333eb4b72688f4b74e2c0358ffb46db1
 scope:
   - allow `export.artifacts.artifact_root=source-pack` in dry-run artifact writing
   - add `export.artifacts.source_pack_root` plus `--source-pack-root` CLI alias for fixture and non-default source-pack bases
@@ -45,3 +46,9 @@ publication_boundary:
   statement: "Dry-run source-pack artifact-root writer only; no live Zotero write, lifecycle tag mutation, PDF recovery, source-pack source-evidence creation or mutation, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
 notes:
   - "PR #51 merged PR #50 closeout metadata to dev at 41e88b6b56921fdfc35615a3355d0918908ec35c; this PR records that completed closeout while opening the source-pack artifact-root implementation slice."
+evidence:
+  - 'PR #52 merged with merge commit 92166efe333eb4b72688f4b74e2c0358ffb46db1'
+  - 'Mergeguez review approved head 9cbae6344321013ba2df30cafbde35ccdc14d1e1: https://github.com/fr-meyer/millefeuille/pull/52#pullrequestreview-4684116211'
+  - 'Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/86800022039'
+  - Project item unavailable; closeout recorded without ProjectV2 mutation
+  - surface-sync --close-merged-task cleared repo-local active task metadata

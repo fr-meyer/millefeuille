@@ -1,0 +1,7 @@
+chore: close PR 52 metadata
+
+Record PR #52 as merged/Done and clear active repo-local Speculoos task
+surfaces.
+
+No live Zotero, PDF, OCR, PageIndex, OpenKB, index, source-pack, credential,
+main-branch, release, or package publication actions.

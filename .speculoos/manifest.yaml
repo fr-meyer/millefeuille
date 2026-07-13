@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-052-source-pack-artifact-root
+canonical_task: null
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: feat/pr-052-source-pack-artifact-root
+  working_branch: null
 status:
-  phase: review
-  pret_a_coder: ready_for_review
+  phase: idle
+  pret_a_coder: idle
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,14 +57,14 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
-    number: 52
-    url: https://github.com/fr-meyer/millefeuille/pull/52
+    status: none-active
+    number: null
+    url: null
     base_branch: dev
-    head_branch: feat/pr-052-source-pack-artifact-root
-    head_sha: 1b0c8a893faa6ef54967f45253e63548f2c78689
+    head_branch: null
+    head_sha: null
     merge_commit: null
-    project_status: In Progress
+    project_status: none-active
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet
@@ -93,14 +93,7 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task:
-  id: pr-052-source-pack-artifact-root
-  title: Add source-pack artifact-root writing
-  status: in_review
-  branch: feat/pr-052-source-pack-artifact-root
-  base_branch: dev
-  task_file: .speculoos/tasks/pr-052-source-pack-artifact-root.yaml
-  started_from: 41e88b6b56921fdfc35615a3355d0918908ec35c
+current_task: null
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -235,3 +228,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/51#pullrequestreview-4683801465
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86791722572
+    - id: pr-052-source-pack-artifact-root
+      status: merged
+      branch: feat/pr-052-source-pack-artifact-root
+      base_branch: dev
+      pull_request: 52
+      url: https://github.com/fr-meyer/millefeuille/pull/52
+      head_sha: 9cbae6344321013ba2df30cafbde35ccdc14d1e1
+      merge_commit: 92166efe333eb4b72688f4b74e2c0358ffb46db1
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/52#pullrequestreview-4684116211
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86800022039
