@@ -1,6 +1,6 @@
 id: pr-054-source-pack-intake-fixtures
 title: Add fixture-first source-pack intake
-status: implementation
+status: merged
 branch: feat/pr-054-source-pack-intake-fixtures
 base_branch: dev
 github:
@@ -8,10 +8,11 @@ github:
   pull_request: 54
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
-  url: null
-  head_sha: 2823554deab684934e979bf5650d0e6d7c1a24f8
+  url: https://github.com/fr-meyer/millefeuille/pull/54
+  head_sha: 112cdeada6aed3d788bf7a602703f56d69816b7c
+  merge_commit: 1ae94e457869325d13f396ef19582bfa678255c9
 post_merge_expected:
   pull_request: 54
   base_branch: dev
@@ -55,3 +56,9 @@ notes:
 evidence:
   - 'PR #54 opened for pr-054-source-pack-intake-fixtures'
   - 'PR #54 linked to Project item unavailable'
+  - 'Mergeguez review approved head 112cdeada6aed3d788bf7a602703f56d69816b7c: https://github.com/fr-meyer/millefeuille/pull/54#pullrequestreview-4684886328'
+  - 'Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/86822134546'
+  - 'PR #54 merged with merge commit 1ae94e457869325d13f396ef19582bfa678255c9'
+  - Remote PR branch deleted after merge through branch-cleanup-execute
+  - Project item unavailable moved to Done
+  - surface-sync --close-merged-task cleared repo-local active task metadata

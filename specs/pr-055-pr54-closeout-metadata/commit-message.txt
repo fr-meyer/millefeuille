@@ -1,0 +1,7 @@
+chore: close PR 54 metadata
+
+Record PR #54 as merged/Done and move active repo-local Speculoos task
+surfaces to this closeout branch.
+
+No live Zotero, PDF, OCR, PageIndex, OpenKB, index, source-pack, credential,
+main-branch, release, or package publication actions.

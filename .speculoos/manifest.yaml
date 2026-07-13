@@ -1,13 +1,13 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-054-source-pack-intake-fixtures
+canonical_task: pr-055-pr54-closeout-metadata
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: feat/pr-054-source-pack-intake-fixtures
+  working_branch: chore/pr-055-pr54-closeout-metadata
 status:
   phase: in_review
   pret_a_coder: in_progress
@@ -61,7 +61,7 @@ surfaces:
     number: null
     url: null
     base_branch: dev
-    head_branch: feat/pr-054-source-pack-intake-fixtures
+    head_branch: chore/pr-055-pr54-closeout-metadata
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -94,13 +94,13 @@ gates:
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
 current_task:
-  id: pr-054-source-pack-intake-fixtures
-  title: Add fixture-first source-pack intake
+  id: pr-055-pr54-closeout-metadata
+  title: Close PR 54 source-pack intake metadata
   status: implementation
-  branch: feat/pr-054-source-pack-intake-fixtures
+  branch: chore/pr-055-pr54-closeout-metadata
   base_branch: dev
-  task_file: .speculoos/tasks/pr-054-source-pack-intake-fixtures.yaml
-  started_from: 8f7c0f46f6aa7f267ca936be8a87b096f9f4d37e
+  task_file: .speculoos/tasks/pr-055-pr54-closeout-metadata.yaml
+  started_from: 1ae94e457869325d13f396ef19582bfa678255c9
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -257,3 +257,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/53#pullrequestreview-4684163854
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86801420865
+    - id: pr-054-source-pack-intake-fixtures
+      status: merged
+      branch: feat/pr-054-source-pack-intake-fixtures
+      base_branch: dev
+      pull_request: 54
+      url: https://github.com/fr-meyer/millefeuille/pull/54
+      head_sha: 112cdeada6aed3d788bf7a602703f56d69816b7c
+      merge_commit: 1ae94e457869325d13f396ef19582bfa678255c9
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/54#pullrequestreview-4684886328
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86822134546
