@@ -5,10 +5,10 @@ branch: chore/pr-049-pr48-closeout-metadata
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 49
   issue_project_item: null
   pull_request_project_item: null
-  project_status: Pending Publication
+  project_status: In Progress
   project_item: null
 scope:
   - clear repo-local active task metadata after PR #48 merged to dev
