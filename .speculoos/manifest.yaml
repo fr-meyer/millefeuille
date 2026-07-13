@@ -9,8 +9,8 @@ repository:
   base_branch: dev
   working_branch: feat/pr-052-source-pack-artifact-root
 status:
-  phase: implementation
-  pret_a_coder: in_progress
+  phase: review
+  pret_a_coder: ready_for_review
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: pending-publication
-    number: null
-    url: null
+    status: open
+    number: 52
+    url: https://github.com/fr-meyer/millefeuille/pull/52
     base_branch: dev
     head_branch: feat/pr-052-source-pack-artifact-root
-    head_sha: null
+    head_sha: 1b0c8a893faa6ef54967f45253e63548f2c78689
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
@@ -96,7 +96,7 @@ gates:
 current_task:
   id: pr-052-source-pack-artifact-root
   title: Add source-pack artifact-root writing
-  status: in_progress
+  status: in_review
   branch: feat/pr-052-source-pack-artifact-root
   base_branch: dev
   task_file: .speculoos/tasks/pr-052-source-pack-artifact-root.yaml

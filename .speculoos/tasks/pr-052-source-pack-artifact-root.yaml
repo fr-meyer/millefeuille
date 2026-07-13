@@ -1,17 +1,17 @@
 id: pr-052-source-pack-artifact-root
 title: Add source-pack artifact-root writing
-status: in_progress
+status: in_review
 branch: feat/pr-052-source-pack-artifact-root
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 52
   issue_project_item: null
   pull_request_project_item: null
   project_status: In Progress
   project_item: null
-  url: null
-  head_sha: null
+  url: https://github.com/fr-meyer/millefeuille/pull/52
+  head_sha: 1b0c8a893faa6ef54967f45253e63548f2c78689
 scope:
   - allow `export.artifacts.artifact_root=source-pack` in dry-run artifact writing
   - add `export.artifacts.source_pack_root` plus `--source-pack-root` CLI alias for fixture and non-default source-pack bases

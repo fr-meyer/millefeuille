@@ -16,16 +16,16 @@ notes:
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
   id: pr-052-source-pack-artifact-root
-  status: in_progress
+  status: in_review
   branch: feat/pr-052-source-pack-artifact-root
   speculoos_task: .speculoos/tasks/pr-052-source-pack-artifact-root.yaml
 pull_request:
-  status: pending-publication
-  number: null
-  url: null
+  status: open
+  number: 52
+  url: https://github.com/fr-meyer/millefeuille/pull/52
   base_branch: dev
   head_branch: feat/pr-052-source-pack-artifact-root
-  head_sha: null
+  head_sha: 1b0c8a893faa6ef54967f45253e63548f2c78689
   merge_commit: null
   mergeguez_review: null
   mergeguez_check_run: null
