@@ -40,6 +40,12 @@ state in the stage manifest and artifact index.
 
 - `source-pack`
   - Create or update source packs after identity verification.
+  - Initial fixture command:
+    `millefeuille source-pack intake --evidence <json> --source-pack-root <dir>`.
+  - Verify recovered local bytes against expected SHA-256 before writing
+    `source.pdf` or `manifest.json`.
+  - Refuse to overwrite source packs whose source hash or manifest identity has
+    drifted from the supplied evidence.
   - Emit disposal/import manifest rows.
 
 - `extract-native`
@@ -136,7 +142,8 @@ millefeuille run \
 
 - `preview`
   - No live writes.
-  - No PDF recovery unless an explicit approved fixture is used.
+  - No PDF recovery or source-pack intake unless an explicit approved local
+    fixture is used.
   - Model/provider calls are skipped unless the stage is running against an
     approved fixture or approved local profile.
 

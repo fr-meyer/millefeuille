@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/source-pack-manifest.schema.json",
+  "title": "Millefeuille Source Pack Manifest",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "paper_id",
+    "source_type",
+    "source_hash",
+    "created_at",
+    "source",
+    "identity",
+    "verification",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-source-pack-manifest/v0.1"
+    },
+    "paper_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_type": {
+      "const": "zotero"
+    },
+    "source_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["kind", "ref", "format", "byte_size", "sha256"],
+      "properties": {
+        "kind": {
+          "const": "recovered-pdf"
+        },
+        "ref": {
+          "const": "source.pdf"
+        },
+        "format": {
+          "const": "pdf"
+        },
+        "byte_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "content_type": {
+          "type": "string"
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "zotero_item_key",
+        "zotero_attachment_key",
+        "canonical_filename"
+      ],
+      "properties": {
+        "zotero_item_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "zotero_attachment_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_filename": {
+          "type": "string",
+          "minLength": 1
+        },
+        "item_title": {
+          "type": "string"
+        },
+        "citation_key": {
+          "type": "string"
+        },
+        "file_size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "zotero_version": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "method", "expected_sha256", "actual_sha256"],
+      "properties": {
+        "status": {
+          "const": "verified"
+        },
+        "method": {
+          "const": "sha256"
+        },
+        "expected_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "actual_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["intake_method", "evidence_schema_version"],
+      "properties": {
+        "intake_method": {
+          "const": "fixture-recovered-pdf"
+        },
+        "evidence_schema_version": {
+          "const": "millefeuille-recovered-pdf-evidence/v0.1"
+        },
+        "discovered_at": {
+          "type": "string"
+        },
+        "verification_strength": {
+          "type": "string"
+        },
+        "recovery": {
+          "type": "object"
+        },
+        "openkb_policy_hints": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

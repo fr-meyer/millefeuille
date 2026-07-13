@@ -1,0 +1,57 @@
+id: pr-054-source-pack-intake-fixtures
+title: Add fixture-first source-pack intake
+status: implementation
+branch: feat/pr-054-source-pack-intake-fixtures
+base_branch: dev
+github:
+  issue: null
+  pull_request: 54
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  url: null
+  head_sha: 2823554deab684934e979bf5650d0e6d7c1a24f8
+post_merge_expected:
+  pull_request: 54
+  base_branch: dev
+  head_branch: feat/pr-054-source-pack-intake-fixtures
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - add an offline source-pack intake writer for explicit local recovered-PDF fixture evidence
+  - verify recovered bytes against expected SHA-256 before creating source-pack source evidence
+  - write `source.pdf` and `manifest.json` under `<source-pack-root>/zotero/<paper-id>/`
+  - require source-pack manifests to expose a `sha256:<hex>` source hash before artifact-root analysis writes treat them as verified
+  - add a `millefeuille source-pack intake` CLI command that does not initialize Zotero, OCR, model, OpenKB, or index clients
+  - carry forward PR #53 closeout merge facts in repo-local Speculoos ledgers
+non_goals:
+  - live Zotero reads or writes, lifecycle tag mutation, or live PDF recovery
+  - OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or index writes
+  - hierarchical summaries, paper cards, classification, or retrieval-index population
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - fixture evidence intake writes source-pack source evidence only after SHA-256 verification
+  - mismatched source hash or file size fails before source-pack creation
+  - rerunning against identical evidence is idempotent
+  - existing source-pack source or manifest drift is rejected without overwrite
+  - source-pack artifact-root runs consume the manifest source hash in artifact-index output
+  - the source-pack intake CLI succeeds without Zotero/provider environment variables
+  - focused source-pack/artifact tests, full unittest discovery, Ruff, metadata parse, diff check, and Speculoos validate pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_artifact_commands tests.test_millefeuille_contract_artifacts"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-054-source-pack-intake-fixtures --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Fixture-first source-pack intake only; no live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+notes:
+  - "PR #53 merged PR #52 closeout metadata to dev at 8f7c0f46f6aa7f267ca936be8a87b096f9f4d37e; this PR records that completed closeout while opening the fixture-first source-pack intake slice."
+evidence:
+  - 'PR #54 opened for pr-054-source-pack-intake-fixtures'
+  - 'PR #54 linked to Project item unavailable'

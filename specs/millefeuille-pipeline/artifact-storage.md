@@ -13,8 +13,9 @@ Supported root modes:
 - `source-pack`
   - Store derived artifacts under the paper source pack.
   - Preferred for production Zotero/OpenKB runs.
-  - Requires a verified existing source-pack `manifest.json`; derived
-    Millefeuille run artifacts are written under
+  - Requires a verified existing source-pack `manifest.json` with a
+    `source_hash` in `sha256:<hex>` form; derived Millefeuille run artifacts are
+    written under
     `analyses/millefeuille/<run-id>/` without changing source evidence.
 
 - absolute or relative path
@@ -32,6 +33,7 @@ Supported root modes:
 source-packs/
   zotero/<paper-slug>/
     manifest.json
+    source.pdf
     source.md
     pages/
     extractions/
@@ -52,6 +54,37 @@ source-packs/
           reports/
           zotero-writeback-plan.json
 ```
+
+## Source-Pack Intake Contract
+
+The fixture-first source-pack writer accepts an explicit local recovered-PDF
+evidence file and a source-pack root:
+
+```bash
+millefeuille source-pack intake \
+  --evidence recovered-pdf-evidence.json \
+  --source-pack-root /path/to/source-packs
+```
+
+The evidence file must name the Zotero item key, attachment key, canonical
+filename, local recovered PDF path, and expected SHA-256. Relative recovered PDF
+paths resolve beside the evidence JSON. The writer computes the recovered bytes'
+SHA-256 before creating the pack, fails before writing on hash or size
+mismatch, and refuses to overwrite an existing pack whose `source.pdf` or
+manifest drift from the evidence.
+
+`manifest.json` must follow `millefeuille-source-pack-manifest/v0.1` and record:
+
+- `paper_id`, `source_type`, and top-level `source_hash`;
+- `source.ref` (`source.pdf`), byte size, format, and source SHA-256;
+- Zotero item/attachment identity and canonical filename;
+- verification status/method plus expected and actual SHA-256;
+- fixture intake provenance and sanitized recovery/policy hints.
+
+The fixture-first intake command does not read Zotero, download PDFs, call OCR
+or model providers, write OpenKB/PageIndex/ConDB/ChatIndex data, or mutate
+Zotero tags/notes. Live recovery and live source-pack writes remain separate
+approved-live stages.
 
 ## Required Run Artifacts
 
