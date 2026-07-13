@@ -249,9 +249,23 @@ millefeuille --artifact-root /path/to/millefeuille-artifacts --run-id dry-run-de
 This writes `stage-manifest.json` and `artifact-index.json` under
 `<artifact-root>/<paper-id>/<run-id>/` for each discovered paper. It does not
 download PDFs, recover source packs, call OCR/model/index providers, write
-OpenKB/PageIndex/ConDB/ChatIndex data, or mutate Zotero. The reserved
-`source-pack` artifact root is rejected until the source-pack writer exists; use
-an explicit filesystem path for this dry-run slice.
+OpenKB/PageIndex/ConDB/ChatIndex data, or mutate Zotero.
+
+When a verified source pack already exists, `--artifact-root source-pack` writes
+the same run artifacts into the source pack analysis area:
+
+```bash
+millefeuille --artifact-root source-pack \
+  --source-pack-root /path/to/source-packs \
+  --run-id dry-run-demo \
+  processing.dry_run=true export.openkb_handoff.enabled=true
+```
+
+This requires `<source-pack-root>/zotero/<paper-id>/manifest.json` and writes
+only under
+`<source-pack-root>/zotero/<paper-id>/analyses/millefeuille/<run-id>/`. It does
+not create source packs or alter source evidence; a missing manifest is a hard
+configuration/evidence error.
 
 ### Command-Line Configuration
 

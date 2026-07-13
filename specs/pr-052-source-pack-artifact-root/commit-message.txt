@@ -1,0 +1,9 @@
+feat: add source-pack artifact-root writing
+
+Support `--artifact-root source-pack` for dry-run artifact writing by resolving
+existing source-pack manifests and writing run metadata under
+`analyses/millefeuille/<run-id>`.
+
+No live Zotero, PDF recovery, OCR/provider, model, OpenKB, index, source-pack
+source-evidence, credential, main-branch, release, or package publication
+actions.

@@ -13,6 +13,9 @@ Supported root modes:
 - `source-pack`
   - Store derived artifacts under the paper source pack.
   - Preferred for production Zotero/OpenKB runs.
+  - Requires a verified existing source-pack `manifest.json`; derived
+    Millefeuille run artifacts are written under
+    `analyses/millefeuille/<run-id>/` without changing source evidence.
 
 - absolute or relative path
   - Store a project or batch bundle outside the source pack.
@@ -87,3 +90,5 @@ The artifact index should answer:
 Source-pack writes, OpenKB writes, index writes, model/provider calls, Zotero
 writeback, GitHub publication, release tags, and package publication require
 the applicable approval. An artifact-root choice does not bypass those gates.
+Writing Millefeuille analysis artifacts under an existing source pack is not the
+same as creating or mutating the source pack's recovered source evidence.

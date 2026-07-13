@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 from typing import Any
@@ -22,6 +23,9 @@ from millefeuille.domain.millefeuille import (
 )
 from millefeuille.domain.models import DiscoveredItem, OpenKBHandoffRow
 
+SOURCE_PACK_ARTIFACT_ROOT = "source-pack"
+DEFAULT_SOURCE_PACK_ROOT = "/srv/openkb/source-packs"
+
 
 @dataclass(frozen=True)
 class ArtifactWriteResult:
@@ -30,6 +34,14 @@ class ArtifactWriteResult:
     run_dir: Path
     artifact_index_path: Path
     stage_manifest_path: Path
+
+
+@dataclass(frozen=True)
+class ArtifactRunContext:
+    run_dir: Path
+    source_pack_ref: str
+    source_pack_manifest_ref: str | None = None
+    source_pack_verified: bool = False
 
 
 def default_artifact_run_id(now: datetime | None = None) -> str:
@@ -55,24 +67,28 @@ def write_dry_run_artifacts(
         return []
     if config.artifact_root is None:
         raise ValueError("artifact_root must be configured when artifacts are enabled")
-    if str(config.artifact_root).strip() == "source-pack":
-        raise ValueError(
-            "export.artifacts.artifact_root=source-pack requires a later "
-            "source-pack writer; use an explicit filesystem path for this dry-run "
-            "artifact slice"
-        )
 
-    root = Path(config.artifact_root)
     run_id = str(config.run_id).strip() if config.run_id else default_artifact_run_id()
     rows_by_item: dict[str, list[OpenKBHandoffRow]] = {}
     for row in handoff_rows:
         rows_by_item.setdefault(row.item_key, []).append(row)
 
-    results: list[ArtifactWriteResult] = []
+    planned_runs: list[
+        tuple[DiscoveredItem, str, list[OpenKBHandoffRow], ArtifactRunContext]
+    ] = []
     for item in items:
         paper_id = paper_id_for_item(item)
         item_rows = rows_by_item.get(item.key, [])
-        run_dir = root / paper_id / run_id
+        run_context = resolve_artifact_run_context(
+            item=item,
+            config=config,
+            run_id=run_id,
+        )
+        planned_runs.append((item, paper_id, item_rows, run_context))
+
+    results: list[ArtifactWriteResult] = []
+    for item, paper_id, item_rows, run_context in planned_runs:
+        run_dir = run_context.run_dir
         run_dir.mkdir(parents=True, exist_ok=True)
 
         stage_manifest = build_dry_run_stage_manifest(
@@ -80,6 +96,7 @@ def write_dry_run_artifacts(
             rows=item_rows,
             run_id=run_id,
             handoff_enabled=handoff_enabled,
+            source_pack_verified=run_context.source_pack_verified,
         )
         stage_manifest_path = run_dir / "stage-manifest.json"
         write_stage_manifest(stage_manifest, stage_manifest_path)
@@ -90,6 +107,8 @@ def write_dry_run_artifacts(
             run_id=run_id,
             run_dir=run_dir,
             stage_manifest=stage_manifest,
+            source_pack_ref=run_context.source_pack_ref,
+            source_pack_manifest_ref=run_context.source_pack_manifest_ref,
         )
         artifact_index_path = run_dir / "artifact-index.json"
         write_artifact_index(artifact_index, artifact_index_path)
@@ -104,6 +123,43 @@ def write_dry_run_artifacts(
             )
         )
     return results
+
+
+def resolve_artifact_run_context(
+    *,
+    item: DiscoveredItem,
+    config: ArtifactExportConfig,
+    run_id: str,
+) -> ArtifactRunContext:
+    if config.artifact_root is None:
+        raise ValueError("artifact_root must be configured when artifacts are enabled")
+
+    paper_id = paper_id_for_item(item)
+    artifact_root = str(config.artifact_root).strip()
+    if artifact_root != SOURCE_PACK_ARTIFACT_ROOT:
+        run_dir = Path(config.artifact_root) / paper_id / run_id
+        return ArtifactRunContext(
+            run_dir=run_dir,
+            source_pack_ref=f"source-packs/zotero/{paper_id}",
+        )
+
+    source_pack_root = config.source_pack_root or DEFAULT_SOURCE_PACK_ROOT
+    source_pack_dir = Path(source_pack_root) / "zotero" / paper_id
+    source_pack_manifest = source_pack_dir / "manifest.json"
+    if not source_pack_manifest.is_file():
+        raise ValueError(
+            "export.artifacts.artifact_root=source-pack requires an existing "
+            f"source-pack manifest at {source_pack_manifest}"
+        )
+
+    run_dir = source_pack_dir / "analyses" / "millefeuille" / run_id
+    manifest_ref = _relative_ref(source_pack_manifest, run_dir)
+    return ArtifactRunContext(
+        run_dir=run_dir,
+        source_pack_ref=str(source_pack_dir),
+        source_pack_manifest_ref=manifest_ref,
+        source_pack_verified=True,
+    )
 
 
 def paper_id_for_item(item: DiscoveredItem) -> str:
@@ -127,13 +183,13 @@ def build_dry_run_stage_manifest(
     rows: list[OpenKBHandoffRow],
     run_id: str,
     handoff_enabled: bool,
+    source_pack_verified: bool = False,
 ) -> StageManifest:
     has_pdf = bool(rows)
-    manual_gates = (
-        [ManualGate.PDF_RECOVERY, ManualGate.SOURCE_PACK_WRITE]
-        if has_pdf
-        else []
-    )
+    manual_gates = []
+    if has_pdf and not source_pack_verified:
+        manual_gates = [ManualGate.PDF_RECOVERY, ManualGate.SOURCE_PACK_WRITE]
+    downstream_has_source = has_pdf or source_pack_verified
     stages = [
         StageRecord(
             name=StageName.DISCOVER,
@@ -160,32 +216,71 @@ def build_dry_run_stage_manifest(
         ),
         StageRecord(
             name=StageName.RECOVER,
-            status=StageStatus.MANUAL_GATE if has_pdf else StageStatus.SKIPPED,
+            status=(
+                StageStatus.SKIPPED
+                if source_pack_verified
+                else StageStatus.MANUAL_GATE
+                if has_pdf
+                else StageStatus.SKIPPED
+            ),
             inputs=["openkb-millefeuille-handoff-preview"] if has_pdf else [],
-            manual_gate_required=has_pdf,
-            gate=ManualGate.PDF_RECOVERY if has_pdf else None,
-            notes=["PDF recovery not performed by dry-run artifact writer"]
-            if has_pdf
-            else ["no PDF rows to recover"],
+            manual_gate_required=has_pdf and not source_pack_verified,
+            gate=ManualGate.PDF_RECOVERY
+            if has_pdf and not source_pack_verified
+            else None,
+            notes=(
+                ["source-pack manifest already exists; PDF recovery not performed"]
+                if source_pack_verified
+                else ["PDF recovery not performed by dry-run artifact writer"]
+                if has_pdf
+                else ["no PDF rows to recover"]
+            ),
         ),
         StageRecord(
             name=StageName.SOURCE_PACK,
-            status=StageStatus.MANUAL_GATE if has_pdf else StageStatus.SKIPPED,
-            inputs=["verified recovered PDF bytes"] if has_pdf else [],
-            manual_gate_required=has_pdf,
-            gate=ManualGate.SOURCE_PACK_WRITE if has_pdf else None,
-            notes=["source-pack creation intentionally not performed"]
-            if has_pdf
-            else ["no source-pack planned without a PDF row"],
+            status=(
+                StageStatus.PASSED
+                if source_pack_verified
+                else StageStatus.MANUAL_GATE
+                if has_pdf
+                else StageStatus.SKIPPED
+            ),
+            inputs=(
+                ["source-pack manifest"]
+                if source_pack_verified
+                else ["verified recovered PDF bytes"]
+                if has_pdf
+                else []
+            ),
+            outputs=["source-pack manifest"] if source_pack_verified else [],
+            manual_gate_required=has_pdf and not source_pack_verified,
+            gate=ManualGate.SOURCE_PACK_WRITE
+            if has_pdf and not source_pack_verified
+            else None,
+            notes=(
+                ["existing source-pack manifest verified for artifact-root lane"]
+                if source_pack_verified
+                else ["source-pack creation intentionally not performed"]
+                if has_pdf
+                else ["no source-pack planned without a PDF row"]
+            ),
         ),
     ]
     stages.extend(
         StageRecord(
             name=stage_name,
-            status=StageStatus.NOT_STARTED if has_pdf else StageStatus.SKIPPED,
-            notes=["waiting for source-pack evidence"]
-            if has_pdf
-            else ["skipped because no PDF handoff row exists"],
+            status=(
+                StageStatus.NOT_STARTED
+                if downstream_has_source
+                else StageStatus.SKIPPED
+            ),
+            notes=(
+                ["source-pack evidence available; stage not run in dry-run writer"]
+                if source_pack_verified
+                else ["waiting for source-pack evidence"]
+                if has_pdf
+                else ["skipped because no PDF handoff row exists"]
+            ),
         )
         for stage_name in (
             StageName.EXTRACT_NATIVE,
@@ -222,17 +317,22 @@ def build_dry_run_artifact_index(
     run_id: str,
     run_dir: Path,
     stage_manifest: StageManifest,
+    source_pack_ref: str | None = None,
+    source_pack_manifest_ref: str | None = None,
 ) -> ArtifactIndex:
     paper_id = paper_id_for_item(item)
+    source_pack = {
+        "ref": source_pack_ref or f"source-packs/zotero/{paper_id}",
+        "source_type": "zotero",
+        "source_hash": _source_hash_for_rows(rows),
+    }
+    if source_pack_manifest_ref is not None:
+        source_pack["manifest_ref"] = source_pack_manifest_ref
     return ArtifactIndex(
         paper_id=paper_id,
         run_id=run_id,
         artifact_root=str(run_dir),
-        source_pack={
-            "ref": f"source-packs/zotero/{paper_id}",
-            "source_type": "zotero",
-            "source_hash": _source_hash_for_rows(rows),
-        },
+        source_pack=source_pack,
         source_identity=_source_identity_for_item(item, rows),
         stages={
             stage.name.value: {
@@ -305,3 +405,7 @@ def _source_hash_for_rows(rows: list[OpenKBHandoffRow]) -> str:
         digest = hashlib.sha256("\n".join(hashes).encode("utf-8")).hexdigest()
         return f"sha256-aggregate:{digest}"
     return "not-computed:dry-run"
+
+
+def _relative_ref(path: Path, start: Path) -> str:
+    return Path(os.path.relpath(path, start=start)).as_posix()

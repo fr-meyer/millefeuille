@@ -1,0 +1,47 @@
+id: pr-052-source-pack-artifact-root
+title: Add source-pack artifact-root writing
+status: in_review
+branch: feat/pr-052-source-pack-artifact-root
+base_branch: dev
+github:
+  issue: null
+  pull_request: 52
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+  url: https://github.com/fr-meyer/millefeuille/pull/52
+  head_sha: 1b0c8a893faa6ef54967f45253e63548f2c78689
+scope:
+  - allow `export.artifacts.artifact_root=source-pack` in dry-run artifact writing
+  - add `export.artifacts.source_pack_root` plus `--source-pack-root` CLI alias for fixture and non-default source-pack bases
+  - resolve source-pack mode to `<source-pack-root>/zotero/<paper-id>/analyses/millefeuille/<run-id>/`
+  - require an existing source-pack `manifest.json` before writing source-pack-mode run artifacts
+  - mark the source-pack stage passed when the existing manifest is verified, without creating or mutating source evidence
+  - carry forward PR #51 closeout merge facts in repo-local Speculoos ledgers
+non_goals:
+  - live Zotero writes or lifecycle tag mutation
+  - PDF recovery, source-pack source-evidence creation or mutation, OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or index writes
+  - implementing native/OCR extraction, hierarchical summaries, paper cards, classification, or retrieval-index population
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - dry-run with a filesystem `--artifact-root` keeps writing under `<artifact-root>/<paper-id>/<run-id>/`
+  - dry-run with `--artifact-root source-pack --source-pack-root <fixture-root>` writes under the verified source pack analysis directory
+  - missing source-pack manifests fail before artifact output is written
+  - source-pack-mode stage manifests remove PDF recovery/source-pack-write manual gates and record the source-pack stage as passed
+  - live artifact writes remain rejected unless `processing.dry_run=true`
+  - no live provider, OpenKB, index, source-pack source-evidence, PDF download, or Zotero write calls are made by this slice
+  - focused artifact writer and artifact command tests, full unittest discovery, Ruff, metadata parse, diff check, and Speculoos validate pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_artifact_writer tests.test_millefeuille_artifact_commands"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-052-source-pack-artifact-root --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Dry-run source-pack artifact-root writer only; no live Zotero write, lifecycle tag mutation, PDF recovery, source-pack source-evidence creation or mutation, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+notes:
+  - "PR #51 merged PR #50 closeout metadata to dev at 41e88b6b56921fdfc35615a3355d0918908ec35c; this PR records that completed closeout while opening the source-pack artifact-root implementation slice."

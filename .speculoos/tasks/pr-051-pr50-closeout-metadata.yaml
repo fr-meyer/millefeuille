@@ -1,6 +1,6 @@
 id: pr-051-pr50-closeout-metadata
 title: Close PR 50 dry-run artifact writer metadata
-status: metadata_closeout
+status: merged
 branch: chore/pr-051-pr50-closeout-metadata
 base_branch: dev
 github:
@@ -8,10 +8,11 @@ github:
   pull_request: 51
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
   url: https://github.com/fr-meyer/millefeuille/pull/51
-  head_sha: 7df18c1cb38e8b78891a4c2f58df3bd2b00bf8bf
+  head_sha: d0c12d72ee4af6c2de83114284b461120e19c086
+  merge_commit: 41e88b6b56921fdfc35615a3355d0918908ec35c
 scope:
   - clear repo-local active task metadata after PR #50 merged to dev
   - mark PR #50 task as merged and Done
@@ -35,3 +36,6 @@ validation:
   - "speculoos validate --task pr-051-pr50-closeout-metadata --validation \"git diff --check\" --json"
 publication_boundary:
   statement: "Metadata-only closeout; no live Zotero read or write, PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, source-pack write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+evidence:
+  - 'PR #51 merged with merge commit 41e88b6b56921fdfc35615a3355d0918908ec35c'
+  - Project item unavailable; closeout recorded without ProjectV2 mutation
