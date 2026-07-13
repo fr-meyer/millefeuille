@@ -1,0 +1,35 @@
+id: pr-051-pr50-closeout-metadata
+title: Close PR 50 dry-run artifact writer metadata
+status: metadata_closeout
+branch: chore/pr-051-pr50-closeout-metadata
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+scope:
+  - clear repo-local active task metadata after PR #50 merged to dev
+  - mark PR #50 task as merged and Done
+  - record PR #50 head, merge commit, review URL, and Mergeguez check-run URL
+  - keep the repository in idle Speculoos state with no current task
+non_goals:
+  - code changes
+  - live Zotero reads or writes
+  - PDF recovery, OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, index writes, or source-pack writes
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - PR #50 appears in completed task and PR ledgers
+  - repo-local manifest has null canonical task and idle status
+  - GitHub and Vibe surfaces have no active current task
+  - metadata parse, diff check, and Speculoos validate pass
+validation:
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-051-pr50-closeout-metadata --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Metadata-only closeout; no live Zotero read or write, PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, source-pack write, credential change, main-branch merge, release tag, package publication, or approval bypass."

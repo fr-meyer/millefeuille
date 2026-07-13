@@ -1,6 +1,6 @@
 id: pr-050-artifact-writer-dry-run-source-pack
 title: Wire dry-run artifact indexes into the source-pack pipeline path
-status: in_review
+status: merged
 branch: feat/pr-050-artifact-writer-dry-run-source-pack
 base_branch: dev
 github:
@@ -8,10 +8,11 @@ github:
   pull_request: 50
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
   url: https://github.com/fr-meyer/millefeuille/pull/50
-  head_sha: ea60c95f12c86fba1835307bbeee131ebe84f35c
+  head_sha: b8730353f6580916168dba0e404b31efbd5e6384
+  merge_commit: a9dc5206e2ed1a1b89e3a63640d876ea18630f89
 scope:
   - add an explicit artifact export configuration and CLI alias for `--artifact-root`
   - write per-paper `stage-manifest.json` and `artifact-index.json` from dry-run discovery plus OpenKB handoff preview evidence
@@ -44,3 +45,7 @@ publication_boundary:
   statement: "Dry-run artifact writer only; no live Zotero write, lifecycle tag mutation, PDF recovery, source-pack creation, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
 notes:
   - "PR #49 merged PR #48 closeout metadata to dev at 380fea3f40b9ad1118ba49363a780a7252a75460; this PR records that completed closeout while opening the artifact-writer implementation slice."
+evidence:
+  - 'PR #50 merged with merge commit a9dc5206e2ed1a1b89e3a63640d876ea18630f89'
+  - Project item unavailable; closeout recorded without ProjectV2 mutation
+  - surface-sync --close-merged-task cleared repo-local active task metadata

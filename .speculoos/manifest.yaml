@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-050-artifact-writer-dry-run-source-pack
+canonical_task: null
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: feat/pr-050-artifact-writer-dry-run-source-pack
+  working_branch: null
 status:
-  phase: review
-  pret_a_coder: ready_for_review
+  phase: idle
+  pret_a_coder: idle
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,14 +57,14 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
-    number: 50
-    url: https://github.com/fr-meyer/millefeuille/pull/50
+    status: none-active
+    number: null
+    url: null
     base_branch: dev
-    head_branch: feat/pr-050-artifact-writer-dry-run-source-pack
-    head_sha: ea60c95f12c86fba1835307bbeee131ebe84f35c
+    head_branch: null
+    head_sha: null
     merge_commit: null
-    project_status: In Progress
+    project_status: none-active
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet
@@ -93,14 +93,7 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task:
-  id: pr-050-artifact-writer-dry-run-source-pack
-  title: Wire dry-run artifact indexes into the source-pack pipeline path
-  status: in_review
-  branch: feat/pr-050-artifact-writer-dry-run-source-pack
-  base_branch: dev
-  task_file: .speculoos/tasks/pr-050-artifact-writer-dry-run-source-pack.yaml
-  started_from: 380fea3f40b9ad1118ba49363a780a7252a75460
+current_task: null
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -213,3 +206,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/49#pullrequestreview-4683542433
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86784610113
+    - id: pr-050-artifact-writer-dry-run-source-pack
+      status: merged
+      branch: feat/pr-050-artifact-writer-dry-run-source-pack
+      base_branch: dev
+      pull_request: 50
+      url: https://github.com/fr-meyer/millefeuille/pull/50
+      head_sha: b8730353f6580916168dba0e404b31efbd5e6384
+      merge_commit: a9dc5206e2ed1a1b89e3a63640d876ea18630f89
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/50#pullrequestreview-4683754354
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86790404842
