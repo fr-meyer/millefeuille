@@ -18,6 +18,7 @@ classification lifecycle for research-paper attachments discovered from Zotero.
 - [Tag Adding](#tag-adding)
 - [PDF Download](#pdf-download)
 - [OpenKB/Millefeuille Handoff Export](#openkbmillefeuille-handoff-export)
+- [Artifact and Status Inspection](#artifact-and-status-inspection)
 - [Extraction Modes](#extraction-modes)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
@@ -210,6 +211,32 @@ The pipeline supports two OCR providers:
 | Best For | Batch processing, hierarchical organization | Single documents, fast processing |
 
 **Recommendation:** For new installations, **PageIndex OCR** is recommended for batch processing and hierarchical document organization. Use **Mistral OCR** for single-document processing when tree structure is not needed.
+
+## Artifact and Status Inspection
+
+The read-only artifact commands inspect Millefeuille artifact indexes without
+initializing Zotero, OCR providers, OpenKB, PageIndex, ConDB, ChatIndex, or
+model clients.
+
+```bash
+millefeuille artifacts --index /path/to/artifact-index.json
+millefeuille status --index /path/to/artifact-index.json
+millefeuille status --artifact-root /path/to/run --strict
+```
+
+These commands are intentionally outside the Hydra pipeline path. They do not
+require `ZOTERO_LIBRARY_ID`, `ZOTERO_READ_KEY`, `ZOTERO_WRITE_KEY`,
+`MISTRAL_API_KEY`, or `PAGEINDEX_API_KEY`.
+
+Use `--json` when another tool or agent needs machine-readable output:
+
+```bash
+millefeuille status --index /path/to/artifact-index.json --json
+```
+
+`millefeuille status --strict` exits with code `2` when the artifact index has
+blocking stage, index, or approved-live writeback states such as `failed`,
+`needs-review`, `manual-gate`, or `not-started`.
 
 ### Command-Line Configuration
 

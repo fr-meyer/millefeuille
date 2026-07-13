@@ -1,0 +1,42 @@
+id: pr-048-millefeuille-artifact-store-status
+title: Add Millefeuille artifact index and status surfaces
+status: implementation
+branch: feat/pr-048-millefeuille-artifact-store-status
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: Pending Publication
+  project_item: null
+scope:
+  - add read-only artifact-index load, validation, write, path resolution, and completion helpers
+  - add `millefeuille artifacts` inspection command outside the live Hydra/Zotero path
+  - add `millefeuille status` completeness command with optional strict exit behavior
+  - add fixture-only artifact-index coverage for complete and blocked runs
+  - keep artifact/status commands independent from Zotero, OCR providers, model calls, OpenKB, PageIndex, ConDB, and ChatIndex clients
+non_goals:
+  - live Zotero reads or writes
+  - PDF recovery, OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, index writes, or source-pack writes
+  - implementing structure, summarization, paper-card generation, classification, or writeback
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - artifact-index fixtures load and round-trip offline
+  - "`millefeuille artifacts --index ... --json` emits artifact refs"
+  - "`millefeuille status --index ... --strict` exits 2 for blocked fixture state"
+  - "`python -m millefeuille status --index ... --json` succeeds without Zotero env vars"
+  - full unit tests, Ruff, metadata parse, diff check, and Speculoos validate pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_artifact_commands"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-048-millefeuille-artifact-store-status --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Fixture-only artifact/status implementation; no live Zotero read or write, PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, source-pack write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+notes:
+  - "PR #47 merged product vision to dev at 6bfe353328d8f89570fe9214f2bcc3c834a979ca; this PR is the first implementation slice."

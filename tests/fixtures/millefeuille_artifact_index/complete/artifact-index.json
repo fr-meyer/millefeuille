@@ -1,0 +1,77 @@
+{
+  "schema_version": "millefeuille-artifact-index/v0.1",
+  "paper_id": "fixture-paper-complete",
+  "run_id": "run-complete",
+  "artifact_root": "tests/fixtures/millefeuille_artifact_index/complete",
+  "source_pack": {
+    "ref": "source-packs/zotero/fixture-paper-complete",
+    "source_type": "fixture",
+    "source_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "manifest_ref": "source-packs/zotero/fixture-paper-complete/manifest.json"
+  },
+  "source_identity": {
+    "title": "Complete Fixture Paper",
+    "year": 2026,
+    "doi": null,
+    "zotero_item_key": "ITEMCOMP",
+    "zotero_attachment_key": "ATTCOMP",
+    "canonical_filename": "Complete Fixture Paper.pdf"
+  },
+  "stages": {
+    "discover": {"status": "passed"},
+    "handoff": {"status": "passed"},
+    "recover": {"status": "skipped"},
+    "source-pack": {"status": "passed"},
+    "extract-native": {"status": "passed"},
+    "extract-ocr": {"status": "skipped"},
+    "route": {"status": "passed"},
+    "structure": {"status": "passed"},
+    "summarize": {"status": "passed"},
+    "card": {"status": "passed"},
+    "openkb-add": {"status": "skipped"},
+    "index": {"status": "skipped"},
+    "acceptance": {"status": "passed"},
+    "classify": {"status": "skipped"},
+    "writeback": {"status": "skipped"}
+  },
+  "artifacts": {
+    "stage_manifest": {
+      "kind": "stage-manifest",
+      "ref": "stage-manifest.json",
+      "format": "json",
+      "stage": "acceptance",
+      "private_content": false
+    },
+    "selected_fulltext": {
+      "kind": "selected-fulltext",
+      "ref": "selected/fulltext.md",
+      "format": "markdown",
+      "stage": "route",
+      "private_content": true
+    },
+    "paper_card_json": {
+      "kind": "paper-card",
+      "ref": "cards/paper-card.json",
+      "format": "json",
+      "stage": "card",
+      "private_content": false
+    }
+  },
+  "indexes": [
+    {
+      "lane": "openkb",
+      "status": "skipped",
+      "skip_reason": "fixture-only run"
+    },
+    {
+      "lane": "pageindex",
+      "status": "skipped",
+      "skip_reason": "fixture-only run"
+    }
+  ],
+  "zotero_writeback": {
+    "mode": "preview",
+    "status": "previewed",
+    "plan_ref": "zotero-writeback-plan.json"
+  }
+}
