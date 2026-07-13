@@ -5,13 +5,13 @@ branch: chore/pr-053-pr52-closeout-metadata
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 53
   issue_project_item: null
   pull_request_project_item: null
   project_status: In Progress
   project_item: null
-  url: null
-  head_sha: null
+  url: https://github.com/fr-meyer/millefeuille/pull/53
+  head_sha: bf0da69a3f5cfd6c672384ed9e1d02f951d86523
 scope:
   - clear repo-local active task metadata after PR #52 merged to dev
   - mark PR #52 task as merged and Done
