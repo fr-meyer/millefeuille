@@ -14,21 +14,8 @@ notes:
   - Container gh is intentionally not the GitHub write path.
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
-current_task:
-  id: pr-050-artifact-writer-dry-run-source-pack
-  status: in_review
-  branch: feat/pr-050-artifact-writer-dry-run-source-pack
-  speculoos_task: .speculoos/tasks/pr-050-artifact-writer-dry-run-source-pack.yaml
-pull_request:
-  status: open
-  number: 50
-  url: https://github.com/fr-meyer/millefeuille/pull/50
-  base_branch: dev
-  head_branch: feat/pr-050-artifact-writer-dry-run-source-pack
-  head_sha: ea60c95f12c86fba1835307bbeee131ebe84f35c
-  merge_commit: null
-  mergeguez_review: null
-  mergeguez_check_run: null
+current_task: null
+pull_request: null
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
@@ -130,3 +117,13 @@ completed_pull_requests:
     merge_commit: 380fea3f40b9ad1118ba49363a780a7252a75460
     mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/49#pullrequestreview-4683542433
     mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86784610113
+  - id: pr-050-artifact-writer-dry-run-source-pack
+    number: 50
+    url: https://github.com/fr-meyer/millefeuille/pull/50
+    status: merged
+    base_branch: dev
+    head_branch: feat/pr-050-artifact-writer-dry-run-source-pack
+    head_sha: b8730353f6580916168dba0e404b31efbd5e6384
+    merge_commit: a9dc5206e2ed1a1b89e3a63640d876ea18630f89
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/50#pullrequestreview-4683754354
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86790404842

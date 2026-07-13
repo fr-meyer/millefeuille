@@ -1,0 +1,4 @@
+chore: close PR 50 metadata
+
+Record the PR #50 dry-run artifact writer merge outcome in repo-local
+Speculoos metadata and return the Millefeuille repo surfaces to idle state.

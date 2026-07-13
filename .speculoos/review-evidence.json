@@ -25,30 +25,30 @@
     "local_validation": {
       "kind": "local_validation",
       "status": "passed",
-      "summary": "PR #50 dry-run artifact writer validation passed: focused artifact tests, full unittest discovery, Ruff, metadata/schema parse, git diff check, Speculoos status, and Speculoos validate/private-data scan.",
-      "evidence_ref": ".speculoos/tasks/pr-050-artifact-writer-dry-run-source-pack.yaml",
-      "updated_at": "pr-050-artifact-writer-dry-run-source-pack"
+      "summary": "PR #51 closeout metadata validation passed: metadata/schema parse, git diff check, Speculoos status, and Speculoos validate/private-data scan.",
+      "evidence_ref": ".speculoos/tasks/pr-051-pr50-closeout-metadata.yaml",
+      "updated_at": "pr-051-pr50-closeout-metadata"
     },
     "github_checks": {
       "kind": "github_checks",
       "status": "pending-live-read",
       "summary": "Live GitHub checks must be read through the broker before merge execution.",
       "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-050-artifact-writer-dry-run-source-pack"
+      "updated_at": "pr-051-pr50-closeout-metadata"
     },
     "self_managed": {
       "kind": "self_managed",
       "status": "pending",
       "summary": "Ignored local self-managed reviewer artifact is the emergency fallback if hosted Mergeguez review is unavailable.",
-      "evidence_ref": ".speculoos/reviews/pr-050-artifact-writer-dry-run-source-pack/self-review.json",
-      "updated_at": "pr-050-artifact-writer-dry-run-source-pack"
+      "evidence_ref": ".speculoos/reviews/pr-051-pr50-closeout-metadata/self-review.json",
+      "updated_at": "pr-051-pr50-closeout-metadata"
     },
     "mergeguez_review": {
       "kind": "mergeguez_review",
       "status": "pending-live-read",
       "summary": "Live @mergeguez review evidence is the primary required reviewer source when exact-head and clean.",
       "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-050-artifact-writer-dry-run-source-pack"
+      "updated_at": "pr-051-pr50-closeout-metadata"
     }
   }
 }
