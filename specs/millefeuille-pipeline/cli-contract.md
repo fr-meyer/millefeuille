@@ -11,6 +11,8 @@ Every command that reads or writes derived artifacts should accept:
 
 - `--mode preview|read-only-live|approved-live`
 - `--artifact-root source-pack|<path>`
+- `--source-pack-root <path>` when `--artifact-root source-pack` should resolve
+  against a non-default source-pack base directory
 - `--model-profile <profile-id-or-file>` for model-using stages
 - `--run-id <id>` for resumable runs
 - `--stage-manifest <path>` when resuming or inspecting a prior run

@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: null
+canonical_task: pr-052-source-pack-artifact-root
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: null
+  working_branch: feat/pr-052-source-pack-artifact-root
 status:
-  phase: idle
-  pret_a_coder: idle
+  phase: implementation
+  pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 166 passed, 0 failed
+    result: 170 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -57,14 +57,14 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: none-active
+    status: pending-publication
     number: null
     url: null
     base_branch: dev
-    head_branch: null
+    head_branch: feat/pr-052-source-pack-artifact-root
     head_sha: null
     merge_commit: null
-    project_status: none-active
+    project_status: In Progress
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet
@@ -93,7 +93,14 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: null
+current_task:
+  id: pr-052-source-pack-artifact-root
+  title: Add source-pack artifact-root writing
+  status: in_progress
+  branch: feat/pr-052-source-pack-artifact-root
+  base_branch: dev
+  task_file: .speculoos/tasks/pr-052-source-pack-artifact-root.yaml
+  started_from: 41e88b6b56921fdfc35615a3355d0918908ec35c
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -217,3 +224,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/50#pullrequestreview-4683754354
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86790404842
+    - id: pr-051-pr50-closeout-metadata
+      status: merged
+      branch: chore/pr-051-pr50-closeout-metadata
+      base_branch: dev
+      pull_request: 51
+      url: https://github.com/fr-meyer/millefeuille/pull/51
+      head_sha: d0c12d72ee4af6c2de83114284b461120e19c086
+      merge_commit: 41e88b6b56921fdfc35615a3355d0918908ec35c
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/51#pullrequestreview-4683801465
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86791722572

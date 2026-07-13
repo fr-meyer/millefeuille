@@ -22,4 +22,5 @@ openkb_handoff:
 artifacts:
   enabled: false
   artifact_root: null
+  source_pack_root: null
   run_id: null

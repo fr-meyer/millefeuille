@@ -327,13 +327,7 @@ def validate_flags(cfg: AppConfig) -> None:
             raise ConfigError(
                 "export.artifacts.artifact_root must be set when "
                 "export.artifacts.enabled=true. Use --artifact-root /path or "
-                "export.artifacts.artifact_root=/path."
-            )
-        if str(artifacts.artifact_root).strip() == "source-pack":
-            raise ConfigError(
-                "export.artifacts.artifact_root=source-pack requires a later "
-                "source-pack writer; use an explicit filesystem path for this "
-                "dry-run artifact slice."
+                "export.artifacts.artifact_root=/path|source-pack."
             )
 
     logger.debug("Flag configuration validated successfully")
@@ -769,6 +763,20 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
                 "export.artifacts.artifact_root=" + arg.split("=", 1)[1]
             )
             artifact_root_seen = True
+            idx += 1
+            continue
+        if arg == "--source-pack-root":
+            if idx + 1 >= len(argv):
+                translated.append(arg)
+                idx += 1
+                continue
+            translated.append(f"export.artifacts.source_pack_root={argv[idx + 1]}")
+            idx += 2
+            continue
+        if arg.startswith("--source-pack-root="):
+            translated.append(
+                "export.artifacts.source_pack_root=" + arg.split("=", 1)[1]
+            )
             idx += 1
             continue
         if arg == "--run-id":

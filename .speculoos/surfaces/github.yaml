@@ -14,8 +14,21 @@ notes:
   - Container gh is intentionally not the GitHub write path.
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
-current_task: null
-pull_request: null
+current_task:
+  id: pr-052-source-pack-artifact-root
+  status: in_progress
+  branch: feat/pr-052-source-pack-artifact-root
+  speculoos_task: .speculoos/tasks/pr-052-source-pack-artifact-root.yaml
+pull_request:
+  status: pending-publication
+  number: null
+  url: null
+  base_branch: dev
+  head_branch: feat/pr-052-source-pack-artifact-root
+  head_sha: null
+  merge_commit: null
+  mergeguez_review: null
+  mergeguez_check_run: null
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
@@ -127,3 +140,13 @@ completed_pull_requests:
     merge_commit: a9dc5206e2ed1a1b89e3a63640d876ea18630f89
     mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/50#pullrequestreview-4683754354
     mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86790404842
+  - id: pr-051-pr50-closeout-metadata
+    number: 51
+    url: https://github.com/fr-meyer/millefeuille/pull/51
+    status: merged
+    base_branch: dev
+    head_branch: chore/pr-051-pr50-closeout-metadata
+    head_sha: d0c12d72ee4af6c2de83114284b461120e19c086
+    merge_commit: 41e88b6b56921fdfc35615a3355d0918908ec35c
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/51#pullrequestreview-4683801465
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86791722572

@@ -710,7 +710,10 @@ class ArtifactExportConfig:
     """Whether to write artifact-index and stage-manifest files."""
 
     artifact_root: str | None = None
-    """Explicit artifact root directory for generated run artifacts."""
+    """Explicit artifact root directory or ``source-pack`` root mode."""
+
+    source_pack_root: str | None = None
+    """Base directory used when ``artifact_root`` is ``source-pack``."""
 
     run_id: str | None = None
     """Optional stable run id. When omitted, a timestamped run id is generated."""
@@ -722,8 +725,10 @@ class ArtifactExportConfig:
             raise ConfigError(
                 "export.artifacts.artifact_root must be set when "
                 "export.artifacts.enabled=true. Use --artifact-root /path or "
-                "export.artifacts.artifact_root=/path."
+                "export.artifacts.artifact_root=/path|source-pack."
             )
+        if self.source_pack_root is not None and not str(self.source_pack_root).strip():
+            raise ConfigError("export.artifacts.source_pack_root cannot be empty")
         if self.run_id is not None and not str(self.run_id).strip():
             raise ConfigError("export.artifacts.run_id cannot be empty")
 
