@@ -25,30 +25,30 @@
     "local_validation": {
       "kind": "local_validation",
       "status": "passed",
-      "summary": "PR #48 local validation passed: targeted artifact CLI tests, 161-test full unit suite, Ruff, metadata/schema parse, git diff check, Speculoos status, and Speculoos validate/private-data scan.",
-      "evidence_ref": ".speculoos/tasks/pr-048-millefeuille-artifact-store-status.yaml",
-      "updated_at": "pr-048-millefeuille-artifact-store-status"
+      "summary": "PR #49 closeout metadata validation passed: metadata/schema parse, git diff check, Speculoos status, and Speculoos validate/private-data scan.",
+      "evidence_ref": ".speculoos/tasks/pr-049-pr48-closeout-metadata.yaml",
+      "updated_at": "pr-049-pr48-closeout-metadata"
     },
     "github_checks": {
       "kind": "github_checks",
       "status": "pending-live-read",
       "summary": "Live GitHub checks must be read through the broker before merge execution.",
       "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-048-millefeuille-artifact-store-status"
+      "updated_at": "pr-049-pr48-closeout-metadata"
     },
     "self_managed": {
       "kind": "self_managed",
       "status": "pending",
       "summary": "Ignored local self-managed reviewer artifact is the emergency fallback if hosted Mergeguez review is unavailable.",
-      "evidence_ref": ".speculoos/reviews/pr-048-millefeuille-artifact-store-status/self-review.json",
-      "updated_at": "pr-048-millefeuille-artifact-store-status"
+      "evidence_ref": ".speculoos/reviews/pr-049-pr48-closeout-metadata/self-review.json",
+      "updated_at": "pr-049-pr48-closeout-metadata"
     },
     "mergeguez_review": {
       "kind": "mergeguez_review",
       "status": "pending-live-read",
       "summary": "Live @mergeguez review evidence is the primary required reviewer source when exact-head and clean.",
       "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-048-millefeuille-artifact-store-status"
+      "updated_at": "pr-049-pr48-closeout-metadata"
     }
   }
 }

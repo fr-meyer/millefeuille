@@ -1,0 +1,4 @@
+chore: close PR 48 metadata
+
+Record the PR #48 artifact/status merge outcome in repo-local Speculoos
+metadata and return the Millefeuille repo surfaces to idle state.

@@ -1,6 +1,6 @@
 id: pr-048-millefeuille-artifact-store-status
 title: Add Millefeuille artifact index and status surfaces
-status: implementation
+status: merged
 branch: feat/pr-048-millefeuille-artifact-store-status
 base_branch: dev
 github:
@@ -8,8 +8,9 @@ github:
   pull_request: 48
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
+  merge_commit: 212ae574fe1a003ff9bf12dec426e8ed5db53baf
 scope:
   - add read-only artifact-index load, validation, write, path resolution, and completion helpers
   - add `millefeuille artifacts` inspection command outside the live Hydra/Zotero path
@@ -40,3 +41,7 @@ publication_boundary:
   statement: "Fixture-only artifact/status implementation; no live Zotero read or write, PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, source-pack write, credential change, main-branch merge, release tag, package publication, or approval bypass."
 notes:
   - "PR #47 merged product vision to dev at 6bfe353328d8f89570fe9214f2bcc3c834a979ca; this PR is the first implementation slice."
+evidence:
+  - 'PR #48 merged with merge commit 212ae574fe1a003ff9bf12dec426e8ed5db53baf'
+  - Project item unavailable; closeout recorded without ProjectV2 mutation
+  - surface-sync --close-merged-task cleared repo-local active task metadata
