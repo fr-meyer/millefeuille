@@ -16,16 +16,16 @@ notes:
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
   id: pr-048-millefeuille-artifact-store-status
-  pull_request: null
+  pull_request: 48
   project_item: null
   pull_request_project_item: null
   branch: feat/pr-048-millefeuille-artifact-store-status
-  status: Pending Publication
-  project_status: Pending Publication
+  status: In Progress
+  project_status: In Progress
 pull_request:
-  number: null
-  url: null
-  status: pending-publication
+  number: 48
+  url: https://github.com/fr-meyer/millefeuille/pull/48
+  status: open
   base_branch: dev
   head_branch: feat/pr-048-millefeuille-artifact-store-status
   head_sha: null

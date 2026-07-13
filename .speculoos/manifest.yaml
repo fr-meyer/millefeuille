@@ -57,14 +57,14 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: pending-publication
-    number: null
-    url: null
+    status: open
+    number: 48
+    url: https://github.com/fr-meyer/millefeuille/pull/48
     base_branch: dev
     head_branch: feat/pr-048-millefeuille-artifact-store-status
     head_sha: null
     merge_commit: null
-    project_status: Pending Publication
+    project_status: In Progress
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet

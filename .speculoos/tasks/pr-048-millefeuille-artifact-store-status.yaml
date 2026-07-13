@@ -5,10 +5,10 @@ branch: feat/pr-048-millefeuille-artifact-store-status
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 48
   issue_project_item: null
   pull_request_project_item: null
-  project_status: Pending Publication
+  project_status: In Progress
   project_item: null
 scope:
   - add read-only artifact-index load, validation, write, path resolution, and completion helpers
