@@ -5,11 +5,12 @@ branch: chore/pr-055-pr54-closeout-metadata
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 55
   issue_project_item: null
-  pull_request_project_item: null
+  pull_request_project_item: unavailable
   project_status: In Progress
-  project_item: null
+  project_item: unavailable
+  head_sha: c83d5a7f8770c4f6393ca159b10a95aa8da9335f
 post_merge_expected:
   pull_request: 55
   base_branch: dev
@@ -47,3 +48,5 @@ evidence:
   - Remote PR #54 branch deleted through branch-cleanup-execute
   - Project item unavailable; closeout recorded without ProjectV2 mutation
   - surface-sync --close-merged-task cleared PR #54 active task metadata before PR #55 activation
+  - 'PR #55 opened for pr-055-pr54-closeout-metadata'
+  - 'PR #55 linked to Project item unavailable'

@@ -16,19 +16,15 @@ notes:
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
   id: pr-055-pr54-closeout-metadata
-  status: implementation
+  status: In Progress
   branch: chore/pr-055-pr54-closeout-metadata
   speculoos_task: .speculoos/tasks/pr-055-pr54-closeout-metadata.yaml
-pull_request:
-  status: branch-active
-  number: null
-  url: null
-  base_branch: dev
-  head_branch: chore/pr-055-pr54-closeout-metadata
-  head_sha: null
-  merge_commit: null
-  mergeguez_review: null
-  mergeguez_check_run: null
+  pull_request: 55
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  head_sha: c83d5a7f8770c4f6393ca159b10a95aa8da9335f
+pull_request: 55
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
