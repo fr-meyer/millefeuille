@@ -1,0 +1,48 @@
+{
+  "schema_version": "millefeuille-artifact-index/v0.1",
+  "paper_id": "fixture-paper-blocked",
+  "run_id": "run-blocked",
+  "artifact_root": "tests/fixtures/millefeuille_artifact_index/blocked",
+  "source_pack": {
+    "ref": "source-packs/zotero/fixture-paper-blocked",
+    "source_type": "fixture",
+    "source_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "source_identity": {
+    "title": "Blocked Fixture Paper",
+    "year": 2026,
+    "doi": null
+  },
+  "stages": {
+    "discover": {"status": "passed"},
+    "handoff": {"status": "passed"},
+    "source-pack": {"status": "passed"},
+    "extract-native": {"status": "passed"},
+    "extract-ocr": {
+      "status": "manual-gate",
+      "manifest_ref": "stage-manifest.json"
+    },
+    "route": {"status": "not-started"},
+    "index": {"status": "needs-review"}
+  },
+  "artifacts": {
+    "stage_manifest": {
+      "kind": "stage-manifest",
+      "ref": "stage-manifest.json",
+      "format": "json",
+      "stage": "extract-ocr",
+      "private_content": false
+    }
+  },
+  "indexes": [
+    {
+      "lane": "openkb",
+      "status": "needs-review",
+      "result_ref": "index/openkb-review.json"
+    }
+  ],
+  "zotero_writeback": {
+    "mode": "none",
+    "status": "not-planned"
+  }
+}

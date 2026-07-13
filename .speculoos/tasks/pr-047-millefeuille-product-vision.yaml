@@ -1,6 +1,6 @@
 id: pr-047-millefeuille-product-vision
 title: Define Millefeuille complete paper-processing product vision
-status: implementation
+status: merged
 branch: docs/pr-047-millefeuille-product-vision
 base_branch: dev
 github:
@@ -8,7 +8,7 @@ github:
   pull_request: 47
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
 scope:
   - define the complete paper-processing CLI vision

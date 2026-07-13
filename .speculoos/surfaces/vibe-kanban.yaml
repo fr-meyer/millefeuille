@@ -16,5 +16,5 @@ notes:
 task:
   status: in-progress
   id: null
-  speculoos_task: pr-047-millefeuille-product-vision
-  command: define complete Millefeuille paper-processing product vision
+  speculoos_task: pr-048-millefeuille-artifact-store-status
+  command: add read-only artifact index and status inspection surfaces

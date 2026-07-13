@@ -21,6 +21,7 @@ import sys
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
+from millefeuille.cli.artifacts import run_artifact_cli
 from millefeuille.cli.commands import dry_run_command, process_command
 from millefeuille.clients.exceptions import (
     OCRClientError,
@@ -675,6 +676,10 @@ Entry points:
   millefeuille          (installed console script)
   python -m millefeuille
 
+Read-only artifact commands:
+  millefeuille artifacts --index /path/to/artifact-index.json
+  millefeuille status --index /path/to/artifact-index.json --strict
+
 Required environment variables:
   ZOTERO_LIBRARY_ID   Your Zotero user-library numeric ID
   ZOTERO_READ_KEY     Zotero API key with read access — required for all runs
@@ -700,6 +705,14 @@ overrides; the packaged placeholder defaults are not accepted.
 # ---------------------------------------------------------------------------
 # Hydra entry point
 # ---------------------------------------------------------------------------
+
+
+def entrypoint() -> None:
+    """Dispatch read-only subcommands before falling back to Hydra."""
+    argv = sys.argv[1:]
+    if argv and argv[0] in {"artifacts", "status"}:
+        sys.exit(run_artifact_cli(argv))
+    main()
 
 
 @hydra.main(
@@ -818,4 +831,4 @@ def main(cfg: DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    entrypoint()

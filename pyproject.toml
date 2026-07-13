@@ -39,7 +39,7 @@ dependencies = [
 ]
 
 [project.scripts]
-millefeuille = "millefeuille.cli.main:main"
+millefeuille = "millefeuille.cli.main:entrypoint"
 
 [tool.setuptools]
 

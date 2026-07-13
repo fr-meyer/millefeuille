@@ -1,0 +1,4 @@
+feat: add artifact status inspection
+
+Add fixture-only artifact-index plumbing plus read-only `artifacts` and
+`status` subcommands that run outside the live Hydra/Zotero provider path.

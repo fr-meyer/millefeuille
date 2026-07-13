@@ -15,19 +15,19 @@ notes:
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
-  id: pr-047-millefeuille-product-vision
-  pull_request: 47
+  id: pr-048-millefeuille-artifact-store-status
+  pull_request: 48
   project_item: null
   pull_request_project_item: null
-  branch: docs/pr-047-millefeuille-product-vision
+  branch: feat/pr-048-millefeuille-artifact-store-status
   status: In Progress
   project_status: In Progress
 pull_request:
-  number: 47
-  url: https://github.com/fr-meyer/millefeuille/pull/47
+  number: 48
+  url: https://github.com/fr-meyer/millefeuille/pull/48
   status: open
   base_branch: dev
-  head_branch: docs/pr-047-millefeuille-product-vision
+  head_branch: feat/pr-048-millefeuille-artifact-store-status
   head_sha: null
   merge_commit: null
   mergeguez_review: null
@@ -102,4 +102,14 @@ completed_pull_requests:
     head_sha: c8031914fc4e6dc4789f37711bdc3b6ad8c2416b
     merge_commit: f7923c1710ffd935433ebf2d37197c722f8ca175
     mergeguez_review: null
+    mergeguez_check_run: null
+  - id: pr-047-millefeuille-product-vision
+    number: 47
+    url: https://github.com/fr-meyer/millefeuille/pull/47
+    status: merged
+    base_branch: dev
+    head_branch: docs/pr-047-millefeuille-product-vision
+    head_sha: 8f945bece299d36c546d67e99e5dc434b1dd54b5
+    merge_commit: 6bfe353328d8f89570fe9214f2bcc3c834a979ca
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/47#pullrequestreview-4683317893
     mergeguez_check_run: null
