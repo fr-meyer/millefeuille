@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-048-millefeuille-artifact-store-status
+canonical_task: null
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: feat/pr-048-millefeuille-artifact-store-status
+  working_branch: null
 status:
-  phase: implementation
-  pret_a_coder: in-progress
+  phase: idle
+  pret_a_coder: idle
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,14 +57,14 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
-    number: 48
-    url: https://github.com/fr-meyer/millefeuille/pull/48
+    status: none-active
+    number: null
+    url: null
     base_branch: dev
-    head_branch: feat/pr-048-millefeuille-artifact-store-status
+    head_branch: null
     head_sha: null
     merge_commit: null
-    project_status: In Progress
+    project_status: none-active
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet
@@ -93,6 +93,7 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
+current_task: null
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -183,3 +184,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/47#pullrequestreview-4683317893
       mergeguez_check_run: null
+    - id: pr-048-millefeuille-artifact-store-status
+      status: merged
+      branch: feat/pr-048-millefeuille-artifact-store-status
+      base_branch: dev
+      pull_request: 48
+      url: https://github.com/fr-meyer/millefeuille/pull/48
+      head_sha: 5ccbdc1f04c68dbee340d39db83ba45c625bea09
+      merge_commit: 212ae574fe1a003ff9bf12dec426e8ed5db53baf
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/48#pullrequestreview-4683495406
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86783172432
