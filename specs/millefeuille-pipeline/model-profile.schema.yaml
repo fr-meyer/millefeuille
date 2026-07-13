@@ -1,0 +1,69 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/model-profile.schema.yaml
+title: Millefeuille Model Profile
+type: object
+required:
+  - schema_version
+  - default_profile
+  - profiles
+additionalProperties: false
+properties:
+  schema_version:
+    const: millefeuille-model-profile/v0.1
+  default_profile:
+    type: string
+    minLength: 1
+  profiles:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      properties:
+        extract_ocr:
+          $ref: "#/$defs/model_stage"
+        structure:
+          $ref: "#/$defs/model_stage"
+        summarize_page:
+          $ref: "#/$defs/model_stage"
+        summarize_section:
+          $ref: "#/$defs/model_stage"
+        summarize_full_paper:
+          $ref: "#/$defs/model_stage"
+        paper_card:
+          $ref: "#/$defs/model_stage"
+        classify:
+          allOf:
+            - $ref: "#/$defs/model_stage"
+            - type: object
+              properties:
+                require_taxonomy_version:
+                  type: boolean
+$defs:
+  model_stage:
+    type: object
+    required:
+      - model
+    additionalProperties: true
+    properties:
+      backend:
+        type: string
+      model:
+        type: string
+        minLength: 1
+      provider:
+        type: string
+      temperature:
+        type: number
+      prompt_version:
+        type: string
+      confidence_scores_granularity:
+        enum:
+          - page
+          - word
+      include_blocks:
+        type: boolean
+      fallback_model:
+        type: string
+      record_usage:
+        type: boolean

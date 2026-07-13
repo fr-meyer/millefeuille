@@ -1,0 +1,43 @@
+id: pr-047-millefeuille-product-vision
+title: Define Millefeuille complete paper-processing product vision
+status: implementation
+branch: docs/pr-047-millefeuille-product-vision
+base_branch: dev
+github:
+  issue: null
+  pull_request: 47
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+scope:
+  - define the complete paper-processing CLI vision
+  - add artifact-root and artifact-index storage contracts
+  - add model-profile, hierarchical-summary, and paper-card schemas
+  - make OpenKB/PageIndex plus optional ConDB/ChatIndex indexing first-class
+  - define CLI-owned classification modes including optional multi-agent mode
+  - separate classification from Zotero writeback in stage and tag contracts
+  - add offline docs/schema consistency tests
+non_goals:
+  - live Zotero reads or writes
+  - PDF recovery, OCR/Mistral/PageIndex provider calls, model calls, OpenKB writes, index writes, or source-pack writes
+  - changing credential values or secret handling
+  - implementing the new CLI commands
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - product vision names the full paper-processing lifecycle
+  - CLI contract includes artifact-root, model profiles, summaries, paper cards, indexing, classification modes, and writeback
+  - schemas parse offline for stage manifests, artifact indexes, hierarchical summaries, and paper cards
+  - executable contract enums stay aligned with stage-manifest schema values
+  - tag lifecycle blocks classification until acceptance evidence passes
+  - docs keep manual approval gates visible
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_contract_artifacts tests.test_millefeuille_contract_models"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-047-millefeuille-product-vision --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Spec/docs/schema/tests only; no live Zotero read or write, PDF recovery, OCR/Mistral/PageIndex provider call, model call, OpenKB write, index write, source-pack write, credential change, main-branch merge, release tag, package publication, or approval bypass."

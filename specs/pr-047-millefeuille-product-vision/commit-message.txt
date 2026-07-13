@@ -1,0 +1,6 @@
+docs: define Millefeuille product vision
+
+Expand the offline Millefeuille contract into the full paper-processing
+CLI vision: artifact storage, model profiles, hierarchical summaries, paper
+cards, retrieval/index lanes, CLI-owned classification orchestration, and
+separate Zotero writeback.

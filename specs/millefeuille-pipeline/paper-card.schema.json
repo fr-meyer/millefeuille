@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/paper-card.schema.json",
+  "title": "Millefeuille Paper Card",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "paper_id",
+    "identity",
+    "one_line_thesis",
+    "primary_contribution",
+    "evidence_refs",
+    "index_status",
+    "model_provenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-paper-card/v0.1"
+    },
+    "paper_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "identity": {
+      "type": "object",
+      "required": ["title"],
+      "additionalProperties": true,
+      "properties": {
+        "title": {"type": "string", "minLength": 1},
+        "authors": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "year": {"type": ["integer", "null"]},
+        "doi": {"type": ["string", "null"]},
+        "url": {"type": ["string", "null"]},
+        "zotero_item_key": {"type": ["string", "null"]},
+        "canonical_filename": {"type": ["string", "null"]},
+        "source_hash": {"type": ["string", "null"]}
+      }
+    },
+    "one_line_thesis": {"type": "string", "minLength": 1},
+    "primary_contribution": {"type": "string", "minLength": 1},
+    "problem_addressed": {"type": "string"},
+    "method_or_approach": {"type": "string"},
+    "data_modality_domain": {"type": "string"},
+    "main_results": {"type": "string"},
+    "limitations": {"type": "string"},
+    "classification_clues": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "strongest_rejected_classification_path": {"type": ["string", "null"]},
+    "quality_warnings": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {"type": "string"},
+      "minItems": 1
+    },
+    "index_status": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["lane", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "lane": {"type": "string", "minLength": 1},
+          "status": {"type": "string", "minLength": 1},
+          "ref": {"type": "string"}
+        }
+      }
+    },
+    "model_provenance": {
+      "type": "object",
+      "required": ["profile_id"],
+      "additionalProperties": true,
+      "properties": {
+        "profile_id": {"type": "string", "minLength": 1},
+        "provenance_ref": {"type": "string"}
+      }
+    },
+    "zotero_lifecycle_tag_state": {"type": ["string", "null"]}
+  }
+}

@@ -13,20 +13,55 @@ SPEC_DIR = (
 
 REQUIRED_DOCS = [
     "README.md",
+    "vision.md",
     "remaining-work.md",
     "cli-contract.md",
+    "artifact-storage.md",
+    "retrieval-index-contract.md",
+    "classification-orchestration.md",
     "tag-state-machine.md",
     "ocr-backend-contract.md",
     "release-version-policy.md",
     "live-run-plan.md",
 ]
 
+REQUIRED_JSON_SCHEMAS = [
+    "stage-manifest.schema.json",
+    "artifact-index.schema.json",
+    "hierarchical-summary.schema.json",
+    "paper-card.schema.json",
+]
+
+REQUIRED_STAGES = {
+    "discover",
+    "handoff",
+    "recover",
+    "source-pack",
+    "extract-native",
+    "extract-ocr",
+    "route",
+    "structure",
+    "summarize",
+    "card",
+    "openkb-add",
+    "index",
+    "acceptance",
+    "classify",
+    "writeback",
+    "release",
+}
+
 MANUAL_GATE_TERMS = [
     "Zotero",
     "PDF",
     "OCR",
+    "model",
     "OpenKB",
+    "PageIndex",
+    "index",
     "source-pack",
+    "artifact-root",
+    "paper card",
     "GitHub",
     "release",
     "approval",
@@ -41,6 +76,13 @@ FORBIDDEN_PAYLOAD_PATTERNS = [
 
 
 class TestMillefeuilleContractArtifacts(unittest.TestCase):
+    def test_required_json_schemas_are_parseable(self):
+        for name in REQUIRED_JSON_SCHEMAS:
+            with self.subTest(name=name):
+                schema = json.loads((SPEC_DIR / name).read_text(encoding="utf-8"))
+                self.assertIn("title", schema)
+                self.assertIn("type", schema)
+
     def test_stage_manifest_schema_is_parseable_and_names_required_stages(self):
         schema = json.loads(
             (SPEC_DIR / "stage-manifest.schema.json").read_text(encoding="utf-8")
@@ -54,19 +96,19 @@ class TestMillefeuilleContractArtifacts(unittest.TestCase):
             "millefeuille-stage-manifest/v0.1",
         )
         self.assertEqual(schema["properties"]["source_type"]["const"], "zotero")
-        self.assertTrue({
-            "discover",
-            "handoff",
-            "recover",
-            "source-pack",
-            "extract-native",
-            "extract-ocr",
-            "route",
-            "openkb-add",
-            "acceptance",
+        self.assertTrue(REQUIRED_STAGES.issubset(stage_names))
+
+    def test_model_profile_schema_names_model_using_stages(self):
+        text = (SPEC_DIR / "model-profile.schema.yaml").read_text(encoding="utf-8")
+        for marker in [
+            "millefeuille-model-profile/v0.1",
+            "extract_ocr",
+            "summarize_page",
+            "summarize_section",
+            "paper_card",
             "classify",
-            "release",
-        }.issubset(stage_names))
+        ]:
+            self.assertIn(marker, text)
 
     def test_contract_docs_keep_manual_gates_visible(self):
         combined = "\n".join(

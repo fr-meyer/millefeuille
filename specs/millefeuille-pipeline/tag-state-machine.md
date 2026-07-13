@@ -26,8 +26,21 @@ secondary to handoff/source-pack/OpenKB evidence.
 - `millefeuille-extracted-ocr`
   - OCR extraction evidence exists.
 
+- `millefeuille-structure-ready`
+  - Page, section, table, figure, and reference structure evidence exists.
+
+- `millefeuille-summarized`
+  - Required page/section/full-paper summaries exist for the configured scope.
+
+- `millefeuille-card-ready`
+  - Markdown and JSON paper card artifacts exist.
+
 - `millefeuille-openkb-added`
   - Selected Markdown was added to OpenKB.
+
+- `millefeuille-indexed`
+  - Required OpenKB/PageIndex and optional ConDB/ChatIndex index lanes were
+    written or explicitly skipped with evidence.
 
 - `millefeuille-acceptance-passed`
   - Acceptance summary passed with no unmatched rows or duplicate review rows.
@@ -52,12 +65,26 @@ secondary to handoff/source-pack/OpenKB evidence.
 4. `millefeuille-source-verified` -> `millefeuille-source-packed`
 5. `millefeuille-source-packed` -> `millefeuille-extracted-native`
 6. `millefeuille-source-packed` -> `millefeuille-extracted-ocr`
-7. any extraction-complete state -> `millefeuille-openkb-added`
-8. `millefeuille-openkb-added` -> `millefeuille-acceptance-passed`
-9. `millefeuille-acceptance-passed` -> `millefeuille-ready-for-classification`
-10. `millefeuille-ready-for-classification` -> `millefeuille-classified`
-11. any state -> `millefeuille-needs-review`
-12. any state -> `millefeuille-error`
+7. any extraction-complete state -> `millefeuille-structure-ready`
+8. `millefeuille-structure-ready` -> `millefeuille-summarized`
+9. `millefeuille-summarized` -> `millefeuille-card-ready`
+10. `millefeuille-card-ready` -> `millefeuille-openkb-added`
+11. `millefeuille-card-ready` -> `millefeuille-indexed`
+12. `millefeuille-openkb-added` -> `millefeuille-indexed`
+13. `millefeuille-indexed` -> `millefeuille-acceptance-passed`
+14. `millefeuille-acceptance-passed` -> `millefeuille-ready-for-classification`
+15. `millefeuille-ready-for-classification` -> `millefeuille-classified`
+16. any state -> `millefeuille-needs-review`
+17. any state -> `millefeuille-error`
+
+Compatibility transitions:
+
+- any extraction-complete state -> `millefeuille-openkb-added`
+- `millefeuille-openkb-added` -> `millefeuille-acceptance-passed`
+
+These shortcuts are allowed only when the stage manifest records the skipped
+structure, summary, card, or index stages and explains why the reduced pipeline
+is acceptable.
 
 ## Rules
 
@@ -65,3 +92,5 @@ secondary to handoff/source-pack/OpenKB evidence.
 - Classification tags must not be applied before acceptance evidence passes.
 - Error and review tags must preserve the prior evidence trail.
 - Removing a staging tag is a separate write action and requires approval.
+- Tag writeback is separate from stage execution. A stage can pass in the
+  manifest while the live Zotero tag write remains preview-only until approved.

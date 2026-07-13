@@ -101,6 +101,13 @@ class TestTagStateContract(unittest.TestCase):
                 TagState.READY_FOR_CLASSIFICATION,
             )
         )
+        self.assertTrue(
+            can_transition_tag(
+                TagState.STRUCTURE_READY,
+                TagState.SUMMARIZED,
+            )
+        )
+        self.assertTrue(can_transition_tag(TagState.CARD_READY, TagState.INDEXED))
 
     def test_classification_before_acceptance_is_not_allowed(self):
         self.assertFalse(

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/hierarchical-summary.schema.json",
+  "title": "Millefeuille Hierarchical Summary",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "paper_id",
+    "run_id",
+    "taxonomy_context",
+    "summaries"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-hierarchical-summary/v0.1"
+    },
+    "paper_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taxonomy_context": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "properties": {
+        "taxonomy_version": {"type": "string"},
+        "classification_scope": {"type": "string"}
+      }
+    },
+    "summaries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "summary_id",
+          "grain",
+          "scope",
+          "text_ref",
+          "source_locators"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "summary_id": {"type": "string", "minLength": 1},
+          "grain": {
+            "enum": [
+              "page",
+              "section",
+              "figure-table",
+              "full-paper",
+              "scope-specific"
+            ]
+          },
+          "scope": {
+            "enum": [
+              "classification",
+              "literature-review",
+              "technical",
+              "domain",
+              "quick-read",
+              "general"
+            ]
+          },
+          "text_ref": {"type": "string", "minLength": 1},
+          "source_locators": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "model_provenance_ref": {"type": "string"},
+          "quality_warnings": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}
