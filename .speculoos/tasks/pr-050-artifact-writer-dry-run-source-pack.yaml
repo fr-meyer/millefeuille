@@ -1,15 +1,17 @@
 id: pr-050-artifact-writer-dry-run-source-pack
 title: Wire dry-run artifact indexes into the source-pack pipeline path
-status: validated
+status: in_review
 branch: feat/pr-050-artifact-writer-dry-run-source-pack
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 50
   issue_project_item: null
   pull_request_project_item: null
   project_status: In Progress
   project_item: null
+  url: https://github.com/fr-meyer/millefeuille/pull/50
+  head_sha: ea60c95f12c86fba1835307bbeee131ebe84f35c
 scope:
   - add an explicit artifact export configuration and CLI alias for `--artifact-root`
   - write per-paper `stage-manifest.json` and `artifact-index.json` from dry-run discovery plus OpenKB handoff preview evidence
