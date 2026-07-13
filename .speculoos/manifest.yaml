@@ -57,14 +57,14 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: pending-publication
-    number: null
-    url: null
+    status: open
+    number: 47
+    url: https://github.com/fr-meyer/millefeuille/pull/47
     base_branch: dev
     head_branch: docs/pr-047-millefeuille-product-vision
     head_sha: null
     merge_commit: null
-    project_status: Pending Publication
+    project_status: In Progress
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet

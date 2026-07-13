@@ -5,10 +5,10 @@ branch: docs/pr-047-millefeuille-product-vision
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 47
   issue_project_item: null
   pull_request_project_item: null
-  project_status: Pending Publication
+  project_status: In Progress
   project_item: null
 scope:
   - define the complete paper-processing CLI vision
