@@ -5,13 +5,13 @@ branch: feat/pr-054-source-pack-intake-fixtures
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 54
   issue_project_item: null
-  pull_request_project_item: null
+  pull_request_project_item: unavailable
   project_status: In Progress
-  project_item: null
+  project_item: unavailable
   url: null
-  head_sha: null
+  head_sha: ba207aabae8dd341c44afaa92ee5e548a49a7543
 scope:
   - add an offline source-pack intake writer for explicit local recovered-PDF fixture evidence
   - verify recovered bytes against expected SHA-256 before creating source-pack source evidence
@@ -45,3 +45,6 @@ publication_boundary:
   statement: "Fixture-first source-pack intake only; no live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
 notes:
   - "PR #53 merged PR #52 closeout metadata to dev at 8f7c0f46f6aa7f267ca936be8a87b096f9f4d37e; this PR records that completed closeout while opening the fixture-first source-pack intake slice."
+evidence:
+  - 'PR #54 opened for pr-054-source-pack-intake-fixtures'
+  - 'PR #54 linked to Project item unavailable'
