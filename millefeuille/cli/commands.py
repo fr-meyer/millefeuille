@@ -12,8 +12,9 @@ from tabulate import tabulate
 
 from millefeuille.clients.ocr_client import OCRClient
 from millefeuille.clients.zotero_client import ZoteroClient
+from millefeuille.domain.artifact_writer import write_dry_run_artifacts
 from millefeuille.domain.config import AppConfig
-from millefeuille.domain.models import TagAddingResult
+from millefeuille.domain.models import OpenKBHandoffRow, TagAddingResult
 from millefeuille.domain.tree_processor import TreeStructureProcessor
 from millefeuille.orchestration.pipeline import (
     Pipeline,
@@ -256,12 +257,13 @@ def dry_run_command(
                 "(no writes in dry-run mode)"
             )
 
+    openkb_handoff_rows: list[OpenKBHandoffRow] = []
     if cfg.export.openkb_handoff.enabled:
-        rows = build_openkb_handoff_rows(
+        openkb_handoff_rows = build_openkb_handoff_rows(
             items, zotero_client, cfg.export.openkb_handoff
         )
         report = validate_openkb_handoff_rows(
-            rows, mode="dry_run", source_items=items
+            openkb_handoff_rows, mode="dry_run", source_items=items
         )
         log_openkb_weak_verification_warnings(
             logger, report.weak_verification_rows
@@ -272,7 +274,7 @@ def dry_run_command(
             return 2
         if cfg.export.openkb_handoff.preview_jsonl_path:
             write_openkb_preview_jsonl(
-                rows, cfg.export.openkb_handoff.preview_jsonl_path
+                openkb_handoff_rows, cfg.export.openkb_handoff.preview_jsonl_path
             )
             logger.info(
                 "Non-authoritative OpenKB handoff preview written to "
@@ -281,7 +283,28 @@ def dry_run_command(
         else:
             logger.info(
                 f"[DRY-RUN] OpenKB handoff JSONL write suppressed "
-                f"({len(rows)} rows validated)"
+                f"({len(openkb_handoff_rows)} rows validated)"
+            )
+
+    if cfg.export.artifacts.enabled:
+        artifact_results = write_dry_run_artifacts(
+            items=items,
+            handoff_rows=openkb_handoff_rows,
+            config=cfg.export.artifacts,
+            handoff_enabled=cfg.export.openkb_handoff.enabled,
+        )
+        logger.info(
+            "[DRY-RUN] Millefeuille artifact indexes written: "
+            f"{len(artifact_results)}"
+        )
+        for result in artifact_results:
+            logger.info(
+                "  - paper_id=%s run_id=%s artifact_index=%s "
+                "stage_manifest=%s",
+                result.paper_id,
+                result.run_id,
+                result.artifact_index_path,
+                result.stage_manifest_path,
             )
 
     return 0

@@ -39,6 +39,7 @@ from millefeuille.domain.config import (
     PACKAGED_PLACEHOLDER_READ_KEY,
     PACKAGED_PLACEHOLDER_STORAGE_BASE_DIR,
     AppConfig,
+    ArtifactExportConfig,
     AttachmentUrlExportConfig,
     AuthQueryConfig,
     AuthQueryHelperConfig,
@@ -177,7 +178,7 @@ def validate_flags(cfg: AppConfig) -> None:
        ocr.enabled, tag_adding.enabled, or selection_tagging.enabled must be
        True, except for standalone export modes (export.openkb_handoff.enabled
        for dry-run or live export; export.attachment_urls.enabled with
-       processing.dry_run).
+       processing.dry_run; or export.artifacts.enabled).
 
     Args:
         cfg: Application configuration object
@@ -208,6 +209,7 @@ def validate_flags(cfg: AppConfig) -> None:
     standalone_export = (
         cfg.export.openkb_handoff.enabled
         or (cfg.processing.dry_run and cfg.export.attachment_urls.enabled)
+        or cfg.export.artifacts.enabled
     )
     if (
         not cfg.download.enabled
@@ -313,6 +315,26 @@ def validate_flags(cfg: AppConfig) -> None:
                     "export.openkb_handoff.preview_jsonl_path must differ from "
                     "export.openkb_handoff.jsonl_path"
                 )
+
+    artifacts = cfg.export.artifacts
+    if artifacts.enabled:
+        if not cfg.processing.dry_run:
+            raise ConfigError(
+                "export.artifacts.enabled=true is supported only with "
+                "processing.dry_run=true in this artifact-writer slice."
+            )
+        if artifacts.artifact_root is None or not str(artifacts.artifact_root).strip():
+            raise ConfigError(
+                "export.artifacts.artifact_root must be set when "
+                "export.artifacts.enabled=true. Use --artifact-root /path or "
+                "export.artifacts.artifact_root=/path."
+            )
+        if str(artifacts.artifact_root).strip() == "source-pack":
+            raise ConfigError(
+                "export.artifacts.artifact_root=source-pack requires a later "
+                "source-pack writer; use an explicit filesystem path for this "
+                "dry-run artifact slice."
+            )
 
     logger.debug("Flag configuration validated successfully")
 
@@ -598,9 +620,17 @@ def build_app_config(cfg: DictConfig) -> AppConfig:
         raise ConfigError("export.openkb_handoff must resolve to a mapping")
     openkb_handoff_export = OpenKBHandoffExportConfig(**openkb_handoff_raw)
 
+    artifacts_raw = OmegaConf.to_container(
+        cfg.export.artifacts, resolve=True
+    )
+    if not isinstance(artifacts_raw, dict):
+        raise ConfigError("export.artifacts must resolve to a mapping")
+    artifact_export = ArtifactExportConfig(**artifacts_raw)
+
     export_config = ExportConfig(
         attachment_urls=attachment_urls_export,
         openkb_handoff=openkb_handoff_export,
+        artifacts=artifact_export,
     )
 
     if not OmegaConf.is_missing(cfg, "credentials"):
@@ -712,7 +742,52 @@ def entrypoint() -> None:
     argv = sys.argv[1:]
     if argv and argv[0] in {"artifacts", "status"}:
         sys.exit(run_artifact_cli(argv))
+    translated_argv = _translate_artifact_writer_args(argv)
+    if translated_argv != argv:
+        sys.argv = [sys.argv[0], *translated_argv]
     main()
+
+
+def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
+    """Translate lightweight artifact flags into Hydra overrides."""
+    translated: list[str] = []
+    artifact_root_seen = False
+    idx = 0
+    while idx < len(argv):
+        arg = argv[idx]
+        if arg == "--artifact-root":
+            if idx + 1 >= len(argv):
+                translated.append(arg)
+                idx += 1
+                continue
+            translated.append(f"export.artifacts.artifact_root={argv[idx + 1]}")
+            artifact_root_seen = True
+            idx += 2
+            continue
+        if arg.startswith("--artifact-root="):
+            translated.append(
+                "export.artifacts.artifact_root=" + arg.split("=", 1)[1]
+            )
+            artifact_root_seen = True
+            idx += 1
+            continue
+        if arg == "--run-id":
+            if idx + 1 >= len(argv):
+                translated.append(arg)
+                idx += 1
+                continue
+            translated.append(f"export.artifacts.run_id={argv[idx + 1]}")
+            idx += 2
+            continue
+        if arg.startswith("--run-id="):
+            translated.append("export.artifacts.run_id=" + arg.split("=", 1)[1])
+            idx += 1
+            continue
+        translated.append(arg)
+        idx += 1
+    if artifact_root_seen and "export.artifacts.enabled=true" not in translated:
+        translated.append("export.artifacts.enabled=true")
+    return translated
 
 
 @hydra.main(
@@ -751,6 +826,7 @@ def main(cfg: DictConfig) -> None:
                 app_cfg.processing.dry_run
                 and app_cfg.export.attachment_urls.enabled
             )
+            or app_cfg.export.artifacts.enabled
         )
         if all_ops_disabled and not standalone_export:
             print(_HELP_TEXT)

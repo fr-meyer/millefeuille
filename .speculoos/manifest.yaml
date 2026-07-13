@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: null
+canonical_task: pr-050-artifact-writer-dry-run-source-pack
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: null
+  working_branch: feat/pr-050-artifact-writer-dry-run-source-pack
 status:
-  phase: idle
-  pret_a_coder: idle
+  phase: implementation
+  pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 161 passed, 0 failed
+    result: 166 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -57,14 +57,14 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: none-active
+    status: pending-publication
     number: null
     url: null
     base_branch: dev
-    head_branch: null
+    head_branch: feat/pr-050-artifact-writer-dry-run-source-pack
     head_sha: null
     merge_commit: null
-    project_status: none-active
+    project_status: In Progress
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet
@@ -93,7 +93,14 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: null
+current_task:
+  id: pr-050-artifact-writer-dry-run-source-pack
+  title: Wire dry-run artifact indexes into the source-pack pipeline path
+  status: validated
+  branch: feat/pr-050-artifact-writer-dry-run-source-pack
+  base_branch: dev
+  task_file: .speculoos/tasks/pr-050-artifact-writer-dry-run-source-pack.yaml
+  started_from: 380fea3f40b9ad1118ba49363a780a7252a75460
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -195,3 +202,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/48#pullrequestreview-4683495406
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86783172432
+    - id: pr-049-pr48-closeout-metadata
+      status: merged
+      branch: chore/pr-049-pr48-closeout-metadata
+      base_branch: dev
+      pull_request: 49
+      url: https://github.com/fr-meyer/millefeuille/pull/49
+      head_sha: 2d41a389a1717694872056c878bf37a47687f5f8
+      merge_commit: 380fea3f40b9ad1118ba49363a780a7252a75460
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/49#pullrequestreview-4683542433
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86784610113

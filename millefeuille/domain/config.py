@@ -703,6 +703,32 @@ class OpenKBHandoffExportConfig:
 
 
 @dataclass
+class ArtifactExportConfig:
+    """Configuration for writing Millefeuille artifact indexes from dry-runs."""
+
+    enabled: bool = False
+    """Whether to write artifact-index and stage-manifest files."""
+
+    artifact_root: str | None = None
+    """Explicit artifact root directory for generated run artifacts."""
+
+    run_id: str | None = None
+    """Optional stable run id. When omitted, a timestamped run id is generated."""
+
+    def __post_init__(self) -> None:
+        if self.enabled and (
+            self.artifact_root is None or not str(self.artifact_root).strip()
+        ):
+            raise ConfigError(
+                "export.artifacts.artifact_root must be set when "
+                "export.artifacts.enabled=true. Use --artifact-root /path or "
+                "export.artifacts.artifact_root=/path."
+            )
+        if self.run_id is not None and not str(self.run_id).strip():
+            raise ConfigError("export.artifacts.run_id cannot be empty")
+
+
+@dataclass
 class ExportConfig:
     """Top-level export feature configuration."""
 
@@ -715,6 +741,9 @@ class ExportConfig:
         default_factory=OpenKBHandoffExportConfig
     )
     """OpenKB/Millefeuille JSONL handoff export settings."""
+
+    artifacts: ArtifactExportConfig = field(default_factory=ArtifactExportConfig)
+    """Artifact-index and stage-manifest export settings."""
 
 
 @dataclass
