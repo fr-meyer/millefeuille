@@ -1,0 +1,49 @@
+id: pr-055-pr54-closeout-metadata
+title: Close PR 54 source-pack intake metadata
+status: implementation
+branch: chore/pr-055-pr54-closeout-metadata
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+post_merge_expected:
+  pull_request: 55
+  base_branch: dev
+  head_branch: chore/pr-055-pr54-closeout-metadata
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - mark PR #54 source-pack intake metadata as merged and Done
+  - record PR #54 exact head, merge commit, Mergeguez review URL, and Mergeguez check-run URL
+  - add PR #54 to completed Speculoos and GitHub PR ledgers
+  - move current repo-local surfaces to this metadata closeout branch
+non_goals:
+  - code changes
+  - live Zotero reads or writes
+  - PDF recovery, OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, index writes, or source-pack writes
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - PR #54 appears in completed task and PR ledgers
+  - PR #54 task is marked merged with Done project status and exact merge/review/check evidence
+  - active Speculoos task points at this PR #55 closeout branch
+  - metadata parse, diff check, and Speculoos validate pass
+validation:
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-055-pr54-closeout-metadata --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Metadata-only closeout; no live Zotero read or write, PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, source-pack write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+evidence:
+  - 'PR #54 merged with merge commit 1ae94e457869325d13f396ef19582bfa678255c9'
+  - 'Mergeguez review approved head 112cdeada6aed3d788bf7a602703f56d69816b7c: https://github.com/fr-meyer/millefeuille/pull/54#pullrequestreview-4684886328'
+  - 'Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/86822134546'
+  - Remote PR #54 branch deleted through branch-cleanup-execute
+  - Project item unavailable; closeout recorded without ProjectV2 mutation
+  - surface-sync --close-merged-task cleared PR #54 active task metadata before PR #55 activation
