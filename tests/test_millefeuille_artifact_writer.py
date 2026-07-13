@@ -281,6 +281,86 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             )
             self.assertEqual(source_pack_stage["status"], "passed")
 
+    def test_source_pack_intake_fixture_path_feeds_artifact_writer(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            fixture_bytes = b"x" * 12345
+            fixture_sha256 = (
+                "3c49a9d347ea48dc66e4f50b991829cdbef079a2e57c805cc0163f6b"
+                "18860fb1"
+            )
+            recovered_pdf = Path(tempdir) / "recovered.pdf"
+            recovered_pdf.write_bytes(fixture_bytes)
+            evidence_path = Path(tempdir) / "recovered-pdf-evidence.json"
+            evidence_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "millefeuille-recovered-pdf-evidence/v0.1",
+                        "source_type": "zotero",
+                        "item_key": "ITEM1",
+                        "attachment_key": "ATT1",
+                        "canonical_filename": (
+                            "Example Author - 2026 - Artifact Writer.pdf"
+                        ),
+                        "recovered_pdf_path": recovered_pdf.name,
+                        "expected_sha256": fixture_sha256,
+                        "content_type": "application/pdf",
+                        "file_size_bytes": len(fixture_bytes),
+                        "zotero_version": 7,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            source_pack_root = Path(tempdir) / "source-packs"
+            cfg = _make_app_config(
+                export=ExportConfig(
+                    openkb_handoff=OpenKBHandoffExportConfig(enabled=True),
+                    artifacts=ArtifactExportConfig(
+                        enabled=True,
+                        artifact_root="source-pack",
+                        source_pack_root=str(source_pack_root),
+                        source_pack_intake_evidence_path=str(evidence_path),
+                        run_id="run-fixture",
+                    ),
+                )
+            )
+            logger = MagicMock()
+            mock_zotero = MagicMock()
+            mock_zotero.credentials = SimpleNamespace(library_id="123")
+            mock_zotero.get_items_by_selection.return_value = (
+                [_make_item(sha256=fixture_sha256)],
+                _make_discovery_stats(),
+            )
+
+            exit_code = dry_run_command(cfg, logger, mock_zotero)
+
+            source_pack_dir = source_pack_root / "zotero" / "zotero-ITEM1"
+            run_dir = source_pack_dir / "analyses" / "millefeuille" / "run-fixture"
+            index_path = run_dir / "artifact-index.json"
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                (source_pack_dir / "source.pdf").read_bytes(),
+                fixture_bytes,
+            )
+            self.assertTrue((source_pack_dir / "manifest.json").is_file())
+            self.assertTrue(index_path.is_file())
+            mock_zotero.download_pdf.assert_not_called()
+            mock_zotero.add_tag.assert_not_called()
+            mock_zotero.remove_tag.assert_not_called()
+
+            artifact_index = load_artifact_index(index_path)
+            self.assertEqual(
+                artifact_index.source_pack["source_hash"],
+                f"sha256:{fixture_sha256}",
+            )
+            self.assertEqual(
+                artifact_index.stages["source-pack"]["status"],
+                "passed",
+            )
+
     def test_source_pack_artifact_root_requires_existing_manifest(self):
         with tempfile.TemporaryDirectory() as tempdir:
             cfg = _make_app_config(
@@ -336,6 +416,36 @@ class TestDryRunArtifactWriter(unittest.TestCase):
 
         validate_flags(cfg)
 
+    def test_validate_flags_rejects_source_pack_intake_without_handoff(self):
+        cfg = _make_app_config(
+            export=ExportConfig(
+                artifacts=ArtifactExportConfig(
+                    enabled=True,
+                    artifact_root="source-pack",
+                    source_pack_root="/tmp/millefeuille-source-packs",
+                    source_pack_intake_evidence_path="/tmp/evidence.json",
+                )
+            )
+        )
+
+        with self.assertRaisesRegex(ConfigError, "openkb_handoff.enabled=true"):
+            validate_flags(cfg)
+
+    def test_validate_flags_rejects_source_pack_intake_without_root(self):
+        cfg = _make_app_config(
+            export=ExportConfig(
+                openkb_handoff=OpenKBHandoffExportConfig(enabled=True),
+                artifacts=ArtifactExportConfig(
+                    enabled=True,
+                    artifact_root="source-pack",
+                    source_pack_intake_evidence_path="/tmp/evidence.json",
+                ),
+            )
+        )
+
+        with self.assertRaisesRegex(ConfigError, "source_pack_root"):
+            validate_flags(cfg)
+
 
 class TestArtifactWriterCliAliases(unittest.TestCase):
     def test_artifact_root_alias_enables_artifact_export(self):
@@ -385,6 +495,32 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
             [
                 "export.artifacts.artifact_root=source-pack",
                 "export.artifacts.source_pack_root=/tmp/source-packs",
+                "export.artifacts.run_id=run-fixture",
+                "export.artifacts.enabled=true",
+            ],
+        )
+
+    def test_source_pack_intake_evidence_alias_is_supported(self):
+        translated = _translate_artifact_writer_args([
+            "--artifact-root",
+            "source-pack",
+            "--source-pack-root",
+            "/tmp/source-packs",
+            "--source-pack-intake-evidence",
+            "/tmp/evidence.jsonl",
+            "--run-id",
+            "run-fixture",
+        ])
+
+        self.assertEqual(
+            translated,
+            [
+                "export.artifacts.artifact_root=source-pack",
+                "export.artifacts.source_pack_root=/tmp/source-packs",
+                (
+                    "export.artifacts.source_pack_intake_evidence_path="
+                    "/tmp/evidence.jsonl"
+                ),
                 "export.artifacts.run_id=run-fixture",
                 "export.artifacts.enabled=true",
             ],

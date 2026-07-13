@@ -15,6 +15,7 @@ from millefeuille.clients.zotero_client import ZoteroClient
 from millefeuille.domain.artifact_writer import write_dry_run_artifacts
 from millefeuille.domain.config import AppConfig
 from millefeuille.domain.models import OpenKBHandoffRow, TagAddingResult
+from millefeuille.domain.source_packs import write_source_packs_from_handoff_evidence
 from millefeuille.domain.tree_processor import TreeStructureProcessor
 from millefeuille.orchestration.pipeline import (
     Pipeline,
@@ -284,6 +285,28 @@ def dry_run_command(
             logger.info(
                 f"[DRY-RUN] OpenKB handoff JSONL write suppressed "
                 f"({len(openkb_handoff_rows)} rows validated)"
+            )
+
+    if (
+        cfg.export.artifacts.enabled
+        and cfg.export.artifacts.source_pack_intake_evidence_path
+    ):
+        assert cfg.export.artifacts.source_pack_root is not None
+        intake_results = write_source_packs_from_handoff_evidence(
+            handoff_rows=openkb_handoff_rows,
+            evidence_path=cfg.export.artifacts.source_pack_intake_evidence_path,
+            source_pack_root=cfg.export.artifacts.source_pack_root,
+        )
+        logger.info(
+            "[DRY-RUN] Source-pack intake fixtures written: "
+            f"{len(intake_results)}"
+        )
+        for result in intake_results:
+            logger.info(
+                "  - paper_id=%s status=%s manifest=%s",
+                result.paper_id,
+                result.status,
+                result.manifest_path,
             )
 
     if cfg.export.artifacts.enabled:

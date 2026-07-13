@@ -17,6 +17,7 @@ import shutil
 from typing import Any
 
 from millefeuille.domain.millefeuille import MillefeuilleContractError
+from millefeuille.domain.models import OpenKBHandoffRow
 
 SOURCE_PACK_ARTIFACT_ROOT = "source-pack"
 DEFAULT_SOURCE_PACK_ROOT = "/srv/openkb/source-packs"
@@ -184,17 +185,62 @@ def load_recovered_pdf_evidence(path: str | Path) -> RecoveredPdfEvidence:
     return RecoveredPdfEvidence.from_dict(payload, base_dir=evidence_path.parent)
 
 
-def write_source_pack_from_recovered_pdf(
-    *,
-    evidence: RecoveredPdfEvidence,
-    source_pack_root: str | Path,
-    created_at: str | None = None,
-) -> SourcePackIntakeResult:
-    """Create a source pack from verified local recovered-PDF evidence."""
-    root = Path(source_pack_root)
-    if not str(root).strip():
-        raise MillefeuilleContractError("source_pack_root cannot be empty")
+def load_recovered_pdf_evidence_batch(
+    path: str | Path,
+) -> list[RecoveredPdfEvidence]:
+    """Load one or more recovered-PDF evidence records from JSON or JSONL."""
+    evidence_path = Path(path)
+    try:
+        text = evidence_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise MillefeuilleContractError(
+            f"could not read recovered PDF evidence {evidence_path}: {exc}"
+        ) from exc
 
+    if evidence_path.suffix == ".jsonl":
+        records: list[RecoveredPdfEvidence] = []
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise MillefeuilleContractError(
+                    "recovered PDF evidence JSONL is not valid JSON "
+                    f"at {evidence_path}:{line_number}"
+                ) from exc
+            records.append(
+                RecoveredPdfEvidence.from_dict(
+                    payload,
+                    base_dir=evidence_path.parent,
+                )
+            )
+        return records
+
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise MillefeuilleContractError(
+            f"recovered PDF evidence is not valid JSON: {evidence_path}"
+        ) from exc
+
+    if isinstance(payload, list):
+        raw_records = payload
+    elif isinstance(payload, dict) and isinstance(payload.get("evidence"), list):
+        raw_records = payload["evidence"]
+    elif isinstance(payload, dict) and isinstance(payload.get("records"), list):
+        raw_records = payload["records"]
+    else:
+        raw_records = [payload]
+
+    return [
+        RecoveredPdfEvidence.from_dict(record, base_dir=evidence_path.parent)
+        for record in raw_records
+    ]
+
+
+def verify_recovered_pdf_evidence(evidence: RecoveredPdfEvidence) -> str:
+    """Verify local recovered bytes against evidence and return source hash."""
     source_path = evidence.recovered_pdf_path
     if not source_path.is_file():
         raise MillefeuilleContractError(
@@ -217,12 +263,80 @@ def write_source_pack_from_recovered_pdf(
             "recovered PDF size mismatch: "
             f"expected {evidence.file_size_bytes}, got {byte_size}"
         )
+    return f"sha256:{actual_sha256}"
+
+
+def write_source_packs_from_handoff_evidence(
+    *,
+    handoff_rows: list[OpenKBHandoffRow],
+    evidence_path: str | Path,
+    source_pack_root: str | Path,
+    created_at: str | None = None,
+) -> list[SourcePackIntakeResult]:
+    """Write source packs for selected handoff rows from local fixture evidence.
+
+    This is the dry-run/staged-run bridge: it only consumes already-built
+    handoff rows and explicit local recovered-PDF evidence. It preflights every
+    selected PDF row before creating any source-pack files.
+    """
+    root = Path(source_pack_root)
+    if not str(root).strip():
+        raise MillefeuilleContractError("source_pack_root cannot be empty")
+
+    rows = [row for row in handoff_rows if row.is_pdf]
+    if not rows:
+        return []
+
+    evidence_records = load_recovered_pdf_evidence_batch(evidence_path)
+    evidence_by_key = _evidence_by_handoff_key(evidence_records)
+
+    planned: list[RecoveredPdfEvidence] = []
+    missing: list[str] = []
+    for row in rows:
+        key = _handoff_key(row.item_key, row.attachment_key)
+        evidence = evidence_by_key.get(key)
+        if evidence is None:
+            missing.append(key)
+            continue
+        _validate_evidence_matches_handoff_row(evidence, row)
+        verify_recovered_pdf_evidence(evidence)
+        planned.append(evidence)
+
+    if missing:
+        raise MillefeuilleContractError(
+            "source-pack intake missing recovered PDF evidence for "
+            f"handoff rows: {', '.join(sorted(missing))}"
+        )
+
+    return [
+        write_source_pack_from_recovered_pdf(
+            evidence=evidence,
+            source_pack_root=root,
+            created_at=created_at,
+        )
+        for evidence in planned
+    ]
+
+
+def write_source_pack_from_recovered_pdf(
+    *,
+    evidence: RecoveredPdfEvidence,
+    source_pack_root: str | Path,
+    created_at: str | None = None,
+) -> SourcePackIntakeResult:
+    """Create a source pack from verified local recovered-PDF evidence."""
+    root = Path(source_pack_root)
+    if not str(root).strip():
+        raise MillefeuilleContractError("source_pack_root cannot be empty")
+
+    source_path = evidence.recovered_pdf_path
+    source_hash = verify_recovered_pdf_evidence(evidence)
+    byte_size = source_path.stat().st_size
 
     paper_id = evidence.paper_id or paper_id_for_zotero_item_key(evidence.item_key)
     source_pack_dir = root / "zotero" / paper_id
     manifest_path = source_pack_dir / "manifest.json"
     target_source_path = source_pack_dir / SOURCE_PACK_SOURCE_REF
-    source_hash = f"sha256:{actual_sha256}"
     timestamp = created_at or datetime.now(UTC).isoformat()
     manifest = build_source_pack_manifest(
         evidence=evidence,
@@ -371,6 +485,89 @@ def paper_id_for_zotero_item_key(item_key: str) -> str:
     raw = f"zotero-{item_key}"
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", raw).strip("-._")
     return slug or "zotero-item"
+
+
+def _evidence_by_handoff_key(
+    evidence_records: list[RecoveredPdfEvidence],
+) -> dict[str, RecoveredPdfEvidence]:
+    evidence_by_key: dict[str, RecoveredPdfEvidence] = {}
+    for evidence in evidence_records:
+        key = _handoff_key(evidence.item_key, evidence.attachment_key)
+        if key in evidence_by_key:
+            raise MillefeuilleContractError(
+                f"duplicate recovered PDF evidence for handoff row {key}"
+            )
+        evidence_by_key[key] = evidence
+    return evidence_by_key
+
+
+def _handoff_key(item_key: str, attachment_key: str) -> str:
+    return f"{item_key}:{attachment_key}"
+
+
+def _validate_evidence_matches_handoff_row(
+    evidence: RecoveredPdfEvidence,
+    row: OpenKBHandoffRow,
+) -> None:
+    if evidence.source_type != row.source_type:
+        raise MillefeuilleContractError(
+            "source-pack evidence source_type does not match handoff row "
+            f"for {_handoff_key(row.item_key, row.attachment_key)}"
+        )
+    if evidence.item_key != row.item_key:
+        raise MillefeuilleContractError("source-pack evidence item_key drift")
+    if evidence.attachment_key != row.attachment_key:
+        raise MillefeuilleContractError(
+            "source-pack evidence attachment_key drift"
+        )
+    if evidence.canonical_filename != row.canonical_filename:
+        raise MillefeuilleContractError(
+            "source-pack evidence canonical_filename does not match handoff "
+            f"row for {_handoff_key(row.item_key, row.attachment_key)}"
+        )
+    if not row.sha256:
+        raise MillefeuilleContractError(
+            "source-pack intake requires handoff row sha256 for "
+            f"{_handoff_key(row.item_key, row.attachment_key)}"
+        )
+    try:
+        row_sha256 = _normalize_sha256(row.sha256)
+    except MillefeuilleContractError as exc:
+        raise MillefeuilleContractError(
+            "source-pack intake requires a valid handoff row sha256 for "
+            f"{_handoff_key(row.item_key, row.attachment_key)}"
+        ) from exc
+    if evidence.expected_sha256 != row_sha256:
+        raise MillefeuilleContractError(
+            "source-pack evidence sha256 does not match handoff row for "
+            f"{_handoff_key(row.item_key, row.attachment_key)}"
+        )
+    if (
+        row.file_size_bytes is not None
+        and evidence.file_size_bytes != row.file_size_bytes
+    ):
+        raise MillefeuilleContractError(
+            "source-pack evidence file_size_bytes does not match "
+            f"handoff row for {_handoff_key(row.item_key, row.attachment_key)}"
+        )
+    if (
+        row.content_type is not None
+        and evidence.content_type is not None
+        and evidence.content_type != row.content_type
+    ):
+        raise MillefeuilleContractError(
+            "source-pack evidence content_type does not match handoff row "
+            f"for {_handoff_key(row.item_key, row.attachment_key)}"
+        )
+    if (
+        row.zotero_version is not None
+        and evidence.zotero_version is not None
+        and evidence.zotero_version != row.zotero_version
+    ):
+        raise MillefeuilleContractError(
+            "source-pack evidence zotero_version does not match handoff row "
+            f"for {_handoff_key(row.item_key, row.attachment_key)}"
+        )
 
 
 def sha256_file(path: str | Path) -> str:

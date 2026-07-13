@@ -28,6 +28,7 @@ from millefeuille.domain.source_packs import (
     load_recovered_pdf_evidence,
     load_source_pack_manifest,
     write_source_pack_from_recovered_pdf,
+    write_source_packs_from_handoff_evidence,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -128,20 +129,27 @@ def _make_item() -> DiscoveredItem:
     )
 
 
-def _make_handoff_row() -> OpenKBHandoffRow:
+def _make_handoff_row(
+    *,
+    item_key: str = "ITEM1",
+    attachment_key: str = "ATT1",
+    canonical_filename: str = "Example Author - 2026 - Intake Fixture.pdf",
+    sha256: str | None = FIXTURE_SHA256,
+    file_size_bytes: int = len(FIXTURE_BYTES),
+) -> OpenKBHandoffRow:
     return OpenKBHandoffRow(
         schema_version="openkb-millefeuille-handoff/v0.1",
         source_type="zotero",
         discovered_at="2026-07-13T12:00:00+00:00",
-        item_key="ITEM1",
-        attachment_key="ATT1",
-        canonical_filename="Example Author - 2026 - Intake Fixture.pdf",
+        item_key=item_key,
+        attachment_key=attachment_key,
+        canonical_filename=canonical_filename,
         is_pdf=True,
         verification_strength="full",
         recovery={
             "method": "fixture-recovered-pdf",
-            "item_key": "ITEM1",
-            "attachment_key": "ATT1",
+            "item_key": item_key,
+            "attachment_key": attachment_key,
         },
         openkb_policy_hints={
             "no_auth_url": True,
@@ -150,9 +158,9 @@ def _make_handoff_row() -> OpenKBHandoffRow:
         item_title="Intake Fixture Paper",
         citation_key="fixture2026intake",
         content_type="application/pdf",
-        file_size_bytes=len(FIXTURE_BYTES),
+        file_size_bytes=file_size_bytes,
         zotero_version=7,
-        sha256=FIXTURE_SHA256,
+        sha256=sha256,
     )
 
 
@@ -363,6 +371,70 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                 artifact_index.stages["source-pack"]["status"],
                 "passed",
             )
+
+    def test_handoff_intake_writes_from_matching_fixture_evidence(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            evidence_path = _write_evidence_json(tempdir, source_path)
+            source_pack_root = Path(tempdir) / "source-packs"
+
+            results = write_source_packs_from_handoff_evidence(
+                handoff_rows=[_make_handoff_row()],
+                evidence_path=evidence_path,
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0].status, "created")
+            self.assertEqual(results[0].source_hash, f"sha256:{FIXTURE_SHA256}")
+            self.assertTrue(results[0].manifest_path.is_file())
+            self.assertEqual(results[0].source_path.read_bytes(), FIXTURE_BYTES)
+
+    def test_handoff_intake_missing_evidence_fails_before_any_write(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            evidence_path = _write_evidence_json(tempdir, source_path)
+            source_pack_root = Path(tempdir) / "source-packs"
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "missing recovered PDF evidence",
+            ):
+                write_source_packs_from_handoff_evidence(
+                    handoff_rows=[
+                        _make_handoff_row(),
+                        _make_handoff_row(
+                            item_key="ITEM2",
+                            attachment_key="ATT2",
+                            canonical_filename=(
+                                "Example Author - 2026 - Missing Fixture.pdf"
+                            ),
+                            sha256="1" * 64,
+                        ),
+                    ],
+                    evidence_path=evidence_path,
+                    source_pack_root=source_pack_root,
+                    created_at="2026-07-13T12:00:00+00:00",
+                )
+
+            self.assertFalse((source_pack_root / "zotero").exists())
+
+    def test_handoff_intake_requires_handoff_sha256(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            evidence_path = _write_evidence_json(tempdir, source_path)
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "requires handoff row sha256",
+            ):
+                write_source_packs_from_handoff_evidence(
+                    handoff_rows=[_make_handoff_row(sha256=None)],
+                    evidence_path=evidence_path,
+                    source_pack_root=Path(tempdir) / "source-packs",
+                    created_at="2026-07-13T12:00:00+00:00",
+                )
 
 
 class TestSourcePackIntakeCli(unittest.TestCase):

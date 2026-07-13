@@ -318,6 +318,27 @@ def validate_flags(cfg: AppConfig) -> None:
                 )
 
     artifacts = cfg.export.artifacts
+    if artifacts.source_pack_intake_evidence_path is not None:
+        if not artifacts.enabled:
+            raise ConfigError(
+                "export.artifacts.source_pack_intake_evidence_path requires "
+                "export.artifacts.enabled=true"
+            )
+        if artifacts.artifact_root != "source-pack":
+            raise ConfigError(
+                "export.artifacts.source_pack_intake_evidence_path requires "
+                "export.artifacts.artifact_root=source-pack"
+            )
+        if not artifacts.source_pack_root:
+            raise ConfigError(
+                "export.artifacts.source_pack_intake_evidence_path requires "
+                "an explicit export.artifacts.source_pack_root"
+            )
+        if not cfg.export.openkb_handoff.enabled:
+            raise ConfigError(
+                "export.artifacts.source_pack_intake_evidence_path requires "
+                "export.openkb_handoff.enabled=true"
+            )
     if artifacts.enabled:
         if not cfg.processing.dry_run:
             raise ConfigError(
@@ -752,7 +773,7 @@ def entrypoint() -> None:
 def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
     """Translate lightweight artifact flags into Hydra overrides."""
     translated: list[str] = []
-    artifact_root_seen = False
+    artifact_enable_seen = False
     idx = 0
     while idx < len(argv):
         arg = argv[idx]
@@ -762,14 +783,34 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
                 idx += 1
                 continue
             translated.append(f"export.artifacts.artifact_root={argv[idx + 1]}")
-            artifact_root_seen = True
+            artifact_enable_seen = True
             idx += 2
             continue
         if arg.startswith("--artifact-root="):
             translated.append(
                 "export.artifacts.artifact_root=" + arg.split("=", 1)[1]
             )
-            artifact_root_seen = True
+            artifact_enable_seen = True
+            idx += 1
+            continue
+        if arg == "--source-pack-intake-evidence":
+            if idx + 1 >= len(argv):
+                translated.append(arg)
+                idx += 1
+                continue
+            translated.append(
+                "export.artifacts.source_pack_intake_evidence_path="
+                + argv[idx + 1]
+            )
+            artifact_enable_seen = True
+            idx += 2
+            continue
+        if arg.startswith("--source-pack-intake-evidence="):
+            translated.append(
+                "export.artifacts.source_pack_intake_evidence_path="
+                + arg.split("=", 1)[1]
+            )
+            artifact_enable_seen = True
             idx += 1
             continue
         if arg == "--source-pack-root":
@@ -800,7 +841,7 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
             continue
         translated.append(arg)
         idx += 1
-    if artifact_root_seen and "export.artifacts.enabled=true" not in translated:
+    if artifact_enable_seen and "export.artifacts.enabled=true" not in translated:
         translated.append("export.artifacts.enabled=true")
     return translated
 

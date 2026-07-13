@@ -15,6 +15,6 @@ notes:
   - Bootstrap should not depend on Vibe reachability.
 task:
   status: implementation
-  id: pr-055-pr54-closeout-metadata
-  speculoos_task: .speculoos/tasks/pr-055-pr54-closeout-metadata.yaml
+  id: pr-056-source-pack-staged-handoff-intake
+  speculoos_task: .speculoos/tasks/pr-056-source-pack-staged-handoff-intake.yaml
   command: null

@@ -284,6 +284,26 @@ refuses mismatched hashes or existing pack drift. It does not read Zotero,
 download PDFs, call OCR/model providers, write OpenKB/index data, or mutate
 Zotero.
 
+The staged dry-run handoff path can also create source packs from explicit
+fixture evidence before writing the run artifacts:
+
+```bash
+millefeuille --artifact-root source-pack \
+  --source-pack-root /path/to/source-packs \
+  --source-pack-intake-evidence /path/to/recovered-pdf-evidence.jsonl \
+  --run-id dry-run-demo \
+  processing.dry_run=true export.openkb_handoff.enabled=true
+```
+
+The evidence file may be one JSON object, a JSON array, an object containing
+`evidence` or `records`, or JSONL. Each selected PDF handoff row must have a
+matching evidence record with the same Zotero item key, attachment key,
+canonical filename, file size, and SHA-256. The command preflights every row
+before writing any source pack. It then writes only local source-pack evidence
+and Millefeuille artifact manifests under the explicit `--source-pack-root`;
+it does not write Zotero, OCR/model providers, OpenKB, PageIndex, ConDB, or
+ChatIndex.
+
 ### Command-Line Configuration
 
 Override configuration from the command line:
