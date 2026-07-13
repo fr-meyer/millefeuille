@@ -7,9 +7,18 @@ GitHub publication, releases, or package-index changes.
 
 Files:
 
+- `vision.md` - complete paper-processing product vision.
 - `remaining-work.md` - end-to-end work pipeline and manual gates.
 - `cli-contract.md` - intended command groups and run modes.
 - `stage-manifest.schema.json` - machine-readable stage manifest shape.
+- `artifact-storage.md` - artifact-root and source-pack storage contract.
+- `artifact-index.schema.json` - machine-readable artifact index shape.
+- `model-profile.schema.yaml` - per-stage model/profile selection shape.
+- `hierarchical-summary.schema.json` - page/section/paper summary shape.
+- `paper-card.schema.json` - compact human/agent card shape.
+- `retrieval-index-contract.md` - OpenKB/PageIndex and optional index lanes.
+- `classification-orchestration.md` - CLI-owned classification modes and
+  multi-agent governance.
 - `tag-state-machine.md` - Zotero tag lifecycle design.
 - `ocr-backend-contract.md` - native/OCR evidence adapter contract.
 - `release-version-policy.md` - Speculoos-governed release and version path.
@@ -21,6 +30,7 @@ manual gates, tag-state transitions, and OCR evidence records without changing
 live CLI behavior.
 
 Manual gates remain explicit: live Zotero reads/writes, PDF recovery/download,
-OCR/Mistral/PageIndex calls, OpenKB writes, source-pack writes, GitHub
-publication/merge, `dev` to `main` promotion, release tags, and package
-publication all require separate approval.
+OCR/Mistral/PageIndex calls, model calls, worker-agent execution, OpenKB
+writes, index writes, source-pack writes, GitHub publication/merge, `dev` to
+`main` promotion, release tags, and package publication all require separate
+approval.

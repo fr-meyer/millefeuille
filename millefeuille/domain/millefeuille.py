@@ -34,8 +34,11 @@ class ManualGate(_StringEnum):
     ZOTERO_WRITE = "zotero_write"
     PDF_RECOVERY = "pdf_recovery"
     OCR_PROVIDER_CALL = "ocr_provider_call"
+    MODEL_PROVIDER_CALL = "model_provider_call"
+    WORKER_AGENT_EXECUTION = "worker_agent_execution"
     SOURCE_PACK_WRITE = "source_pack_write"
     OPENKB_WRITE = "openkb_write"
+    INDEX_WRITE = "index_write"
     STABLE_BRANCH_PROMOTION = "stable_branch_promotion"
     RELEASE_TAG = "release_tag"
     PACKAGE_PUBLICATION = "package_publication"
@@ -49,9 +52,14 @@ class StageName(_StringEnum):
     EXTRACT_NATIVE = "extract-native"
     EXTRACT_OCR = "extract-ocr"
     ROUTE = "route"
+    STRUCTURE = "structure"
+    SUMMARIZE = "summarize"
+    CARD = "card"
     OPENKB_ADD = "openkb-add"
+    INDEX = "index"
     ACCEPTANCE = "acceptance"
     CLASSIFY = "classify"
+    WRITEBACK = "writeback"
     RELEASE = "release"
 
 
@@ -84,7 +92,11 @@ class TagState(_StringEnum):
     SOURCE_PACKED = "millefeuille-source-packed"
     EXTRACTED_NATIVE = "millefeuille-extracted-native"
     EXTRACTED_OCR = "millefeuille-extracted-ocr"
+    STRUCTURE_READY = "millefeuille-structure-ready"
+    SUMMARIZED = "millefeuille-summarized"
+    CARD_READY = "millefeuille-card-ready"
     OPENKB_ADDED = "millefeuille-openkb-added"
+    INDEXED = "millefeuille-indexed"
     ACCEPTANCE_PASSED = "millefeuille-acceptance-passed"
     READY_FOR_CLASSIFICATION = "millefeuille-ready-for-classification"
     CLASSIFIED = "millefeuille-classified"
@@ -106,7 +118,15 @@ ALLOWED_TAG_TRANSITIONS = frozenset({
     (TagState.SOURCE_PACKED, TagState.EXTRACTED_OCR),
     (TagState.EXTRACTED_NATIVE, TagState.OPENKB_ADDED),
     (TagState.EXTRACTED_OCR, TagState.OPENKB_ADDED),
+    (TagState.EXTRACTED_NATIVE, TagState.STRUCTURE_READY),
+    (TagState.EXTRACTED_OCR, TagState.STRUCTURE_READY),
+    (TagState.STRUCTURE_READY, TagState.SUMMARIZED),
+    (TagState.SUMMARIZED, TagState.CARD_READY),
+    (TagState.CARD_READY, TagState.OPENKB_ADDED),
+    (TagState.CARD_READY, TagState.INDEXED),
     (TagState.OPENKB_ADDED, TagState.ACCEPTANCE_PASSED),
+    (TagState.OPENKB_ADDED, TagState.INDEXED),
+    (TagState.INDEXED, TagState.ACCEPTANCE_PASSED),
     (TagState.ACCEPTANCE_PASSED, TagState.READY_FOR_CLASSIFICATION),
     (TagState.READY_FOR_CLASSIFICATION, TagState.CLASSIFIED),
 })
@@ -120,9 +140,14 @@ STAGE_MANUAL_GATES: dict[StageName, ManualGate | None] = {
     StageName.EXTRACT_NATIVE: None,
     StageName.EXTRACT_OCR: ManualGate.OCR_PROVIDER_CALL,
     StageName.ROUTE: None,
+    StageName.STRUCTURE: None,
+    StageName.SUMMARIZE: ManualGate.MODEL_PROVIDER_CALL,
+    StageName.CARD: ManualGate.MODEL_PROVIDER_CALL,
     StageName.OPENKB_ADD: ManualGate.OPENKB_WRITE,
+    StageName.INDEX: ManualGate.INDEX_WRITE,
     StageName.ACCEPTANCE: None,
-    StageName.CLASSIFY: ManualGate.ZOTERO_WRITE,
+    StageName.CLASSIFY: ManualGate.MODEL_PROVIDER_CALL,
+    StageName.WRITEBACK: ManualGate.ZOTERO_WRITE,
     StageName.RELEASE: ManualGate.RELEASE_TAG,
 }
 

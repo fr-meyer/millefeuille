@@ -35,8 +35,11 @@
           "zotero_write",
           "pdf_recovery",
           "ocr_provider_call",
+          "model_provider_call",
+          "worker_agent_execution",
           "source_pack_write",
           "openkb_write",
+          "index_write",
           "stable_branch_promotion",
           "release_tag",
           "package_publication"
@@ -67,9 +70,14 @@
               "extract-native",
               "extract-ocr",
               "route",
+              "structure",
+              "summarize",
+              "card",
               "openkb-add",
+              "index",
               "acceptance",
               "classify",
+              "writeback",
               "release"
             ]
           },
@@ -95,7 +103,21 @@
             "type": "boolean"
           },
           "gate": {
-            "type": "string"
+            "enum": [
+              "github_publication",
+              "zotero_read",
+              "zotero_write",
+              "pdf_recovery",
+              "ocr_provider_call",
+              "model_provider_call",
+              "worker_agent_execution",
+              "source_pack_write",
+              "openkb_write",
+              "index_write",
+              "stable_branch_promotion",
+              "release_tag",
+              "package_publication"
+            ]
           },
           "notes": {
             "type": "array",

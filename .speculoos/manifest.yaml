@@ -1,13 +1,13 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-045-zotero-credential-guidance
+canonical_task: pr-047-millefeuille-product-vision
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: fix/pr-045-zotero-credential-guidance
+  working_branch: docs/pr-047-millefeuille-product-vision
 status:
   phase: implementation
   pret_a_coder: in-progress
@@ -22,14 +22,14 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 152 passed, 0 failed
+    result: 154 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
     result: all checks passed
   metadata:
     status: passed
-    command: ruby -ryaml -rjson -e 'Dir[".speculoos/**/*.yaml"].sort.each { |p| Psych.parse_file(p) }; JSON.parse(File.read(".speculoos/review-evidence.json")); puts "metadata ok"'
+    command: ruby -ryaml -rjson -e 'Dir[".speculoos/**/*.yaml", "specs/**/*.yaml"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[".speculoos/**/*.json", "specs/**/*.json"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts "metadata ok"'
     result: metadata ok
 commit_identity:
   default_mode: human_approved_agent_assisted
@@ -57,14 +57,14 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
-    number: 46
-    url: https://github.com/fr-meyer/millefeuille/pull/46
+    status: pending-publication
+    number: null
+    url: null
     base_branch: dev
-    head_branch: fix/pr-045-zotero-credential-guidance
+    head_branch: docs/pr-047-millefeuille-product-vision
     head_sha: null
     merge_commit: null
-    project_status: In Progress
+    project_status: Pending Publication
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet
@@ -158,6 +158,17 @@ history:
       url: https://github.com/fr-meyer/millefeuille/pull/44
       head_sha: 39c9d543d190ed125407d9a4593601c817469038
       merge_commit: ad5e58ddc22642068bf067a6f77e3e1ab270e58b
+      merged_by: mergeguez[bot]
+      mergeguez_review: null
+      mergeguez_check_run: null
+    - id: pr-045-zotero-credential-guidance
+      status: merged
+      branch: fix/pr-045-zotero-credential-guidance
+      base_branch: dev
+      pull_request: 46
+      url: https://github.com/fr-meyer/millefeuille/pull/46
+      head_sha: c8031914fc4e6dc4789f37711bdc3b6ad8c2416b
+      merge_commit: f7923c1710ffd935433ebf2d37197c722f8ca175
       merged_by: mergeguez[bot]
       mergeguez_review: null
       mergeguez_check_run: null

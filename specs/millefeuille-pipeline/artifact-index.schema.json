@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/artifact-index.schema.json",
+  "title": "Millefeuille Artifact Index",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "paper_id",
+    "run_id",
+    "artifact_root",
+    "source_pack",
+    "source_identity",
+    "stages",
+    "artifacts",
+    "indexes",
+    "zotero_writeback"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-artifact-index/v0.1"
+    },
+    "paper_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_pack": {
+      "type": "object",
+      "required": ["ref", "source_type", "source_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "ref": {"type": "string", "minLength": 1},
+        "source_type": {"enum": ["zotero", "fixture", "other"]},
+        "source_hash": {"type": "string", "minLength": 1},
+        "manifest_ref": {"type": "string"}
+      }
+    },
+    "source_identity": {
+      "type": "object",
+      "required": ["title"],
+      "additionalProperties": true,
+      "properties": {
+        "title": {"type": "string", "minLength": 1},
+        "year": {"type": ["integer", "null"]},
+        "doi": {"type": ["string", "null"]},
+        "zotero_item_key": {"type": ["string", "null"]},
+        "zotero_attachment_key": {"type": ["string", "null"]},
+        "canonical_filename": {"type": ["string", "null"]}
+      }
+    },
+    "stages": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status"],
+        "additionalProperties": true,
+        "properties": {
+          "status": {
+            "enum": [
+              "not-started",
+              "skipped",
+              "passed",
+              "failed",
+              "needs-review",
+              "manual-gate"
+            ]
+          },
+          "manifest_ref": {"type": "string"}
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["kind", "ref"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {"type": "string", "minLength": 1},
+          "ref": {"type": "string", "minLength": 1},
+          "format": {"type": "string"},
+          "stage": {"type": "string"},
+          "private_content": {"type": "boolean"}
+        }
+      }
+    },
+    "indexes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["lane", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "lane": {
+            "enum": ["openkb", "pageindex", "condb", "chatindex", "other"]
+          },
+          "status": {
+            "enum": ["skipped", "previewed", "written", "failed", "needs-review"]
+          },
+          "result_ref": {"type": "string"},
+          "skip_reason": {"type": "string"}
+        }
+      }
+    },
+    "zotero_writeback": {
+      "type": "object",
+      "required": ["mode", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"enum": ["none", "preview", "approved-live"]},
+        "status": {"enum": ["not-planned", "previewed", "written", "skipped"]},
+        "plan_ref": {"type": "string"},
+        "result_ref": {"type": "string"}
+      }
+    }
+  }
+}
