@@ -23,7 +23,7 @@ current_task:
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
-  head_sha: ba207aabae8dd341c44afaa92ee5e548a49a7543
+  head_sha: 2823554deab684934e979bf5650d0e6d7c1a24f8
 pull_request: 54
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap

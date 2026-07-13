@@ -11,7 +11,7 @@ github:
   project_status: In Progress
   project_item: unavailable
   url: null
-  head_sha: ba207aabae8dd341c44afaa92ee5e548a49a7543
+  head_sha: 2823554deab684934e979bf5650d0e6d7c1a24f8
 post_merge_expected:
   pull_request: 54
   base_branch: dev
