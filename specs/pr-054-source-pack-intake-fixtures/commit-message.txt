@@ -1,0 +1,7 @@
+feat: add fixture source-pack intake
+
+Add an offline source-pack intake path that creates source packs from explicit
+local recovered-PDF fixture evidence after SHA-256 verification.
+
+No live Zotero read or write, live PDF recovery, OCR/provider, model, OpenKB,
+index, credential, main-branch, release, or package publication actions.

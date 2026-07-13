@@ -1,6 +1,6 @@
 id: pr-053-pr52-closeout-metadata
 title: Close PR 52 source-pack artifact-root metadata
-status: metadata_closeout
+status: merged
 branch: chore/pr-053-pr52-closeout-metadata
 base_branch: dev
 github:
@@ -8,10 +8,11 @@ github:
   pull_request: 53
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
   url: https://github.com/fr-meyer/millefeuille/pull/53
-  head_sha: bf0da69a3f5cfd6c672384ed9e1d02f951d86523
+  head_sha: b2f7e80e624e6f47d14c91e5d84a61822e489cc4
+  merge_commit: 8f7c0f46f6aa7f267ca936be8a87b096f9f4d37e
 scope:
   - clear repo-local active task metadata after PR #52 merged to dev
   - mark PR #52 task as merged and Done
@@ -35,3 +36,9 @@ validation:
   - "speculoos validate --task pr-053-pr52-closeout-metadata --validation \"git diff --check\" --json"
 publication_boundary:
   statement: "Metadata-only closeout; no live Zotero read or write, PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, source-pack write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+evidence:
+  - 'PR #53 merged with merge commit 8f7c0f46f6aa7f267ca936be8a87b096f9f4d37e'
+  - 'Mergeguez review approved head b2f7e80e624e6f47d14c91e5d84a61822e489cc4: https://github.com/fr-meyer/millefeuille/pull/53#pullrequestreview-4684163854'
+  - 'Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/86801420865'
+  - Project item unavailable; closeout recorded without ProjectV2 mutation
+  - surface-sync --close-merged-task cleared repo-local active task metadata

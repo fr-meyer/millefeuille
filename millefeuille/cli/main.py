@@ -23,6 +23,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from millefeuille.cli.artifacts import run_artifact_cli
 from millefeuille.cli.commands import dry_run_command, process_command
+from millefeuille.cli.source_pack import run_source_pack_cli
 from millefeuille.clients.exceptions import (
     OCRClientError,
     OpenKBHandoffValidationError,
@@ -704,6 +705,10 @@ Read-only artifact commands:
   millefeuille artifacts --index /path/to/artifact-index.json
   millefeuille status --index /path/to/artifact-index.json --strict
 
+Offline source-pack commands:
+  millefeuille source-pack intake --evidence recovered-pdf-evidence.json
+    --source-pack-root /path/to/source-packs
+
 Required environment variables:
   ZOTERO_LIBRARY_ID   Your Zotero user-library numeric ID
   ZOTERO_READ_KEY     Zotero API key with read access — required for all runs
@@ -736,6 +741,8 @@ def entrypoint() -> None:
     argv = sys.argv[1:]
     if argv and argv[0] in {"artifacts", "status"}:
         sys.exit(run_artifact_cli(argv))
+    if argv and argv[0] == "source-pack":
+        sys.exit(run_source_pack_cli(argv))
     translated_argv = _translate_artifact_writer_args(argv)
     if translated_argv != argv:
         sys.argv = [sys.argv[0], *translated_argv]

@@ -8,7 +8,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import re
 from typing import Any
 
 from millefeuille.domain.artifacts import ArtifactIndex, write_artifact_index
@@ -22,9 +21,12 @@ from millefeuille.domain.millefeuille import (
     StageStatus,
 )
 from millefeuille.domain.models import DiscoveredItem, OpenKBHandoffRow
-
-SOURCE_PACK_ARTIFACT_ROOT = "source-pack"
-DEFAULT_SOURCE_PACK_ROOT = "/srv/openkb/source-packs"
+from millefeuille.domain.source_packs import (
+    DEFAULT_SOURCE_PACK_ROOT,
+    SOURCE_PACK_ARTIFACT_ROOT,
+    load_source_pack_manifest_source_hash,
+    paper_id_for_zotero_item_key,
+)
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,7 @@ class ArtifactRunContext:
     run_dir: Path
     source_pack_ref: str
     source_pack_manifest_ref: str | None = None
+    source_pack_hash: str | None = None
     source_pack_verified: bool = False
 
 
@@ -109,6 +112,7 @@ def write_dry_run_artifacts(
             stage_manifest=stage_manifest,
             source_pack_ref=run_context.source_pack_ref,
             source_pack_manifest_ref=run_context.source_pack_manifest_ref,
+            source_pack_hash=run_context.source_pack_hash,
         )
         artifact_index_path = run_dir / "artifact-index.json"
         write_artifact_index(artifact_index, artifact_index_path)
@@ -151,6 +155,13 @@ def resolve_artifact_run_context(
             "export.artifacts.artifact_root=source-pack requires an existing "
             f"source-pack manifest at {source_pack_manifest}"
         )
+    try:
+        source_pack_hash = load_source_pack_manifest_source_hash(source_pack_manifest)
+    except ValueError as exc:
+        raise ValueError(
+            "export.artifacts.artifact_root=source-pack requires a source-pack "
+            f"manifest with a verified source_hash at {source_pack_manifest}: {exc}"
+        ) from exc
 
     run_dir = source_pack_dir / "analyses" / "millefeuille" / run_id
     manifest_ref = _relative_ref(source_pack_manifest, run_dir)
@@ -158,14 +169,13 @@ def resolve_artifact_run_context(
         run_dir=run_dir,
         source_pack_ref=str(source_pack_dir),
         source_pack_manifest_ref=manifest_ref,
+        source_pack_hash=source_pack_hash,
         source_pack_verified=True,
     )
 
 
 def paper_id_for_item(item: DiscoveredItem) -> str:
-    raw = f"zotero-{item.key}"
-    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", raw).strip("-._")
-    return slug or "zotero-item"
+    return paper_id_for_zotero_item_key(item.key)
 
 
 def write_stage_manifest(manifest: StageManifest, path: str | Path) -> None:
@@ -319,12 +329,13 @@ def build_dry_run_artifact_index(
     stage_manifest: StageManifest,
     source_pack_ref: str | None = None,
     source_pack_manifest_ref: str | None = None,
+    source_pack_hash: str | None = None,
 ) -> ArtifactIndex:
     paper_id = paper_id_for_item(item)
     source_pack = {
         "ref": source_pack_ref or f"source-packs/zotero/{paper_id}",
         "source_type": "zotero",
-        "source_hash": _source_hash_for_rows(rows),
+        "source_hash": source_pack_hash or _source_hash_for_rows(rows),
     }
     if source_pack_manifest_ref is not None:
         source_pack["manifest_ref"] = source_pack_manifest_ref

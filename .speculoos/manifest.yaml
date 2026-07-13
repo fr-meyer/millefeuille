@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: null
+canonical_task: pr-054-source-pack-intake-fixtures
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: null
+  working_branch: feat/pr-054-source-pack-intake-fixtures
 status:
-  phase: idle
-  pret_a_coder: idle
+  phase: implementation
+  pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 170 passed, 0 failed
+    result: 181 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -57,14 +57,14 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: none-active
+    status: branch-active
     number: null
     url: null
     base_branch: dev
-    head_branch: null
+    head_branch: feat/pr-054-source-pack-intake-fixtures
     head_sha: null
     merge_commit: null
-    project_status: none-active
+    project_status: In Progress
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet
@@ -93,7 +93,14 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: null
+current_task:
+  id: pr-054-source-pack-intake-fixtures
+  title: Add fixture-first source-pack intake
+  status: implementation
+  branch: feat/pr-054-source-pack-intake-fixtures
+  base_branch: dev
+  task_file: .speculoos/tasks/pr-054-source-pack-intake-fixtures.yaml
+  started_from: 8f7c0f46f6aa7f267ca936be8a87b096f9f4d37e
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -239,3 +246,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/52#pullrequestreview-4684116211
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86800022039
+    - id: pr-053-pr52-closeout-metadata
+      status: merged
+      branch: chore/pr-053-pr52-closeout-metadata
+      base_branch: dev
+      pull_request: 53
+      url: https://github.com/fr-meyer/millefeuille/pull/53
+      head_sha: b2f7e80e624e6f47d14c91e5d84a61822e489cc4
+      merge_commit: 8f7c0f46f6aa7f267ca936be8a87b096f9f4d37e
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/53#pullrequestreview-4684163854
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86801420865

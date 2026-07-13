@@ -12,6 +12,8 @@ Files:
 - `cli-contract.md` - intended command groups and run modes.
 - `stage-manifest.schema.json` - machine-readable stage manifest shape.
 - `artifact-storage.md` - artifact-root and source-pack storage contract.
+- `source-pack-manifest.schema.json` - source-pack source identity and hash
+  contract.
 - `artifact-index.schema.json` - machine-readable artifact index shape.
 - `model-profile.schema.yaml` - per-stage model/profile selection shape.
 - `hierarchical-summary.schema.json` - page/section/paper summary shape.

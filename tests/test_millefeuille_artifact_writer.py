@@ -171,7 +171,9 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             existing_source_pack_dir = Path(tempdir) / "zotero" / "zotero-ITEM1"
             existing_source_pack_dir.mkdir(parents=True)
             (existing_source_pack_dir / "manifest.json").write_text(
-                '{"schema_version":"source-pack-fixture/v0.1"}\n',
+                '{"schema_version":"source-pack-fixture/v0.1","source_hash":"sha256:'
+                + ("c" * 64)
+                + '"}\n',
                 encoding="utf-8",
             )
             cfg = _make_app_config(
@@ -213,7 +215,9 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             source_pack_dir = Path(tempdir) / "zotero" / "zotero-ITEM1"
             source_pack_dir.mkdir(parents=True)
             (source_pack_dir / "manifest.json").write_text(
-                '{"schema_version":"source-pack-fixture/v0.1"}\n',
+                '{"schema_version":"source-pack-fixture/v0.1","source_hash":"sha256:'
+                + ("c" * 64)
+                + '"}\n',
                 encoding="utf-8",
             )
             cfg = _make_app_config(

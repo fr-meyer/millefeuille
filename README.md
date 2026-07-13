@@ -267,6 +267,23 @@ only under
 not create source packs or alter source evidence; a missing manifest is a hard
 configuration/evidence error.
 
+To create a source pack from explicit local recovered-PDF fixture evidence, use
+the offline intake command:
+
+```bash
+millefeuille source-pack intake \
+  --evidence /path/to/recovered-pdf-evidence.json \
+  --source-pack-root /path/to/source-packs
+```
+
+The evidence JSON must include the Zotero item key, attachment key, canonical
+filename, local recovered PDF path, and expected SHA-256. The command verifies
+the recovered bytes before writing
+`<source-pack-root>/zotero/<paper-id>/source.pdf` and `manifest.json`; it
+refuses mismatched hashes or existing pack drift. It does not read Zotero,
+download PDFs, call OCR/model providers, write OpenKB/index data, or mutate
+Zotero.
+
 ### Command-Line Configuration
 
 Override configuration from the command line:

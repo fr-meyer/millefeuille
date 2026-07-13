@@ -28,6 +28,7 @@ REQUIRED_DOCS = [
 REQUIRED_JSON_SCHEMAS = [
     "stage-manifest.schema.json",
     "artifact-index.schema.json",
+    "source-pack-manifest.schema.json",
     "hierarchical-summary.schema.json",
     "paper-card.schema.json",
 ]
