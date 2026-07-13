@@ -12,6 +12,13 @@ github:
   project_item: unavailable
   url: null
   head_sha: ba207aabae8dd341c44afaa92ee5e548a49a7543
+post_merge_expected:
+  pull_request: 54
+  base_branch: dev
+  head_branch: feat/pr-054-source-pack-intake-fixtures
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
 scope:
   - add an offline source-pack intake writer for explicit local recovered-PDF fixture evidence
   - verify recovered bytes against expected SHA-256 before creating source-pack source evidence
