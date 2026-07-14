@@ -42,6 +42,16 @@ def _write_recovered_pdf(tempdir: str) -> Path:
     return source_path
 
 
+def _write_recovered_pdf_bytes(
+    tempdir: str,
+    filename: str,
+    payload: bytes,
+) -> Path:
+    source_path = Path(tempdir) / filename
+    source_path.write_bytes(payload)
+    return source_path
+
+
 def _evidence(source_path: Path) -> RecoveredPdfEvidence:
     return RecoveredPdfEvidence(
         item_key="ITEM1",
@@ -435,6 +445,84 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                     source_pack_root=Path(tempdir) / "source-packs",
                     created_at="2026-07-13T12:00:00+00:00",
                 )
+
+    def test_handoff_intake_rejects_multi_pdf_same_item_before_any_write(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            bytes_one = b"main paper bytes\n"
+            bytes_two = b"supplement paper bytes\n"
+            sha_one = hashlib.sha256(bytes_one).hexdigest()
+            sha_two = hashlib.sha256(bytes_two).hexdigest()
+            source_one = _write_recovered_pdf_bytes(tempdir, "main.pdf", bytes_one)
+            source_two = _write_recovered_pdf_bytes(
+                tempdir,
+                "supplement.pdf",
+                bytes_two,
+            )
+            evidence_path = Path(tempdir) / "recovered-pdf-evidence.jsonl"
+            evidence_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "schema_version": (
+                                    "millefeuille-recovered-pdf-evidence/v0.1"
+                                ),
+                                "source_type": "zotero",
+                                "item_key": "ITEM1",
+                                "attachment_key": "ATT1",
+                                "canonical_filename": "Main.pdf",
+                                "recovered_pdf_path": source_one.name,
+                                "expected_sha256": sha_one,
+                                "content_type": "application/pdf",
+                                "file_size_bytes": len(bytes_one),
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "schema_version": (
+                                    "millefeuille-recovered-pdf-evidence/v0.1"
+                                ),
+                                "source_type": "zotero",
+                                "item_key": "ITEM1",
+                                "attachment_key": "ATT2",
+                                "canonical_filename": "Supplement.pdf",
+                                "recovered_pdf_path": source_two.name,
+                                "expected_sha256": sha_two,
+                                "content_type": "application/pdf",
+                                "file_size_bytes": len(bytes_two),
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "exactly one PDF handoff row per Zotero item/source pack",
+            ):
+                write_source_packs_from_handoff_evidence(
+                    handoff_rows=[
+                        _make_handoff_row(
+                            attachment_key="ATT1",
+                            canonical_filename="Main.pdf",
+                            sha256=sha_one,
+                            file_size_bytes=len(bytes_one),
+                        ),
+                        _make_handoff_row(
+                            attachment_key="ATT2",
+                            canonical_filename="Supplement.pdf",
+                            sha256=sha_two,
+                            file_size_bytes=len(bytes_two),
+                        ),
+                    ],
+                    evidence_path=evidence_path,
+                    source_pack_root=Path(tempdir) / "source-packs",
+                    created_at="2026-07-13T12:00:00+00:00",
+                )
+
+            self.assertFalse((Path(tempdir) / "source-packs" / "zotero").exists())
 
 
 class TestSourcePackIntakeCli(unittest.TestCase):

@@ -3,6 +3,7 @@
 - add staged dry-run source-pack intake from explicit recovered-PDF fixture evidence
 - require evidence to match validated handoff rows by item key, attachment key, canonical filename, file size, and SHA-256
 - preflight all selected rows before any source-pack or artifact write
+- reject multi-PDF same-item handoff groups until the source-pack schema can represent more than one source file per item
 - add `--source-pack-intake-evidence` as the CLI alias for the staged path
 - document the new command shape in the artifact/source-pack README section
 

@@ -304,6 +304,12 @@ and Millefeuille artifact manifests under the explicit `--source-pack-root`;
 it does not write Zotero, OCR/model providers, OpenKB, PageIndex, ConDB, or
 ChatIndex.
 
+The current source-pack schema is still single-source: one `source.pdf` and one
+`manifest.json` per Zotero item-derived source pack. If a discovered Zotero item
+has multiple PDF handoff rows, this staged intake lane now aborts before any
+write rather than partially creating a source pack and drifting on a later
+attachment. Multi-PDF item support needs a dedicated follow-up slice.
+
 ### Command-Line Configuration
 
 Override configuration from the command line:

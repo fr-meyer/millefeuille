@@ -286,6 +286,7 @@ def write_source_packs_from_handoff_evidence(
     rows = [row for row in handoff_rows if row.is_pdf]
     if not rows:
         return []
+    _reject_multi_pdf_handoff_groups(rows)
 
     evidence_records = load_recovered_pdf_evidence_batch(evidence_path)
     evidence_by_key = _evidence_by_handoff_key(evidence_records)
@@ -499,6 +500,31 @@ def _evidence_by_handoff_key(
             )
         evidence_by_key[key] = evidence
     return evidence_by_key
+
+
+def _reject_multi_pdf_handoff_groups(rows: list[OpenKBHandoffRow]) -> None:
+    grouped_rows: dict[str, list[OpenKBHandoffRow]] = {}
+    for row in rows:
+        grouped_rows.setdefault(row.item_key, []).append(row)
+
+    conflicts: list[str] = []
+    for item_key, item_rows in grouped_rows.items():
+        if len(item_rows) <= 1:
+            continue
+        paper_id = paper_id_for_zotero_item_key(item_key)
+        attachment_keys = ", ".join(
+            sorted(row.attachment_key for row in item_rows)
+        )
+        conflicts.append(
+            f"{item_key} -> {paper_id} [{attachment_keys}]"
+        )
+
+    if conflicts:
+        raise MillefeuilleContractError(
+            "source-pack intake currently supports exactly one PDF handoff row "
+            "per Zotero item/source pack; refusing multi-PDF groups: "
+            + "; ".join(sorted(conflicts))
+        )
 
 
 def _handoff_key(item_key: str, attachment_key: str) -> str:

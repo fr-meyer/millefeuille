@@ -22,6 +22,7 @@ scope:
   - match intake evidence to validated OpenKB handoff rows by Zotero item and attachment identity
   - require handoff SHA-256 and fixture SHA-256 agreement before local source-pack creation
   - preflight all selected handoff rows before writing any source-pack or artifact output
+  - reject multi-PDF same-item handoff groups until the source-pack schema grows beyond one `source.pdf` per item
   - add a CLI alias for `--source-pack-intake-evidence`
   - write artifact indexes and stage manifests under the created source-pack analysis directory
   - document the staged dry-run intake command shape
@@ -36,6 +37,7 @@ non_goals:
 acceptance:
   - dry-run handoff runs can create source packs from matching local fixture evidence before artifact writes
   - mismatched, duplicate, missing, or weakly identified evidence fails before any source-pack or artifact write
+  - multi-PDF handoff rows for the same Zotero item fail before any source-pack or artifact write
   - staged intake requires `artifact_root=source-pack`, explicit `source_pack_root`, and enabled OpenKB handoff export
   - artifact indexes consume the new source-pack manifest hash and mark the source-pack stage passed
   - no new live Zotero write, OCR/model provider call, OpenKB write, or index write is introduced
@@ -54,10 +56,11 @@ notes:
   - "PR #55 merged PR #54 closeout metadata to dev at ec22c60e3a69c940b9203923d9a76e29459b1497; this PR records that completed closeout while opening the staged source-pack intake slice."
 evidence:
   - "Started from dev merge commit ec22c60e3a69c940b9203923d9a76e29459b1497."
-  - "Focused tests passed: .venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer (27 tests)."
-  - "Full unittest discovery passed: .venv/bin/python -m unittest discover -v (188 tests)."
+  - "Focused tests passed: .venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer (29 tests)."
+  - "Full unittest discovery passed: .venv/bin/python -m unittest discover -v (190 tests)."
   - "Ruff passed: .venv/bin/ruff check ."
   - "Metadata parse passed: ruby -ryaml -rjson -e metadata ok."
   - "git diff --check passed."
   - "Speculoos status and validate passed for pr-056-source-pack-staged-handoff-intake."
   - "Speculoos publish-check passed for the PR body and commit message."
+  - "Manual reproduction of a two-PDF same-item handoff now fails before any source-pack directory is created."
