@@ -5,11 +5,12 @@ branch: feat/pr-057-source-pack-extraction-fixtures
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 57
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
+  head_sha: 3d6cb4fe7b9b2132ec6fa15b74322e153cdd2fbb
 post_merge_expected:
   pull_request: null
   base_branch: dev
@@ -57,3 +58,5 @@ evidence:
   - "Metadata parse passed: ruby -ryaml -rjson -e metadata ok."
   - "git diff --check passed."
   - "Speculoos status and validate passed for pr-057-source-pack-extraction-fixtures."
+  - 'PR #57 opened for pr-057-source-pack-extraction-fixtures'
+  - 'PR #57 linked to Project item unavailable'
