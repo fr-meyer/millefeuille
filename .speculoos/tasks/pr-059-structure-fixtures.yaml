@@ -5,13 +5,13 @@ branch: feat/pr-059-structure-fixtures
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 59
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
 post_merge_expected:
-  pull_request: null
+  pull_request: 59
   base_branch: dev
   head_branch: feat/pr-059-structure-fixtures
   head_sha: merge-plan-exact-head
@@ -55,3 +55,4 @@ evidence:
   - "Focused unit tests passed: tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (54 tests)."
   - "Full unittest discovery passed: 207 tests."
   - "Ruff, metadata parse, git diff --check, and speculoos validate passed."
+  - "Published as PR #59 at https://github.com/fr-meyer/millefeuille/pull/59 with exact head 4f607cb4096e00e3fb474fce4427cdbae176cd4e."

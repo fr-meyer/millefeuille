@@ -19,12 +19,12 @@ current_task:
   status: In Progress
   branch: feat/pr-059-structure-fixtures
   speculoos_task: .speculoos/tasks/pr-059-structure-fixtures.yaml
-  pull_request: null
+  pull_request: 59
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
-  head_sha: null
-pull_request: null
+  head_sha: 4f607cb4096e00e3fb474fce4427cdbae176cd4e
+pull_request: 59
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
