@@ -12,7 +12,7 @@ github:
   project_item: unavailable
   head_sha: 5c1a1455d5a93684e46850229c99774d49628f60
 post_merge_expected:
-  pull_request: null
+  pull_request: 58
   base_branch: dev
   head_branch: feat/pr-058-route-selection-fixtures
   head_sha: merge-plan-exact-head
@@ -53,6 +53,7 @@ notes:
   - "PR #57 merged to dev as cbe60b8916d231c484ad44cec11498c1146a5f86; this branch now starts from that exact dev head before PR #58 publication."
 evidence:
   - "Rebased onto merged dev commit cbe60b8916d231c484ad44cec11498c1146a5f86 after PR #57 merged."
+  - "Published as PR #58 at https://github.com/fr-meyer/millefeuille/pull/58 with exact head 5c1a1455d5a93684e46850229c99774d49628f60."
   - "Focused tests passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (50 tests)."
   - "Full unittest discovery passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest discover -v (203 tests)."
   - "Ruff passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/ruff check ."

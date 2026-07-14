@@ -58,11 +58,11 @@ surfaces:
   github_pull_request:
     enabled: true
     status: open
-    number: null
-    url: null
+    number: 58
+    url: https://github.com/fr-meyer/millefeuille/pull/58
     base_branch: dev
     head_branch: feat/pr-058-route-selection-fixtures
-    head_sha: null
+    head_sha: 5c1a1455d5a93684e46850229c99774d49628f60
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
