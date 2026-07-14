@@ -1,0 +1,12 @@
+feat: wire source-pack intake into staged handoff
+
+Connect explicit recovered-PDF fixture evidence to the dry-run OpenKB
+handoff artifact path. The staged path now verifies all selected handoff
+rows before creating source packs, then lets artifact-root source-pack
+runs write their stage manifests and artifact indexes under the verified
+pack.
+
+This remains offline and fixture-first: no live Zotero writes, OCR/model
+provider calls, OpenKB writes, or index writes are introduced.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

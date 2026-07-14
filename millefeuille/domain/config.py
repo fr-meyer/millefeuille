@@ -715,6 +715,9 @@ class ArtifactExportConfig:
     source_pack_root: str | None = None
     """Base directory used when ``artifact_root`` is ``source-pack``."""
 
+    source_pack_intake_evidence_path: str | None = None
+    """Optional recovered-PDF evidence file for staged source-pack intake."""
+
     run_id: str | None = None
     """Optional stable run id. When omitted, a timestamped run id is generated."""
 
@@ -729,6 +732,12 @@ class ArtifactExportConfig:
             )
         if self.source_pack_root is not None and not str(self.source_pack_root).strip():
             raise ConfigError("export.artifacts.source_pack_root cannot be empty")
+        if self.source_pack_intake_evidence_path is not None and not str(
+            self.source_pack_intake_evidence_path
+        ).strip():
+            raise ConfigError(
+                "export.artifacts.source_pack_intake_evidence_path cannot be empty"
+            )
         if self.run_id is not None and not str(self.run_id).strip():
             raise ConfigError("export.artifacts.run_id cannot be empty")
 

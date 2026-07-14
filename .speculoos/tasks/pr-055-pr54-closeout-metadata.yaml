@@ -1,6 +1,6 @@
 id: pr-055-pr54-closeout-metadata
 title: Close PR 54 source-pack intake metadata
-status: implementation
+status: merged
 branch: chore/pr-055-pr54-closeout-metadata
 base_branch: dev
 github:
@@ -8,9 +8,13 @@ github:
   pull_request: 55
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
-  head_sha: c83d5a7f8770c4f6393ca159b10a95aa8da9335f
+  url: https://github.com/fr-meyer/millefeuille/pull/55
+  head_sha: 95127934d1ecf7a6516ea2aeb169ec8604620cc7
+  merge_commit: ec22c60e3a69c940b9203923d9a76e29459b1497
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/55#pullrequestreview-4684962077
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86824278156
 post_merge_expected:
   pull_request: 55
   base_branch: dev
@@ -50,3 +54,8 @@ evidence:
   - surface-sync --close-merged-task cleared PR #54 active task metadata before PR #55 activation
   - 'PR #55 opened for pr-055-pr54-closeout-metadata'
   - 'PR #55 linked to Project item unavailable'
+  - 'PR #55 merged with merge commit ec22c60e3a69c940b9203923d9a76e29459b1497'
+  - 'PR #55 head recorded from local merge parent 95127934d1ecf7a6516ea2aeb169ec8604620cc7'
+  - 'Mergeguez review approved head 95127934d1ecf7a6516ea2aeb169ec8604620cc7: https://github.com/fr-meyer/millefeuille/pull/55#pullrequestreview-4684962077'
+  - 'Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/86824278156'
+  - 'PR #55 closeout carried forward by PR #56 staged source-pack intake metadata'

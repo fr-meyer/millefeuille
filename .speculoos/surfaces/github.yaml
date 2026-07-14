@@ -15,16 +15,16 @@ notes:
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
-  id: pr-055-pr54-closeout-metadata
+  id: pr-056-source-pack-staged-handoff-intake
   status: In Progress
-  branch: chore/pr-055-pr54-closeout-metadata
-  speculoos_task: .speculoos/tasks/pr-055-pr54-closeout-metadata.yaml
-  pull_request: 55
+  branch: feat/pr-056-source-pack-staged-handoff-intake
+  speculoos_task: .speculoos/tasks/pr-056-source-pack-staged-handoff-intake.yaml
+  pull_request: 56
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
-  head_sha: c83d5a7f8770c4f6393ca159b10a95aa8da9335f
-pull_request: 55
+  head_sha: 119c52920c8c53fcede2193a81ac5b36bd9d2155
+pull_request: 56
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
@@ -176,3 +176,13 @@ completed_pull_requests:
     merge_commit: 1ae94e457869325d13f396ef19582bfa678255c9
     mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/54#pullrequestreview-4684886328
     mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86822134546
+  - id: pr-055-pr54-closeout-metadata
+    number: 55
+    url: https://github.com/fr-meyer/millefeuille/pull/55
+    status: merged
+    base_branch: dev
+    head_branch: chore/pr-055-pr54-closeout-metadata
+    head_sha: 95127934d1ecf7a6516ea2aeb169ec8604620cc7
+    merge_commit: ec22c60e3a69c940b9203923d9a76e29459b1497
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/55#pullrequestreview-4684962077
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86824278156

@@ -1,13 +1,13 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-055-pr54-closeout-metadata
+canonical_task: pr-056-source-pack-staged-handoff-intake
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /home/node/.openclaw/repos/millefeuille
   base_branch: dev
-  working_branch: chore/pr-055-pr54-closeout-metadata
+  working_branch: feat/pr-056-source-pack-staged-handoff-intake
 status:
   phase: in_review
   pret_a_coder: in_progress
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 181 passed, 0 failed
+    result: 188 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -61,7 +61,7 @@ surfaces:
     number: null
     url: null
     base_branch: dev
-    head_branch: chore/pr-055-pr54-closeout-metadata
+    head_branch: feat/pr-056-source-pack-staged-handoff-intake
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -94,13 +94,13 @@ gates:
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
 current_task:
-  id: pr-055-pr54-closeout-metadata
-  title: Close PR 54 source-pack intake metadata
+  id: pr-056-source-pack-staged-handoff-intake
+  title: Wire source-pack intake into staged handoff path
   status: implementation
-  branch: chore/pr-055-pr54-closeout-metadata
+  branch: feat/pr-056-source-pack-staged-handoff-intake
   base_branch: dev
-  task_file: .speculoos/tasks/pr-055-pr54-closeout-metadata.yaml
-  started_from: 1ae94e457869325d13f396ef19582bfa678255c9
+  task_file: .speculoos/tasks/pr-056-source-pack-staged-handoff-intake.yaml
+  started_from: ec22c60e3a69c940b9203923d9a76e29459b1497
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -268,3 +268,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/54#pullrequestreview-4684886328
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86822134546
+    - id: pr-055-pr54-closeout-metadata
+      status: merged
+      branch: chore/pr-055-pr54-closeout-metadata
+      base_branch: dev
+      pull_request: 55
+      url: https://github.com/fr-meyer/millefeuille/pull/55
+      head_sha: 95127934d1ecf7a6516ea2aeb169ec8604620cc7
+      merge_commit: ec22c60e3a69c940b9203923d9a76e29459b1497
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/55#pullrequestreview-4684962077
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86824278156

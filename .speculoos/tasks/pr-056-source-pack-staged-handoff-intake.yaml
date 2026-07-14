@@ -1,0 +1,69 @@
+id: pr-056-source-pack-staged-handoff-intake
+title: Wire source-pack intake into staged handoff path
+status: implementation
+branch: feat/pr-056-source-pack-staged-handoff-intake
+base_branch: dev
+github:
+  issue: null
+  pull_request: 56
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  head_sha: 119c52920c8c53fcede2193a81ac5b36bd9d2155
+post_merge_expected:
+  pull_request: 56
+  base_branch: dev
+  head_branch: feat/pr-056-source-pack-staged-handoff-intake
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - add staged dry-run source-pack intake from explicit recovered-PDF fixture evidence
+  - match intake evidence to validated OpenKB handoff rows by Zotero item and attachment identity
+  - require handoff SHA-256 and fixture SHA-256 agreement before local source-pack creation
+  - preflight all selected handoff rows before writing any source-pack or artifact output
+  - reject multi-PDF same-item handoff groups until the source-pack schema grows beyond one `source.pdf` per item
+  - add a CLI alias for `--source-pack-intake-evidence`
+  - write artifact indexes and stage manifests under the created source-pack analysis directory
+  - document the staged dry-run intake command shape
+  - carry forward PR #55 closeout merge facts in repo-local Speculoos ledgers
+non_goals:
+  - live Zotero writes, lifecycle tag mutation, or Zotero note writes
+  - live PDF recovery beyond already-materialized local fixture evidence
+  - OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or index writes
+  - hierarchical summaries, paper cards, classification, or retrieval-index population
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - dry-run handoff runs can create source packs from matching local fixture evidence before artifact writes
+  - mismatched, duplicate, missing, or weakly identified evidence fails before any source-pack or artifact write
+  - multi-PDF handoff rows for the same Zotero item fail before any source-pack or artifact write
+  - staged intake requires `artifact_root=source-pack`, explicit `source_pack_root`, and enabled OpenKB handoff export
+  - artifact indexes consume the new source-pack manifest hash and mark the source-pack stage passed
+  - no new live Zotero write, OCR/model provider call, OpenKB write, or index write is introduced
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, and Speculoos validate pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-056-source-pack-staged-handoff-intake --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Fixture-first staged source-pack intake only; local source-pack writes are allowed only under an explicit --source-pack-root after handoff/evidence preflight. No live Zotero write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+notes:
+  - "PR #55 merged PR #54 closeout metadata to dev at ec22c60e3a69c940b9203923d9a76e29459b1497; this PR records that completed closeout while opening the staged source-pack intake slice."
+evidence:
+  - "Started from dev merge commit ec22c60e3a69c940b9203923d9a76e29459b1497."
+  - "Focused tests passed: .venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer (29 tests)."
+  - "Full unittest discovery passed: .venv/bin/python -m unittest discover -v (190 tests)."
+  - "Ruff passed: .venv/bin/ruff check ."
+  - "Metadata parse passed: ruby -ryaml -rjson -e metadata ok."
+  - "git diff --check passed."
+  - "Speculoos status and validate passed for pr-056-source-pack-staged-handoff-intake."
+  - "Speculoos publish-check passed for the PR body and commit message."
+  - "Manual reproduction of a two-PDF same-item handoff now fails before any source-pack directory is created."
+  - 'PR #56 opened for pr-056-source-pack-staged-handoff-intake'
+  - 'PR #56 linked to Project item unavailable'
