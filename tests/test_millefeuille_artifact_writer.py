@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 from millefeuille.cli.commands import dry_run_command
 from millefeuille.cli.main import _translate_artifact_writer_args, validate_flags
 from millefeuille.domain.artifacts import load_artifact_index
+from millefeuille.domain.card_fixtures import load_paper_card
 from millefeuille.domain.config import (
     AppConfig,
     ArtifactExportConfig,
@@ -296,6 +297,63 @@ def _write_summary_evidence_json(
                 "attachment_key": "ATT1",
                 "canonical_filename": "Example Author - 2026 - Artifact Writer.pdf",
                 "summary_path": summary_path.name,
+                "expected_sha256": FIXTURE_PDF_SHA256,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return evidence_path
+
+
+def _write_card_fixture_json(tempdir: str) -> Path:
+    card_path = Path(tempdir) / "paper-card-fixture.json"
+    card_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "millefeuille-paper-card/v0.1",
+                "paper_id": "fixture-paper",
+                "identity": {
+                    "title": "Fixture Paper",
+                    "authors": ["Alice Example", "Bob Example"],
+                    "year": 2026,
+                },
+                "one_line_thesis": "A concise thesis.",
+                "primary_contribution": "A clear primary contribution.",
+                "main_results": "Fixture results.",
+                "limitations": "Fixture limitations.",
+                "classification_clues": ["benchmark", "vision"],
+                "evidence_refs": ["fixture-summary.json"],
+                "index_status": [{"lane": "openkb", "status": "skipped"}],
+                "model_provenance": {"profile_id": "fixture-card"},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return card_path
+
+
+def _write_card_evidence_json(
+    tempdir: str,
+    card_json_path: Path,
+    card_markdown_path: Path,
+) -> Path:
+    evidence_path = Path(tempdir) / "card-evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "millefeuille-card-fixture-evidence/v0.1",
+                "source_type": "zotero",
+                "item_key": "ITEM1",
+                "attachment_key": "ATT1",
+                "canonical_filename": "Example Author - 2026 - Artifact Writer.pdf",
+                "card_json_path": card_json_path.name,
+                "card_markdown_path": card_markdown_path.name,
                 "expected_sha256": FIXTURE_PDF_SHA256,
             },
             indent=2,
@@ -1043,6 +1101,122 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    def test_card_fixture_path_feeds_source_pack_artifact_writer(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root = _write_source_pack(tempdir)
+            native_markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\nNative fixture page 2\n",
+            )
+            ocr_markdown_path = _write_markdown(
+                tempdir,
+                "ocr-fulltext.md",
+                "OCR fixture page 1\nOCR fixture page 2\n",
+            )
+            route_markdown_path = _write_markdown(
+                tempdir,
+                "selected-fulltext.md",
+                "Merged fixture page 1\nMerged fixture page 2\n",
+            )
+            _write_markdown(tempdir, "page-1.md", "Page 1 summary.\n")
+            _write_markdown(tempdir, "full-paper.md", "Full paper summary.\n")
+            card_markdown_path = _write_markdown(
+                tempdir,
+                "paper-card.md",
+                "# Fixture Paper Card\n\nA concise thesis.\n",
+            )
+            cfg = _make_app_config(
+                export=ExportConfig(
+                    artifacts=ArtifactExportConfig(
+                        enabled=True,
+                        artifact_root="source-pack",
+                        source_pack_root=str(source_pack_root),
+                        native_extraction_evidence_path=str(
+                            _write_native_extraction_evidence_json(
+                                tempdir,
+                                native_markdown_path,
+                            )
+                        ),
+                        ocr_extraction_evidence_path=str(
+                            _write_ocr_extraction_evidence_json(
+                                tempdir,
+                                ocr_markdown_path,
+                            )
+                        ),
+                        route_selection_evidence_path=str(
+                            _write_route_selection_evidence_json(
+                                tempdir,
+                                route_markdown_path,
+                            )
+                        ),
+                        structure_evidence_path=str(
+                            _write_structure_evidence_json(
+                                tempdir,
+                                _write_structure_payload_json(tempdir),
+                            )
+                        ),
+                        summary_evidence_path=str(
+                            _write_summary_evidence_json(
+                                tempdir,
+                                _write_summary_fixture_json(tempdir),
+                            )
+                        ),
+                        card_evidence_path=str(
+                            _write_card_evidence_json(
+                                tempdir,
+                                _write_card_fixture_json(tempdir),
+                                card_markdown_path,
+                            )
+                        ),
+                        run_id="run-fixture",
+                    )
+                )
+            )
+            logger = MagicMock()
+            mock_zotero = MagicMock()
+            mock_zotero.credentials = SimpleNamespace(library_id="123")
+            mock_zotero.get_items_by_selection.return_value = (
+                [_make_item(sha256=FIXTURE_PDF_SHA256)],
+                _make_discovery_stats(),
+            )
+
+            exit_code = dry_run_command(cfg, logger, mock_zotero)
+
+            run_dir = (
+                source_pack_root
+                / "zotero"
+                / "zotero-ITEM1"
+                / "analyses"
+                / "millefeuille"
+                / "run-fixture"
+            )
+            artifact_index = load_artifact_index(run_dir / "artifact-index.json")
+            card_json_path = run_dir / "cards" / "paper-card.json"
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(artifact_index.stages["card"]["status"], "passed")
+            self.assertIn("paper_card_json", artifact_index.artifacts)
+            self.assertIn("paper_card_markdown", artifact_index.artifacts)
+            self.assertEqual(
+                artifact_index.artifacts["paper_card_json"]["ref"],
+                "cards/paper-card.json",
+            )
+            self.assertEqual(
+                artifact_index.artifacts["paper_card_markdown"]["ref"],
+                "cards/paper-card.md",
+            )
+            payload = load_paper_card(card_json_path)
+            self.assertEqual(payload["paper_id"], "zotero-ITEM1")
+            self.assertEqual(
+                payload["identity"]["source_hash"],
+                f"sha256:{FIXTURE_PDF_SHA256}",
+            )
+            self.assertTrue((run_dir / "cards" / "paper-card.md").is_file())
+            mock_zotero.download_pdf.assert_not_called()
+            mock_zotero.add_tag.assert_not_called()
+            mock_zotero.remove_tag.assert_not_called()
+
     def test_source_pack_intake_fixture_path_rejects_multi_pdf_item_cleanly(self):
         with tempfile.TemporaryDirectory() as tempdir:
             recovered_main = Path(tempdir) / "main.pdf"
@@ -1195,6 +1369,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                     route_selection_evidence_path="/tmp/route.json",
                     structure_evidence_path="/tmp/structure.json",
                     summary_evidence_path="/tmp/summary.json",
+                    card_evidence_path="/tmp/card.json",
                 )
             )
         )
@@ -1339,6 +1514,7 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
             "--structure-evidence=/tmp/structure.jsonl",
             "--summary-evidence",
             "/tmp/summary.jsonl",
+            "--card-evidence=/tmp/card.jsonl",
             "--run-id",
             "run-fixture",
         ])
@@ -1359,6 +1535,7 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
                 ),
                 "export.artifacts.structure_evidence_path=/tmp/structure.jsonl",
                 "export.artifacts.summary_evidence_path=/tmp/summary.jsonl",
+                "export.artifacts.card_evidence_path=/tmp/card.jsonl",
                 "export.artifacts.run_id=run-fixture",
                 "export.artifacts.enabled=true",
             ],

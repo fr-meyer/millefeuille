@@ -29,4 +29,5 @@ artifacts:
   route_selection_evidence_path: null
   structure_evidence_path: null
   summary_evidence_path: null
+  card_evidence_path: null
   run_id: null

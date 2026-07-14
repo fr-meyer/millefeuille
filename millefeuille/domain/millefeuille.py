@@ -581,3 +581,150 @@ class HierarchicalSummaryRecord:
             ),
             "summaries": [summary.to_dict() for summary in self.summaries],
         }
+
+
+@dataclass
+class PaperCardRecord:
+    paper_id: str
+    identity: dict[str, Any]
+    one_line_thesis: str
+    primary_contribution: str
+    evidence_refs: list[str]
+    index_status: list[dict[str, Any]]
+    model_provenance: dict[str, Any]
+    problem_addressed: str | None = None
+    method_or_approach: str | None = None
+    data_modality_domain: str | None = None
+    main_results: str | None = None
+    limitations: str | None = None
+    classification_clues: list[str] = field(default_factory=list)
+    strongest_rejected_classification_path: str | None = None
+    quality_warnings: list[str] = field(default_factory=list)
+    zotero_lifecycle_tag_state: str | None = None
+    schema_version: str = "millefeuille-paper-card/v0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "millefeuille-paper-card/v0.1":
+            raise MillefeuilleContractError(
+                f"unsupported schema_version {self.schema_version!r}"
+            )
+        if not self.paper_id.strip():
+            raise MillefeuilleContractError("paper_id must not be empty")
+        for field_name in ("one_line_thesis", "primary_contribution"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string"
+                )
+        if not isinstance(self.identity, dict):
+            raise MillefeuilleContractError("identity must be an object")
+        title = self.identity.get("title")
+        if not isinstance(title, str) or not title.strip():
+            raise MillefeuilleContractError("identity.title must be a non-empty string")
+        if not isinstance(self.model_provenance, dict):
+            raise MillefeuilleContractError("model_provenance must be an object")
+        profile_id = self.model_provenance.get("profile_id")
+        if not isinstance(profile_id, str) or not profile_id.strip():
+            raise MillefeuilleContractError(
+                "model_provenance.profile_id must be a non-empty string"
+            )
+        if not isinstance(self.evidence_refs, list) or not self.evidence_refs:
+            raise MillefeuilleContractError(
+                "evidence_refs must be a non-empty array"
+            )
+        for ref in self.evidence_refs:
+            if not isinstance(ref, str) or not ref.strip():
+                raise MillefeuilleContractError(
+                    "evidence_refs must contain non-empty strings"
+                )
+        if not isinstance(self.index_status, list):
+            raise MillefeuilleContractError("index_status must be an array")
+        for entry in self.index_status:
+            if not isinstance(entry, dict):
+                raise MillefeuilleContractError(
+                    "index_status entries must be objects"
+                )
+            lane = entry.get("lane")
+            status = entry.get("status")
+            if not isinstance(lane, str) or not lane.strip():
+                raise MillefeuilleContractError(
+                    "index_status.lane must be a non-empty string"
+                )
+            if not isinstance(status, str) or not status.strip():
+                raise MillefeuilleContractError(
+                    "index_status.status must be a non-empty string"
+                )
+        for field_name in ("classification_clues", "quality_warnings"):
+            value = getattr(self, field_name)
+            if not isinstance(value, list):
+                raise MillefeuilleContractError(f"{field_name} must be an array")
+            for entry in value:
+                if not isinstance(entry, str) or not entry.strip():
+                    raise MillefeuilleContractError(
+                        f"{field_name} must contain non-empty strings"
+                    )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> PaperCardRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("paper card must be an object")
+        evidence_refs = payload.get("evidence_refs")
+        index_status = payload.get("index_status")
+        if not isinstance(evidence_refs, list):
+            raise MillefeuilleContractError("evidence_refs must be an array")
+        if not isinstance(index_status, list):
+            raise MillefeuilleContractError("index_status must be an array")
+        return cls(
+            paper_id=str(payload.get("paper_id", "")).strip(),
+            identity=dict(payload.get("identity", {})),
+            one_line_thesis=str(payload.get("one_line_thesis", "")).strip(),
+            primary_contribution=str(
+                payload.get("primary_contribution", "")
+            ).strip(),
+            evidence_refs=list(evidence_refs),
+            index_status=[dict(entry) for entry in index_status],
+            model_provenance=dict(payload.get("model_provenance", {})),
+            problem_addressed=payload.get("problem_addressed"),
+            method_or_approach=payload.get("method_or_approach"),
+            data_modality_domain=payload.get("data_modality_domain"),
+            main_results=payload.get("main_results"),
+            limitations=payload.get("limitations"),
+            classification_clues=list(payload.get("classification_clues", [])),
+            strongest_rejected_classification_path=payload.get(
+                "strongest_rejected_classification_path"
+            ),
+            quality_warnings=list(payload.get("quality_warnings", [])),
+            zotero_lifecycle_tag_state=payload.get("zotero_lifecycle_tag_state"),
+            schema_version=str(payload.get("schema_version", "")).strip(),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "schema_version": self.schema_version,
+            "paper_id": self.paper_id,
+            "identity": dict(self.identity),
+            "one_line_thesis": self.one_line_thesis,
+            "primary_contribution": self.primary_contribution,
+            "evidence_refs": list(self.evidence_refs),
+            "index_status": [dict(entry) for entry in self.index_status],
+            "model_provenance": dict(self.model_provenance),
+        }
+        optional_string_fields = {
+            "problem_addressed": self.problem_addressed,
+            "method_or_approach": self.method_or_approach,
+            "data_modality_domain": self.data_modality_domain,
+            "main_results": self.main_results,
+            "limitations": self.limitations,
+            "strongest_rejected_classification_path": (
+                self.strongest_rejected_classification_path
+            ),
+            "zotero_lifecycle_tag_state": self.zotero_lifecycle_tag_state,
+        }
+        for field_name, value in optional_string_fields.items():
+            if value is not None:
+                payload[field_name] = value
+        if self.classification_clues:
+            payload["classification_clues"] = list(self.classification_clues)
+        if self.quality_warnings:
+            payload["quality_warnings"] = list(self.quality_warnings)
+        return payload
