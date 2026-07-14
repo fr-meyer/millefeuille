@@ -1,15 +1,15 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-058-route-selection-fixtures
+canonical_task: pr-059-structure-fixtures
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
-  local_path: /tmp/millefeuille-pr58
+  local_path: /tmp/millefeuille-pr59
   base_branch: dev
-  working_branch: feat/pr-058-route-selection-fixtures
+  working_branch: feat/pr-059-structure-fixtures
 status:
-  phase: in_review
+  phase: implementation
   pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 203 passed, 0 failed
+    result: 207 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -58,11 +58,11 @@ surfaces:
   github_pull_request:
     enabled: true
     status: open
-    number: 58
-    url: https://github.com/fr-meyer/millefeuille/pull/58
+    number: 59
+    url: https://github.com/fr-meyer/millefeuille/pull/59
     base_branch: dev
-    head_branch: feat/pr-058-route-selection-fixtures
-    head_sha: 5c1a1455d5a93684e46850229c99774d49628f60
+    head_branch: feat/pr-059-structure-fixtures
+    head_sha: 4f607cb4096e00e3fb474fce4427cdbae176cd4e
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
@@ -94,13 +94,13 @@ gates:
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
 current_task:
-  id: pr-058-route-selection-fixtures
-  title: Add route-selection fixtures
+  id: pr-059-structure-fixtures
+  title: Add structure fixtures
   status: implementation
-  branch: feat/pr-058-route-selection-fixtures
+  branch: feat/pr-059-structure-fixtures
   base_branch: dev
-  task_file: .speculoos/tasks/pr-058-route-selection-fixtures.yaml
-  started_from: cbe60b8916d231c484ad44cec11498c1146a5f86
+  task_file: .speculoos/tasks/pr-059-structure-fixtures.yaml
+  started_from: 602112498dd02ddbc09c5e724292793742d42721
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap

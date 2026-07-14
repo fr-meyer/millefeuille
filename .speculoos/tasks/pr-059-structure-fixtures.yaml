@@ -1,0 +1,58 @@
+id: pr-059-structure-fixtures
+title: Add structure fixtures
+status: implementation
+branch: feat/pr-059-structure-fixtures
+base_branch: dev
+github:
+  issue: null
+  pull_request: 59
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+post_merge_expected:
+  pull_request: 59
+  base_branch: dev
+  head_branch: feat/pr-059-structure-fixtures
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - add offline structure fixture writers under verified source packs
+  - require structure writes to match the selected route sidecars already present under each source pack
+  - preflight every structure record against source-pack manifest identity, source hash, and selected route before writing any structure sidecars
+  - surface structure evidence and outline refs through source-pack artifact-root stage manifests and artifact indexes
+  - add CLI aliases and config wiring for structure fixture evidence paths
+  - keep the slice offline-only on top of merged dev after PR #58
+non_goals:
+  - live Zotero reads or writes, lifecycle tag mutation, or live PDF recovery
+  - OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or index writes
+  - summaries, paper cards, classification, retrieval-index population, or live tree extraction
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - structure fixture evidence preflights against existing source-pack manifests and selected route sidecars before any structure write
+  - structure fixture writes emit verified structure evidence plus optional outline markdown with locators, coverage, and warnings
+  - rerunning identical structure fixture evidence is idempotent while drifted structure sidecars fail loudly
+  - dry-run source-pack artifact-root runs mark structure passed when verified structure artifacts exist
+  - artifact indexes expose structure evidence plus outline refs for the staged fixture outputs
+  - structure fixture flags require artifact_root=source-pack with an explicit source_pack_root
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, and Speculoos validate pass
+validation:
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models"
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest discover -v"
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-059-structure-fixtures --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Fixture-first structure only; no live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+notes:
+  - "PR #58 merged to dev as 602112498dd02ddbc09c5e724292793742d42721; this branch starts from that exact dev head before PR #59 publication."
+evidence:
+  - "Branched from merged dev commit 602112498dd02ddbc09c5e724292793742d42721 after PR #58 merged."
+  - "Focused unit tests passed: tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (54 tests)."
+  - "Full unittest discovery passed: 207 tests."
+  - "Ruff, metadata parse, git diff --check, and speculoos validate passed."
+  - "Published as PR #59 at https://github.com/fr-meyer/millefeuille/pull/59 with exact head 4f607cb4096e00e3fb474fce4427cdbae176cd4e."

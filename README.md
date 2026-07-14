@@ -352,6 +352,23 @@ verified. `selected_route=native` requires native extraction evidence,
 marks `route` passed and exposes the selected fulltext ref without calling
 providers or writing OpenKB/index lanes.
 
+Once the route sidecar exists, the dry-run path can stage structure fixture
+evidence:
+
+```bash
+millefeuille --artifact-root source-pack \
+  --source-pack-root /path/to/source-packs \
+  --structure-evidence /path/to/structure-evidence.jsonl \
+  --run-id dry-run-demo \
+  processing.dry_run=true
+```
+
+Structure fixture evidence writes `structure/structure.json` plus optional
+`structure/outline.md` only after the source-pack manifest, selected route, and
+selected fulltext are verified. The dry-run artifact index then marks
+`structure` passed and exposes the structure refs without calling model
+providers or writing OpenKB/index lanes.
+
 ### Command-Line Configuration
 
 Override configuration from the command line:

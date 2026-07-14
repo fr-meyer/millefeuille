@@ -18,6 +18,7 @@ from millefeuille.domain.millefeuille import (
     StageName,
     StageRecord,
     StageStatus,
+    StructureEvidenceRecord,
     TagState,
     can_transition_tag,
 )
@@ -201,6 +202,37 @@ class TestOCREvidenceContract(unittest.TestCase):
         self.assertEqual(payload["selected_route"], "merged-dual")
         self.assertEqual(payload["output_markdown_ref"], "selected/fulltext.md")
         self.assertTrue(payload["dual_extraction_complete"])
+
+    def test_structure_evidence_record_serializes(self):
+        identity = AttachmentEvidenceIdentity(
+            item_key="ITEM1",
+            attachment_key="ATT1",
+            canonical_filename="Redacted - 2026 - Paper.pdf",
+            sha256="a" * 64,
+            zotero_version=7,
+        )
+        evidence = StructureEvidenceRecord(
+            structure_backend="fixture-structure",
+            selected_route=RouteSelection.MERGED_DUAL,
+            source_pack="fixture/openkb/source-packs/zotero/redacted",
+            attachment_identity=identity,
+            source_markdown_ref="selected/fulltext.md",
+            page_count=12,
+            section_count=5,
+            table_count=2,
+            figure_count=1,
+            reference_count=20,
+            coverage={"locators": 18},
+            structure={"sections": [{"id": "s1"}]},
+            outline_markdown_ref="structure/outline.md",
+        )
+
+        payload = evidence.to_dict()
+
+        self.assertEqual(payload["selected_route"], "merged-dual")
+        self.assertEqual(payload["source_markdown_ref"], "selected/fulltext.md")
+        self.assertEqual(payload["outline_markdown_ref"], "structure/outline.md")
+        self.assertEqual(payload["section_count"], 5)
 
     def test_attachment_identity_requires_sha256_shape(self):
         with self.assertRaises(MillefeuilleContractError):

@@ -727,6 +727,9 @@ class ArtifactExportConfig:
     route_selection_evidence_path: str | None = None
     """Optional route-selection fixture evidence file for source packs."""
 
+    structure_evidence_path: str | None = None
+    """Optional structure fixture evidence file for source packs."""
+
     run_id: str | None = None
     """Optional stable run id. When omitted, a timestamped run id is generated."""
 
@@ -764,6 +767,12 @@ class ArtifactExportConfig:
         ).strip():
             raise ConfigError(
                 "export.artifacts.route_selection_evidence_path cannot be empty"
+            )
+        if self.structure_evidence_path is not None and not str(
+            self.structure_evidence_path
+        ).strip():
+            raise ConfigError(
+                "export.artifacts.structure_evidence_path cannot be empty"
             )
         if self.run_id is not None and not str(self.run_id).strip():
             raise ConfigError("export.artifacts.run_id cannot be empty")
