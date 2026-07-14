@@ -5,11 +5,12 @@ branch: feat/pr-056-source-pack-staged-handoff-intake
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 56
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
+  head_sha: 119c52920c8c53fcede2193a81ac5b36bd9d2155
 post_merge_expected:
   pull_request: 56
   base_branch: dev
@@ -64,3 +65,5 @@ evidence:
   - "Speculoos status and validate passed for pr-056-source-pack-staged-handoff-intake."
   - "Speculoos publish-check passed for the PR body and commit message."
   - "Manual reproduction of a two-PDF same-item handoff now fails before any source-pack directory is created."
+  - 'PR #56 opened for pr-056-source-pack-staged-handoff-intake'
+  - 'PR #56 linked to Project item unavailable'

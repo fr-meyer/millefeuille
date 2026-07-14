@@ -19,12 +19,12 @@ current_task:
   status: In Progress
   branch: feat/pr-056-source-pack-staged-handoff-intake
   speculoos_task: .speculoos/tasks/pr-056-source-pack-staged-handoff-intake.yaml
-  pull_request: null
+  pull_request: 56
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
-  head_sha: null
-pull_request: null
+  head_sha: 119c52920c8c53fcede2193a81ac5b36bd9d2155
+pull_request: 56
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
