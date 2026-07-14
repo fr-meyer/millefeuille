@@ -331,6 +331,27 @@ model plus returned provider model/version in the OCR sidecar, but still does
 not call OCR/model providers, write OpenKB/PageIndex/ConDB/ChatIndex, or mutate
 Zotero.
 
+Once both extraction sidecars exist, the same dry-run path can stage a route
+selection fixture:
+
+```bash
+millefeuille --artifact-root source-pack \
+  --source-pack-root /path/to/source-packs \
+  --native-extraction-evidence /path/to/native-extraction-evidence.jsonl \
+  --ocr-extraction-evidence /path/to/ocr-extraction-evidence.jsonl \
+  --route-selection-evidence /path/to/route-selection-evidence.jsonl \
+  --run-id dry-run-demo \
+  processing.dry_run=true
+```
+
+Route fixture evidence writes `selected/route.json` plus `selected/fulltext.md`
+only after the source-pack manifest and required extraction sidecars are
+verified. `selected_route=native` requires native extraction evidence,
+`selected_route=ocr` requires OCR extraction evidence, and
+`selected_route=merged-dual` requires both. The dry-run artifact index then
+marks `route` passed and exposes the selected fulltext ref without calling
+providers or writing OpenKB/index lanes.
+
 ### Command-Line Configuration
 
 Override configuration from the command line:

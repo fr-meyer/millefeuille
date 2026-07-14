@@ -19,6 +19,7 @@ from millefeuille.domain.extraction_fixtures import (
     write_ocr_extractions_from_evidence,
 )
 from millefeuille.domain.models import OpenKBHandoffRow, TagAddingResult
+from millefeuille.domain.route_fixtures import write_route_selections_from_evidence
 from millefeuille.domain.source_packs import write_source_packs_from_handoff_evidence
 from millefeuille.domain.tree_processor import TreeStructureProcessor
 from millefeuille.orchestration.pipeline import (
@@ -348,6 +349,27 @@ def dry_run_command(
             len(ocr_results),
         )
         for result in ocr_results:
+            logger.info(
+                "  - paper_id=%s status=%s evidence=%s",
+                result.paper_id,
+                result.status,
+                result.evidence_path,
+            )
+
+    if (
+        cfg.export.artifacts.enabled
+        and cfg.export.artifacts.route_selection_evidence_path
+    ):
+        assert cfg.export.artifacts.source_pack_root is not None
+        route_results = write_route_selections_from_evidence(
+            evidence_path=cfg.export.artifacts.route_selection_evidence_path,
+            source_pack_root=cfg.export.artifacts.source_pack_root,
+        )
+        logger.info(
+            "[DRY-RUN] Route selection fixtures written: %s",
+            len(route_results),
+        )
+        for result in route_results:
             logger.info(
                 "  - paper_id=%s status=%s evidence=%s",
                 result.paper_id,

@@ -66,6 +66,9 @@ state in the stage manifest and artifact index.
 - `route`
   - Select `native`, `ocr`, or `merged-dual`.
   - Emit route decision evidence.
+  - Preview fixture slice may write `selected/route.json` plus
+    `selected/fulltext.md` only after the required native/OCR extraction
+    sidecars are already verified.
 
 - `structure`
   - Build page, section, table, figure, and reference structure from the

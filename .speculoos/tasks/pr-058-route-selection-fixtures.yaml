@@ -1,0 +1,65 @@
+id: pr-058-route-selection-fixtures
+title: Add route-selection fixtures
+status: implementation
+branch: feat/pr-058-route-selection-fixtures
+base_branch: dev
+github:
+  issue: null
+  pull_request: 58
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  head_sha: 5c1a1455d5a93684e46850229c99774d49628f60
+post_merge_expected:
+  pull_request: 58
+  base_branch: dev
+  head_branch: feat/pr-058-route-selection-fixtures
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - add offline route-selection fixture writers under verified source packs
+  - require native, OCR, or merged-dual route writes to match the extraction sidecars already present under each source pack
+  - preflight every route-selection record against source-pack manifest identity and source hash before writing any selected sidecars
+  - surface selected fulltext and route selection evidence through source-pack artifact-root stage manifests and artifact indexes
+  - add CLI aliases and config wiring for route-selection fixture evidence paths
+  - keep the slice offline-only after rebasing it onto merged dev from PR #57
+non_goals:
+  - live Zotero reads or writes, lifecycle tag mutation, or live PDF recovery
+  - OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or index writes
+  - summaries, paper cards, classification, retrieval-index population, or multi-route ranking logic beyond fixture selection
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - route-selection fixture evidence preflights against existing source-pack manifests before any selected sidecar write
+  - route-selection fixture writes require the matching extraction sidecars for the chosen route and reject incomplete merged-dual evidence
+  - rerunning identical route-selection fixture evidence is idempotent while drifted sidecars fail loudly
+  - dry-run source-pack artifact-root runs mark route passed when verified route sidecars exist
+  - artifact indexes expose route selection evidence plus selected fulltext refs for the staged fixture outputs
+  - route-selection fixture flags require artifact_root=source-pack with an explicit source_pack_root
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, and Speculoos validate pass
+validation:
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models"
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest discover -v"
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-058-route-selection-fixtures --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Fixture-first route selection only; no live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+notes:
+  - "PR #57 merged to dev as cbe60b8916d231c484ad44cec11498c1146a5f86; this branch now starts from that exact dev head before PR #58 publication."
+evidence:
+  - "Rebased onto merged dev commit cbe60b8916d231c484ad44cec11498c1146a5f86 after PR #57 merged."
+  - "Published as PR #58 at https://github.com/fr-meyer/millefeuille/pull/58 with exact head 5c1a1455d5a93684e46850229c99774d49628f60."
+  - "Focused tests passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (50 tests)."
+  - "Full unittest discovery passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest discover -v (203 tests)."
+  - "Ruff passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/ruff check ."
+  - "Metadata parse passed: ruby -ryaml -rjson -e metadata ok."
+  - "git diff --check passed."
+  - "Speculoos status and validate passed for pr-058-route-selection-fixtures."
+  - "Speculoos publish-check passed with the committed PR58 packet."
+  - 'PR #58 opened for pr-058-route-selection-fixtures'
+  - 'PR #58 linked to Project item unavailable'

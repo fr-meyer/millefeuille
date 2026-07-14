@@ -26,4 +26,5 @@ artifacts:
   source_pack_intake_evidence_path: null
   native_extraction_evidence_path: null
   ocr_extraction_evidence_path: null
+  route_selection_evidence_path: null
   run_id: null
