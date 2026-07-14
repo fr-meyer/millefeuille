@@ -74,6 +74,9 @@ state in the stage manifest and artifact index.
   - Build page, section, table, figure, and reference structure from the
     selected reconstruction.
   - Emit source locators and quality warnings.
+  - Preview fixture slice may write `structure/structure.json` plus optional
+    `structure/outline.md` only after the source-pack manifest, route sidecar,
+    and selected full text are verified.
 
 - `summarize`
   - Produce page, section, figure/table, full-paper, and scope-specific

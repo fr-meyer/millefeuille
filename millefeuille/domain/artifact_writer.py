@@ -40,6 +40,11 @@ from millefeuille.domain.source_packs import (
     load_source_pack_manifest_source_hash,
     paper_id_for_zotero_item_key,
 )
+from millefeuille.domain.structure_fixtures import (
+    STRUCTURE_EVIDENCE_REF,
+    STRUCTURE_OUTLINE_REF,
+    load_structure_sidecar,
+)
 
 
 @dataclass(frozen=True)
@@ -64,6 +69,8 @@ class ArtifactRunContext:
     ocr_extraction_markdown_ref: str | None = None
     route_evidence_ref: str | None = None
     route_markdown_ref: str | None = None
+    structure_evidence_ref: str | None = None
+    structure_outline_ref: str | None = None
 
 
 def default_artifact_run_id(now: datetime | None = None) -> str:
@@ -124,6 +131,8 @@ def write_dry_run_artifacts(
             ),
             ocr_extraction_ready=run_context.ocr_extraction_evidence_ref is not None,
             route_ready=run_context.route_evidence_ref is not None,
+            structure_ready=run_context.structure_evidence_ref is not None,
+            structure_outline_ready=run_context.structure_outline_ref is not None,
         )
         stage_manifest_path = run_dir / "stage-manifest.json"
         write_stage_manifest(stage_manifest, stage_manifest_path)
@@ -147,6 +156,8 @@ def write_dry_run_artifacts(
             ocr_extraction_markdown_ref=run_context.ocr_extraction_markdown_ref,
             route_evidence_ref=run_context.route_evidence_ref,
             route_markdown_ref=run_context.route_markdown_ref,
+            structure_evidence_ref=run_context.structure_evidence_ref,
+            structure_outline_ref=run_context.structure_outline_ref,
         )
         artifact_index_path = run_dir / "artifact-index.json"
         write_artifact_index(artifact_index, artifact_index_path)
@@ -216,6 +227,8 @@ def resolve_artifact_run_context(
         ocr_extraction_markdown_ref=extraction_refs["ocr_markdown_ref"],
         route_evidence_ref=extraction_refs["route_evidence_ref"],
         route_markdown_ref=extraction_refs["route_markdown_ref"],
+        structure_evidence_ref=extraction_refs["structure_evidence_ref"],
+        structure_outline_ref=extraction_refs["structure_outline_ref"],
     )
 
 
@@ -242,6 +255,8 @@ def build_dry_run_stage_manifest(
     native_extraction_ready: bool = False,
     ocr_extraction_ready: bool = False,
     route_ready: bool = False,
+    structure_ready: bool = False,
+    structure_outline_ready: bool = False,
 ) -> StageManifest:
     has_pdf = bool(rows)
     manual_gates = []
@@ -361,6 +376,12 @@ def build_dry_run_stage_manifest(
             stage_status = StageStatus.PASSED
             stage_outputs = ["route selection evidence", "selected fulltext"]
             stage_notes = ["fixture route selection evidence available"]
+        elif stage_name == StageName.STRUCTURE and structure_ready:
+            stage_status = StageStatus.PASSED
+            stage_outputs = ["structure evidence"]
+            if structure_outline_ready:
+                stage_outputs.append("structure outline")
+            stage_notes = ["fixture structure evidence available"]
         stages.append(
             StageRecord(
                 name=stage_name,
@@ -400,6 +421,8 @@ def build_dry_run_artifact_index(
     ocr_extraction_markdown_ref: str | None = None,
     route_evidence_ref: str | None = None,
     route_markdown_ref: str | None = None,
+    structure_evidence_ref: str | None = None,
+    structure_outline_ref: str | None = None,
 ) -> ArtifactIndex:
     paper_id = paper_id_for_item(item)
     source_pack = {
@@ -469,6 +492,22 @@ def build_dry_run_artifact_index(
             "stage": "route",
             "private_content": True,
         }
+    if structure_evidence_ref is not None:
+        artifacts["structure_evidence"] = {
+            "kind": "structure-evidence",
+            "ref": structure_evidence_ref,
+            "format": "json",
+            "stage": "structure",
+            "private_content": False,
+        }
+        if structure_outline_ref is not None:
+            artifacts["structure_outline"] = {
+                "kind": "structure-outline",
+                "ref": structure_outline_ref,
+                "format": "markdown",
+                "stage": "structure",
+                "private_content": True,
+            }
     return ArtifactIndex(
         paper_id=paper_id,
         run_id=run_id,
@@ -574,6 +613,12 @@ def _resolve_extraction_refs(
         loader=load_route_selection_sidecar,
         stage="route selection",
     )
+    structure_evidence_ref, structure_outline_ref = _resolve_structure_ref(
+        evidence_path=source_pack_dir / STRUCTURE_EVIDENCE_REF,
+        outline_path=source_pack_dir / STRUCTURE_OUTLINE_REF,
+        run_dir=run_dir,
+        expected_source_hash=expected_source_hash,
+    )
     return {
         "native_evidence_ref": native_evidence_ref,
         "native_markdown_ref": native_markdown_ref,
@@ -581,6 +626,8 @@ def _resolve_extraction_refs(
         "ocr_markdown_ref": ocr_markdown_ref,
         "route_evidence_ref": route_evidence_ref,
         "route_markdown_ref": route_markdown_ref,
+        "structure_evidence_ref": structure_evidence_ref,
+        "structure_outline_ref": structure_outline_ref,
     }
 
 
@@ -608,3 +655,29 @@ def _resolve_extraction_ref(
         _relative_ref(evidence_path, run_dir),
         _relative_ref(markdown_path, run_dir),
     )
+
+
+def _resolve_structure_ref(
+    *,
+    evidence_path: Path,
+    outline_path: Path,
+    run_dir: Path,
+    expected_source_hash: str,
+) -> tuple[str | None, str | None]:
+    evidence_exists = evidence_path.exists()
+    outline_exists = outline_path.exists()
+    if not evidence_exists and not outline_exists:
+        return None, None
+    if not evidence_path.is_file():
+        raise ValueError(
+            f"incomplete structure fixture under {evidence_path.parent}"
+        )
+    if outline_exists and not outline_path.is_file():
+        raise ValueError(
+            f"incomplete structure fixture under {evidence_path.parent}"
+        )
+    payload = load_structure_sidecar(evidence_path)
+    if payload["source_hash"] != expected_source_hash:
+        raise ValueError(f"structure evidence source_hash drift at {evidence_path}")
+    outline_ref = _relative_ref(outline_path, run_dir) if outline_exists else None
+    return _relative_ref(evidence_path, run_dir), outline_ref

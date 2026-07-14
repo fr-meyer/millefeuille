@@ -40,6 +40,10 @@ from millefeuille.domain.source_packs import (
     write_source_pack_from_recovered_pdf,
     write_source_packs_from_handoff_evidence,
 )
+from millefeuille.domain.structure_fixtures import (
+    load_structure_sidecar,
+    write_structures_from_evidence,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_BYTES = b"fixture recovered paper bytes for source-pack intake\n"
@@ -230,6 +234,64 @@ def _write_route_selection_evidence_json(
             sort_keys=True,
         )
         + "\n",
+        encoding="utf-8",
+    )
+    return evidence_path
+
+
+def _write_structure_payload_json(tempdir: str) -> Path:
+    structure_path = Path(tempdir) / "structure-fixture.json"
+    structure_path.write_text(
+        json.dumps(
+            {
+                "pages": [
+                    {"page": 1, "sections": ["Introduction"]},
+                    {"page": 2, "sections": ["Methods"]},
+                    {"page": 3, "sections": ["Results"]},
+                ],
+                "sections": [
+                    {"id": "s1", "title": "Introduction", "page": 1},
+                    {"id": "s2", "title": "Methods", "page": 2},
+                ],
+                "tables": [{"id": "t1", "caption": "Fixture table", "page": 2}],
+                "figures": [],
+                "references": [{"id": "r1", "label": "[1]"}],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return structure_path
+
+
+def _write_structure_evidence_json(
+    tempdir: str,
+    structure_path: Path,
+    outline_path: Path | None = None,
+) -> Path:
+    evidence_path = Path(tempdir) / "structure-evidence.json"
+    payload = {
+        "schema_version": "millefeuille-structure-evidence/v0.1",
+        "source_type": "zotero",
+        "item_key": "ITEM1",
+        "attachment_key": "ATT1",
+        "canonical_filename": "Example Author - 2026 - Intake Fixture.pdf",
+        "structure_path": structure_path.name,
+        "expected_sha256": FIXTURE_SHA256,
+        "page_count": 3,
+        "selected_route": "merged-dual",
+        "sections": 2,
+        "tables": 1,
+        "figures": 0,
+        "references": 1,
+        "locators": 7,
+    }
+    if outline_path is not None:
+        payload["outline_path"] = outline_path.name
+    evidence_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     return evidence_path
@@ -961,6 +1023,118 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                     evidence_path=route_evidence_path,
                     source_pack_root=source_pack_root,
                 )
+
+    def test_structure_fixture_writes_after_route_selection(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            source_pack_root = Path(tempdir) / "source-packs"
+            result = write_source_pack_from_recovered_pdf(
+                evidence=_evidence(source_path),
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+            native_markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\n",
+            )
+            ocr_markdown_path = _write_markdown(
+                tempdir,
+                "ocr-fulltext.md",
+                "OCR fixture page 1\n",
+            )
+            write_native_extractions_from_evidence(
+                evidence_path=_write_native_extraction_evidence_json(
+                    tempdir,
+                    native_markdown_path,
+                ),
+                source_pack_root=source_pack_root,
+            )
+            write_ocr_extractions_from_evidence(
+                evidence_path=_write_ocr_extraction_evidence_json(
+                    tempdir,
+                    ocr_markdown_path,
+                ),
+                source_pack_root=source_pack_root,
+            )
+            route_evidence_path = _write_route_selection_evidence_json(
+                tempdir,
+                _write_markdown(
+                    tempdir,
+                    "selected-fulltext.md",
+                    "Merged fixture page 1\n",
+                ),
+            )
+            write_route_selections_from_evidence(
+                evidence_path=route_evidence_path,
+                source_pack_root=source_pack_root,
+            )
+            outline_path = _write_markdown(
+                tempdir,
+                "outline.md",
+                "# Fixture outline\n\n- Introduction p.1\n",
+            )
+            structure_evidence_path = _write_structure_evidence_json(
+                tempdir,
+                _write_structure_payload_json(tempdir),
+                outline_path,
+            )
+
+            write_results = write_structures_from_evidence(
+                evidence_path=structure_evidence_path,
+                source_pack_root=source_pack_root,
+            )
+            rerun_results = write_structures_from_evidence(
+                evidence_path=structure_evidence_path,
+                source_pack_root=source_pack_root,
+            )
+
+            self.assertEqual(len(write_results), 1)
+            self.assertEqual(write_results[0].status, "created")
+            self.assertEqual(rerun_results[0].status, "existing")
+            structure_dir = result.source_pack_dir / "structure"
+            payload = load_structure_sidecar(structure_dir / "structure.json")
+            self.assertEqual(
+                payload["schema_version"],
+                "millefeuille-structure-evidence/v0.1",
+            )
+            self.assertEqual(payload["source_hash"], f"sha256:{FIXTURE_SHA256}")
+            self.assertEqual(payload["selected_route"], "merged-dual")
+            self.assertEqual(payload["route_evidence_ref"], "selected/route.json")
+            self.assertEqual(payload["selected_fulltext_ref"], "selected/fulltext.md")
+            self.assertEqual(payload["section_count"], 2)
+            self.assertEqual(payload["table_count"], 1)
+            self.assertEqual(
+                (structure_dir / "outline.md").read_text(encoding="utf-8"),
+                outline_path.read_text(encoding="utf-8"),
+            )
+
+    def test_structure_fixture_requires_route_selection_sidecar(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            source_pack_root = Path(tempdir) / "source-packs"
+            result = write_source_pack_from_recovered_pdf(
+                evidence=_evidence(source_path),
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+            structure_evidence_path = _write_structure_evidence_json(
+                tempdir,
+                _write_structure_payload_json(tempdir),
+            )
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "could not read route selection evidence",
+            ):
+                write_structures_from_evidence(
+                    evidence_path=structure_evidence_path,
+                    source_pack_root=source_pack_root,
+                )
+
+            self.assertFalse(
+                (result.source_pack_dir / "structure" / "structure.json").exists()
+            )
 
 
 class TestSourcePackIntakeCli(unittest.TestCase):

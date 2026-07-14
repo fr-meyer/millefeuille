@@ -618,6 +618,7 @@ def _write_new_source_pack(
         "extractions/native",
         "extractions/mistral-ocr",
         "selected",
+        "structure",
         "analyses/millefeuille",
     ):
         (source_pack_dir / dirname).mkdir(parents=True, exist_ok=True)

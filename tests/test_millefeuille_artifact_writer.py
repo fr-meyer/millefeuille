@@ -185,6 +185,63 @@ def _write_route_selection_evidence_json(
     return evidence_path
 
 
+def _write_structure_payload_json(tempdir: str) -> Path:
+    structure_path = Path(tempdir) / "structure-fixture.json"
+    structure_path.write_text(
+        json.dumps(
+            {
+                "pages": [
+                    {"page": 1, "sections": ["Introduction"]},
+                    {"page": 2, "sections": ["Methods"]},
+                ],
+                "sections": [
+                    {"id": "s1", "title": "Introduction", "page": 1},
+                    {"id": "s2", "title": "Methods", "page": 2},
+                ],
+                "tables": [{"id": "t1", "caption": "Fixture table", "page": 2}],
+                "figures": [],
+                "references": [{"id": "r1", "label": "[1]"}],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return structure_path
+
+
+def _write_structure_evidence_json(
+    tempdir: str,
+    structure_path: Path,
+    outline_path: Path | None = None,
+) -> Path:
+    evidence_path = Path(tempdir) / "structure-evidence.json"
+    payload = {
+        "schema_version": "millefeuille-structure-evidence/v0.1",
+        "source_type": "zotero",
+        "item_key": "ITEM1",
+        "attachment_key": "ATT1",
+        "canonical_filename": "Example Author - 2026 - Artifact Writer.pdf",
+        "structure_path": structure_path.name,
+        "expected_sha256": FIXTURE_PDF_SHA256,
+        "page_count": 2,
+        "selected_route": "merged-dual",
+        "sections": 2,
+        "tables": 1,
+        "figures": 0,
+        "references": 1,
+        "locators": 6,
+    }
+    if outline_path is not None:
+        payload["outline_path"] = outline_path.name
+    evidence_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return evidence_path
+
+
 def _write_source_pack(tempdir: str) -> Path:
     source_path = _write_recovered_pdf(tempdir)
     source_pack_root = Path(tempdir) / "source-packs"
@@ -713,6 +770,109 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    def test_structure_fixture_path_feeds_source_pack_artifact_writer(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root = _write_source_pack(tempdir)
+            native_markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\nNative fixture page 2\n",
+            )
+            ocr_markdown_path = _write_markdown(
+                tempdir,
+                "ocr-fulltext.md",
+                "OCR fixture page 1\nOCR fixture page 2\n",
+            )
+            route_markdown_path = _write_markdown(
+                tempdir,
+                "selected-fulltext.md",
+                "Merged fixture page 1\nMerged fixture page 2\n",
+            )
+            outline_path = _write_markdown(
+                tempdir,
+                "outline.md",
+                "# Fixture outline\n\n- Introduction p.1\n",
+            )
+            cfg = _make_app_config(
+                export=ExportConfig(
+                    artifacts=ArtifactExportConfig(
+                        enabled=True,
+                        artifact_root="source-pack",
+                        source_pack_root=str(source_pack_root),
+                        native_extraction_evidence_path=str(
+                            _write_native_extraction_evidence_json(
+                                tempdir,
+                                native_markdown_path,
+                            )
+                        ),
+                        ocr_extraction_evidence_path=str(
+                            _write_ocr_extraction_evidence_json(
+                                tempdir,
+                                ocr_markdown_path,
+                            )
+                        ),
+                        route_selection_evidence_path=str(
+                            _write_route_selection_evidence_json(
+                                tempdir,
+                                route_markdown_path,
+                            )
+                        ),
+                        structure_evidence_path=str(
+                            _write_structure_evidence_json(
+                                tempdir,
+                                _write_structure_payload_json(tempdir),
+                                outline_path,
+                            )
+                        ),
+                        run_id="run-fixture",
+                    )
+                )
+            )
+            logger = MagicMock()
+            mock_zotero = MagicMock()
+            mock_zotero.credentials = SimpleNamespace(library_id="123")
+            mock_zotero.get_items_by_selection.return_value = (
+                [_make_item(sha256=FIXTURE_PDF_SHA256)],
+                _make_discovery_stats(),
+            )
+
+            exit_code = dry_run_command(cfg, logger, mock_zotero)
+
+            run_dir = (
+                source_pack_root
+                / "zotero"
+                / "zotero-ITEM1"
+                / "analyses"
+                / "millefeuille"
+                / "run-fixture"
+            )
+            artifact_index = load_artifact_index(run_dir / "artifact-index.json")
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(artifact_index.stages["structure"]["status"], "passed")
+            self.assertIn("structure_evidence", artifact_index.artifacts)
+            self.assertIn("structure_outline", artifact_index.artifacts)
+            self.assertEqual(
+                artifact_index.artifacts["structure_evidence"]["ref"],
+                "../../../structure/structure.json",
+            )
+            self.assertEqual(
+                artifact_index.artifacts["structure_outline"]["ref"],
+                "../../../structure/outline.md",
+            )
+            self.assertTrue(
+                (
+                    source_pack_root
+                    / "zotero"
+                    / "zotero-ITEM1"
+                    / "structure"
+                    / "structure.json"
+                ).is_file()
+            )
+            mock_zotero.download_pdf.assert_not_called()
+            mock_zotero.add_tag.assert_not_called()
+            mock_zotero.remove_tag.assert_not_called()
+
     def test_source_pack_intake_fixture_path_rejects_multi_pdf_item_cleanly(self):
         with tempfile.TemporaryDirectory() as tempdir:
             recovered_main = Path(tempdir) / "main.pdf"
@@ -863,6 +1023,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                     native_extraction_evidence_path="/tmp/native.json",
                     ocr_extraction_evidence_path="/tmp/ocr.json",
                     route_selection_evidence_path="/tmp/route.json",
+                    structure_evidence_path="/tmp/structure.json",
                 )
             )
         )
@@ -1004,6 +1165,7 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
             "--ocr-extraction-evidence=/tmp/ocr.jsonl",
             "--route-selection-evidence",
             "/tmp/route.jsonl",
+            "--structure-evidence=/tmp/structure.jsonl",
             "--run-id",
             "run-fixture",
         ])
@@ -1022,6 +1184,7 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
                     "export.artifacts.route_selection_evidence_path="
                     "/tmp/route.jsonl"
                 ),
+                "export.artifacts.structure_evidence_path=/tmp/structure.jsonl",
                 "export.artifacts.run_id=run-fixture",
                 "export.artifacts.enabled=true",
             ],

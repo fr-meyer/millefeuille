@@ -379,3 +379,62 @@ class RouteEvidenceRecord:
         if self.reason is not None:
             payload["reason"] = self.reason
         return payload
+
+
+@dataclass
+class StructureEvidenceRecord:
+    structure_backend: str
+    selected_route: RouteSelection | str
+    source_pack: str
+    attachment_identity: AttachmentEvidenceIdentity
+    source_markdown_ref: str
+    page_count: int
+    section_count: int
+    table_count: int
+    figure_count: int
+    reference_count: int
+    coverage: dict[str, Any]
+    structure: dict[str, Any]
+    outline_markdown_ref: str | None = None
+    low_confidence_refs: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.selected_route = _coerce_enum(RouteSelection, self.selected_route)
+        for field_name in (
+            "page_count",
+            "section_count",
+            "table_count",
+            "figure_count",
+            "reference_count",
+        ):
+            value = getattr(self, field_name)
+            if value < 0:
+                raise MillefeuilleContractError(
+                    f"{field_name} must be non-negative"
+                )
+        if not isinstance(self.coverage, dict):
+            raise MillefeuilleContractError("coverage must be an object")
+        if not isinstance(self.structure, dict):
+            raise MillefeuilleContractError("structure must be an object")
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = {
+            "structure_backend": self.structure_backend,
+            "selected_route": self.selected_route.value,
+            "source_pack": self.source_pack,
+            "attachment_identity": self.attachment_identity.to_dict(),
+            "source_markdown_ref": self.source_markdown_ref,
+            "page_count": self.page_count,
+            "section_count": self.section_count,
+            "table_count": self.table_count,
+            "figure_count": self.figure_count,
+            "reference_count": self.reference_count,
+            "coverage": dict(self.coverage),
+            "structure": dict(self.structure),
+            "low_confidence_refs": list(self.low_confidence_refs),
+            "warnings": list(self.warnings),
+        }
+        if self.outline_markdown_ref is not None:
+            payload["outline_markdown_ref"] = self.outline_markdown_ref
+        return payload

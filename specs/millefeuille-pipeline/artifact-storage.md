@@ -40,6 +40,9 @@ source-packs/
       native/
       mistral-ocr/
     selected/
+    structure/
+      structure.json
+      outline.md
     analyses/
       millefeuille/
         <run-id>/

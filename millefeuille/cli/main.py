@@ -322,6 +322,7 @@ def validate_flags(cfg: AppConfig) -> None:
         artifacts.native_extraction_evidence_path,
         artifacts.ocr_extraction_evidence_path,
         artifacts.route_selection_evidence_path,
+        artifacts.structure_evidence_path,
     ]
     if artifacts.source_pack_intake_evidence_path is not None:
         if not artifacts.enabled:
@@ -751,10 +752,11 @@ Offline source-pack commands:
   millefeuille source-pack intake --evidence recovered-pdf-evidence.json
     --source-pack-root /path/to/source-packs
 
-Artifact-writer extraction fixture flags:
+Artifact-writer source-pack fixture flags:
   --native-extraction-evidence /path/to/native-extraction-evidence.jsonl
   --ocr-extraction-evidence /path/to/ocr-extraction-evidence.jsonl
   --route-selection-evidence /path/to/route-selection-evidence.jsonl
+  --structure-evidence /path/to/structure-evidence.jsonl
 
 Required environment variables:
   ZOTERO_LIBRARY_ID   Your Zotero user-library numeric ID
@@ -908,6 +910,26 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
         if arg.startswith("--route-selection-evidence="):
             translated.append(
                 "export.artifacts.route_selection_evidence_path="
+                + arg.split("=", 1)[1]
+            )
+            artifact_enable_seen = True
+            idx += 1
+            continue
+        if arg == "--structure-evidence":
+            if idx + 1 >= len(argv):
+                translated.append(arg)
+                idx += 1
+                continue
+            translated.append(
+                "export.artifacts.structure_evidence_path="
+                + argv[idx + 1]
+            )
+            artifact_enable_seen = True
+            idx += 2
+            continue
+        if arg.startswith("--structure-evidence="):
+            translated.append(
+                "export.artifacts.structure_evidence_path="
                 + arg.split("=", 1)[1]
             )
             artifact_enable_seen = True
