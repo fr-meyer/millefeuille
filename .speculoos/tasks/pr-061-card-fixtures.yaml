@@ -5,13 +5,13 @@ branch: feat/pr-061-card-fixtures
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 61
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
 post_merge_expected:
-  pull_request: null
+  pull_request: 61
   base_branch: dev
   head_branch: feat/pr-061-card-fixtures
   head_sha: merge-plan-exact-head
@@ -54,4 +54,4 @@ evidence:
   - "Branched from merged dev commit 96717617811703d8327b1f4575aa000fd80b49c7 after PR #60 merged."
   - "Focused unit tests passed: tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (62 tests)."
   - "Full unittest discovery passed: 215 tests."
-  - "Card fixture implementation is still local-only; PR publication metadata will be synced after branch push."
+  - "Published as PR #61 at https://github.com/fr-meyer/millefeuille/pull/61 with exact head 3ed3470f03ee97c1d11d2360e44503d960bc5170."
