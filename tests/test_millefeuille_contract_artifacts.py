@@ -31,6 +31,7 @@ REQUIRED_JSON_SCHEMAS = [
     "source-pack-manifest.schema.json",
     "hierarchical-summary.schema.json",
     "paper-card.schema.json",
+    "retrieval-index-status.schema.json",
 ]
 
 REQUIRED_STAGES = {

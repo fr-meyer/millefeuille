@@ -18,6 +18,7 @@ Files:
 - `model-profile.schema.yaml` - per-stage model/profile selection shape.
 - `hierarchical-summary.schema.json` - page/section/paper summary shape.
 - `paper-card.schema.json` - compact human/agent card shape.
+- `retrieval-index-status.schema.json` - retrieval/index lane status shape.
 - `retrieval-index-contract.md` - OpenKB/PageIndex and optional index lanes.
 - `classification-orchestration.md` - CLI-owned classification modes and
   multi-agent governance.

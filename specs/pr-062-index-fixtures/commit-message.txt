@@ -1,0 +1,9 @@
+feat: add index fixtures
+
+Add offline retrieval/index fixture writers under verified source packs, then
+surface the lane status refs through the source-pack artifact writer.
+
+No live Zotero read or write, PDF recovery, OCR/provider, model, OpenKB,
+index-write, credential, main-branch, release, or package publication actions.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

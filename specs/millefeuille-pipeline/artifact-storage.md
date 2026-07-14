@@ -58,6 +58,7 @@ source-packs/
             paper-card.md
           classification/
           index/
+            index-status.json
           reports/
           zotero-writeback-plan.json
 ```

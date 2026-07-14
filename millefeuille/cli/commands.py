@@ -23,6 +23,7 @@ from millefeuille.domain.extraction_fixtures import (
     write_native_extractions_from_evidence,
     write_ocr_extractions_from_evidence,
 )
+from millefeuille.domain.index_fixtures import write_indexes_from_evidence
 from millefeuille.domain.models import OpenKBHandoffRow, TagAddingResult
 from millefeuille.domain.route_fixtures import write_route_selections_from_evidence
 from millefeuille.domain.source_packs import write_source_packs_from_handoff_evidence
@@ -437,6 +438,27 @@ def dry_run_command(
                 result.run_id,
                 result.status,
                 result.card_json_path,
+            )
+
+    if artifact_cfg.enabled and artifact_cfg.index_evidence_path:
+        assert artifact_cfg.source_pack_root is not None
+        assert artifact_cfg.run_id is not None
+        index_results = write_indexes_from_evidence(
+            evidence_path=artifact_cfg.index_evidence_path,
+            source_pack_root=artifact_cfg.source_pack_root,
+            run_id=artifact_cfg.run_id,
+        )
+        logger.info(
+            "[DRY-RUN] Retrieval/index fixtures written: %s",
+            len(index_results),
+        )
+        for result in index_results:
+            logger.info(
+                "  - paper_id=%s run_id=%s status=%s index=%s",
+                result.paper_id,
+                result.run_id,
+                result.status,
+                result.index_status_path,
             )
 
     if artifact_cfg.enabled:

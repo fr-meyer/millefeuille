@@ -736,6 +736,9 @@ class ArtifactExportConfig:
     card_evidence_path: str | None = None
     """Optional paper-card fixture evidence file for source packs."""
 
+    index_evidence_path: str | None = None
+    """Optional retrieval/index fixture evidence file for source packs."""
+
     run_id: str | None = None
     """Optional stable run id. When omitted, a timestamped run id is generated."""
 
@@ -791,6 +794,12 @@ class ArtifactExportConfig:
         ).strip():
             raise ConfigError(
                 "export.artifacts.card_evidence_path cannot be empty"
+            )
+        if self.index_evidence_path is not None and not str(
+            self.index_evidence_path
+        ).strip():
+            raise ConfigError(
+                "export.artifacts.index_evidence_path cannot be empty"
             )
         if self.run_id is not None and not str(self.run_id).strip():
             raise ConfigError("export.artifacts.run_id cannot be empty")

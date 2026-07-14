@@ -728,3 +728,205 @@ class PaperCardRecord:
         if self.quality_warnings:
             payload["quality_warnings"] = list(self.quality_warnings)
         return payload
+
+
+INDEX_LANE_VALUES = frozenset({"openkb", "pageindex", "condb", "chatindex", "other"})
+INDEX_STATUS_VALUES = frozenset({
+    "skipped",
+    "previewed",
+    "written",
+    "failed",
+    "needs-review",
+})
+
+
+@dataclass
+class IndexLaneRecord:
+    lane: str
+    status: str
+    skip_reason: str | None = None
+    target: dict[str, Any] | None = None
+    chunking_profile: dict[str, Any] | None = None
+    quality_warnings: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.lane = self.lane.strip()
+        self.status = self.status.strip()
+        if not self.lane:
+            raise MillefeuilleContractError("lane must be a non-empty string")
+        if self.lane not in INDEX_LANE_VALUES:
+            raise MillefeuilleContractError(
+                f"lane must be one of {sorted(INDEX_LANE_VALUES)!r}"
+            )
+        if not self.status:
+            raise MillefeuilleContractError("status must be a non-empty string")
+        if self.status not in INDEX_STATUS_VALUES:
+            raise MillefeuilleContractError(
+                f"status must be one of {sorted(INDEX_STATUS_VALUES)!r}"
+            )
+        if self.status == "skipped":
+            if not isinstance(self.skip_reason, str) or not self.skip_reason.strip():
+                raise MillefeuilleContractError(
+                    "skip_reason must be provided when lane status is skipped"
+                )
+            self.skip_reason = self.skip_reason.strip()
+        elif self.skip_reason is not None:
+            if not isinstance(self.skip_reason, str) or not self.skip_reason.strip():
+                raise MillefeuilleContractError(
+                    "skip_reason must be a non-empty string when provided"
+                )
+            self.skip_reason = self.skip_reason.strip()
+        if self.target is not None and not isinstance(self.target, dict):
+            raise MillefeuilleContractError("target must be an object or null")
+        if self.chunking_profile is not None and not isinstance(
+            self.chunking_profile, dict
+        ):
+            raise MillefeuilleContractError(
+                "chunking_profile must be an object or null"
+            )
+        if not isinstance(self.quality_warnings, list):
+            raise MillefeuilleContractError("quality_warnings must be an array")
+        for entry in self.quality_warnings:
+            if not isinstance(entry, str) or not entry.strip():
+                raise MillefeuilleContractError(
+                    "quality_warnings must contain non-empty strings"
+                )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> IndexLaneRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("index lane must be an object")
+        return cls(
+            lane=str(payload.get("lane", "")).strip(),
+            status=str(payload.get("status", "")).strip(),
+            skip_reason=payload.get("skip_reason"),
+            target=payload.get("target"),
+            chunking_profile=payload.get("chunking_profile"),
+            quality_warnings=list(payload.get("quality_warnings", [])),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "lane": self.lane,
+            "status": self.status,
+        }
+        if self.skip_reason is not None:
+            payload["skip_reason"] = self.skip_reason
+        if self.target is not None:
+            payload["target"] = dict(self.target)
+        if self.chunking_profile is not None:
+            payload["chunking_profile"] = dict(self.chunking_profile)
+        if self.quality_warnings:
+            payload["quality_warnings"] = list(self.quality_warnings)
+        return payload
+
+
+@dataclass
+class RetrievalIndexRecord:
+    paper_id: str
+    run_id: str
+    source_hash: str
+    selected_fulltext_ref: str
+    summary_ref: str
+    paper_card_ref: str
+    lanes: list[IndexLaneRecord | dict[str, Any]]
+    duplicate_scan: dict[str, Any] | None = None
+    collision_summary: dict[str, Any] | None = None
+    quality_warnings: list[str] = field(default_factory=list)
+    schema_version: str = "millefeuille-retrieval-index-status/v0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "millefeuille-retrieval-index-status/v0.1":
+            raise MillefeuilleContractError(
+                f"unsupported schema_version {self.schema_version!r}"
+            )
+        for field_name in (
+            "paper_id",
+            "run_id",
+            "source_hash",
+            "selected_fulltext_ref",
+            "summary_ref",
+            "paper_card_ref",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string"
+                )
+        if self.duplicate_scan is not None and not isinstance(
+            self.duplicate_scan, dict
+        ):
+            raise MillefeuilleContractError("duplicate_scan must be an object or null")
+        if self.collision_summary is not None and not isinstance(
+            self.collision_summary, dict
+        ):
+            raise MillefeuilleContractError(
+                "collision_summary must be an object or null"
+            )
+        if not isinstance(self.quality_warnings, list):
+            raise MillefeuilleContractError("quality_warnings must be an array")
+        for entry in self.quality_warnings:
+            if not isinstance(entry, str) or not entry.strip():
+                raise MillefeuilleContractError(
+                    "quality_warnings must contain non-empty strings"
+                )
+        self.lanes = [
+            lane
+            if isinstance(lane, IndexLaneRecord)
+            else IndexLaneRecord.from_dict(lane)
+            for lane in self.lanes
+        ]
+        if not self.lanes:
+            raise MillefeuilleContractError("lanes must not be empty")
+        lane_names = [lane.lane for lane in self.lanes]
+        if len(lane_names) != len(set(lane_names)):
+            raise MillefeuilleContractError("lane values must be unique")
+        required_lanes = {"openkb", "pageindex"}
+        missing_lanes = required_lanes - set(lane_names)
+        if missing_lanes:
+            raise MillefeuilleContractError(
+                "lanes missing required entries: "
+                f"{sorted(missing_lanes)!r}"
+            )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> RetrievalIndexRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("retrieval index status must be an object")
+        lanes = payload.get("lanes")
+        if not isinstance(lanes, list):
+            raise MillefeuilleContractError("lanes must be an array")
+        return cls(
+            paper_id=str(payload.get("paper_id", "")).strip(),
+            run_id=str(payload.get("run_id", "")).strip(),
+            source_hash=str(payload.get("source_hash", "")).strip(),
+            selected_fulltext_ref=str(
+                payload.get("selected_fulltext_ref", "")
+            ).strip(),
+            summary_ref=str(payload.get("summary_ref", "")).strip(),
+            paper_card_ref=str(payload.get("paper_card_ref", "")).strip(),
+            lanes=lanes,
+            duplicate_scan=payload.get("duplicate_scan"),
+            collision_summary=payload.get("collision_summary"),
+            quality_warnings=list(payload.get("quality_warnings", [])),
+            schema_version=str(payload.get("schema_version", "")).strip(),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "schema_version": self.schema_version,
+            "paper_id": self.paper_id,
+            "run_id": self.run_id,
+            "source_hash": self.source_hash,
+            "selected_fulltext_ref": self.selected_fulltext_ref,
+            "summary_ref": self.summary_ref,
+            "paper_card_ref": self.paper_card_ref,
+            "lanes": [lane.to_dict() for lane in self.lanes],
+        }
+        if self.duplicate_scan is not None:
+            payload["duplicate_scan"] = dict(self.duplicate_scan)
+        if self.collision_summary is not None:
+            payload["collision_summary"] = dict(self.collision_summary)
+        if self.quality_warnings:
+            payload["quality_warnings"] = list(self.quality_warnings)
+        return payload
