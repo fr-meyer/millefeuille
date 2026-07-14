@@ -12,7 +12,7 @@ github:
   project_item: unavailable
   head_sha: 3d6cb4fe7b9b2132ec6fa15b74322e153cdd2fbb
 post_merge_expected:
-  pull_request: null
+  pull_request: 57
   base_branch: dev
   head_branch: feat/pr-057-source-pack-extraction-fixtures
   head_sha: merge-plan-exact-head

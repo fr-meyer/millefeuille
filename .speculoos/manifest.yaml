@@ -58,11 +58,11 @@ surfaces:
   github_pull_request:
     enabled: true
     status: open
-    number: null
-    url: null
+    number: 57
+    url: https://github.com/fr-meyer/millefeuille/pull/57
     base_branch: dev
     head_branch: feat/pr-057-source-pack-extraction-fixtures
-    head_sha: null
+    head_sha: a839093a75be5b34ab7fbbd19489b4d22fbbde63
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
