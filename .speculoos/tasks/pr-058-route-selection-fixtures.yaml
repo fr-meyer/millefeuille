@@ -5,11 +5,12 @@ branch: feat/pr-058-route-selection-fixtures
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 58
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
+  head_sha: 5c1a1455d5a93684e46850229c99774d49628f60
 post_merge_expected:
   pull_request: null
   base_branch: dev
@@ -59,3 +60,5 @@ evidence:
   - "git diff --check passed."
   - "Speculoos status and validate passed for pr-058-route-selection-fixtures."
   - "Speculoos publish-check passed with the committed PR58 packet."
+  - 'PR #58 opened for pr-058-route-selection-fixtures'
+  - 'PR #58 linked to Project item unavailable'

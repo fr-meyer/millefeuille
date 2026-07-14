@@ -57,7 +57,7 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: planned
+    status: open
     number: null
     url: null
     base_branch: dev
