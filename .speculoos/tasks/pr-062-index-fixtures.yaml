@@ -5,13 +5,14 @@ branch: feat/pr-062-index-fixtures
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 62
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
+  head_sha: 101e7a1a5159a6ee9c7403a3d9db68a337651111
 post_merge_expected:
-  pull_request: null
+  pull_request: 62
   base_branch: dev
   head_branch: feat/pr-062-index-fixtures
   head_sha: merge-plan-exact-head
@@ -48,9 +49,15 @@ validation:
   - "speculoos validate --task pr-062-index-fixtures --validation \"git diff --check\" --json"
 publication_boundary:
   statement: "Fixture-first retrieval/index status only. No live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, live index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+documentation_impact:
+  status: none
+  rationale: Repo-local Speculoos PR-tracking metadata only after publication; the user-facing README and pipeline docs were already updated in the published PR packet.
 notes:
   - "PR #61 merged to dev as c81f0256b577b18145961a2b828163088bc7e094; this branch starts from that exact dev head before PR #62 publication."
 evidence:
   - "Branched from merged dev commit c81f0256b577b18145961a2b828163088bc7e094 after PR #61 merged."
   - "Focused unit tests passed: tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (66 tests)."
   - "Full unittest discovery passed: 219 tests."
+  - 'PR #62 opened for pr-062-index-fixtures'
+  - 'PR #62 linked to Project item unavailable'
+  - "Published as PR #62 at https://github.com/fr-meyer/millefeuille/pull/62 with exact head 101e7a1a5159a6ee9c7403a3d9db68a337651111."
