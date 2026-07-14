@@ -42,9 +42,7 @@
 This is a feature PR for the dev lane: feature PRs target `dev`;
 release/promotion PRs target `main`.
 
-Because the branch currently stacks on the local PR `#57` head while PR `#56`
-review is still pending, rebase to exact `dev` after PR `#56` and PR `#57`
-merge before publishing PR `#58`.
+This branch has already been rebased onto exact `dev` after PR `#57` merged.
 
 ## Publication Boundary
 

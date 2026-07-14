@@ -23,7 +23,7 @@ scope:
   - preflight every route-selection record against source-pack manifest identity and source hash before writing any selected sidecars
   - surface selected fulltext and route selection evidence through source-pack artifact-root stage manifests and artifact indexes
   - add CLI aliases and config wiring for route-selection fixture evidence paths
-  - carry forward the stacked PR #57 head while PR #56 review is still pending and keep the slice offline-only
+  - keep the slice offline-only after rebasing it onto merged dev from PR #57
 non_goals:
   - live Zotero reads or writes, lifecycle tag mutation, or live PDF recovery
   - OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or index writes
@@ -49,12 +49,13 @@ validation:
 publication_boundary:
   statement: "Fixture-first route selection only; no live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
 notes:
-  - "This stacked branch starts from PR #57 head 82a5ce45feb609a1ae2fbcc79be82c19429027a1 while Mergeguez review on PR #56 is still pending; rebase to exact dev after PR #56 and PR #57 merge before publishing PR #58."
+  - "PR #57 merged to dev as cbe60b8916d231c484ad44cec11498c1146a5f86; this branch now starts from that exact dev head before PR #58 publication."
 evidence:
-  - "Started from stacked PR #57 head 82a5ce45feb609a1ae2fbcc79be82c19429027a1."
+  - "Rebased onto merged dev commit cbe60b8916d231c484ad44cec11498c1146a5f86 after PR #57 merged."
   - "Focused tests passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (50 tests)."
   - "Full unittest discovery passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest discover -v (203 tests)."
   - "Ruff passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/ruff check ."
   - "Metadata parse passed: ruby -ryaml -rjson -e metadata ok."
   - "git diff --check passed."
   - "Speculoos status and validate passed for pr-058-route-selection-fixtures."
+  - "Speculoos publish-check passed with the committed PR58 packet."
