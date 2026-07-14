@@ -1,15 +1,15 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-056-source-pack-staged-handoff-intake
+canonical_task: pr-057-source-pack-extraction-fixtures
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
-  local_path: /home/node/.openclaw/repos/millefeuille
+  local_path: /tmp/millefeuille-pr57
   base_branch: dev
-  working_branch: feat/pr-056-source-pack-staged-handoff-intake
+  working_branch: feat/pr-057-source-pack-extraction-fixtures
 status:
-  phase: in_review
+  phase: implementation
   pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 188 passed, 0 failed
+    result: 199 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -57,11 +57,11 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
+    status: planned
     number: null
     url: null
     base_branch: dev
-    head_branch: feat/pr-056-source-pack-staged-handoff-intake
+    head_branch: feat/pr-057-source-pack-extraction-fixtures
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -94,13 +94,13 @@ gates:
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
 current_task:
-  id: pr-056-source-pack-staged-handoff-intake
-  title: Wire source-pack intake into staged handoff path
+  id: pr-057-source-pack-extraction-fixtures
+  title: Add source-pack extraction fixtures
   status: implementation
-  branch: feat/pr-056-source-pack-staged-handoff-intake
+  branch: feat/pr-057-source-pack-extraction-fixtures
   base_branch: dev
-  task_file: .speculoos/tasks/pr-056-source-pack-staged-handoff-intake.yaml
-  started_from: ec22c60e3a69c940b9203923d9a76e29459b1497
+  task_file: .speculoos/tasks/pr-057-source-pack-extraction-fixtures.yaml
+  started_from: 29fc20793770022a9c3557633462933051c16bd9
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap

@@ -15,16 +15,16 @@ notes:
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
-  id: pr-056-source-pack-staged-handoff-intake
+  id: pr-057-source-pack-extraction-fixtures
   status: In Progress
-  branch: feat/pr-056-source-pack-staged-handoff-intake
-  speculoos_task: .speculoos/tasks/pr-056-source-pack-staged-handoff-intake.yaml
-  pull_request: 56
+  branch: feat/pr-057-source-pack-extraction-fixtures
+  speculoos_task: .speculoos/tasks/pr-057-source-pack-extraction-fixtures.yaml
+  pull_request: null
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
-  head_sha: 119c52920c8c53fcede2193a81ac5b36bd9d2155
-pull_request: 56
+  head_sha: null
+pull_request: null
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36

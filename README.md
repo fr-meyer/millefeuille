@@ -310,6 +310,27 @@ has multiple PDF handoff rows, this staged intake lane now aborts before any
 write rather than partially creating a source pack and drifting on a later
 attachment. Multi-PDF item support needs a dedicated follow-up slice.
 
+Once a source pack already exists, the dry-run artifact lane can also stage
+fixture extraction sidecars before writing the run artifacts:
+
+```bash
+millefeuille --artifact-root source-pack \
+  --source-pack-root /path/to/source-packs \
+  --native-extraction-evidence /path/to/native-extraction-evidence.jsonl \
+  --ocr-extraction-evidence /path/to/ocr-extraction-evidence.jsonl \
+  --run-id dry-run-demo \
+  processing.dry_run=true
+```
+
+Each extraction evidence record points to a local Markdown fixture file and the
+same Zotero item key, attachment key, canonical filename, and SHA-256 already
+verified by the source-pack manifest. The dry-run path preflights every native
+or OCR record before writing any `extractions/native/*`,
+`extractions/mistral-ocr/*`, or artifact-index output. It records requested OCR
+model plus returned provider model/version in the OCR sidecar, but still does
+not call OCR/model providers, write OpenKB/PageIndex/ConDB/ChatIndex, or mutate
+Zotero.
+
 ### Command-Line Configuration
 
 Override configuration from the command line:

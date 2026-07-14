@@ -14,6 +14,10 @@ from millefeuille.clients.ocr_client import OCRClient
 from millefeuille.clients.zotero_client import ZoteroClient
 from millefeuille.domain.artifact_writer import write_dry_run_artifacts
 from millefeuille.domain.config import AppConfig
+from millefeuille.domain.extraction_fixtures import (
+    write_native_extractions_from_evidence,
+    write_ocr_extractions_from_evidence,
+)
 from millefeuille.domain.models import OpenKBHandoffRow, TagAddingResult
 from millefeuille.domain.source_packs import write_source_packs_from_handoff_evidence
 from millefeuille.domain.tree_processor import TreeStructureProcessor
@@ -307,6 +311,48 @@ def dry_run_command(
                 result.paper_id,
                 result.status,
                 result.manifest_path,
+            )
+
+    if (
+        cfg.export.artifacts.enabled
+        and cfg.export.artifacts.native_extraction_evidence_path
+    ):
+        assert cfg.export.artifacts.source_pack_root is not None
+        native_results = write_native_extractions_from_evidence(
+            evidence_path=cfg.export.artifacts.native_extraction_evidence_path,
+            source_pack_root=cfg.export.artifacts.source_pack_root,
+        )
+        logger.info(
+            "[DRY-RUN] Native extraction fixtures written: %s",
+            len(native_results),
+        )
+        for result in native_results:
+            logger.info(
+                "  - paper_id=%s status=%s evidence=%s",
+                result.paper_id,
+                result.status,
+                result.evidence_path,
+            )
+
+    if (
+        cfg.export.artifacts.enabled
+        and cfg.export.artifacts.ocr_extraction_evidence_path
+    ):
+        assert cfg.export.artifacts.source_pack_root is not None
+        ocr_results = write_ocr_extractions_from_evidence(
+            evidence_path=cfg.export.artifacts.ocr_extraction_evidence_path,
+            source_pack_root=cfg.export.artifacts.source_pack_root,
+        )
+        logger.info(
+            "[DRY-RUN] OCR extraction fixtures written: %s",
+            len(ocr_results),
+        )
+        for result in ocr_results:
+            logger.info(
+                "  - paper_id=%s status=%s evidence=%s",
+                result.paper_id,
+                result.status,
+                result.evidence_path,
             )
 
     if cfg.export.artifacts.enabled:

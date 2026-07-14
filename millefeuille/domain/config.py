@@ -718,6 +718,12 @@ class ArtifactExportConfig:
     source_pack_intake_evidence_path: str | None = None
     """Optional recovered-PDF evidence file for staged source-pack intake."""
 
+    native_extraction_evidence_path: str | None = None
+    """Optional native extraction fixture evidence file for source packs."""
+
+    ocr_extraction_evidence_path: str | None = None
+    """Optional OCR extraction fixture evidence file for source packs."""
+
     run_id: str | None = None
     """Optional stable run id. When omitted, a timestamped run id is generated."""
 
@@ -737,6 +743,18 @@ class ArtifactExportConfig:
         ).strip():
             raise ConfigError(
                 "export.artifacts.source_pack_intake_evidence_path cannot be empty"
+            )
+        if self.native_extraction_evidence_path is not None and not str(
+            self.native_extraction_evidence_path
+        ).strip():
+            raise ConfigError(
+                "export.artifacts.native_extraction_evidence_path cannot be empty"
+            )
+        if self.ocr_extraction_evidence_path is not None and not str(
+            self.ocr_extraction_evidence_path
+        ).strip():
+            raise ConfigError(
+                "export.artifacts.ocr_extraction_evidence_path cannot be empty"
             )
         if self.run_id is not None and not str(self.run_id).strip():
             raise ConfigError("export.artifacts.run_id cannot be empty")

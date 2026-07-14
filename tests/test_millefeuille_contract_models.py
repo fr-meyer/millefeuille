@@ -8,6 +8,7 @@ from millefeuille.domain.millefeuille import (
     AttachmentEvidenceIdentity,
     ManualGate,
     MillefeuilleContractError,
+    NativeExtractionEvidenceRecord,
     OCREvidenceRecord,
     ProviderPayloadDisposition,
     RunMode,
@@ -122,6 +123,31 @@ class TestTagStateContract(unittest.TestCase):
 
 
 class TestOCREvidenceContract(unittest.TestCase):
+    def test_native_extraction_evidence_record_serializes(self):
+        identity = AttachmentEvidenceIdentity(
+            item_key="ITEM1",
+            attachment_key="ATT1",
+            canonical_filename="Redacted - 2026 - Paper.pdf",
+            sha256="a" * 64,
+            zotero_version=7,
+        )
+        evidence = NativeExtractionEvidenceRecord(
+            tool="PyPDF2-fixture",
+            source_pack="fixture/openkb/source-packs/zotero/redacted",
+            attachment_identity=identity,
+            output_markdown_ref="extractions/native/fulltext.md",
+            page_count=12,
+        )
+
+        payload = evidence.to_dict()
+
+        self.assertEqual(payload["tool"], "PyPDF2-fixture")
+        self.assertEqual(payload["attachment_identity"]["sha256"], "a" * 64)
+        self.assertEqual(
+            payload["output_markdown_ref"],
+            "extractions/native/fulltext.md",
+        )
+
     def test_ocr_evidence_record_serializes_without_payload(self):
         identity = AttachmentEvidenceIdentity(
             item_key="ITEM1",
@@ -138,6 +164,7 @@ class TestOCREvidenceContract(unittest.TestCase):
             output_markdown_ref="fixture/openkb/raw/redacted.md",
             page_count=12,
             provider_payload_disposition=ProviderPayloadDisposition.DISCARDED,
+            requested_model="mistral-ocr-latest",
         )
 
         payload = evidence.to_dict()
@@ -145,6 +172,7 @@ class TestOCREvidenceContract(unittest.TestCase):
         self.assertEqual(payload["provider"], "mistral")
         self.assertEqual(payload["attachment_identity"]["sha256"], "a" * 64)
         self.assertEqual(payload["provider_payload_disposition"], "discarded")
+        self.assertEqual(payload["requested_model"], "mistral-ocr-latest")
         self.assertNotIn("provider_payload", payload)
 
     def test_attachment_identity_requires_sha256_shape(self):

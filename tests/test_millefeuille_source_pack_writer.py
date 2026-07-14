@@ -16,6 +16,12 @@ from millefeuille.cli.source_pack import run_source_pack_cli
 from millefeuille.domain.artifact_writer import write_dry_run_artifacts
 from millefeuille.domain.artifacts import load_artifact_index
 from millefeuille.domain.config import ArtifactExportConfig
+from millefeuille.domain.extraction_fixtures import (
+    load_native_extraction_sidecar,
+    load_ocr_extraction_sidecar,
+    write_native_extractions_from_evidence,
+    write_ocr_extractions_from_evidence,
+)
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.models import (
     AttachmentInfo,
@@ -104,6 +110,85 @@ def _write_evidence_json(tempdir: str, source_path: Path) -> Path:
                 },
                 "file_size_bytes": len(FIXTURE_BYTES),
                 "zotero_version": 7,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return evidence_path
+
+
+def _write_markdown(tempdir: str, filename: str, text: str) -> Path:
+    markdown_path = Path(tempdir) / filename
+    markdown_path.write_text(text, encoding="utf-8")
+    return markdown_path
+
+
+def _write_native_extraction_evidence_json(
+    tempdir: str,
+    markdown_path: Path,
+    *,
+    item_key: str = "ITEM1",
+    attachment_key: str = "ATT1",
+    canonical_filename: str = "Example Author - 2026 - Intake Fixture.pdf",
+    sha256: str = FIXTURE_SHA256,
+) -> Path:
+    evidence_path = Path(tempdir) / "native-extraction-evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "schema_version": (
+                    "millefeuille-native-extraction-evidence/v0.1"
+                ),
+                "source_type": "zotero",
+                "item_key": item_key,
+                "attachment_key": attachment_key,
+                "canonical_filename": canonical_filename,
+                "markdown_path": markdown_path.name,
+                "expected_sha256": sha256,
+                "page_count": 3,
+                "tool": "PyPDF2-fixture",
+                "empty_pages": 0,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return evidence_path
+
+
+def _write_ocr_extraction_evidence_json(
+    tempdir: str,
+    markdown_path: Path,
+    *,
+    item_key: str = "ITEM1",
+    attachment_key: str = "ATT1",
+    canonical_filename: str = "Example Author - 2026 - Intake Fixture.pdf",
+    sha256: str = FIXTURE_SHA256,
+) -> Path:
+    evidence_path = Path(tempdir) / "ocr-extraction-evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "millefeuille-ocr-extraction-evidence/v0.1",
+                "source_type": "zotero",
+                "item_key": item_key,
+                "attachment_key": attachment_key,
+                "canonical_filename": canonical_filename,
+                "markdown_path": markdown_path.name,
+                "expected_sha256": sha256,
+                "page_count": 3,
+                "provider": "mistral-ocr",
+                "requested_model": "mistral-ocr-latest",
+                "provider_version": "mistral-ocr-4-0-fixture",
+                "provider_payload_disposition": "discarded",
+                "confidence_scores_granularity": "word",
+                "table_format": "markdown",
+                "include_blocks": True,
             },
             indent=2,
             sort_keys=True,
@@ -523,6 +608,217 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                 )
 
             self.assertFalse((Path(tempdir) / "source-packs" / "zotero").exists())
+
+    def test_native_extraction_fixture_writes_sidecars_after_source_pack_verification(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            source_pack_root = Path(tempdir) / "source-packs"
+            result = write_source_pack_from_recovered_pdf(
+                evidence=_evidence(source_path),
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+            markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\n\nNative fixture page 2\n",
+            )
+            evidence_path = _write_native_extraction_evidence_json(
+                tempdir,
+                markdown_path,
+            )
+
+            write_results = write_native_extractions_from_evidence(
+                evidence_path=evidence_path,
+                source_pack_root=source_pack_root,
+            )
+
+            self.assertEqual(len(write_results), 1)
+            self.assertEqual(write_results[0].status, "created")
+            native_dir = result.source_pack_dir / "extractions" / "native"
+            self.assertEqual(
+                (native_dir / "fulltext.md").read_text(encoding="utf-8"),
+                markdown_path.read_text(encoding="utf-8"),
+            )
+            payload = load_native_extraction_sidecar(native_dir / "evidence.json")
+            self.assertEqual(
+                payload["schema_version"],
+                "millefeuille-native-extraction-evidence/v0.1",
+            )
+            self.assertEqual(payload["source_hash"], f"sha256:{FIXTURE_SHA256}")
+            self.assertEqual(payload["tool"], "PyPDF2-fixture")
+
+    def test_ocr_extraction_fixture_writes_sidecars_after_source_pack_verification(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            source_pack_root = Path(tempdir) / "source-packs"
+            result = write_source_pack_from_recovered_pdf(
+                evidence=_evidence(source_path),
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+            markdown_path = _write_markdown(
+                tempdir,
+                "ocr-fulltext.md",
+                "OCR fixture page 1\n\nOCR fixture page 2\n",
+            )
+            evidence_path = _write_ocr_extraction_evidence_json(
+                tempdir,
+                markdown_path,
+            )
+
+            write_results = write_ocr_extractions_from_evidence(
+                evidence_path=evidence_path,
+                source_pack_root=source_pack_root,
+            )
+
+            self.assertEqual(len(write_results), 1)
+            self.assertEqual(write_results[0].status, "created")
+            ocr_dir = result.source_pack_dir / "extractions" / "mistral-ocr"
+            self.assertEqual(
+                (ocr_dir / "fulltext.md").read_text(encoding="utf-8"),
+                markdown_path.read_text(encoding="utf-8"),
+            )
+            payload = load_ocr_extraction_sidecar(ocr_dir / "evidence.json")
+            self.assertEqual(
+                payload["schema_version"],
+                "millefeuille-ocr-extraction-evidence/v0.1",
+            )
+            self.assertEqual(payload["requested_model"], "mistral-ocr-latest")
+            self.assertEqual(
+                payload["provider_version"],
+                "mistral-ocr-4-0-fixture",
+            )
+
+    def test_extraction_fixture_batch_preflights_missing_source_pack_before_any_write(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            source_pack_root = Path(tempdir) / "source-packs"
+            result = write_source_pack_from_recovered_pdf(
+                evidence=_evidence(source_path),
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+            markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\n",
+            )
+            evidence_path = Path(tempdir) / "native-extraction-evidence.jsonl"
+            evidence_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "schema_version": (
+                                    "millefeuille-native-extraction-evidence/v0.1"
+                                ),
+                                "source_type": "zotero",
+                                "item_key": "ITEM1",
+                                "attachment_key": "ATT1",
+                                "canonical_filename": (
+                                    "Example Author - 2026 - Intake Fixture.pdf"
+                                ),
+                                "markdown_path": markdown_path.name,
+                                "expected_sha256": FIXTURE_SHA256,
+                                "page_count": 1,
+                                "tool": "PyPDF2-fixture",
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "schema_version": (
+                                    "millefeuille-native-extraction-evidence/v0.1"
+                                ),
+                                "source_type": "zotero",
+                                "item_key": "ITEM2",
+                                "attachment_key": "ATT2",
+                                "canonical_filename": "Missing.pdf",
+                                "markdown_path": markdown_path.name,
+                                "expected_sha256": "1" * 64,
+                                "page_count": 1,
+                                "tool": "PyPDF2-fixture",
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "could not read source-pack manifest",
+            ):
+                write_native_extractions_from_evidence(
+                    evidence_path=evidence_path,
+                    source_pack_root=source_pack_root,
+                )
+
+            native_evidence_path = (
+                result.source_pack_dir
+                / "extractions"
+                / "native"
+                / "evidence.json"
+            )
+            self.assertFalse(
+                native_evidence_path.exists()
+            )
+
+    def test_extraction_fixture_batch_rejects_duplicate_item_attachment_records(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            source_pack_root = Path(tempdir) / "source-packs"
+            result = write_source_pack_from_recovered_pdf(
+                evidence=_evidence(source_path),
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+            markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\n",
+            )
+            evidence_path = Path(tempdir) / "native-extraction-evidence.jsonl"
+            record = {
+                "schema_version": "millefeuille-native-extraction-evidence/v0.1",
+                "source_type": "zotero",
+                "item_key": "ITEM1",
+                "attachment_key": "ATT1",
+                "canonical_filename": "Example Author - 2026 - Intake Fixture.pdf",
+                "markdown_path": markdown_path.name,
+                "expected_sha256": FIXTURE_SHA256,
+                "page_count": 1,
+                "tool": "PyPDF2-fixture",
+            }
+            evidence_path.write_text(
+                "\n".join([json.dumps(record), json.dumps(record)]) + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "duplicate native extraction evidence",
+            ):
+                write_native_extractions_from_evidence(
+                    evidence_path=evidence_path,
+                    source_pack_root=source_pack_root,
+                )
+
+            self.assertFalse(
+                (
+                    result.source_pack_dir
+                    / "extractions"
+                    / "native"
+                    / "evidence.json"
+                ).exists()
+            )
 
 
 class TestSourcePackIntakeCli(unittest.TestCase):
