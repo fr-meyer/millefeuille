@@ -15,6 +15,6 @@ notes:
   - Bootstrap should not depend on Vibe reachability.
 task:
   status: implementation
-  id: pr-057-source-pack-extraction-fixtures
-  speculoos_task: .speculoos/tasks/pr-057-source-pack-extraction-fixtures.yaml
+  id: pr-058-route-selection-fixtures
+  speculoos_task: .speculoos/tasks/pr-058-route-selection-fixtures.yaml
   command: null

@@ -11,6 +11,8 @@ from millefeuille.domain.millefeuille import (
     NativeExtractionEvidenceRecord,
     OCREvidenceRecord,
     ProviderPayloadDisposition,
+    RouteEvidenceRecord,
+    RouteSelection,
     RunMode,
     StageManifest,
     StageName,
@@ -174,6 +176,31 @@ class TestOCREvidenceContract(unittest.TestCase):
         self.assertEqual(payload["provider_payload_disposition"], "discarded")
         self.assertEqual(payload["requested_model"], "mistral-ocr-latest")
         self.assertNotIn("provider_payload", payload)
+
+    def test_route_evidence_record_serializes(self):
+        identity = AttachmentEvidenceIdentity(
+            item_key="ITEM1",
+            attachment_key="ATT1",
+            canonical_filename="Redacted - 2026 - Paper.pdf",
+            sha256="a" * 64,
+            zotero_version=7,
+        )
+        evidence = RouteEvidenceRecord(
+            selected_route=RouteSelection.MERGED_DUAL,
+            source_pack="fixture/openkb/source-packs/zotero/redacted",
+            attachment_identity=identity,
+            output_markdown_ref="selected/fulltext.md",
+            page_count=12,
+            extraction_routes=["native", "mistral-ocr"],
+            dual_extraction_complete=True,
+            reason="fixture route selection",
+        )
+
+        payload = evidence.to_dict()
+
+        self.assertEqual(payload["selected_route"], "merged-dual")
+        self.assertEqual(payload["output_markdown_ref"], "selected/fulltext.md")
+        self.assertTrue(payload["dual_extraction_complete"])
 
     def test_attachment_identity_requires_sha256_shape(self):
         with self.assertRaises(MillefeuilleContractError):

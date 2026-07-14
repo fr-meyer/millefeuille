@@ -1,0 +1,10 @@
+feat: add route-selection fixtures
+
+Add offline route-selection fixture writers under verified source packs, then
+surface the selected fulltext and route evidence through the source-pack
+artifact writer.
+
+No live Zotero read or write, PDF recovery, OCR/provider, model, OpenKB,
+index, credential, main-branch, release, or package publication actions.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

@@ -346,3 +346,36 @@ class OCREvidenceRecord:
         if self.requested_model is not None:
             payload["requested_model"] = self.requested_model
         return payload
+
+
+@dataclass
+class RouteEvidenceRecord:
+    selected_route: RouteSelection | str
+    source_pack: str
+    attachment_identity: AttachmentEvidenceIdentity
+    output_markdown_ref: str
+    page_count: int
+    extraction_routes: list[str]
+    dual_extraction_complete: bool
+    reason: str | None = None
+    warnings: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.selected_route = _coerce_enum(RouteSelection, self.selected_route)
+        if self.page_count < 0:
+            raise MillefeuilleContractError("page_count must be non-negative")
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = {
+            "selected_route": self.selected_route.value,
+            "source_pack": self.source_pack,
+            "attachment_identity": self.attachment_identity.to_dict(),
+            "output_markdown_ref": self.output_markdown_ref,
+            "page_count": self.page_count,
+            "extraction_routes": list(self.extraction_routes),
+            "dual_extraction_complete": self.dual_extraction_complete,
+            "warnings": list(self.warnings),
+        }
+        if self.reason is not None:
+            payload["reason"] = self.reason
+        return payload

@@ -29,6 +29,11 @@ from millefeuille.domain.millefeuille import (
     StageStatus,
 )
 from millefeuille.domain.models import DiscoveredItem, OpenKBHandoffRow
+from millefeuille.domain.route_fixtures import (
+    ROUTE_EVIDENCE_REF,
+    ROUTE_MARKDOWN_REF,
+    load_route_selection_sidecar,
+)
 from millefeuille.domain.source_packs import (
     DEFAULT_SOURCE_PACK_ROOT,
     SOURCE_PACK_ARTIFACT_ROOT,
@@ -57,6 +62,8 @@ class ArtifactRunContext:
     native_extraction_markdown_ref: str | None = None
     ocr_extraction_evidence_ref: str | None = None
     ocr_extraction_markdown_ref: str | None = None
+    route_evidence_ref: str | None = None
+    route_markdown_ref: str | None = None
 
 
 def default_artifact_run_id(now: datetime | None = None) -> str:
@@ -116,6 +123,7 @@ def write_dry_run_artifacts(
                 run_context.native_extraction_evidence_ref is not None
             ),
             ocr_extraction_ready=run_context.ocr_extraction_evidence_ref is not None,
+            route_ready=run_context.route_evidence_ref is not None,
         )
         stage_manifest_path = run_dir / "stage-manifest.json"
         write_stage_manifest(stage_manifest, stage_manifest_path)
@@ -137,6 +145,8 @@ def write_dry_run_artifacts(
             ),
             ocr_extraction_evidence_ref=run_context.ocr_extraction_evidence_ref,
             ocr_extraction_markdown_ref=run_context.ocr_extraction_markdown_ref,
+            route_evidence_ref=run_context.route_evidence_ref,
+            route_markdown_ref=run_context.route_markdown_ref,
         )
         artifact_index_path = run_dir / "artifact-index.json"
         write_artifact_index(artifact_index, artifact_index_path)
@@ -204,6 +214,8 @@ def resolve_artifact_run_context(
         native_extraction_markdown_ref=extraction_refs["native_markdown_ref"],
         ocr_extraction_evidence_ref=extraction_refs["ocr_evidence_ref"],
         ocr_extraction_markdown_ref=extraction_refs["ocr_markdown_ref"],
+        route_evidence_ref=extraction_refs["route_evidence_ref"],
+        route_markdown_ref=extraction_refs["route_markdown_ref"],
     )
 
 
@@ -229,6 +241,7 @@ def build_dry_run_stage_manifest(
     source_pack_verified: bool = False,
     native_extraction_ready: bool = False,
     ocr_extraction_ready: bool = False,
+    route_ready: bool = False,
 ) -> StageManifest:
     has_pdf = bool(rows)
     manual_gates = []
@@ -344,6 +357,10 @@ def build_dry_run_stage_manifest(
             stage_status = StageStatus.PASSED
             stage_outputs = ["OCR extraction evidence", "OCR markdown"]
             stage_notes = ["fixture OCR extraction evidence available"]
+        elif stage_name == StageName.ROUTE and route_ready:
+            stage_status = StageStatus.PASSED
+            stage_outputs = ["route selection evidence", "selected fulltext"]
+            stage_notes = ["fixture route selection evidence available"]
         stages.append(
             StageRecord(
                 name=stage_name,
@@ -381,6 +398,8 @@ def build_dry_run_artifact_index(
     native_extraction_markdown_ref: str | None = None,
     ocr_extraction_evidence_ref: str | None = None,
     ocr_extraction_markdown_ref: str | None = None,
+    route_evidence_ref: str | None = None,
+    route_markdown_ref: str | None = None,
 ) -> ArtifactIndex:
     paper_id = paper_id_for_item(item)
     source_pack = {
@@ -433,6 +452,21 @@ def build_dry_run_artifact_index(
             "ref": ocr_extraction_markdown_ref,
             "format": "markdown",
             "stage": "extract-ocr",
+            "private_content": True,
+        }
+    if route_evidence_ref is not None and route_markdown_ref is not None:
+        artifacts["route_evidence"] = {
+            "kind": "route-selection-evidence",
+            "ref": route_evidence_ref,
+            "format": "json",
+            "stage": "route",
+            "private_content": False,
+        }
+        artifacts["selected_fulltext"] = {
+            "kind": "selected-fulltext",
+            "ref": route_markdown_ref,
+            "format": "markdown",
+            "stage": "route",
             "private_content": True,
         }
     return ArtifactIndex(
@@ -532,11 +566,21 @@ def _resolve_extraction_refs(
         loader=load_ocr_extraction_sidecar,
         stage="OCR extraction",
     )
+    route_evidence_ref, route_markdown_ref = _resolve_extraction_ref(
+        evidence_path=source_pack_dir / ROUTE_EVIDENCE_REF,
+        markdown_path=source_pack_dir / ROUTE_MARKDOWN_REF,
+        run_dir=run_dir,
+        expected_source_hash=expected_source_hash,
+        loader=load_route_selection_sidecar,
+        stage="route selection",
+    )
     return {
         "native_evidence_ref": native_evidence_ref,
         "native_markdown_ref": native_markdown_ref,
         "ocr_evidence_ref": ocr_evidence_ref,
         "ocr_markdown_ref": ocr_markdown_ref,
+        "route_evidence_ref": route_evidence_ref,
+        "route_markdown_ref": route_markdown_ref,
     }
 
 

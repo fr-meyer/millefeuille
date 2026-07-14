@@ -153,6 +153,38 @@ def _write_ocr_extraction_evidence_json(
     return evidence_path
 
 
+def _write_route_selection_evidence_json(
+    tempdir: str,
+    markdown_path: Path,
+) -> Path:
+    evidence_path = Path(tempdir) / "route-selection-evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "schema_version": (
+                    "millefeuille-route-selection-evidence/v0.1"
+                ),
+                "source_type": "zotero",
+                "item_key": "ITEM1",
+                "attachment_key": "ATT1",
+                "canonical_filename": (
+                    "Example Author - 2026 - Artifact Writer.pdf"
+                ),
+                "markdown_path": markdown_path.name,
+                "expected_sha256": FIXTURE_PDF_SHA256,
+                "page_count": 2,
+                "selected_route": "merged-dual",
+                "reason": "fixture route selection",
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return evidence_path
+
+
 def _write_source_pack(tempdir: str) -> Path:
     source_path = _write_recovered_pdf(tempdir)
     source_pack_root = Path(tempdir) / "source-packs"
@@ -594,6 +626,93 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    def test_route_selection_fixture_path_feeds_source_pack_artifact_writer(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root = _write_source_pack(tempdir)
+            native_markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\nNative fixture page 2\n",
+            )
+            ocr_markdown_path = _write_markdown(
+                tempdir,
+                "ocr-fulltext.md",
+                "OCR fixture page 1\nOCR fixture page 2\n",
+            )
+            route_markdown_path = _write_markdown(
+                tempdir,
+                "selected-fulltext.md",
+                "Merged fixture page 1\nMerged fixture page 2\n",
+            )
+            cfg = _make_app_config(
+                export=ExportConfig(
+                    artifacts=ArtifactExportConfig(
+                        enabled=True,
+                        artifact_root="source-pack",
+                        source_pack_root=str(source_pack_root),
+                        native_extraction_evidence_path=str(
+                            _write_native_extraction_evidence_json(
+                                tempdir,
+                                native_markdown_path,
+                            )
+                        ),
+                        ocr_extraction_evidence_path=str(
+                            _write_ocr_extraction_evidence_json(
+                                tempdir,
+                                ocr_markdown_path,
+                            )
+                        ),
+                        route_selection_evidence_path=str(
+                            _write_route_selection_evidence_json(
+                                tempdir,
+                                route_markdown_path,
+                            )
+                        ),
+                        run_id="run-fixture",
+                    )
+                )
+            )
+            logger = MagicMock()
+            mock_zotero = MagicMock()
+            mock_zotero.credentials = SimpleNamespace(library_id="123")
+            mock_zotero.get_items_by_selection.return_value = (
+                [_make_item(sha256=FIXTURE_PDF_SHA256)],
+                _make_discovery_stats(),
+            )
+
+            exit_code = dry_run_command(cfg, logger, mock_zotero)
+
+            run_dir = (
+                source_pack_root
+                / "zotero"
+                / "zotero-ITEM1"
+                / "analyses"
+                / "millefeuille"
+                / "run-fixture"
+            )
+            artifact_index = load_artifact_index(run_dir / "artifact-index.json")
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(artifact_index.stages["route"]["status"], "passed")
+            self.assertIn("route_evidence", artifact_index.artifacts)
+            self.assertIn("selected_fulltext", artifact_index.artifacts)
+            self.assertEqual(
+                artifact_index.artifacts["selected_fulltext"]["ref"],
+                "../../../selected/fulltext.md",
+            )
+            self.assertTrue(
+                (
+                    source_pack_root
+                    / "zotero"
+                    / "zotero-ITEM1"
+                    / "selected"
+                    / "route.json"
+                ).is_file()
+            )
+            mock_zotero.download_pdf.assert_not_called()
+            mock_zotero.add_tag.assert_not_called()
+            mock_zotero.remove_tag.assert_not_called()
+
     def test_source_pack_intake_fixture_path_rejects_multi_pdf_item_cleanly(self):
         with tempfile.TemporaryDirectory() as tempdir:
             recovered_main = Path(tempdir) / "main.pdf"
@@ -743,6 +862,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                     source_pack_root="/tmp/millefeuille-source-packs",
                     native_extraction_evidence_path="/tmp/native.json",
                     ocr_extraction_evidence_path="/tmp/ocr.json",
+                    route_selection_evidence_path="/tmp/route.json",
                 )
             )
         )
@@ -882,6 +1002,8 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
             "--native-extraction-evidence",
             "/tmp/native.jsonl",
             "--ocr-extraction-evidence=/tmp/ocr.jsonl",
+            "--route-selection-evidence",
+            "/tmp/route.jsonl",
             "--run-id",
             "run-fixture",
         ])
@@ -896,6 +1018,10 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
                     "/tmp/native.jsonl"
                 ),
                 "export.artifacts.ocr_extraction_evidence_path=/tmp/ocr.jsonl",
+                (
+                    "export.artifacts.route_selection_evidence_path="
+                    "/tmp/route.jsonl"
+                ),
                 "export.artifacts.run_id=run-fixture",
                 "export.artifacts.enabled=true",
             ],
