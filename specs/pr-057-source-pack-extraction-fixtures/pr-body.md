@@ -40,9 +40,10 @@
 
 ## Release Flow
 
-This remains a dev-lane feature PR. Because the branch currently stacks on the
-local PR `#56` head while that review is pending, rebase to exact `dev` after
-PR `#56` merges before publishing PR `#57`.
+This is a feature PR for the dev lane: feature PRs target `dev`;
+release/promotion PRs target `main`.
+
+This branch has already been rebased onto exact `dev` after PR `#56` merged.
 
 ## Publication Boundary
 

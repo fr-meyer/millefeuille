@@ -23,7 +23,7 @@ scope:
   - preflight every extraction fixture record against source-pack manifest identity and source hash before writing any sidecars
   - surface extraction sidecars through source-pack artifact-root stage manifests and artifact indexes
   - add CLI aliases and config wiring for native and OCR extraction fixture evidence paths
-  - carry forward the stacked PR #56 head while review is pending and keep the slice offline-only
+  - keep the slice offline-only after rebasing it onto merged dev from PR #56
 non_goals:
   - live Zotero reads or writes, lifecycle tag mutation, or live PDF recovery
   - OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or index writes
@@ -48,9 +48,9 @@ validation:
 publication_boundary:
   statement: "Fixture-first extraction sidecars only; no live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
 notes:
-  - "This stacked branch starts from PR #56 head 29fc20793770022a9c3557633462933051c16bd9 while Mergeguez review on PR #56 is still pending; rebase to exact dev after PR #56 merges before opening PR #57."
+  - "PR #56 merged to dev as d1add6a5b7a9ae16174186dceeb19e38a7ed4f61; this branch was then rebased onto exact dev before publication."
 evidence:
-  - "Started from stacked PR #56 head 29fc20793770022a9c3557633462933051c16bd9."
+  - "Rebased onto merged dev commit d1add6a5b7a9ae16174186dceeb19e38a7ed4f61 after PR #56 merged."
   - "Focused tests passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (46 tests)."
   - "Full unittest discovery passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest discover -v (199 tests)."
   - "Ruff passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/ruff check ."

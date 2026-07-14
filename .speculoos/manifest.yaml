@@ -100,7 +100,7 @@ current_task:
   branch: feat/pr-057-source-pack-extraction-fixtures
   base_branch: dev
   task_file: .speculoos/tasks/pr-057-source-pack-extraction-fixtures.yaml
-  started_from: 29fc20793770022a9c3557633462933051c16bd9
+  started_from: d1add6a5b7a9ae16174186dceeb19e38a7ed4f61
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
