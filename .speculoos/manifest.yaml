@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: planned
-    number: null
-    url: null
+    status: open
+    number: 60
+    url: https://github.com/fr-meyer/millefeuille/pull/60
     base_branch: dev
     head_branch: feat/pr-060-summary-fixtures
-    head_sha: null
+    head_sha: d1a24321c4745aff557fb76dbecbf0519c01ffb0
     merge_commit: null
     project_status: In Progress
   vibe_kanban:

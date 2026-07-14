@@ -5,13 +5,13 @@ branch: feat/pr-060-summary-fixtures
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 60
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
 post_merge_expected:
-  pull_request: null
+  pull_request: 60
   base_branch: dev
   head_branch: feat/pr-060-summary-fixtures
   head_sha: merge-plan-exact-head
@@ -55,3 +55,4 @@ evidence:
   - "Focused unit tests passed: tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (58 tests)."
   - "Full unittest discovery passed: 211 tests."
   - "Ruff, metadata parse, git diff --check, speculoos status, speculoos validate, and speculoos publish-check passed."
+  - "Published as PR #60 at https://github.com/fr-meyer/millefeuille/pull/60 with exact head d1a24321c4745aff557fb76dbecbf0519c01ffb0."

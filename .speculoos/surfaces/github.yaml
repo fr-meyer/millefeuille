@@ -19,12 +19,12 @@ current_task:
   status: In Progress
   branch: feat/pr-060-summary-fixtures
   speculoos_task: .speculoos/tasks/pr-060-summary-fixtures.yaml
-  pull_request: null
+  pull_request: 60
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
-  head_sha: null
-pull_request: null
+  head_sha: d1a24321c4745aff557fb76dbecbf0519c01ffb0
+pull_request: 60
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
