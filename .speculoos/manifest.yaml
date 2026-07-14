@@ -9,7 +9,7 @@ repository:
   base_branch: dev
   working_branch: feat/pr-062-index-fixtures
 status:
-  phase: implementation
+  phase: in_review
   pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: planned
-    number: null
-    url: null
+    status: open
+    number: 62
+    url: https://github.com/fr-meyer/millefeuille/pull/62
     base_branch: dev
     head_branch: feat/pr-062-index-fixtures
-    head_sha: null
+    head_sha: 101e7a1a5159a6ee9c7403a3d9db68a337651111
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
