@@ -54,6 +54,8 @@ source-packs/
             hierarchical-summary.json
             texts/
           cards/
+            paper-card.json
+            paper-card.md
           classification/
           index/
           reports/

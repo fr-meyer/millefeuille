@@ -17,6 +17,7 @@ from millefeuille.domain.artifact_writer import (
     default_artifact_run_id,
     write_dry_run_artifacts,
 )
+from millefeuille.domain.card_fixtures import write_cards_from_evidence
 from millefeuille.domain.config import AppConfig
 from millefeuille.domain.extraction_fixtures import (
     write_native_extractions_from_evidence,
@@ -415,6 +416,27 @@ def dry_run_command(
                 result.run_id,
                 result.status,
                 result.summary_path,
+            )
+
+    if artifact_cfg.enabled and artifact_cfg.card_evidence_path:
+        assert artifact_cfg.source_pack_root is not None
+        assert artifact_cfg.run_id is not None
+        card_results = write_cards_from_evidence(
+            evidence_path=artifact_cfg.card_evidence_path,
+            source_pack_root=artifact_cfg.source_pack_root,
+            run_id=artifact_cfg.run_id,
+        )
+        logger.info(
+            "[DRY-RUN] Paper card fixtures written: %s",
+            len(card_results),
+        )
+        for result in card_results:
+            logger.info(
+                "  - paper_id=%s run_id=%s status=%s card=%s",
+                result.paper_id,
+                result.run_id,
+                result.status,
+                result.card_json_path,
             )
 
     if artifact_cfg.enabled:

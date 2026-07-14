@@ -15,6 +15,10 @@ import unittest
 from millefeuille.cli.source_pack import run_source_pack_cli
 from millefeuille.domain.artifact_writer import write_dry_run_artifacts
 from millefeuille.domain.artifacts import load_artifact_index
+from millefeuille.domain.card_fixtures import (
+    load_paper_card,
+    write_cards_from_evidence,
+)
 from millefeuille.domain.config import ArtifactExportConfig
 from millefeuille.domain.extraction_fixtures import (
     load_native_extraction_sidecar,
@@ -355,6 +359,65 @@ def _write_summary_evidence_json(
                 "attachment_key": "ATT1",
                 "canonical_filename": "Example Author - 2026 - Intake Fixture.pdf",
                 "summary_path": summary_path.name,
+                "expected_sha256": FIXTURE_SHA256,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return evidence_path
+
+
+def _write_card_fixture_json(tempdir: str) -> Path:
+    card_path = Path(tempdir) / "paper-card-fixture.json"
+    card_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "millefeuille-paper-card/v0.1",
+                "paper_id": "fixture-paper",
+                "identity": {
+                    "title": "Fixture Paper",
+                    "authors": ["Alice Example", "Bob Example"],
+                    "year": 2026,
+                },
+                "one_line_thesis": "A concise thesis.",
+                "primary_contribution": "A clear primary contribution.",
+                "problem_addressed": "A fixture problem.",
+                "method_or_approach": "Fixture method.",
+                "main_results": "Fixture results.",
+                "limitations": "Fixture limitations.",
+                "classification_clues": ["benchmark", "vision"],
+                "evidence_refs": ["fixture-summary.json"],
+                "index_status": [{"lane": "openkb", "status": "skipped"}],
+                "model_provenance": {"profile_id": "fixture-card"},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return card_path
+
+
+def _write_card_evidence_json(
+    tempdir: str,
+    card_json_path: Path,
+    card_markdown_path: Path,
+) -> Path:
+    evidence_path = Path(tempdir) / "card-evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "millefeuille-card-fixture-evidence/v0.1",
+                "source_type": "zotero",
+                "item_key": "ITEM1",
+                "attachment_key": "ATT1",
+                "canonical_filename": "Example Author - 2026 - Intake Fixture.pdf",
+                "card_json_path": card_json_path.name,
+                "card_markdown_path": card_markdown_path.name,
                 "expected_sha256": FIXTURE_SHA256,
             },
             indent=2,
@@ -1341,6 +1404,202 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                     / "run-fixture"
                     / "summaries"
                     / "hierarchical-summary.json"
+                ).exists()
+            )
+
+    def test_card_fixture_writes_run_scoped_paper_card(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            source_pack_root = Path(tempdir) / "source-packs"
+            result = write_source_pack_from_recovered_pdf(
+                evidence=_evidence(source_path),
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+            native_markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\n",
+            )
+            ocr_markdown_path = _write_markdown(
+                tempdir,
+                "ocr-fulltext.md",
+                "OCR fixture page 1\n",
+            )
+            write_native_extractions_from_evidence(
+                evidence_path=_write_native_extraction_evidence_json(
+                    tempdir,
+                    native_markdown_path,
+                ),
+                source_pack_root=source_pack_root,
+            )
+            write_ocr_extractions_from_evidence(
+                evidence_path=_write_ocr_extraction_evidence_json(
+                    tempdir,
+                    ocr_markdown_path,
+                ),
+                source_pack_root=source_pack_root,
+            )
+            write_route_selections_from_evidence(
+                evidence_path=_write_route_selection_evidence_json(
+                    tempdir,
+                    _write_markdown(
+                        tempdir,
+                        "selected-fulltext.md",
+                        "Merged fixture page 1\n",
+                    ),
+                ),
+                source_pack_root=source_pack_root,
+            )
+            write_structures_from_evidence(
+                evidence_path=_write_structure_evidence_json(
+                    tempdir,
+                    _write_structure_payload_json(tempdir),
+                ),
+                source_pack_root=source_pack_root,
+            )
+            _write_markdown(tempdir, "page-1.md", "Page 1 summary.\n")
+            _write_markdown(tempdir, "full-paper.md", "Full paper summary.\n")
+            write_summaries_from_evidence(
+                evidence_path=_write_summary_evidence_json(
+                    tempdir,
+                    _write_summary_fixture_json(tempdir),
+                ),
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )
+            card_markdown_path = _write_markdown(
+                tempdir,
+                "paper-card.md",
+                "# Fixture Paper Card\n\nA concise thesis.\n",
+            )
+            card_evidence_path = _write_card_evidence_json(
+                tempdir,
+                _write_card_fixture_json(tempdir),
+                card_markdown_path,
+            )
+
+            write_results = write_cards_from_evidence(
+                evidence_path=card_evidence_path,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )
+            rerun_results = write_cards_from_evidence(
+                evidence_path=card_evidence_path,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )
+
+            self.assertEqual(len(write_results), 1)
+            self.assertEqual(write_results[0].status, "created")
+            self.assertEqual(rerun_results[0].status, "existing")
+            card_json_path = (
+                result.source_pack_dir
+                / "analyses"
+                / "millefeuille"
+                / "run-fixture"
+                / "cards"
+                / "paper-card.json"
+            )
+            payload = load_paper_card(card_json_path)
+            self.assertEqual(payload["paper_id"], result.paper_id)
+            self.assertEqual(
+                payload["identity"]["source_hash"],
+                f"sha256:{FIXTURE_SHA256}",
+            )
+            self.assertEqual(
+                payload["evidence_refs"],
+                [
+                    "../summaries/hierarchical-summary.json",
+                    "../../../structure/structure.json",
+                ],
+            )
+            self.assertEqual(
+                (
+                    card_json_path.parent / "paper-card.md"
+                ).read_text(encoding="utf-8"),
+                "# Fixture Paper Card\n\nA concise thesis.\n",
+            )
+
+    def test_card_fixture_requires_hierarchical_summary(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            source_pack_root = Path(tempdir) / "source-packs"
+            result = write_source_pack_from_recovered_pdf(
+                evidence=_evidence(source_path),
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+            native_markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\n",
+            )
+            ocr_markdown_path = _write_markdown(
+                tempdir,
+                "ocr-fulltext.md",
+                "OCR fixture page 1\n",
+            )
+            write_native_extractions_from_evidence(
+                evidence_path=_write_native_extraction_evidence_json(
+                    tempdir,
+                    native_markdown_path,
+                ),
+                source_pack_root=source_pack_root,
+            )
+            write_ocr_extractions_from_evidence(
+                evidence_path=_write_ocr_extraction_evidence_json(
+                    tempdir,
+                    ocr_markdown_path,
+                ),
+                source_pack_root=source_pack_root,
+            )
+            write_route_selections_from_evidence(
+                evidence_path=_write_route_selection_evidence_json(
+                    tempdir,
+                    _write_markdown(
+                        tempdir,
+                        "selected-fulltext.md",
+                        "Merged fixture page 1\n",
+                    ),
+                ),
+                source_pack_root=source_pack_root,
+            )
+            write_structures_from_evidence(
+                evidence_path=_write_structure_evidence_json(
+                    tempdir,
+                    _write_structure_payload_json(tempdir),
+                ),
+                source_pack_root=source_pack_root,
+            )
+            card_evidence_path = _write_card_evidence_json(
+                tempdir,
+                _write_card_fixture_json(tempdir),
+                _write_markdown(
+                    tempdir,
+                    "paper-card.md",
+                    "# Fixture Paper Card\n",
+                ),
+            )
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "paper card fixture requires hierarchical summary",
+            ):
+                write_cards_from_evidence(
+                    evidence_path=card_evidence_path,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertFalse(
+                (
+                    result.source_pack_dir
+                    / "analyses"
+                    / "millefeuille"
+                    / "run-fixture"
+                    / "cards"
+                    / "paper-card.json"
                 ).exists()
             )
 

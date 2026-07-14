@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import Any
 
 from millefeuille.domain.artifacts import ArtifactIndex, write_artifact_index
+from millefeuille.domain.card_fixtures import (
+    CARD_JSON_REF,
+    CARD_MARKDOWN_REF,
+    load_paper_card,
+)
 from millefeuille.domain.config import ArtifactExportConfig
 from millefeuille.domain.extraction_fixtures import (
     NATIVE_EVIDENCE_REF,
@@ -78,6 +83,8 @@ class ArtifactRunContext:
     structure_outline_ref: str | None = None
     summary_artifact_ref: str | None = None
     summary_text_dir_ref: str | None = None
+    paper_card_json_ref: str | None = None
+    paper_card_markdown_ref: str | None = None
 
 
 def default_artifact_run_id(now: datetime | None = None) -> str:
@@ -141,6 +148,7 @@ def write_dry_run_artifacts(
             structure_ready=run_context.structure_evidence_ref is not None,
             structure_outline_ready=run_context.structure_outline_ref is not None,
             summarize_ready=run_context.summary_artifact_ref is not None,
+            card_ready=run_context.paper_card_json_ref is not None,
         )
         stage_manifest_path = run_dir / "stage-manifest.json"
         write_stage_manifest(stage_manifest, stage_manifest_path)
@@ -168,6 +176,8 @@ def write_dry_run_artifacts(
             structure_outline_ref=run_context.structure_outline_ref,
             summary_artifact_ref=run_context.summary_artifact_ref,
             summary_text_dir_ref=run_context.summary_text_dir_ref,
+            paper_card_json_ref=run_context.paper_card_json_ref,
+            paper_card_markdown_ref=run_context.paper_card_markdown_ref,
         )
         artifact_index_path = run_dir / "artifact-index.json"
         write_artifact_index(artifact_index, artifact_index_path)
@@ -230,6 +240,11 @@ def resolve_artifact_run_context(
         paper_id=paper_id,
         run_id=run_id,
     )
+    card_refs = _resolve_card_refs(
+        run_dir=run_dir,
+        paper_id=paper_id,
+        expected_source_hash=source_pack_hash,
+    )
     return ArtifactRunContext(
         run_dir=run_dir,
         source_pack_ref=str(source_pack_dir),
@@ -246,6 +261,8 @@ def resolve_artifact_run_context(
         structure_outline_ref=extraction_refs["structure_outline_ref"],
         summary_artifact_ref=summary_refs["summary_artifact_ref"],
         summary_text_dir_ref=summary_refs["summary_text_dir_ref"],
+        paper_card_json_ref=card_refs["paper_card_json_ref"],
+        paper_card_markdown_ref=card_refs["paper_card_markdown_ref"],
     )
 
 
@@ -275,6 +292,7 @@ def build_dry_run_stage_manifest(
     structure_ready: bool = False,
     structure_outline_ready: bool = False,
     summarize_ready: bool = False,
+    card_ready: bool = False,
 ) -> StageManifest:
     has_pdf = bool(rows)
     manual_gates = []
@@ -404,6 +422,10 @@ def build_dry_run_stage_manifest(
             stage_status = StageStatus.PASSED
             stage_outputs = ["hierarchical summary", "summary texts"]
             stage_notes = ["fixture hierarchical summary available"]
+        elif stage_name == StageName.CARD and card_ready:
+            stage_status = StageStatus.PASSED
+            stage_outputs = ["paper card json", "paper card markdown"]
+            stage_notes = ["fixture paper card available"]
         stages.append(
             StageRecord(
                 name=stage_name,
@@ -447,6 +469,8 @@ def build_dry_run_artifact_index(
     structure_outline_ref: str | None = None,
     summary_artifact_ref: str | None = None,
     summary_text_dir_ref: str | None = None,
+    paper_card_json_ref: str | None = None,
+    paper_card_markdown_ref: str | None = None,
 ) -> ArtifactIndex:
     paper_id = paper_id_for_item(item)
     source_pack = {
@@ -546,6 +570,22 @@ def build_dry_run_artifact_index(
                 "ref": summary_text_dir_ref,
                 "format": "directory",
                 "stage": "summarize",
+                "private_content": True,
+            }
+    if paper_card_json_ref is not None:
+        artifacts["paper_card_json"] = {
+            "kind": "paper-card",
+            "ref": paper_card_json_ref,
+            "format": "json",
+            "stage": "card",
+            "private_content": False,
+        }
+        if paper_card_markdown_ref is not None:
+            artifacts["paper_card_markdown"] = {
+                "kind": "paper-card-markdown",
+                "ref": paper_card_markdown_ref,
+                "format": "markdown",
+                "stage": "card",
                 "private_content": True,
             }
     return ArtifactIndex(
@@ -755,4 +795,33 @@ def _resolve_summary_refs(
     return {
         "summary_artifact_ref": _relative_ref(summary_path, run_dir),
         "summary_text_dir_ref": _relative_ref(summary_text_dir, run_dir),
+    }
+
+
+def _resolve_card_refs(
+    *,
+    run_dir: Path,
+    paper_id: str,
+    expected_source_hash: str,
+) -> dict[str, str | None]:
+    card_json_path = run_dir / CARD_JSON_REF
+    card_markdown_path = run_dir / CARD_MARKDOWN_REF
+    json_exists = card_json_path.exists()
+    markdown_exists = card_markdown_path.exists()
+    if not json_exists and not markdown_exists:
+        return {
+            "paper_card_json_ref": None,
+            "paper_card_markdown_ref": None,
+        }
+    if not card_json_path.is_file() or not card_markdown_path.is_file():
+        raise ValueError(f"incomplete paper card fixture under {card_json_path.parent}")
+    payload = load_paper_card(card_json_path)
+    if payload["paper_id"] != paper_id:
+        raise ValueError(f"paper card paper_id drift at {card_json_path}")
+    identity = payload["identity"]
+    if identity.get("source_hash") not in (None, expected_source_hash):
+        raise ValueError(f"paper card source_hash drift at {card_json_path}")
+    return {
+        "paper_card_json_ref": _relative_ref(card_json_path, run_dir),
+        "paper_card_markdown_ref": _relative_ref(card_markdown_path, run_dir),
     }

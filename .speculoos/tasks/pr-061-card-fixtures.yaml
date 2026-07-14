@@ -1,0 +1,57 @@
+id: pr-061-card-fixtures
+title: Add card fixtures
+status: implementation
+branch: feat/pr-061-card-fixtures
+base_branch: dev
+github:
+  issue: null
+  pull_request: 61
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+post_merge_expected:
+  pull_request: 61
+  base_branch: dev
+  head_branch: feat/pr-061-card-fixtures
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - add offline paper-card fixture writers under verified source packs
+  - require card writes to match the source-pack manifest and existing hierarchical summary bundles before writing any run-scoped card artifacts
+  - materialize run-scoped paper-card json and markdown under analyses/millefeuille/<run-id>/cards
+  - surface paper-card refs through source-pack artifact-root stage manifests and artifact indexes
+  - add CLI aliases and config wiring for card fixture evidence paths
+  - keep the slice offline-only on top of merged dev after PR #60
+non_goals:
+  - live Zotero reads or writes, lifecycle tag mutation, or live PDF recovery
+  - OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or index writes
+  - classification, retrieval-index population, or live tree extraction
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - card fixture evidence preflights against existing source-pack manifests and hierarchical summary bundles before any card write
+  - card fixture writes emit run-scoped paper-card json plus markdown under the analyses directory
+  - rerunning identical card fixture evidence is idempotent while drifted card artifacts fail loudly
+  - dry-run source-pack artifact-root runs mark card passed when verified paper-card artifacts exist
+  - artifact indexes expose paper-card json plus markdown refs for the staged fixture outputs
+  - card fixture flags require artifact_root=source-pack with an explicit source_pack_root
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, and Speculoos validate pass
+validation:
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models"
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest discover -v"
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-061-card-fixtures --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Fixture-first paper cards only. No live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+notes:
+  - "PR #60 merged to dev as 96717617811703d8327b1f4575aa000fd80b49c7; this branch starts from that exact dev head before PR #61 publication."
+evidence:
+  - "Branched from merged dev commit 96717617811703d8327b1f4575aa000fd80b49c7 after PR #60 merged."
+  - "Focused unit tests passed: tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (62 tests)."
+  - "Full unittest discovery passed: 215 tests."
+  - "Published as PR #61 at https://github.com/fr-meyer/millefeuille/pull/61 with exact head 3ed3470f03ee97c1d11d2360e44503d960bc5170."

@@ -324,6 +324,7 @@ def validate_flags(cfg: AppConfig) -> None:
         artifacts.route_selection_evidence_path,
         artifacts.structure_evidence_path,
         artifacts.summary_evidence_path,
+        artifacts.card_evidence_path,
     ]
     if artifacts.source_pack_intake_evidence_path is not None:
         if not artifacts.enabled:
@@ -950,6 +951,25 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
         if arg.startswith("--summary-evidence="):
             translated.append(
                 "export.artifacts.summary_evidence_path="
+                + arg.split("=", 1)[1]
+            )
+            artifact_enable_seen = True
+            idx += 1
+            continue
+        if arg == "--card-evidence":
+            if idx + 1 >= len(argv):
+                translated.append(arg)
+                idx += 1
+                continue
+            translated.append(
+                "export.artifacts.card_evidence_path=" + argv[idx + 1]
+            )
+            artifact_enable_seen = True
+            idx += 2
+            continue
+        if arg.startswith("--card-evidence="):
+            translated.append(
+                "export.artifacts.card_evidence_path="
                 + arg.split("=", 1)[1]
             )
             artifact_enable_seen = True

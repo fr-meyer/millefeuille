@@ -94,6 +94,9 @@ state in the stage manifest and artifact index.
   - Include identity, source hash, one-line thesis, contribution, method,
     results, limitations, classification clues, index state, and quality
     warnings.
+  - Preview fixture slice may write `analyses/millefeuille/<run-id>/cards`
+    with `paper-card.json` plus `paper-card.md` only after the source-pack
+    manifest and hierarchical summary bundle are already verified.
 
 - `openkb-add`
   - Add selected Markdown or approved refs to OpenKB.

@@ -11,6 +11,7 @@ from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
     NativeExtractionEvidenceRecord,
     OCREvidenceRecord,
+    PaperCardRecord,
     ProviderPayloadDisposition,
     RouteEvidenceRecord,
     RouteSelection,
@@ -277,6 +278,36 @@ class TestOCREvidenceContract(unittest.TestCase):
         self.assertEqual(payload["summaries"][0]["grain"], "page")
         self.assertEqual(payload["summaries"][1]["scope"], "classification")
         self.assertEqual(payload["summaries"][1]["depends_on"], ["page-1"])
+
+    def test_paper_card_record_serializes(self):
+        card = PaperCardRecord(
+            paper_id="zotero-ITEM1",
+            identity={
+                "title": "Fixture Paper",
+                "year": 2026,
+                "source_hash": "sha256:" + ("a" * 64),
+            },
+            one_line_thesis="A concise thesis.",
+            primary_contribution="A clear primary contribution.",
+            evidence_refs=[
+                "../summaries/hierarchical-summary.json",
+                "../../../structure/structure.json",
+            ],
+            index_status=[{"lane": "openkb", "status": "skipped"}],
+            model_provenance={"profile_id": "fixture-card"},
+            classification_clues=["vision", "benchmarking"],
+        )
+
+        payload = card.to_dict()
+
+        self.assertEqual(payload["schema_version"], "millefeuille-paper-card/v0.1")
+        self.assertEqual(payload["paper_id"], "zotero-ITEM1")
+        self.assertEqual(payload["identity"]["title"], "Fixture Paper")
+        self.assertEqual(
+            payload["evidence_refs"][0],
+            "../summaries/hierarchical-summary.json",
+        )
+        self.assertEqual(payload["model_provenance"]["profile_id"], "fixture-card")
 
     def test_attachment_identity_requires_sha256_shape(self):
         with self.assertRaises(MillefeuilleContractError):

@@ -390,6 +390,26 @@ manifest plus existing structure sidecar, then writes
 `summarize` passed and exposes the summary bundle without calling model
 providers or writing OpenKB/index lanes.
 
+Once the summary bundle exists, the same dry-run path can stage paper-card
+fixture evidence:
+
+```bash
+millefeuille --artifact-root source-pack \
+  --source-pack-root /path/to/source-packs \
+  --summary-evidence /path/to/summary-evidence.jsonl \
+  --card-evidence /path/to/card-evidence.jsonl \
+  --run-id dry-run-demo \
+  processing.dry_run=true
+```
+
+Paper-card fixture evidence points to a local
+`millefeuille-paper-card/v0.1` JSON file plus Markdown card content. The
+dry-run path preflights the source-pack manifest and existing hierarchical
+summary bundle, then writes `cards/paper-card.json` and `cards/paper-card.md`
+under `analyses/millefeuille/<run-id>/`. The artifact index marks `card`
+passed and exposes both refs without calling model providers or writing
+OpenKB/index lanes.
+
 ### Command-Line Configuration
 
 Override configuration from the command line:

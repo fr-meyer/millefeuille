@@ -1,13 +1,13 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-060-summary-fixtures
+canonical_task: pr-061-card-fixtures
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
-  local_path: /tmp/millefeuille-pr60
+  local_path: /tmp/millefeuille-pr61
   base_branch: dev
-  working_branch: feat/pr-060-summary-fixtures
+  working_branch: feat/pr-061-card-fixtures
 status:
   phase: implementation
   pret_a_coder: in_progress
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 211 passed, 0 failed
+    result: 215 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -58,11 +58,11 @@ surfaces:
   github_pull_request:
     enabled: true
     status: open
-    number: 60
-    url: https://github.com/fr-meyer/millefeuille/pull/60
+    number: 61
+    url: https://github.com/fr-meyer/millefeuille/pull/61
     base_branch: dev
-    head_branch: feat/pr-060-summary-fixtures
-    head_sha: d1a24321c4745aff557fb76dbecbf0519c01ffb0
+    head_branch: feat/pr-061-card-fixtures
+    head_sha: 3ed3470f03ee97c1d11d2360e44503d960bc5170
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
@@ -94,13 +94,13 @@ gates:
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
 current_task:
-  id: pr-060-summary-fixtures
-  title: Add summary fixtures
+  id: pr-061-card-fixtures
+  title: Add card fixtures
   status: implementation
-  branch: feat/pr-060-summary-fixtures
+  branch: feat/pr-061-card-fixtures
   base_branch: dev
-  task_file: .speculoos/tasks/pr-060-summary-fixtures.yaml
-  started_from: 7187e2652bd1b16292eb73fdcd5cc2c01658ea02
+  task_file: .speculoos/tasks/pr-061-card-fixtures.yaml
+  started_from: 96717617811703d8327b1f4575aa000fd80b49c7
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
