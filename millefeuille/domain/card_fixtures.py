@@ -70,8 +70,7 @@ class CardFixtureEvidence:
         )
         if schema_version != CARD_FIXTURE_SCHEMA_VERSION:
             raise MillefeuilleContractError(
-                "unsupported card fixture evidence schema_version "
-                f"{schema_version!r}"
+                f"unsupported card fixture evidence schema_version {schema_version!r}"
             )
         card_json_path = _resolve_optional_path(
             payload.get("card_json_path") or payload.get("json_path"),
@@ -464,9 +463,7 @@ def _read_text_fixture(path: Path, *, kind: str) -> str:
     try:
         return path.read_text(encoding="utf-8")
     except OSError as exc:
-        raise MillefeuilleContractError(
-            f"could not read {kind} {path}: {exc}"
-        ) from exc
+        raise MillefeuilleContractError(f"could not read {kind} {path}: {exc}") from exc
 
 
 def _load_json_object(path: str | Path, kind: str) -> dict[str, Any]:

@@ -739,8 +739,7 @@ def log_tag_adding_start(
         tag_count: Number of tags to apply
     """
     message = (
-        f"Tag Adding: processing {item_count} candidate items with "
-        f"{tag_count} tags"
+        f"Tag Adding: processing {item_count} candidate items with {tag_count} tags"
     )
     formatted_message = _format_with_emoji(message, "🏷️", "[TAG ADDING]")
     logger.info(formatted_message)
@@ -783,9 +782,7 @@ def log_selection_tagging_summary(
     logger.info(table_str)
 
 
-def log_tag_adding_result(
-    logger: logging.Logger, result: TagAddingResult
-) -> None:
+def log_tag_adding_result(logger: logging.Logger, result: TagAddingResult) -> None:
     """Log the result of a tag adding operation for a single item.
 
     Args:
@@ -794,14 +791,14 @@ def log_tag_adding_result(
     """
     if result.tags_failed:
         message = (
-            f"Tag Adding failed for \"{result.item_title}\" ({result.item_key}): "
+            f'Tag Adding failed for "{result.item_title}" ({result.item_key}): '
             f"{len(result.tags_failed)} tag(s) failed ({result.tags_failed})"
         )
         formatted_message = _format_with_emoji(message, "❌", "[TAG ADDING ERROR]")
         logger.warning(formatted_message)
     else:
         message = (
-            f"Tag Adding OK for \"{result.item_title}\" ({result.item_key}): "
+            f'Tag Adding OK for "{result.item_title}" ({result.item_key}): '
             f"{len(result.tags_added)} tag(s) applied"
         )
         formatted_message = _format_with_emoji(message, "✓", "[TAG ADDING OK]")

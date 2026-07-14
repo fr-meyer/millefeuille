@@ -62,9 +62,7 @@ class ZoteroClient:
     """
 
     @staticmethod
-    def _is_pdf_attachment(
-        content_type: str | None, filename: str | None
-    ) -> bool:
+    def _is_pdf_attachment(content_type: str | None, filename: str | None) -> bool:
         """Return True if attachment metadata represents a PDF."""
         normalized_content_type = (content_type or "").lower()
         normalized_filename = (filename or "").lower()
@@ -93,7 +91,7 @@ class ZoteroClient:
             for line in extra.splitlines():
                 stripped = line.strip()
                 if stripped.lower().startswith("citation key:"):
-                    value = stripped[len("citation key:"):].strip()
+                    value = stripped[len("citation key:") :].strip()
                     if value:
                         return value
 
@@ -124,9 +122,7 @@ class ZoteroClient:
         self.credentials: AuthQueryConfig = config
         self._zotero_read = Zotero(config.library_id, "user", config.read_key)
         if config.write_key is not None:
-            self._zotero_write = Zotero(
-                config.library_id, "user", config.write_key
-            )
+            self._zotero_write = Zotero(config.library_id, "user", config.write_key)
         else:
             self._zotero_write = None
         logger.info(f"Initialized ZoteroClient for library_id: {config.library_id}")
@@ -211,9 +207,7 @@ class ZoteroClient:
         """
         try:
             logger.debug(f"Fetching items for tag: {tag}")
-            raw_items = self._zotero_read.everything(
-                self._zotero_read.items(tag=tag)
-            )
+            raw_items = self._zotero_read.everything(self._zotero_read.items(tag=tag))
 
             result: dict[str, dict[str, Any]] = {}
             for item in raw_items:
@@ -227,9 +221,7 @@ class ZoteroClient:
                     result[item_key] = item_data
 
             if len(result) > 100:
-                logger.info(
-                    f"Fetched {len(result)} items for tag '{tag}' (paginated)"
-                )
+                logger.info(f"Fetched {len(result)} items for tag '{tag}' (paginated)")
             else:
                 logger.debug(f"Fetched {len(result)} items for tag '{tag}'")
             return result
@@ -434,9 +426,7 @@ class ZoteroClient:
                 item_data_raw = item.get("data", {})
                 if not isinstance(item_data_raw, dict):
                     continue
-                item_tags = [
-                    t.get("tag", "") for t in item_data_raw.get("tags", [])
-                ]
+                item_tags = [t.get("tag", "") for t in item_data_raw.get("tags", [])]
                 if exclude_tag not in item_tags:
                     filtered_items.append(item)
             items = filtered_items
@@ -580,8 +570,7 @@ class ZoteroClient:
                         kept_by_conflict_include_wins += 1
 
         final_keys = [
-            item_key for item_key in candidate_map
-            if item_key not in excluded_keys
+            item_key for item_key in candidate_map if item_key not in excluded_keys
         ]
 
         logger.info(
@@ -614,12 +603,8 @@ class ZoteroClient:
                     if not isinstance(child_data, dict):
                         continue
                     filename_raw = child_data.get("filename")
-                    filename = (
-                        filename_raw if isinstance(filename_raw, str) else None
-                    )
-                    if self._is_pdf_attachment(
-                        child_data.get("contentType"), filename
-                    ):
+                    filename = filename_raw if isinstance(filename_raw, str) else None
+                    if self._is_pdf_attachment(child_data.get("contentType"), filename):
                         attachments.append(
                             AttachmentInfo(
                                 key=child.get("key", ""),
@@ -669,7 +654,9 @@ class ZoteroClient:
                 raise ZoteroAPIError(error_msg, e) from e
 
             paper_metadata = self._extract_paper_metadata(
-                item_data, include_abstract, item_key=item_key,
+                item_data,
+                include_abstract,
+                item_key=item_key,
             )
             paper_metadata.attachments = list(attachments)
 
@@ -1270,9 +1257,7 @@ class ZoteroClient:
                 item_data["tags"] = [{"tag": t} for t in tags]
 
                 zw.update_item(item)
-                logger.info(
-                    f"Successfully set tags {tags} on item_key={item_key}"
-                )
+                logger.info(f"Successfully set tags {tags} on item_key={item_key}")
                 return
 
             except zotero_errors.PreConditionFailedError as e:
@@ -1326,8 +1311,7 @@ class ZoteroClient:
             except HTTPError as e:
                 if e.code == 404:
                     error_msg = (
-                        f"Item not found while setting tags: "
-                        f"item_key={item_key}"
+                        f"Item not found while setting tags: item_key={item_key}"
                     )
                     logger.error(f"{error_msg}: {e}")
                     raise ZoteroItemNotFoundError(error_msg, e) from e
@@ -1346,15 +1330,12 @@ class ZoteroClient:
                     logger.error(f"{error_msg}: {e}")
                     raise ZoteroAPIError(error_msg, e) from e
             except URLError as e:
-                error_msg = (
-                    f"Network error while setting tags on item_key={item_key}"
-                )
+                error_msg = f"Network error while setting tags on item_key={item_key}"
                 logger.error(f"{error_msg}: {e}")
                 raise ZoteroAPIError(error_msg, e) from e
             except Exception as e:
                 error_msg = (
-                    f"Unexpected error while setting tags on "
-                    f"item_key={item_key}"
+                    f"Unexpected error while setting tags on item_key={item_key}"
                 )
                 logger.error(f"{error_msg}: {e}", exc_info=True)
                 raise ZoteroAPIError(error_msg, e) from e

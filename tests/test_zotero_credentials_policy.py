@@ -30,9 +30,7 @@ def _make_config(credentials: AuthQueryConfig, **overrides) -> AppConfig:
         storage=StorageConfig(),
         credentials=credentials,
         tagging=TaggingConfig(
-            selection=TagSelectionConfig(
-                include=TagRuleConfig(values=["millefeuille"])
-            )
+            selection=TagSelectionConfig(include=TagRuleConfig(values=["millefeuille"]))
         ),
         **overrides,
     )

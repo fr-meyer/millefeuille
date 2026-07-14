@@ -218,6 +218,33 @@ The read-only artifact commands inspect Millefeuille artifact indexes without
 initializing Zotero, OCR providers, OpenKB, PageIndex, ConDB, ChatIndex, or
 model clients.
 
+### Preview Stage Commands
+
+For offline artifact-package validation, Millefeuille also exposes preview and
+read-only stage commands that operate on a verified source-pack run directory:
+
+```bash
+millefeuille acceptance --source-pack-root ./artifacts/source-pack --run-id run-001
+millefeuille classify --source-pack-root ./artifacts/source-pack --run-id run-001 --evidence classification-evidence.json
+millefeuille writeback --source-pack-root ./artifacts/source-pack --run-id run-001
+millefeuille retrieve --source-pack-root ./artifacts/source-pack --run-id run-001
+millefeuille models
+millefeuille run --source-pack-root ./artifacts/source-pack --run-id run-001 --classification-evidence classification-evidence.json --release-preflight
+```
+
+These commands stay offline and preview-only in the current contract slice:
+
+- `acceptance` synthesizes a final verdict from handoff, source-pack,
+  extraction, route, structure, summary, card, and index evidence.
+- `classify` materializes classification plans, decision records, review
+  queues, and writeback previews from explicit local evidence.
+- `writeback` turns the preview classification output into a governed Zotero
+  writeback plan without mutating Zotero.
+- `retrieve` lists stored artifact references for downstream inspection.
+- `models` prints the bundled offline model-profile catalog.
+- `run` chains `acceptance`, `classify`, and `writeback`, with optional
+  release-candidate preflight reporting.
+
 ```bash
 millefeuille artifacts --index /path/to/artifact-index.json
 millefeuille status --index /path/to/artifact-index.json

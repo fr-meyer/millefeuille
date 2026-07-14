@@ -95,6 +95,31 @@ class SummaryScope(_StringEnum):
     GENERAL = "general"
 
 
+class AcceptanceStatus(_StringEnum):
+    PASS = "pass"
+    NEEDS_REVIEW = "needs-review"
+
+
+class AcceptanceCheckStatus(_StringEnum):
+    PASSED = "passed"
+    SKIPPED = "skipped"
+    NEEDS_REVIEW = "needs-review"
+
+
+class ClassificationMode(_StringEnum):
+    SINGLE = "single"
+    BATCH = "batch"
+    REVIEW = "review"
+    ADJUDICATE = "adjudicate"
+    MULTI_AGENT = "multi-agent"
+
+
+class ClassificationStatus(_StringEnum):
+    CLASSIFIED = "classified"
+    NEEDS_REVIEW = "needs-review"
+    ADJUDICATION_REQUIRED = "adjudication-required"
+
+
 class ProviderPayloadDisposition(_StringEnum):
     DISCARDED = "discarded"
     QUARANTINED = "quarantined"
@@ -121,32 +146,36 @@ class TagState(_StringEnum):
     ERROR = "millefeuille-error"
 
 
-TERMINAL_REVIEW_STATES = frozenset({
-    TagState.NEEDS_REVIEW,
-    TagState.ERROR,
-})
+TERMINAL_REVIEW_STATES = frozenset(
+    {
+        TagState.NEEDS_REVIEW,
+        TagState.ERROR,
+    }
+)
 
-ALLOWED_TAG_TRANSITIONS = frozenset({
-    (TagState.SELECTED, TagState.PREVIEWED),
-    (TagState.PREVIEWED, TagState.HANDOFF_EXPORTED),
-    (TagState.HANDOFF_EXPORTED, TagState.SOURCE_VERIFIED),
-    (TagState.SOURCE_VERIFIED, TagState.SOURCE_PACKED),
-    (TagState.SOURCE_PACKED, TagState.EXTRACTED_NATIVE),
-    (TagState.SOURCE_PACKED, TagState.EXTRACTED_OCR),
-    (TagState.EXTRACTED_NATIVE, TagState.OPENKB_ADDED),
-    (TagState.EXTRACTED_OCR, TagState.OPENKB_ADDED),
-    (TagState.EXTRACTED_NATIVE, TagState.STRUCTURE_READY),
-    (TagState.EXTRACTED_OCR, TagState.STRUCTURE_READY),
-    (TagState.STRUCTURE_READY, TagState.SUMMARIZED),
-    (TagState.SUMMARIZED, TagState.CARD_READY),
-    (TagState.CARD_READY, TagState.OPENKB_ADDED),
-    (TagState.CARD_READY, TagState.INDEXED),
-    (TagState.OPENKB_ADDED, TagState.ACCEPTANCE_PASSED),
-    (TagState.OPENKB_ADDED, TagState.INDEXED),
-    (TagState.INDEXED, TagState.ACCEPTANCE_PASSED),
-    (TagState.ACCEPTANCE_PASSED, TagState.READY_FOR_CLASSIFICATION),
-    (TagState.READY_FOR_CLASSIFICATION, TagState.CLASSIFIED),
-})
+ALLOWED_TAG_TRANSITIONS = frozenset(
+    {
+        (TagState.SELECTED, TagState.PREVIEWED),
+        (TagState.PREVIEWED, TagState.HANDOFF_EXPORTED),
+        (TagState.HANDOFF_EXPORTED, TagState.SOURCE_VERIFIED),
+        (TagState.SOURCE_VERIFIED, TagState.SOURCE_PACKED),
+        (TagState.SOURCE_PACKED, TagState.EXTRACTED_NATIVE),
+        (TagState.SOURCE_PACKED, TagState.EXTRACTED_OCR),
+        (TagState.EXTRACTED_NATIVE, TagState.OPENKB_ADDED),
+        (TagState.EXTRACTED_OCR, TagState.OPENKB_ADDED),
+        (TagState.EXTRACTED_NATIVE, TagState.STRUCTURE_READY),
+        (TagState.EXTRACTED_OCR, TagState.STRUCTURE_READY),
+        (TagState.STRUCTURE_READY, TagState.SUMMARIZED),
+        (TagState.SUMMARIZED, TagState.CARD_READY),
+        (TagState.CARD_READY, TagState.OPENKB_ADDED),
+        (TagState.CARD_READY, TagState.INDEXED),
+        (TagState.OPENKB_ADDED, TagState.ACCEPTANCE_PASSED),
+        (TagState.OPENKB_ADDED, TagState.INDEXED),
+        (TagState.INDEXED, TagState.ACCEPTANCE_PASSED),
+        (TagState.ACCEPTANCE_PASSED, TagState.READY_FOR_CLASSIFICATION),
+        (TagState.READY_FOR_CLASSIFICATION, TagState.CLASSIFIED),
+    }
+)
 
 
 STAGE_MANUAL_GATES: dict[StageName, ManualGate | None] = {
@@ -227,6 +256,20 @@ class StageRecord:
             result["notes"] = list(self.notes)
         return result
 
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> StageRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("stage record must be an object")
+        return cls(
+            name=payload.get("name", ""),
+            status=payload.get("status", ""),
+            inputs=list(payload.get("inputs", [])),
+            outputs=list(payload.get("outputs", [])),
+            manual_gate_required=bool(payload.get("manual_gate_required", False)),
+            gate=payload.get("gate"),
+            notes=list(payload.get("notes", [])),
+        )
+
 
 @dataclass
 class StageManifest:
@@ -277,6 +320,27 @@ class StageManifest:
             "manual_gates": [gate.value for gate in self.manual_gates],
             "stages": [stage.to_dict() for stage in self.stages],
         }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> StageManifest:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("stage manifest must be an object")
+        stages = payload.get("stages")
+        if not isinstance(stages, list):
+            raise MillefeuilleContractError("stage manifest stages must be an array")
+        manual_gates = payload.get("manual_gates", [])
+        if not isinstance(manual_gates, list):
+            raise MillefeuilleContractError(
+                "stage manifest manual_gates must be an array"
+            )
+        return cls(
+            run_id=str(payload.get("run_id", "")).strip(),
+            mode=str(payload.get("mode", "")).strip(),
+            stages=stages,
+            manual_gates=manual_gates,
+            schema_version=str(payload.get("schema_version", "")).strip(),
+            source_type=str(payload.get("source_type", "")).strip(),
+        )
 
 
 @dataclass
@@ -355,9 +419,7 @@ class OCREvidenceRecord:
             "attachment_identity": self.attachment_identity.to_dict(),
             "output_markdown_ref": self.output_markdown_ref,
             "page_count": self.page_count,
-            "provider_payload_disposition": (
-                self.provider_payload_disposition.value
-            ),
+            "provider_payload_disposition": (self.provider_payload_disposition.value),
             "warnings": list(self.warnings),
         }
         if self.requested_model is not None:
@@ -427,9 +489,7 @@ class StructureEvidenceRecord:
         ):
             value = getattr(self, field_name)
             if value < 0:
-                raise MillefeuilleContractError(
-                    f"{field_name} must be non-negative"
-                )
+                raise MillefeuilleContractError(f"{field_name} must be non-negative")
         if not isinstance(self.coverage, dict):
             raise MillefeuilleContractError("coverage must be an object")
         if not isinstance(self.structure, dict):
@@ -555,9 +615,7 @@ class HierarchicalSummaryRecord:
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> HierarchicalSummaryRecord:
         if not isinstance(payload, dict):
-            raise MillefeuilleContractError(
-                "hierarchical summary must be an object"
-            )
+            raise MillefeuilleContractError("hierarchical summary must be an object")
         summaries = payload.get("summaries")
         if not isinstance(summaries, list):
             raise MillefeuilleContractError("summaries must be an array")
@@ -575,9 +633,7 @@ class HierarchicalSummaryRecord:
             "paper_id": self.paper_id,
             "run_id": self.run_id,
             "taxonomy_context": (
-                None
-                if self.taxonomy_context is None
-                else dict(self.taxonomy_context)
+                None if self.taxonomy_context is None else dict(self.taxonomy_context)
             ),
             "summaries": [summary.to_dict() for summary in self.summaries],
         }
@@ -629,9 +685,7 @@ class PaperCardRecord:
                 "model_provenance.profile_id must be a non-empty string"
             )
         if not isinstance(self.evidence_refs, list) or not self.evidence_refs:
-            raise MillefeuilleContractError(
-                "evidence_refs must be a non-empty array"
-            )
+            raise MillefeuilleContractError("evidence_refs must be a non-empty array")
         for ref in self.evidence_refs:
             if not isinstance(ref, str) or not ref.strip():
                 raise MillefeuilleContractError(
@@ -641,9 +695,7 @@ class PaperCardRecord:
             raise MillefeuilleContractError("index_status must be an array")
         for entry in self.index_status:
             if not isinstance(entry, dict):
-                raise MillefeuilleContractError(
-                    "index_status entries must be objects"
-                )
+                raise MillefeuilleContractError("index_status entries must be objects")
             lane = entry.get("lane")
             status = entry.get("status")
             if not isinstance(lane, str) or not lane.strip():
@@ -678,9 +730,7 @@ class PaperCardRecord:
             paper_id=str(payload.get("paper_id", "")).strip(),
             identity=dict(payload.get("identity", {})),
             one_line_thesis=str(payload.get("one_line_thesis", "")).strip(),
-            primary_contribution=str(
-                payload.get("primary_contribution", "")
-            ).strip(),
+            primary_contribution=str(payload.get("primary_contribution", "")).strip(),
             evidence_refs=list(evidence_refs),
             index_status=[dict(entry) for entry in index_status],
             model_provenance=dict(payload.get("model_provenance", {})),
@@ -731,13 +781,15 @@ class PaperCardRecord:
 
 
 INDEX_LANE_VALUES = frozenset({"openkb", "pageindex", "condb", "chatindex", "other"})
-INDEX_STATUS_VALUES = frozenset({
-    "skipped",
-    "previewed",
-    "written",
-    "failed",
-    "needs-review",
-})
+INDEX_STATUS_VALUES = frozenset(
+    {
+        "skipped",
+        "previewed",
+        "written",
+        "failed",
+        "needs-review",
+    }
+)
 
 
 @dataclass
@@ -885,8 +937,7 @@ class RetrievalIndexRecord:
         missing_lanes = required_lanes - set(lane_names)
         if missing_lanes:
             raise MillefeuilleContractError(
-                "lanes missing required entries: "
-                f"{sorted(missing_lanes)!r}"
+                f"lanes missing required entries: {sorted(missing_lanes)!r}"
             )
 
     @classmethod
@@ -900,9 +951,7 @@ class RetrievalIndexRecord:
             paper_id=str(payload.get("paper_id", "")).strip(),
             run_id=str(payload.get("run_id", "")).strip(),
             source_hash=str(payload.get("source_hash", "")).strip(),
-            selected_fulltext_ref=str(
-                payload.get("selected_fulltext_ref", "")
-            ).strip(),
+            selected_fulltext_ref=str(payload.get("selected_fulltext_ref", "")).strip(),
             summary_ref=str(payload.get("summary_ref", "")).strip(),
             paper_card_ref=str(payload.get("paper_card_ref", "")).strip(),
             lanes=lanes,
@@ -929,4 +978,542 @@ class RetrievalIndexRecord:
             payload["collision_summary"] = dict(self.collision_summary)
         if self.quality_warnings:
             payload["quality_warnings"] = list(self.quality_warnings)
+        return payload
+
+
+@dataclass
+class AcceptanceCheckRecord:
+    name: str
+    status: AcceptanceCheckStatus | str
+    refs: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+    details: dict[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise MillefeuilleContractError("acceptance check name must be non-empty")
+        self.name = self.name.strip()
+        self.status = _coerce_enum(AcceptanceCheckStatus, self.status)
+        for field_name in ("refs", "notes"):
+            value = getattr(self, field_name)
+            if not isinstance(value, list):
+                raise MillefeuilleContractError(f"{field_name} must be an array")
+            for entry in value:
+                if not isinstance(entry, str) or not entry.strip():
+                    raise MillefeuilleContractError(
+                        f"{field_name} must contain non-empty strings"
+                    )
+        if self.details is not None and not isinstance(self.details, dict):
+            raise MillefeuilleContractError("details must be an object or null")
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> AcceptanceCheckRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("acceptance check must be an object")
+        return cls(
+            name=str(payload.get("name", "")).strip(),
+            status=str(payload.get("status", "")).strip(),
+            refs=list(payload.get("refs", [])),
+            notes=list(payload.get("notes", [])),
+            details=payload.get("details"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "name": self.name,
+            "status": self.status.value,
+            "refs": list(self.refs),
+        }
+        if self.notes:
+            payload["notes"] = list(self.notes)
+        if self.details is not None:
+            payload["details"] = dict(self.details)
+        return payload
+
+
+@dataclass
+class AcceptanceSummaryRecord:
+    paper_id: str
+    run_id: str
+    source_hash: str
+    source_pack_ref: str
+    status: AcceptanceStatus | str
+    counts: dict[str, int]
+    checks: list[AcceptanceCheckRecord | dict[str, Any]]
+    handoff: dict[str, Any] | None = None
+    duplicate_scan: dict[str, Any] | None = None
+    writeback_preview: dict[str, Any] | None = None
+    review_reasons: list[str] = field(default_factory=list)
+    schema_version: str = "openkb-millefeuille-acceptance-summary/v0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "openkb-millefeuille-acceptance-summary/v0.1":
+            raise MillefeuilleContractError(
+                f"unsupported schema_version {self.schema_version!r}"
+            )
+        for field_name in ("paper_id", "run_id", "source_hash", "source_pack_ref"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string"
+                )
+        self.status = _coerce_enum(AcceptanceStatus, self.status)
+        if not isinstance(self.counts, dict):
+            raise MillefeuilleContractError("counts must be an object")
+        for key, value in self.counts.items():
+            if not isinstance(key, str) or not key.strip():
+                raise MillefeuilleContractError("counts keys must be non-empty")
+            if not isinstance(value, int) or value < 0:
+                raise MillefeuilleContractError("counts values must be non-negative")
+        self.checks = [
+            check
+            if isinstance(check, AcceptanceCheckRecord)
+            else AcceptanceCheckRecord.from_dict(check)
+            for check in self.checks
+        ]
+        if not self.checks:
+            raise MillefeuilleContractError("checks must not be empty")
+        for field_name in ("review_reasons",):
+            value = getattr(self, field_name)
+            if not isinstance(value, list):
+                raise MillefeuilleContractError(f"{field_name} must be an array")
+            for entry in value:
+                if not isinstance(entry, str) or not entry.strip():
+                    raise MillefeuilleContractError(
+                        f"{field_name} must contain non-empty strings"
+                    )
+        for field_name in ("handoff", "duplicate_scan", "writeback_preview"):
+            value = getattr(self, field_name)
+            if value is not None and not isinstance(value, dict):
+                raise MillefeuilleContractError(
+                    f"{field_name} must be an object or null"
+                )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> AcceptanceSummaryRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("acceptance summary must be an object")
+        checks = payload.get("checks")
+        if not isinstance(checks, list):
+            raise MillefeuilleContractError("checks must be an array")
+        return cls(
+            paper_id=str(payload.get("paper_id", "")).strip(),
+            run_id=str(payload.get("run_id", "")).strip(),
+            source_hash=str(payload.get("source_hash", "")).strip(),
+            source_pack_ref=str(payload.get("source_pack_ref", "")).strip(),
+            status=str(payload.get("status", "")).strip(),
+            counts=dict(payload.get("counts", {})),
+            checks=checks,
+            handoff=payload.get("handoff"),
+            duplicate_scan=payload.get("duplicate_scan"),
+            writeback_preview=payload.get("writeback_preview"),
+            review_reasons=list(payload.get("review_reasons", [])),
+            schema_version=str(payload.get("schema_version", "")).strip(),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "schema_version": self.schema_version,
+            "paper_id": self.paper_id,
+            "run_id": self.run_id,
+            "source_hash": self.source_hash,
+            "source_pack_ref": self.source_pack_ref,
+            "status": self.status.value,
+            "counts": dict(self.counts),
+            "checks": [check.to_dict() for check in self.checks],
+        }
+        if self.handoff is not None:
+            payload["handoff"] = dict(self.handoff)
+        if self.duplicate_scan is not None:
+            payload["duplicate_scan"] = dict(self.duplicate_scan)
+        if self.writeback_preview is not None:
+            payload["writeback_preview"] = dict(self.writeback_preview)
+        if self.review_reasons:
+            payload["review_reasons"] = list(self.review_reasons)
+        return payload
+
+
+@dataclass
+class RejectedAlternativeRecord:
+    path: str
+    reason: str
+    evidence_refs: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        for field_name in ("path", "reason"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string"
+                )
+        if not isinstance(self.evidence_refs, list):
+            raise MillefeuilleContractError("evidence_refs must be an array")
+        for ref in self.evidence_refs:
+            if not isinstance(ref, str) or not ref.strip():
+                raise MillefeuilleContractError(
+                    "evidence_refs must contain non-empty strings"
+                )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> RejectedAlternativeRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("rejected alternative must be an object")
+        return cls(
+            path=str(payload.get("path", "")).strip(),
+            reason=str(payload.get("reason", "")).strip(),
+            evidence_refs=list(payload.get("evidence_refs", [])),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "path": self.path,
+            "reason": self.reason,
+        }
+        if self.evidence_refs:
+            payload["evidence_refs"] = list(self.evidence_refs)
+        return payload
+
+
+@dataclass
+class ClassificationDecisionRecord:
+    paper_id: str
+    run_id: str
+    source_hash: str
+    taxonomy_version: str
+    mode: ClassificationMode | str
+    status: ClassificationStatus | str
+    primary_path: str
+    confidence: str
+    evidence_refs: list[str]
+    strongest_rejected_path: str | None = None
+    rejected_alternatives: list[RejectedAlternativeRecord | dict[str, Any]] = field(
+        default_factory=list
+    )
+    review_reasons: list[str] = field(default_factory=list)
+    qa_flags: list[str] = field(default_factory=list)
+    writeback_preview_ref: str | None = None
+    schema_version: str = "millefeuille-classification-decision/v0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "millefeuille-classification-decision/v0.1":
+            raise MillefeuilleContractError(
+                f"unsupported schema_version {self.schema_version!r}"
+            )
+        for field_name in (
+            "paper_id",
+            "run_id",
+            "source_hash",
+            "taxonomy_version",
+            "primary_path",
+            "confidence",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string"
+                )
+        self.mode = _coerce_enum(ClassificationMode, self.mode)
+        self.status = _coerce_enum(ClassificationStatus, self.status)
+        for field_name in ("evidence_refs", "review_reasons", "qa_flags"):
+            value = getattr(self, field_name)
+            if not isinstance(value, list):
+                raise MillefeuilleContractError(f"{field_name} must be an array")
+            for entry in value:
+                if not isinstance(entry, str) or not entry.strip():
+                    raise MillefeuilleContractError(
+                        f"{field_name} must contain non-empty strings"
+                    )
+        self.rejected_alternatives = [
+            alt
+            if isinstance(alt, RejectedAlternativeRecord)
+            else RejectedAlternativeRecord.from_dict(alt)
+            for alt in self.rejected_alternatives
+        ]
+        if self.writeback_preview_ref is not None and (
+            not isinstance(self.writeback_preview_ref, str)
+            or not self.writeback_preview_ref.strip()
+        ):
+            raise MillefeuilleContractError(
+                "writeback_preview_ref must be a non-empty string when provided"
+            )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ClassificationDecisionRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("classification decision must be an object")
+        return cls(
+            paper_id=str(payload.get("paper_id", "")).strip(),
+            run_id=str(payload.get("run_id", "")).strip(),
+            source_hash=str(payload.get("source_hash", "")).strip(),
+            taxonomy_version=str(payload.get("taxonomy_version", "")).strip(),
+            mode=str(payload.get("mode", "")).strip(),
+            status=str(payload.get("status", "")).strip(),
+            primary_path=str(payload.get("primary_path", "")).strip(),
+            confidence=str(payload.get("confidence", "")).strip(),
+            evidence_refs=list(payload.get("evidence_refs", [])),
+            strongest_rejected_path=payload.get("strongest_rejected_path"),
+            rejected_alternatives=list(payload.get("rejected_alternatives", [])),
+            review_reasons=list(payload.get("review_reasons", [])),
+            qa_flags=list(payload.get("qa_flags", [])),
+            writeback_preview_ref=payload.get("writeback_preview_ref"),
+            schema_version=str(payload.get("schema_version", "")).strip(),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "schema_version": self.schema_version,
+            "paper_id": self.paper_id,
+            "run_id": self.run_id,
+            "source_hash": self.source_hash,
+            "taxonomy_version": self.taxonomy_version,
+            "mode": self.mode.value,
+            "status": self.status.value,
+            "primary_path": self.primary_path,
+            "confidence": self.confidence,
+            "evidence_refs": list(self.evidence_refs),
+        }
+        if self.strongest_rejected_path is not None:
+            payload["strongest_rejected_path"] = self.strongest_rejected_path
+        if self.rejected_alternatives:
+            payload["rejected_alternatives"] = [
+                alt.to_dict() for alt in self.rejected_alternatives
+            ]
+        if self.review_reasons:
+            payload["review_reasons"] = list(self.review_reasons)
+        if self.qa_flags:
+            payload["qa_flags"] = list(self.qa_flags)
+        if self.writeback_preview_ref is not None:
+            payload["writeback_preview_ref"] = self.writeback_preview_ref
+        return payload
+
+
+@dataclass
+class ClassificationPlanRecord:
+    run_id: str
+    taxonomy_version: str
+    mode: ClassificationMode | str
+    papers: list[dict[str, Any]]
+    default_profile: str | None = None
+    schema_version: str = "millefeuille-classification-plan/v0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "millefeuille-classification-plan/v0.1":
+            raise MillefeuilleContractError(
+                f"unsupported schema_version {self.schema_version!r}"
+            )
+        for field_name in ("run_id", "taxonomy_version"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string"
+                )
+        self.mode = _coerce_enum(ClassificationMode, self.mode)
+        if not isinstance(self.papers, list) or not self.papers:
+            raise MillefeuilleContractError("papers must be a non-empty array")
+        for paper in self.papers:
+            if not isinstance(paper, dict):
+                raise MillefeuilleContractError("papers entries must be objects")
+            paper_id = paper.get("paper_id")
+            decision_ref = paper.get("decision_ref")
+            if not isinstance(paper_id, str) or not paper_id.strip():
+                raise MillefeuilleContractError(
+                    "papers.paper_id must be a non-empty string"
+                )
+            if not isinstance(decision_ref, str) or not decision_ref.strip():
+                raise MillefeuilleContractError(
+                    "papers.decision_ref must be a non-empty string"
+                )
+        if self.default_profile is not None and (
+            not isinstance(self.default_profile, str)
+            or not self.default_profile.strip()
+        ):
+            raise MillefeuilleContractError(
+                "default_profile must be a non-empty string when provided"
+            )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ClassificationPlanRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("classification plan must be an object")
+        return cls(
+            run_id=str(payload.get("run_id", "")).strip(),
+            taxonomy_version=str(payload.get("taxonomy_version", "")).strip(),
+            mode=str(payload.get("mode", "")).strip(),
+            papers=list(payload.get("papers", [])),
+            default_profile=payload.get("default_profile"),
+            schema_version=str(payload.get("schema_version", "")).strip(),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "schema_version": self.schema_version,
+            "run_id": self.run_id,
+            "taxonomy_version": self.taxonomy_version,
+            "mode": self.mode.value,
+            "papers": [dict(paper) for paper in self.papers],
+        }
+        if self.default_profile is not None:
+            payload["default_profile"] = self.default_profile
+        return payload
+
+
+@dataclass
+class ZoteroWritebackPlanRecord:
+    paper_id: str
+    run_id: str
+    source_hash: str
+    mode: str
+    status: str
+    add_tags: list[str] = field(default_factory=list)
+    remove_tags: list[str] = field(default_factory=list)
+    note_markdown_ref: str | None = None
+    destination_collection: str | None = None
+    classification_ref: str | None = None
+    execution_notes: list[str] = field(default_factory=list)
+    schema_version: str = "millefeuille-zotero-writeback-plan/v0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "millefeuille-zotero-writeback-plan/v0.1":
+            raise MillefeuilleContractError(
+                f"unsupported schema_version {self.schema_version!r}"
+            )
+        for field_name in ("paper_id", "run_id", "source_hash", "mode", "status"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string"
+                )
+        if self.mode not in {"none", "preview", "approved-live"}:
+            raise MillefeuilleContractError("unsupported writeback mode")
+        if self.status not in {"not-planned", "previewed", "written", "skipped"}:
+            raise MillefeuilleContractError("unsupported writeback status")
+        for field_name in ("add_tags", "remove_tags", "execution_notes"):
+            value = getattr(self, field_name)
+            if not isinstance(value, list):
+                raise MillefeuilleContractError(f"{field_name} must be an array")
+            for entry in value:
+                if not isinstance(entry, str) or not entry.strip():
+                    raise MillefeuilleContractError(
+                        f"{field_name} must contain non-empty strings"
+                    )
+        for field_name in (
+            "note_markdown_ref",
+            "destination_collection",
+            "classification_ref",
+        ):
+            value = getattr(self, field_name)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string when provided"
+                )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ZoteroWritebackPlanRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("writeback plan must be an object")
+        return cls(
+            paper_id=str(payload.get("paper_id", "")).strip(),
+            run_id=str(payload.get("run_id", "")).strip(),
+            source_hash=str(payload.get("source_hash", "")).strip(),
+            mode=str(payload.get("mode", "")).strip(),
+            status=str(payload.get("status", "")).strip(),
+            add_tags=list(payload.get("add_tags", [])),
+            remove_tags=list(payload.get("remove_tags", [])),
+            note_markdown_ref=payload.get("note_markdown_ref"),
+            destination_collection=payload.get("destination_collection"),
+            classification_ref=payload.get("classification_ref"),
+            execution_notes=list(payload.get("execution_notes", [])),
+            schema_version=str(payload.get("schema_version", "")).strip(),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "schema_version": self.schema_version,
+            "paper_id": self.paper_id,
+            "run_id": self.run_id,
+            "source_hash": self.source_hash,
+            "mode": self.mode,
+            "status": self.status,
+            "add_tags": list(self.add_tags),
+            "remove_tags": list(self.remove_tags),
+        }
+        if self.note_markdown_ref is not None:
+            payload["note_markdown_ref"] = self.note_markdown_ref
+        if self.destination_collection is not None:
+            payload["destination_collection"] = self.destination_collection
+        if self.classification_ref is not None:
+            payload["classification_ref"] = self.classification_ref
+        if self.execution_notes:
+            payload["execution_notes"] = list(self.execution_notes)
+        return payload
+
+
+@dataclass
+class ReleaseCandidatePreflightRecord:
+    current_version: str
+    completed_stages: list[str]
+    manual_gates_remaining: list[str]
+    readiness: str
+    validations: list[str] = field(default_factory=list)
+    candidate_version: str | None = None
+    schema_version: str = "millefeuille-release-candidate-preflight/v0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "millefeuille-release-candidate-preflight/v0.1":
+            raise MillefeuilleContractError(
+                f"unsupported schema_version {self.schema_version!r}"
+            )
+        if (
+            not isinstance(self.current_version, str)
+            or not self.current_version.strip()
+        ):
+            raise MillefeuilleContractError(
+                "current_version must be a non-empty string"
+            )
+        if self.candidate_version is not None and (
+            not isinstance(self.candidate_version, str)
+            or not self.candidate_version.strip()
+        ):
+            raise MillefeuilleContractError(
+                "candidate_version must be a non-empty string when provided"
+            )
+        for field_name in ("completed_stages", "manual_gates_remaining", "validations"):
+            value = getattr(self, field_name)
+            if not isinstance(value, list):
+                raise MillefeuilleContractError(f"{field_name} must be an array")
+            for entry in value:
+                if not isinstance(entry, str) or not entry.strip():
+                    raise MillefeuilleContractError(
+                        f"{field_name} must contain non-empty strings"
+                    )
+        if not isinstance(self.readiness, str) or not self.readiness.strip():
+            raise MillefeuilleContractError("readiness must be a non-empty string")
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ReleaseCandidatePreflightRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError(
+                "release candidate preflight must be an object"
+            )
+        return cls(
+            current_version=str(payload.get("current_version", "")).strip(),
+            candidate_version=payload.get("candidate_version"),
+            completed_stages=list(payload.get("completed_stages", [])),
+            manual_gates_remaining=list(payload.get("manual_gates_remaining", [])),
+            readiness=str(payload.get("readiness", "")).strip(),
+            validations=list(payload.get("validations", [])),
+            schema_version=str(payload.get("schema_version", "")).strip(),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "schema_version": self.schema_version,
+            "current_version": self.current_version,
+            "completed_stages": list(self.completed_stages),
+            "manual_gates_remaining": list(self.manual_gates_remaining),
+            "readiness": self.readiness,
+            "validations": list(self.validations),
+        }
+        if self.candidate_version is not None:
+            payload["candidate_version"] = self.candidate_version
         return payload

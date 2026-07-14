@@ -20,9 +20,7 @@ from millefeuille.utils.export import (
 )
 
 FIXTURE_DIR = (
-    Path(__file__).resolve().parent
-    / "fixtures"
-    / "openkb_handoff_multi_attachment"
+    Path(__file__).resolve().parent / "fixtures" / "openkb_handoff_multi_attachment"
 )
 
 

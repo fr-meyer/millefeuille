@@ -373,9 +373,7 @@ class Pipeline:
             ProcessingTagResult with per-operation counts.
         """
         outcome = "success" if success else "failure"
-        plan = _plan_outcome_tags(
-            self.tagging_config, self.zotero_config, outcome
-        )
+        plan = _plan_outcome_tags(self.tagging_config, self.zotero_config, outcome)
         result = ProcessingTagResult(
             outcome=outcome,
             add_attempted=0,
@@ -458,8 +456,7 @@ class Pipeline:
                     item_result.add_failed += 1
                     agg.add_failed += 1
                     self.logger.warning(
-                        f"Failed to add tag '{tag}' to item "
-                        f'"{item.title}": {e}'
+                        f"Failed to add tag '{tag}' to item \"{item.title}\": {e}"
                     )
 
             for tag in self.selection_tagging_config.remove.values:
@@ -473,8 +470,7 @@ class Pipeline:
                     item_result.remove_failed += 1
                     agg.remove_failed += 1
                     self.logger.warning(
-                        f"Failed to remove tag '{tag}' from item "
-                        f'"{item.title}": {e}'
+                        f"Failed to remove tag '{tag}' from item \"{item.title}\": {e}"
                     )
 
             if item_result.has_failures:
@@ -555,9 +551,7 @@ class Pipeline:
                 f"{skipped} items skipped for {label} (no tag operations planned)"
             )
         if partial_failed:
-            parts.append(
-                f"{partial_failed} items with partial {label} failures"
-            )
+            parts.append(f"{partial_failed} items with partial {label} failures")
         if fully_failed:
             parts.append(f"{fully_failed} items with failed {label}")
         if not parts:
@@ -1011,9 +1005,7 @@ class Pipeline:
         for item in items:
             try:
                 if item.key in failed_item_keys:
-                    tag_result = self._apply_processing_tags(
-                        item.key, success=False
-                    )
+                    tag_result = self._apply_processing_tags(item.key, success=False)
                     if tag_result.has_failures:
                         self.logger.warning(
                             f"Some tag operations failed for item {item.key}"
@@ -1021,8 +1013,7 @@ class Pipeline:
                     _record_error_outcome(tag_result)
                 elif item.key in success_item_keys:
                     pdf_attachments = [
-                        att for att in item.attachments
-                        if self._is_pdf_attachment(att)
+                        att for att in item.attachments if self._is_pdf_attachment(att)
                     ]
                     if not pdf_attachments:
                         tag_result = self._apply_processing_tags(
@@ -1042,9 +1033,7 @@ class Pipeline:
                             break
 
                     if all_attachments_succeeded and apply_processed_tag:
-                        tag_result = self._apply_processing_tags(
-                            item.key, success=True
-                        )
+                        tag_result = self._apply_processing_tags(item.key, success=True)
                         if tag_result.has_failures:
                             self.logger.warning(
                                 f"Some tag operations failed for item {item.key}"
@@ -1053,7 +1042,8 @@ class Pipeline:
                 else:
                     if apply_processed_tag:
                         pdf_attachments = [
-                            att for att in item.attachments
+                            att
+                            for att in item.attachments
                             if self._is_pdf_attachment(att)
                         ]
                         if len(pdf_attachments) == 0:
@@ -1210,9 +1200,7 @@ class Pipeline:
         Returns the number of items that received success processing tags.
         """
         processed_count = 0
-        results_by_item_key = {
-            result.item_key: result for result in tag_adding_results
-        }
+        results_by_item_key = {result.item_key: result for result in tag_adding_results}
 
         for item in items:
             matched_result = results_by_item_key.get(item.key)
@@ -1256,8 +1244,7 @@ class Pipeline:
     ) -> int:
         """Supplement missing in-memory PDFs with disk-backed entries."""
         known_pdf_keys = {
-            (item_key, attachment_key)
-            for _, _, item_key, attachment_key in pdfs
+            (item_key, attachment_key) for _, _, item_key, attachment_key in pdfs
         }
         supplemented_count = 0
 
@@ -1303,13 +1290,7 @@ class Pipeline:
 
         # Calculate total PDFs across all items (PDF attachments only)
         total_pdfs = sum(
-            len(
-                [
-                    att
-                    for att in item.attachments
-                    if self._is_pdf_attachment(att)
-                ]
-            )
+            len([att for att in item.attachments if self._is_pdf_attachment(att)])
             for item in items
         )
 
@@ -1525,9 +1506,7 @@ class Pipeline:
                     "OCR client is not initialized but batch polling was invoked"
                 )
             try:
-                ocr_results = ocr.poll_ocr_results_batch(
-                    doc_ids, progress_callback
-                )
+                ocr_results = ocr.poll_ocr_results_batch(doc_ids, progress_callback)
             except Exception as e:
                 # Log unexpected exceptions from OCR client
                 self.logger.error(
@@ -2103,8 +2082,7 @@ class Pipeline:
                         )
         except OSError as e:
             self.logger.warning(
-                f"Failed to save processing summary to disk for item "
-                f"{item.key}: {e}"
+                f"Failed to save processing summary to disk for item {item.key}: {e}"
             )
         except Exception as e:
             self.logger.warning(
@@ -2244,9 +2222,7 @@ class Pipeline:
                 self.selection_tagging_config.enabled
                 and self.export_config.attachment_urls.enabled
             ):
-                log_selection_tagging_summary(
-                    self.logger, _selection_tagging_fields()
-                )
+                log_selection_tagging_summary(self.logger, _selection_tagging_fields())
                 selection_tagging_summary_displayed = True
 
         def _export_attachment_urls() -> None:
@@ -2280,9 +2256,7 @@ class Pipeline:
             rows = build_openkb_handoff_rows(
                 items, self.zotero_client, self.export_config.openkb_handoff
             )
-            report = validate_openkb_handoff_rows(
-                rows, mode="live", source_items=items
-            )
+            report = validate_openkb_handoff_rows(rows, mode="live", source_items=items)
             log_openkb_weak_verification_warnings(
                 self.logger, report.weak_verification_rows
             )
@@ -2294,9 +2268,7 @@ class Pipeline:
                     "validation failure(s). No JSONL written."
                 )
             assert self.export_config.openkb_handoff.jsonl_path is not None
-            write_openkb_jsonl(
-                rows, self.export_config.openkb_handoff.jsonl_path
-            )
+            write_openkb_jsonl(rows, self.export_config.openkb_handoff.jsonl_path)
             return len(rows)
 
         def _selection_tagging_fields(selected: int | None = None) -> dict[str, int]:
@@ -2435,15 +2407,11 @@ class Pipeline:
             and not self.ocr_config.enabled
             and not self.download_config.enabled
         ):
-            self.logger.info(
-                "Standalone tag-adding mode: OCR and download disabled"
-            )
+            self.logger.info("Standalone tag-adding mode: OCR and download disabled")
             total_assigned_tags = sum(
                 len(tags) for tags in self.tag_adding_config.assignments.values()
             )
-            log_tag_adding_start(
-                self.logger, len(items), total_assigned_tags
-            )
+            log_tag_adding_start(self.logger, len(items), total_assigned_tags)
             tag_adding_results, no_key_count = self._apply_tag_adding(items)
 
             tag_adding_processed = self._apply_output_tag_to_eligible_items(
@@ -2451,9 +2419,7 @@ class Pipeline:
             )
 
             # Recompute after possible mutations
-            tag_adding_failed = sum(
-                1 for r in tag_adding_results if r.tags_failed
-            )
+            tag_adding_failed = sum(1 for r in tag_adding_results if r.tags_failed)
             tag_adding_succeeded = sum(
                 1 for r in tag_adding_results if not r.tags_failed
             )
@@ -2557,7 +2523,9 @@ class Pipeline:
             self.logger.info("Download-only mode: OCR disabled, skipping OCR phases")
             apply_processed_tag_on_download = not self.tag_adding_config.enabled
             self._tag_items_based_on_download(
-                items, download_summary, self._download_path_mapping,
+                items,
+                download_summary,
+                self._download_path_mapping,
                 apply_processed_tag=apply_processed_tag_on_download,
             )
 
@@ -2608,9 +2576,7 @@ class Pipeline:
                 )
 
                 # Recompute after possible mutations
-                tag_adding_failed = sum(
-                    1 for r in tag_adding_results if r.tags_failed
-                )
+                tag_adding_failed = sum(1 for r in tag_adding_results if r.tags_failed)
                 tag_adding_succeeded = sum(
                     1 for r in tag_adding_results if not r.tags_failed
                 )
@@ -2681,8 +2647,7 @@ class Pipeline:
         # Handle empty PDFs case
         if not pdfs:
             self.logger.warning(
-                "No PDFs collected from items, skipping to Phase 3 with "
-                "empty results"
+                "No PDFs collected from items, skipping to Phase 3 with empty results"
             )
             phase1_time = time.time() - phase1_start_time
             self.logger.info(
@@ -2918,9 +2883,7 @@ class Pipeline:
                                 f"Some tag operations failed for item {item.key}"
                             )
                     else:
-                        tag_result = self._apply_processing_tags(
-                            item.key, success=True
-                        )
+                        tag_result = self._apply_processing_tags(item.key, success=True)
                         if tag_result.has_failures:
                             self.logger.warning(
                                 f"Some tag operations failed for item {item.key}"
@@ -2939,13 +2902,10 @@ class Pipeline:
                             )
                         else:
                             self.logger.warning(
-                                f"Processed outcome tagging failed for item "
-                                f"{item.key}"
+                                f"Processed outcome tagging failed for item {item.key}"
                             )
                 else:
-                    tag_result = self._apply_processing_tags(
-                        item.key, success=True
-                    )
+                    tag_result = self._apply_processing_tags(item.key, success=True)
                     if tag_result.has_failures:
                         self.logger.warning(
                             f"Some tag operations failed for item {item.key}"
@@ -2960,9 +2920,7 @@ class Pipeline:
                         f'("{item.title}"): {error_msg}'
                     )
 
-                tag_result = self._apply_processing_tags(
-                    item.key, success=False
-                )
+                tag_result = self._apply_processing_tags(item.key, success=False)
                 if tag_result.has_failures:
                     self.logger.warning(
                         f"Some tag operations failed for item {item.key}"
@@ -3045,9 +3003,7 @@ class Pipeline:
             summary["tag_adding_succeeded"] = sum(
                 1 for r in tag_adding_results_ocr if not r.tags_failed
             )
-            summary["tag_adding_eligible"] = sum(
-                1 for r in results if r.success
-            )
+            summary["tag_adding_eligible"] = sum(1 for r in results if r.success)
             summary["tag_adding_no_key"] = tag_adding_no_key_total
             summary["tag_adding_processed"] = tag_adding_processed
         else:

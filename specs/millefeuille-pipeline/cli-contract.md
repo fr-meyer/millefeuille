@@ -1,9 +1,11 @@
 # CLI Contract
 
-The future CLI should make each Millefeuille stage explicit. Existing Hydra
-flags can stay supported, but operator-facing commands should make live
-boundaries, artifact locations, model profiles, and Zotero writeback harder to
-cross accidentally.
+The CLI now exposes preview/read-only stage commands for `acceptance`,
+`classify`, `writeback`, `retrieve`, `models`, and `run`, alongside the older
+`artifacts`, `status`, and `source-pack` helpers. The remaining goal is to
+make the earlier discovery/live stages equally explicit so operator-facing
+commands make live boundaries, artifact locations, model profiles, and Zotero
+writeback harder to cross accidentally.
 
 ## Global Options
 
@@ -20,6 +22,37 @@ Every command that reads or writes derived artifacts should accept:
 
 The CLI should record the resolved artifact-root, model profile, and approval
 state in the stage manifest and artifact index.
+
+## Current Preview Surface
+
+- `acceptance`
+  - Implemented for verified source-pack runs.
+  - Requires explicit handoff evidence plus an existing run-scoped artifact
+    package.
+  - Writes `reports/acceptance-summary.json` and updates the stage manifest and
+    artifact index.
+
+- `classify`
+  - Implemented for accepted runs from explicit local evidence.
+  - Writes classification plan/decision artifacts plus a Zotero writeback
+    preview without model/provider calls.
+
+- `writeback`
+  - Implemented in preview mode only.
+  - Materializes a governed Zotero writeback plan and optional preview note.
+
+- `retrieve`
+  - Implemented as a read-only ref resolver over an existing artifact package.
+  - Returns summary, card, index, acceptance, classification, and writeback
+    refs instead of private paper content.
+
+- `models`
+  - Implemented as a bundled profile lister for preview and planning use.
+
+- `run`
+  - Implemented for the preview chain
+    `acceptance,classify,writeback[,release-preflight]`.
+  - Does not yet orchestrate the earlier discovery/source-pack stages.
 
 ## Command Groups
 
@@ -108,26 +141,29 @@ state in the stage manifest and artifact index.
     duplicate/collision evidence, skip reasons, and result refs.
 
 - `retrieve`
-  - Query a paper package or corpus by paper id, Zotero key, DOI, title,
-    section, page, summary scope, or classification evidence need.
-  - Return artifact refs by default instead of dumping full private text.
+  - Current preview implementation queries a verified paper package by paper
+    id or item key, plus summary/index filters, and returns artifact refs.
+  - Future expansion should support corpus lookup by DOI, title, section, page,
+    or broader classification evidence need.
 
 - `acceptance`
-  - Join handoff, skip, source-pack, extraction, structure, summary, card,
-    OpenKB, index, duplicate-scan, and writeback-preview evidence.
-  - Emit `openkb-millefeuille-acceptance-summary/v0.1` plus the artifact-index
-    completion verdict.
+  - Current preview implementation joins handoff, source-pack, extraction,
+    route, structure, summary, card, index, and duplicate-scan evidence.
+  - Future expansion should add broader skip/OpenKB/live-state joins and
+    approval-aware waivers.
 
 - `classify`
-  - Start only after acceptance evidence is complete or explicitly waived.
-  - Run `single`, `batch`, `review`, `adjudicate`, or optional `multi-agent`
-    mode against a locked taxonomy version.
-  - Emit evidence-backed decision records before any Zotero mutation.
+  - Current preview implementation starts only after acceptance evidence is
+    complete and emits evidence-backed decision records before any Zotero
+    mutation.
+  - Future expansion should cover richer batch/review/adjudicate routing and
+    optional `multi-agent` execution.
 
 - `writeback`
-  - Apply verified Zotero lifecycle tags, compact notes, or collection updates.
-  - Default to preview.
-  - Require explicit approval and `ZOTERO_WRITE_KEY` for live mutation.
+  - Current implementation is preview-only and writes governed plans rather
+    than mutating Zotero.
+  - Future approved-live mutation still requires explicit approval and
+    `ZOTERO_WRITE_KEY`.
 
 - `models`
   - List, validate, and explain available model profiles for each model-using
@@ -142,19 +178,22 @@ state in the stage manifest and artifact index.
     index state.
 
 - `run`
-  - Execute a staged pipeline with explicit stage selection, artifact-root,
-    model profile, writeback mode, and approval gates.
+  - Current implementation sequences preview `acceptance`, `classify`, and
+    `writeback`, with optional local release-preflight output.
+  - Future expansion should execute the broader staged pipeline with explicit
+    artifact-root, mode, model profile, writeback mode, and approval gates.
 
 ## Example
 
 ```bash
 millefeuille run \
-  --from-zotero-tag millefeuille-test \
-  --stages discover,handoff,recover,source-pack,extract-native,extract-ocr,route,structure,summarize,card,index,acceptance \
-  --artifact-root source-pack \
-  --model-profile research-default \
-  --mode approved-live \
-  --writeback preview
+  --source-pack-root /path/to/source-packs \
+  --paper-id zotero-ITEM1 \
+  --run-id run-fixture \
+  --stages acceptance,classify,writeback \
+  --handoff /path/to/handoff.jsonl \
+  --classification-evidence /path/to/classification-evidence.json \
+  --release-preflight
 ```
 
 ## Run Modes

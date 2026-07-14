@@ -255,10 +255,7 @@ def verify_recovered_pdf_evidence(evidence: RecoveredPdfEvidence) -> str:
         )
 
     byte_size = source_path.stat().st_size
-    if (
-        evidence.file_size_bytes is not None
-        and evidence.file_size_bytes != byte_size
-    ):
+    if evidence.file_size_bytes is not None and evidence.file_size_bytes != byte_size:
         raise MillefeuilleContractError(
             "recovered PDF size mismatch: "
             f"expected {evidence.file_size_bytes}, got {byte_size}"
@@ -431,9 +428,7 @@ def build_source_pack_manifest(
     if evidence.discovered_at is not None:
         manifest["provenance"]["discovered_at"] = evidence.discovered_at
     if evidence.verification_strength is not None:
-        manifest["provenance"]["verification_strength"] = (
-            evidence.verification_strength
-        )
+        manifest["provenance"]["verification_strength"] = evidence.verification_strength
     if evidence.recovery:
         manifest["provenance"]["recovery"] = dict(evidence.recovery)
     if evidence.openkb_policy_hints:
@@ -512,12 +507,8 @@ def _reject_multi_pdf_handoff_groups(rows: list[OpenKBHandoffRow]) -> None:
         if len(item_rows) <= 1:
             continue
         paper_id = paper_id_for_zotero_item_key(item_key)
-        attachment_keys = ", ".join(
-            sorted(row.attachment_key for row in item_rows)
-        )
-        conflicts.append(
-            f"{item_key} -> {paper_id} [{attachment_keys}]"
-        )
+        attachment_keys = ", ".join(sorted(row.attachment_key for row in item_rows))
+        conflicts.append(f"{item_key} -> {paper_id} [{attachment_keys}]")
 
     if conflicts:
         raise MillefeuilleContractError(
@@ -543,9 +534,7 @@ def _validate_evidence_matches_handoff_row(
     if evidence.item_key != row.item_key:
         raise MillefeuilleContractError("source-pack evidence item_key drift")
     if evidence.attachment_key != row.attachment_key:
-        raise MillefeuilleContractError(
-            "source-pack evidence attachment_key drift"
-        )
+        raise MillefeuilleContractError("source-pack evidence attachment_key drift")
     if evidence.canonical_filename != row.canonical_filename:
         raise MillefeuilleContractError(
             "source-pack evidence canonical_filename does not match handoff "

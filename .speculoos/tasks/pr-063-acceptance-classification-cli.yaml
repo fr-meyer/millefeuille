@@ -1,0 +1,61 @@
+id: pr-063-acceptance-classification-cli
+title: Add acceptance, classification, and stage CLI previews
+status: implementation
+branch: feat/pr-063-acceptance-classification-cli
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  head_sha: null
+post_merge_expected:
+  pull_request: null
+  base_branch: dev
+  head_branch: feat/pr-063-acceptance-classification-cli
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - synthesize run-scoped acceptance summaries from source-pack, extraction, route, structure, summary, card, and index evidence
+  - add offline classification orchestration records, review queues, adjudication artifacts, and writeback previews from explicit local evidence
+  - add a preview-only writeback stage that materializes governed Zotero tag/note/collection plans without mutating Zotero
+  - expose read-only or preview CLI subcommands for acceptance, classify, writeback, retrieve, models, and run
+  - prepare local release-candidate preflight documentation without promotion, tagging, or package publication
+  - keep the slice offline-only on top of merged PR #62 dev commit 16f904be6212ade3c0d8b19acd9d1ccc8b81bbf1
+non_goals:
+  - live Zotero reads or writes, lifecycle tag mutation, or live PDF recovery
+  - OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or live index writes
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - acceptance synthesis writes a stable summary artifact and marks the acceptance stage passed only when source-pack through index evidence is complete or explicitly waived
+  - classification preview requires acceptance evidence, emits plan plus per-paper decision records, and records rejected alternatives, review queues, and writeback previews
+  - writeback preview consumes classification output and emits a governed Zotero writeback plan without live mutation
+  - retrieve, models, and run subcommands surface the offline artifact package without requiring live provider credentials
+  - artifact indexes and stage manifests surface acceptance, classify, and writeback outputs when they exist under a verified source-pack run directory
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, and Speculoos validate pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models tests.test_millefeuille_stage_cli"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-063-acceptance-classification-cli --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Offline acceptance/classification/writeback preview and stage CLI slice only. No live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, live index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+documentation_impact:
+  status: completed
+  rationale: README and pipeline contract docs describe the acceptance, classification, writeback preview, retrieve, models, run, and release-preflight additions in this slice.
+notes:
+  - "Reconstructed from the preserved 183d549fafda8a2b04246c78f50fe402360b668a offline slice on merged PR #62 dev commit 16f904be6212ade3c0d8b19acd9d1ccc8b81bbf1."
+evidence:
+  - "Branch starts from merged PR #62 dev commit 16f904be6212ade3c0d8b19acd9d1ccc8b81bbf1."
+  - "Original offline implementation commit preserved as backup/pr-063-pre-merge-dev-183d549 and in the verified git bundle."
+  - "PR #62 review observations were checked against full files: retrieval_index_status is spelled correctly and dataclasses.field is explicitly imported."
+  - "Focused offline unit tests passed: 71 tests."
+  - "Full unittest discovery passed: 224 tests."
+  - "Ruff, metadata parse, and git diff --check passed after reconstruction."

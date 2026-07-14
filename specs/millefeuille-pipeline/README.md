@@ -25,12 +25,18 @@ Files:
 - `tag-state-machine.md` - Zotero tag lifecycle design.
 - `ocr-backend-contract.md` - native/OCR evidence adapter contract.
 - `release-version-policy.md` - Speculoos-governed release and version path.
+- `release-candidate-preflight.md` - local RC preflight artifacts and stop
+  points before promotion/tagging.
 - `live-run-plan.md` - future live dogfood plan, still requiring approval.
 
 Executable offline contract models live in
 `millefeuille/domain/millefeuille.py`. They cover stage manifests,
-manual gates, tag-state transitions, and OCR evidence records without changing
-live CLI behavior.
+manual gates, tag-state transitions, acceptance summaries, classification
+records, writeback plans, and release-preflight records without requiring live
+provider or Zotero mutation.
+
+Preview/read-only stage commands now live under `millefeuille/cli/stages.py`:
+`acceptance`, `classify`, `writeback`, `retrieve`, `models`, and `run`.
 
 Manual gates remain explicit: live Zotero reads/writes, PDF recovery/download,
 OCR/Mistral/PageIndex calls, model calls, worker-agent execution, OpenKB

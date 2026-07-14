@@ -159,9 +159,7 @@ def _write_native_extraction_evidence_json(
     evidence_path.write_text(
         json.dumps(
             {
-                "schema_version": (
-                    "millefeuille-native-extraction-evidence/v0.1"
-                ),
+                "schema_version": ("millefeuille-native-extraction-evidence/v0.1"),
                 "source_type": "zotero",
                 "item_key": item_key,
                 "attachment_key": attachment_key,
@@ -229,9 +227,7 @@ def _write_route_selection_evidence_json(
     evidence_path.write_text(
         json.dumps(
             {
-                "schema_version": (
-                    "millefeuille-route-selection-evidence/v0.1"
-                ),
+                "schema_version": ("millefeuille-route-selection-evidence/v0.1"),
                 "source_type": "zotero",
                 "item_key": "ITEM1",
                 "attachment_key": "ATT1",
@@ -574,9 +570,7 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
             self.assertEqual(result.source_path.read_bytes(), FIXTURE_BYTES)
             self.assertTrue((result.source_pack_dir / "pages").is_dir())
             self.assertTrue((result.source_pack_dir / "extractions/native").is_dir())
-            self.assertTrue(
-                (result.source_pack_dir / "analyses/millefeuille").is_dir()
-            )
+            self.assertTrue((result.source_pack_dir / "analyses/millefeuille").is_dir())
 
             manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(
@@ -702,9 +696,7 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
     def test_existing_partial_nonempty_directory_is_not_reused(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_path = _write_recovered_pdf(tempdir)
-            source_pack_dir = (
-                Path(tempdir) / "source-packs" / "zotero" / "zotero-ITEM1"
-            )
+            source_pack_dir = Path(tempdir) / "source-packs" / "zotero" / "zotero-ITEM1"
             source_pack_dir.mkdir(parents=True)
             (source_pack_dir / "unexpected.txt").write_text(
                 "do not overwrite\n",
@@ -1060,14 +1052,9 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                 )
 
             native_evidence_path = (
-                result.source_pack_dir
-                / "extractions"
-                / "native"
-                / "evidence.json"
+                result.source_pack_dir / "extractions" / "native" / "evidence.json"
             )
-            self.assertFalse(
-                native_evidence_path.exists()
-            )
+            self.assertFalse(native_evidence_path.exists())
 
     def test_extraction_fixture_batch_rejects_duplicate_item_attachment_records(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -1111,10 +1098,7 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
 
             self.assertFalse(
                 (
-                    result.source_pack_dir
-                    / "extractions"
-                    / "native"
-                    / "evidence.json"
+                    result.source_pack_dir / "extractions" / "native" / "evidence.json"
                 ).exists()
             )
 
@@ -1432,9 +1416,9 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                 ["page-1"],
             )
             self.assertEqual(
-                (
-                    summary_path.parent / "texts" / "full-paper.md"
-                ).read_text(encoding="utf-8"),
+                (summary_path.parent / "texts" / "full-paper.md").read_text(
+                    encoding="utf-8"
+                ),
                 "Full paper summary.\n",
             )
 
@@ -1583,9 +1567,7 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                 ],
             )
             self.assertEqual(
-                (
-                    card_json_path.parent / "paper-card.md"
-                ).read_text(encoding="utf-8"),
+                (card_json_path.parent / "paper-card.md").read_text(encoding="utf-8"),
                 "# Fixture Paper Card\n\nA concise thesis.\n",
             )
 

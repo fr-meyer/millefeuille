@@ -23,9 +23,7 @@ from millefeuille.domain.source_packs import (
 NATIVE_EXTRACTION_EVIDENCE_SCHEMA_VERSION = (
     "millefeuille-native-extraction-evidence/v0.1"
 )
-OCR_EXTRACTION_EVIDENCE_SCHEMA_VERSION = (
-    "millefeuille-ocr-extraction-evidence/v0.1"
-)
+OCR_EXTRACTION_EVIDENCE_SCHEMA_VERSION = "millefeuille-ocr-extraction-evidence/v0.1"
 NATIVE_MARKDOWN_REF = Path("extractions/native/fulltext.md")
 NATIVE_EVIDENCE_REF = Path("extractions/native/evidence.json")
 OCR_MARKDOWN_REF = Path("extractions/mistral-ocr/fulltext.md")
@@ -56,9 +54,7 @@ class NativeExtractionFixtureEvidence:
         if self.page_count < 0:
             raise MillefeuilleContractError("page_count must be non-negative")
         if self.character_count is not None and self.character_count < 0:
-            raise MillefeuilleContractError(
-                "character_count must be non-negative"
-            )
+            raise MillefeuilleContractError("character_count must be non-negative")
         if self.empty_pages is not None and self.empty_pages < 0:
             raise MillefeuilleContractError("empty_pages must be non-negative")
         object.__setattr__(
@@ -176,9 +172,7 @@ class OCRExtractionFixtureEvidence:
         if self.page_count < 0:
             raise MillefeuilleContractError("page_count must be non-negative")
         if self.character_count is not None and self.character_count < 0:
-            raise MillefeuilleContractError(
-                "character_count must be non-negative"
-            )
+            raise MillefeuilleContractError("character_count must be non-negative")
         object.__setattr__(
             self,
             "markdown_path",
@@ -190,9 +184,7 @@ class OCRExtractionFixtureEvidence:
             _normalize_sha256(self.expected_sha256),
         )
         try:
-            disposition = ProviderPayloadDisposition(
-                self.provider_payload_disposition
-            )
+            disposition = ProviderPayloadDisposition(self.provider_payload_disposition)
         except ValueError as exc:
             raise MillefeuilleContractError(
                 "provider_payload_disposition must be a supported value"
@@ -218,8 +210,7 @@ class OCRExtractionFixtureEvidence:
         )
         if schema_version != OCR_EXTRACTION_EVIDENCE_SCHEMA_VERSION:
             raise MillefeuilleContractError(
-                "unsupported OCR extraction evidence schema_version "
-                f"{schema_version!r}"
+                f"unsupported OCR extraction evidence schema_version {schema_version!r}"
             )
         markdown_path = Path(
             _required_string(
@@ -768,9 +759,7 @@ def _read_markdown_text(path: Path, *, kind: str) -> str:
     try:
         return path.read_text(encoding="utf-8")
     except OSError as exc:
-        raise MillefeuilleContractError(
-            f"could not read {kind} {path}: {exc}"
-        ) from exc
+        raise MillefeuilleContractError(f"could not read {kind} {path}: {exc}") from exc
 
 
 def _character_count(*, text: str, expected: int | None) -> int:

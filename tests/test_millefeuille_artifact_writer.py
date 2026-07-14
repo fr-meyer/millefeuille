@@ -67,9 +67,7 @@ def _make_app_config(**overrides) -> AppConfig:
         download=DownloadConfig(enabled=False),
         tag_adding=TagAddingConfig(enabled=False),
         tagging=TaggingConfig(
-            selection=TagSelectionConfig(
-                include=TagRuleConfig(values=["millefeuille"])
-            )
+            selection=TagSelectionConfig(include=TagRuleConfig(values=["millefeuille"]))
         ),
         selection_tagging=SelectionTaggingConfig(enabled=False),
         **overrides,
@@ -100,15 +98,11 @@ def _write_native_extraction_evidence_json(
     evidence_path.write_text(
         json.dumps(
             {
-                "schema_version": (
-                    "millefeuille-native-extraction-evidence/v0.1"
-                ),
+                "schema_version": ("millefeuille-native-extraction-evidence/v0.1"),
                 "source_type": "zotero",
                 "item_key": "ITEM1",
                 "attachment_key": "ATT1",
-                "canonical_filename": (
-                    "Example Author - 2026 - Artifact Writer.pdf"
-                ),
+                "canonical_filename": ("Example Author - 2026 - Artifact Writer.pdf"),
                 "markdown_path": markdown_path.name,
                 "expected_sha256": FIXTURE_PDF_SHA256,
                 "page_count": 2,
@@ -135,9 +129,7 @@ def _write_ocr_extraction_evidence_json(
                 "source_type": "zotero",
                 "item_key": "ITEM1",
                 "attachment_key": "ATT1",
-                "canonical_filename": (
-                    "Example Author - 2026 - Artifact Writer.pdf"
-                ),
+                "canonical_filename": ("Example Author - 2026 - Artifact Writer.pdf"),
                 "markdown_path": markdown_path.name,
                 "expected_sha256": FIXTURE_PDF_SHA256,
                 "page_count": 2,
@@ -163,15 +155,11 @@ def _write_route_selection_evidence_json(
     evidence_path.write_text(
         json.dumps(
             {
-                "schema_version": (
-                    "millefeuille-route-selection-evidence/v0.1"
-                ),
+                "schema_version": ("millefeuille-route-selection-evidence/v0.1"),
                 "source_type": "zotero",
                 "item_key": "ITEM1",
                 "attachment_key": "ATT1",
-                "canonical_filename": (
-                    "Example Author - 2026 - Artifact Writer.pdf"
-                ),
+                "canonical_filename": ("Example Author - 2026 - Artifact Writer.pdf"),
                 "markdown_path": markdown_path.name,
                 "expected_sha256": FIXTURE_PDF_SHA256,
                 "page_count": 2,
@@ -570,9 +558,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                 artifact_index.status().blocking_items,
             )
 
-            stage_manifest = json.loads(
-                stage_manifest_path.read_text(encoding="utf-8")
-            )
+            stage_manifest = json.loads(stage_manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 stage_manifest["schema_version"],
                 "millefeuille-stage-manifest/v0.1",
@@ -684,9 +670,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                 artifact_index.status().blocking_items,
             )
 
-            stage_manifest = json.loads(
-                stage_manifest_path.read_text(encoding="utf-8")
-            )
+            stage_manifest = json.loads(stage_manifest_path.read_text(encoding="utf-8"))
             self.assertNotIn("pdf_recovery", stage_manifest["manual_gates"])
             self.assertNotIn("source_pack_write", stage_manifest["manual_gates"])
             source_pack_stage = next(
@@ -700,8 +684,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             fixture_bytes = b"x" * 12345
             fixture_sha256 = (
-                "3c49a9d347ea48dc66e4f50b991829cdbef079a2e57c805cc0163f6b"
-                "18860fb1"
+                "3c49a9d347ea48dc66e4f50b991829cdbef079a2e57c805cc0163f6b18860fb1"
             )
             recovered_pdf = Path(tempdir) / "recovered.pdf"
             recovered_pdf.write_bytes(fixture_bytes)
@@ -1608,13 +1591,15 @@ class TestDryRunArtifactWriter(unittest.TestCase):
 
 class TestArtifactWriterCliAliases(unittest.TestCase):
     def test_artifact_root_alias_enables_artifact_export(self):
-        translated = _translate_artifact_writer_args([
-            "--artifact-root",
-            "/tmp/millefeuille-artifacts",
-            "--run-id",
-            "run-fixture",
-            "processing.dry_run=true",
-        ])
+        translated = _translate_artifact_writer_args(
+            [
+                "--artifact-root",
+                "/tmp/millefeuille-artifacts",
+                "--run-id",
+                "run-fixture",
+                "processing.dry_run=true",
+            ]
+        )
 
         self.assertIn(
             "export.artifacts.artifact_root=/tmp/millefeuille-artifacts",
@@ -1625,10 +1610,12 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
         self.assertIn("processing.dry_run=true", translated)
 
     def test_artifact_root_equals_form_is_supported(self):
-        translated = _translate_artifact_writer_args([
-            "--artifact-root=/tmp/mf",
-            "--run-id=run-1",
-        ])
+        translated = _translate_artifact_writer_args(
+            [
+                "--artifact-root=/tmp/mf",
+                "--run-id=run-1",
+            ]
+        )
 
         self.assertEqual(
             translated,
@@ -1640,14 +1627,16 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
         )
 
     def test_source_pack_root_alias_is_supported(self):
-        translated = _translate_artifact_writer_args([
-            "--artifact-root",
-            "source-pack",
-            "--source-pack-root",
-            "/tmp/source-packs",
-            "--run-id",
-            "run-fixture",
-        ])
+        translated = _translate_artifact_writer_args(
+            [
+                "--artifact-root",
+                "source-pack",
+                "--source-pack-root",
+                "/tmp/source-packs",
+                "--run-id",
+                "run-fixture",
+            ]
+        )
 
         self.assertEqual(
             translated,
@@ -1660,16 +1649,18 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
         )
 
     def test_source_pack_intake_evidence_alias_is_supported(self):
-        translated = _translate_artifact_writer_args([
-            "--artifact-root",
-            "source-pack",
-            "--source-pack-root",
-            "/tmp/source-packs",
-            "--source-pack-intake-evidence",
-            "/tmp/evidence.jsonl",
-            "--run-id",
-            "run-fixture",
-        ])
+        translated = _translate_artifact_writer_args(
+            [
+                "--artifact-root",
+                "source-pack",
+                "--source-pack-root",
+                "/tmp/source-packs",
+                "--source-pack-intake-evidence",
+                "/tmp/evidence.jsonl",
+                "--run-id",
+                "run-fixture",
+            ]
+        )
 
         self.assertEqual(
             translated,
@@ -1686,40 +1677,36 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
         )
 
     def test_extraction_evidence_aliases_are_supported(self):
-        translated = _translate_artifact_writer_args([
-            "--artifact-root",
-            "source-pack",
-            "--source-pack-root",
-            "/tmp/source-packs",
-            "--native-extraction-evidence",
-            "/tmp/native.jsonl",
-            "--ocr-extraction-evidence=/tmp/ocr.jsonl",
-            "--route-selection-evidence",
-            "/tmp/route.jsonl",
-            "--structure-evidence=/tmp/structure.jsonl",
-            "--summary-evidence",
-            "/tmp/summary.jsonl",
-            "--card-evidence=/tmp/card.jsonl",
-            "--index-evidence",
-            "/tmp/index.jsonl",
-            "--run-id",
-            "run-fixture",
-        ])
+        translated = _translate_artifact_writer_args(
+            [
+                "--artifact-root",
+                "source-pack",
+                "--source-pack-root",
+                "/tmp/source-packs",
+                "--native-extraction-evidence",
+                "/tmp/native.jsonl",
+                "--ocr-extraction-evidence=/tmp/ocr.jsonl",
+                "--route-selection-evidence",
+                "/tmp/route.jsonl",
+                "--structure-evidence=/tmp/structure.jsonl",
+                "--summary-evidence",
+                "/tmp/summary.jsonl",
+                "--card-evidence=/tmp/card.jsonl",
+                "--index-evidence",
+                "/tmp/index.jsonl",
+                "--run-id",
+                "run-fixture",
+            ]
+        )
 
         self.assertEqual(
             translated,
             [
                 "export.artifacts.artifact_root=source-pack",
                 "export.artifacts.source_pack_root=/tmp/source-packs",
-                (
-                    "export.artifacts.native_extraction_evidence_path="
-                    "/tmp/native.jsonl"
-                ),
+                ("export.artifacts.native_extraction_evidence_path=/tmp/native.jsonl"),
                 "export.artifacts.ocr_extraction_evidence_path=/tmp/ocr.jsonl",
-                (
-                    "export.artifacts.route_selection_evidence_path="
-                    "/tmp/route.jsonl"
-                ),
+                ("export.artifacts.route_selection_evidence_path=/tmp/route.jsonl"),
                 "export.artifacts.structure_evidence_path=/tmp/structure.jsonl",
                 "export.artifacts.summary_evidence_path=/tmp/summary.jsonl",
                 "export.artifacts.card_evidence_path=/tmp/card.jsonl",

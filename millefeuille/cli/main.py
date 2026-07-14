@@ -24,6 +24,7 @@ from omegaconf import DictConfig, OmegaConf
 from millefeuille.cli.artifacts import run_artifact_cli
 from millefeuille.cli.commands import dry_run_command, process_command
 from millefeuille.cli.source_pack import run_source_pack_cli
+from millefeuille.cli.stages import run_stage_cli
 from millefeuille.clients.exceptions import (
     OCRClientError,
     OpenKBHandoffValidationError,
@@ -259,10 +260,7 @@ def validate_flags(cfg: AppConfig) -> None:
                 "tagging.apply_on_success is non-empty "
                 "(live run writes post-processing success tags)"
             )
-        if (
-            cfg.tagging.apply_on_error.values
-            and cfg.zotero.error_tagging_enabled
-        ):
+        if cfg.tagging.apply_on_error.values and cfg.zotero.error_tagging_enabled:
             write_reasons.append(
                 "tagging.apply_on_error is non-empty and "
                 "zotero.error_tagging_enabled "
@@ -298,9 +296,8 @@ def validate_flags(cfg: AppConfig) -> None:
 
     handoff = cfg.export.openkb_handoff
     if handoff.enabled:
-        if (
-            not cfg.processing.dry_run
-            and (handoff.jsonl_path is None or not str(handoff.jsonl_path).strip())
+        if not cfg.processing.dry_run and (
+            handoff.jsonl_path is None or not str(handoff.jsonl_path).strip()
         ):
             raise ConfigError(
                 "export.openkb_handoff.jsonl_path is required for live export "
@@ -642,9 +639,7 @@ def build_app_config(cfg: DictConfig) -> AppConfig:
         remove=TagTargetConfig(values=list(cfg.selection_tagging.remove["values"])),
     )
 
-    att_urls = OmegaConf.to_container(
-        cfg.export.attachment_urls, resolve=True
-    )
+    att_urls = OmegaConf.to_container(cfg.export.attachment_urls, resolve=True)
     if not isinstance(att_urls, dict):
         raise ConfigError("export.attachment_urls must resolve to a mapping")
     auth_query_raw = att_urls.pop("auth_query", {})
@@ -654,16 +649,12 @@ def build_app_config(cfg: DictConfig) -> AppConfig:
         **att_urls, auth_query=AuthQueryHelperConfig(**auth_query_raw)
     )
 
-    openkb_handoff_raw = OmegaConf.to_container(
-        cfg.export.openkb_handoff, resolve=True
-    )
+    openkb_handoff_raw = OmegaConf.to_container(cfg.export.openkb_handoff, resolve=True)
     if not isinstance(openkb_handoff_raw, dict):
         raise ConfigError("export.openkb_handoff must resolve to a mapping")
     openkb_handoff_export = OpenKBHandoffExportConfig(**openkb_handoff_raw)
 
-    artifacts_raw = OmegaConf.to_container(
-        cfg.export.artifacts, resolve=True
-    )
+    artifacts_raw = OmegaConf.to_container(cfg.export.artifacts, resolve=True)
     if not isinstance(artifacts_raw, dict):
         raise ConfigError("export.artifacts must resolve to a mapping")
     artifact_export = ArtifactExportConfig(**artifacts_raw)
@@ -798,6 +789,15 @@ def entrypoint() -> None:
         sys.exit(run_artifact_cli(argv))
     if argv and argv[0] == "source-pack":
         sys.exit(run_source_pack_cli(argv))
+    if argv and argv[0] in {
+        "acceptance",
+        "classify",
+        "writeback",
+        "retrieve",
+        "models",
+        "run",
+    }:
+        sys.exit(run_stage_cli(argv))
     translated_argv = _translate_artifact_writer_args(argv)
     if translated_argv != argv:
         sys.argv = [sys.argv[0], *translated_argv]
@@ -821,9 +821,7 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
             idx += 2
             continue
         if arg.startswith("--artifact-root="):
-            translated.append(
-                "export.artifacts.artifact_root=" + arg.split("=", 1)[1]
-            )
+            translated.append("export.artifacts.artifact_root=" + arg.split("=", 1)[1])
             artifact_enable_seen = True
             idx += 1
             continue
@@ -833,8 +831,7 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
                 idx += 1
                 continue
             translated.append(
-                "export.artifacts.source_pack_intake_evidence_path="
-                + argv[idx + 1]
+                "export.artifacts.source_pack_intake_evidence_path=" + argv[idx + 1]
             )
             artifact_enable_seen = True
             idx += 2
@@ -867,8 +864,7 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
                 idx += 1
                 continue
             translated.append(
-                "export.artifacts.native_extraction_evidence_path="
-                + argv[idx + 1]
+                "export.artifacts.native_extraction_evidence_path=" + argv[idx + 1]
             )
             artifact_enable_seen = True
             idx += 2
@@ -887,16 +883,14 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
                 idx += 1
                 continue
             translated.append(
-                "export.artifacts.ocr_extraction_evidence_path="
-                + argv[idx + 1]
+                "export.artifacts.ocr_extraction_evidence_path=" + argv[idx + 1]
             )
             artifact_enable_seen = True
             idx += 2
             continue
         if arg.startswith("--ocr-extraction-evidence="):
             translated.append(
-                "export.artifacts.ocr_extraction_evidence_path="
-                + arg.split("=", 1)[1]
+                "export.artifacts.ocr_extraction_evidence_path=" + arg.split("=", 1)[1]
             )
             artifact_enable_seen = True
             idx += 1
@@ -907,16 +901,14 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
                 idx += 1
                 continue
             translated.append(
-                "export.artifacts.route_selection_evidence_path="
-                + argv[idx + 1]
+                "export.artifacts.route_selection_evidence_path=" + argv[idx + 1]
             )
             artifact_enable_seen = True
             idx += 2
             continue
         if arg.startswith("--route-selection-evidence="):
             translated.append(
-                "export.artifacts.route_selection_evidence_path="
-                + arg.split("=", 1)[1]
+                "export.artifacts.route_selection_evidence_path=" + arg.split("=", 1)[1]
             )
             artifact_enable_seen = True
             idx += 1
@@ -927,16 +919,14 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
                 idx += 1
                 continue
             translated.append(
-                "export.artifacts.structure_evidence_path="
-                + argv[idx + 1]
+                "export.artifacts.structure_evidence_path=" + argv[idx + 1]
             )
             artifact_enable_seen = True
             idx += 2
             continue
         if arg.startswith("--structure-evidence="):
             translated.append(
-                "export.artifacts.structure_evidence_path="
-                + arg.split("=", 1)[1]
+                "export.artifacts.structure_evidence_path=" + arg.split("=", 1)[1]
             )
             artifact_enable_seen = True
             idx += 1
@@ -946,16 +936,13 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
                 translated.append(arg)
                 idx += 1
                 continue
-            translated.append(
-                "export.artifacts.summary_evidence_path=" + argv[idx + 1]
-            )
+            translated.append("export.artifacts.summary_evidence_path=" + argv[idx + 1])
             artifact_enable_seen = True
             idx += 2
             continue
         if arg.startswith("--summary-evidence="):
             translated.append(
-                "export.artifacts.summary_evidence_path="
-                + arg.split("=", 1)[1]
+                "export.artifacts.summary_evidence_path=" + arg.split("=", 1)[1]
             )
             artifact_enable_seen = True
             idx += 1
@@ -965,16 +952,13 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
                 translated.append(arg)
                 idx += 1
                 continue
-            translated.append(
-                "export.artifacts.card_evidence_path=" + argv[idx + 1]
-            )
+            translated.append("export.artifacts.card_evidence_path=" + argv[idx + 1])
             artifact_enable_seen = True
             idx += 2
             continue
         if arg.startswith("--card-evidence="):
             translated.append(
-                "export.artifacts.card_evidence_path="
-                + arg.split("=", 1)[1]
+                "export.artifacts.card_evidence_path=" + arg.split("=", 1)[1]
             )
             artifact_enable_seen = True
             idx += 1
@@ -984,16 +968,13 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
                 translated.append(arg)
                 idx += 1
                 continue
-            translated.append(
-                "export.artifacts.index_evidence_path=" + argv[idx + 1]
-            )
+            translated.append("export.artifacts.index_evidence_path=" + argv[idx + 1])
             artifact_enable_seen = True
             idx += 2
             continue
         if arg.startswith("--index-evidence="):
             translated.append(
-                "export.artifacts.index_evidence_path="
-                + arg.split("=", 1)[1]
+                "export.artifacts.index_evidence_path=" + arg.split("=", 1)[1]
             )
             artifact_enable_seen = True
             idx += 1
@@ -1049,10 +1030,7 @@ def main(cfg: DictConfig) -> None:
         )
         standalone_export = (
             app_cfg.export.openkb_handoff.enabled
-            or (
-                app_cfg.processing.dry_run
-                and app_cfg.export.attachment_urls.enabled
-            )
+            or (app_cfg.processing.dry_run and app_cfg.export.attachment_urls.enabled)
             or app_cfg.export.artifacts.enabled
         )
         if all_ops_disabled and not standalone_export:
@@ -1079,9 +1057,7 @@ def main(cfg: DictConfig) -> None:
             # Validate flag compatibility (dry_run vs download, etc.)
             validate_flags(app_cfg)
 
-            logger = setup_logging(
-                redact_logs=app_cfg.credentials.redact_logs
-            )
+            logger = setup_logging(redact_logs=app_cfg.credentials.redact_logs)
 
             # Route to appropriate command
             if app_cfg.processing.dry_run:

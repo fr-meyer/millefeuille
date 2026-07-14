@@ -16,22 +16,26 @@ ARTIFACT_INDEX_SCHEMA_VERSION = "millefeuille-artifact-index/v0.1"
 
 SOURCE_TYPES = frozenset({"zotero", "fixture", "other"})
 INDEX_LANES = frozenset({"openkb", "pageindex", "condb", "chatindex", "other"})
-INDEX_STATUSES = frozenset({
-    "skipped",
-    "previewed",
-    "written",
-    "failed",
-    "needs-review",
-})
+INDEX_STATUSES = frozenset(
+    {
+        "skipped",
+        "previewed",
+        "written",
+        "failed",
+        "needs-review",
+    }
+)
 WRITEBACK_MODES = frozenset({"none", "preview", "approved-live"})
 WRITEBACK_STATUSES = frozenset({"not-planned", "previewed", "written", "skipped"})
 
-BLOCKING_STAGE_STATUSES = frozenset({
-    StageStatus.NOT_STARTED.value,
-    StageStatus.FAILED.value,
-    StageStatus.NEEDS_REVIEW.value,
-    StageStatus.MANUAL_GATE.value,
-})
+BLOCKING_STAGE_STATUSES = frozenset(
+    {
+        StageStatus.NOT_STARTED.value,
+        StageStatus.FAILED.value,
+        StageStatus.NEEDS_REVIEW.value,
+        StageStatus.MANUAL_GATE.value,
+    }
+)
 BLOCKING_INDEX_STATUSES = frozenset({"failed", "needs-review"})
 
 
@@ -87,9 +91,7 @@ class ArtifactIndex:
 
         paper_id = _require_string(mapping.get("paper_id"), "paper_id")
         run_id = _require_string(mapping.get("run_id"), "run_id")
-        artifact_root = _require_string(
-            mapping.get("artifact_root"), "artifact_root"
-        )
+        artifact_root = _require_string(mapping.get("artifact_root"), "artifact_root")
         source_pack = _validate_source_pack(mapping.get("source_pack"))
         source_identity = _validate_source_identity(mapping.get("source_identity"))
         stages = _validate_stages(mapping.get("stages"))
@@ -309,7 +311,6 @@ def _validate_writeback(value: Any) -> dict[str, Any]:
     status = _require_string(writeback.get("status"), "zotero_writeback.status")
     if status not in WRITEBACK_STATUSES:
         raise MillefeuilleContractError(
-            "zotero_writeback.status must be one of "
-            f"{sorted(WRITEBACK_STATUSES)!r}"
+            f"zotero_writeback.status must be one of {sorted(WRITEBACK_STATUSES)!r}"
         )
     return writeback

@@ -16,9 +16,7 @@ from millefeuille.utils.export import (
 )
 
 FIXTURE_DIR = (
-    Path(__file__).resolve().parent
-    / "fixtures"
-    / "openkb_handoff_millefeuille_test"
+    Path(__file__).resolve().parent / "fixtures" / "openkb_handoff_millefeuille_test"
 )
 SENSITIVE_FIELD_NAMES = {
     "access_token",
@@ -91,9 +89,7 @@ class TestMillefeuilleTestOpenKBHandoffFixture(unittest.TestCase):
             self.assertTrue(row["is_pdf"])
             self.assertEqual(row["recovery"]["method"], "zotero_api_attachment")
             self.assertEqual(row["recovery"]["item_key"], row["item_key"])
-            self.assertEqual(
-                row["recovery"]["attachment_key"], row["attachment_key"]
-            )
+            self.assertEqual(row["recovery"]["attachment_key"], row["attachment_key"])
             self.assertNotIn("url", row["recovery"])
             self.assertTrue(row["openkb_policy_hints"]["no_auth_url"])
 
@@ -108,9 +104,7 @@ class TestMillefeuilleTestOpenKBHandoffFixture(unittest.TestCase):
         )
 
         self.assertEqual(generated_preview, expected_preview)
-        for preview_row, live_row in zip(
-            expected_preview, live_rows, strict=True
-        ):
+        for preview_row, live_row in zip(expected_preview, live_rows, strict=True):
             sanitize_handoff_row(preview_row)
             self.assertEqual(
                 preview_row["schema_version"],
@@ -175,7 +169,9 @@ class TestMillefeuilleTestOpenKBHandoffFixture(unittest.TestCase):
                 row["source_pack"].startswith("fixture/openkb/source-packs/zotero/")
             )
             self.assertTrue(
-                row["openkb_raw_doc"].startswith("fixture/openkb/kbs/millefeuille-main/raw/")
+                row["openkb_raw_doc"].startswith(
+                    "fixture/openkb/kbs/millefeuille-main/raw/"
+                )
             )
             self.assertTrue(row["openkb_raw_doc"].endswith(".md"))
 
@@ -200,9 +196,7 @@ class TestMillefeuilleTestOpenKBHandoffFixture(unittest.TestCase):
         self.assertEqual(summary["counts"]["handoff_rows"], 3)
         self.assertEqual(summary["counts"]["openkb_added"], 3)
         self.assertEqual(summary["counts"]["skipped_total"], 1)
-        self.assertEqual(
-            summary["counts"]["skipped_by_event"], {"skipped-no-pdf": 1}
-        )
+        self.assertEqual(summary["counts"]["skipped_by_event"], {"skipped-no-pdf": 1})
         self.assertEqual(summary["counts"]["duplicate_scans"], 3)
         self.assertEqual(summary["counts"]["joined_imports"], 3)
         self.assertEqual(summary["counts"]["import_join_failures"], 0)
@@ -221,9 +215,7 @@ class TestMillefeuilleTestOpenKBHandoffFixture(unittest.TestCase):
                 entry["duplicate_scan"]["evidence"]["scan_result"],
                 "unique",
             )
-        self.assertEqual(
-            summary["skips"][0]["citation_key"], "fixtureNoPdfSampleD2026"
-        )
+        self.assertEqual(summary["skips"][0]["citation_key"], "fixtureNoPdfSampleD2026")
         self.assertEqual(
             summary["unmatched"],
             {"imports": [], "handoff_rows": [], "duplicate_scans": []},
@@ -243,9 +235,7 @@ class TestMillefeuilleTestOpenKBHandoffFixture(unittest.TestCase):
             duplicate_scans[:-1],
         )
         self.assertEqual(missing_scan_summary["status"], "needs-review")
-        self.assertEqual(
-            missing_scan_summary["counts"]["import_join_failures"], 1
-        )
+        self.assertEqual(missing_scan_summary["counts"]["import_join_failures"], 1)
         self.assertEqual(
             missing_scan_summary["unmatched"]["imports"][0][
                 "duplicate_scan_match_count"

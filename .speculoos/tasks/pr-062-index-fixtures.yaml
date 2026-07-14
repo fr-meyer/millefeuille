@@ -1,6 +1,6 @@
 id: pr-062-index-fixtures
 title: Add index fixtures
-status: implementation
+status: merged
 branch: feat/pr-062-index-fixtures
 base_branch: dev
 github:
@@ -8,9 +8,13 @@ github:
   pull_request: 62
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
-  head_sha: 101e7a1a5159a6ee9c7403a3d9db68a337651111
+  url: https://github.com/fr-meyer/millefeuille/pull/62
+  head_sha: b5cc4232cb119a41b95d3603fd373a4b94e72df7
+  merge_commit: 16f904be6212ade3c0d8b19acd9d1ccc8b81bbf1
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/62#pullrequestreview-4706544285
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87422246923
 post_merge_expected:
   pull_request: 62
   base_branch: dev
@@ -60,4 +64,8 @@ evidence:
   - "Full unittest discovery passed: 219 tests."
   - 'PR #62 opened for pr-062-index-fixtures'
   - 'PR #62 linked to Project item unavailable'
-  - "Published as PR #62 at https://github.com/fr-meyer/millefeuille/pull/62 with exact head 101e7a1a5159a6ee9c7403a3d9db68a337651111."
+  - "Published PR #62 was finalized at exact head b5cc4232cb119a41b95d3603fd373a4b94e72df7."
+  - "Mergeguez approved exact head b5cc4232cb119a41b95d3603fd373a4b94e72df7 with zero blocking findings: https://github.com/fr-meyer/millefeuille/pull/62#pullrequestreview-4706544285."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87422246923."
+  - "PR #62 squash-merged to dev as 16f904be6212ade3c0d8b19acd9d1ccc8b81bbf1 by mergeguez[bot]."
+  - "Remote feature branch feat/pr-062-index-fixtures was deleted after exact-SHA branch-cleanup verification."

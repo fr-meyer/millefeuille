@@ -117,7 +117,9 @@ class TestTaggingConfigValidation(unittest.TestCase):
 
     def test_cross_outcome_overlap_is_allowed(self):
         cfg = TaggingConfig(
-            selection=TagSelectionConfig(include=TagRuleConfig(values=["millefeuille"])),
+            selection=TagSelectionConfig(
+                include=TagRuleConfig(values=["millefeuille"])
+            ),
             apply_on_success=TagTargetConfig(values=["millefeuille"]),
             remove_on_error=TagTargetConfig(values=["millefeuille"]),
         )
@@ -147,9 +149,7 @@ class TestApplyProcessingTagsSuccess(unittest.TestCase):
         self.assertEqual(result.remove_attempted, 1)
         self.assertEqual(result.remove_succeeded, 1)
         self.assertEqual(result.remove_failed, 0)
-        self.assertEqual(
-            mock_client.add_tag.call_args_list, [call("ITEM1", "done")]
-        )
+        self.assertEqual(mock_client.add_tag.call_args_list, [call("ITEM1", "done")])
         self.assertEqual(
             mock_client.remove_tag.call_args_list, [call("ITEM1", "pending")]
         )

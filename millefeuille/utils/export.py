@@ -29,35 +29,40 @@ from millefeuille.domain.models import (
 _logger = logging.getLogger(__name__)
 
 _ZOTERO_RENAME_FORMULA = (
-    '{{ firstCreator suffix=" - " }}{{ year suffix=" - " }}'
-    '{{ title truncate="125" }}'
+    '{{ firstCreator suffix=" - " }}{{ year suffix=" - " }}{{ title truncate="125" }}'
 )
 _ZOTERO_RENAME_HINT = (
     f"Configure the Zotero rename formula {_ZOTERO_RENAME_FORMULA} "
     "to ensure canonical filenames."
 )
 
-_GENERIC_FILENAMES: frozenset[str] = frozenset({
-    "file",
-    "file.pdf",
-    "document",
-    "document.pdf",
-    "unknown",
-    "unknown.pdf",
-})
+_GENERIC_FILENAMES: frozenset[str] = frozenset(
+    {
+        "file",
+        "file.pdf",
+        "document",
+        "document.pdf",
+        "unknown",
+        "unknown.pdf",
+    }
+)
 
-_VALID_VERIFICATION_STRENGTHS: frozenset[str] = frozenset({
-    "full",
-    "hash-only",
-    "metadata-only",
-    "key-only",
-})
+_VALID_VERIFICATION_STRENGTHS: frozenset[str] = frozenset(
+    {
+        "full",
+        "hash-only",
+        "metadata-only",
+        "key-only",
+    }
+)
 
-_WEAK_VERIFICATION_STRENGTHS: frozenset[str] = frozenset({
-    "hash-only",
-    "metadata-only",
-    "key-only",
-})
+_WEAK_VERIFICATION_STRENGTHS: frozenset[str] = frozenset(
+    {
+        "hash-only",
+        "metadata-only",
+        "key-only",
+    }
+)
 
 _RECOVERY_REQUIRED_KEYS: tuple[str, ...] = (
     "method",
@@ -85,16 +90,18 @@ def _is_generic_filename(filename: str) -> bool:
     return x in _GENERIC_FILENAMES
 
 
-_SENSITIVE_QUERY_PARAMS: frozenset[str] = frozenset({
-    "key",
-    "api_key",
-    "token",
-    "access_token",
-    "authorization",
-    "signature",
-    "signed",
-    "expires",
-})
+_SENSITIVE_QUERY_PARAMS: frozenset[str] = frozenset(
+    {
+        "key",
+        "api_key",
+        "token",
+        "access_token",
+        "authorization",
+        "signature",
+        "signed",
+        "expires",
+    }
+)
 
 _CREDENTIAL_HEADER_RE = re.compile(r"(?i)^\s*(Authorization:|Bearer |Basic )")
 _SESSION_COOKIE_RE = re.compile(r"(?i)(Cookie:|Set-Cookie:|session=|sessionid=)")
@@ -117,9 +124,7 @@ class ValidationReport:
 
 def _raise_handoff_security(field_path: str, category: str) -> None:
     label = field_path or "(root)"
-    raise HandoffSecurityError(
-        f"Field '{label}' contains {category}"
-    )
+    raise HandoffSecurityError(f"Field '{label}' contains {category}")
 
 
 def _check_url_query_and_file_path(field_path: str, value: str) -> None:
@@ -128,15 +133,10 @@ def _check_url_query_and_file_path(field_path: str, value: str) -> None:
     if parsed.query:
         for name, _ in parse_qsl(parsed.query, keep_blank_values=True):
             name_lower = name.lower()
-            if (
-                name_lower in _SENSITIVE_QUERY_PARAMS
-                or name_lower.startswith("x-amz-")
-            ):
+            if name_lower in _SENSITIVE_QUERY_PARAMS or name_lower.startswith("x-amz-"):
                 _raise_handoff_security(field_path, "signed/authenticated URL")
     if parsed.path.endswith("/file") and parsed.query:
-        _raise_handoff_security(
-            field_path, "authenticated file endpoint URL"
-        )
+        _raise_handoff_security(field_path, "authenticated file endpoint URL")
 
 
 def _check_string_value(field_path: str, value: str) -> None:
@@ -250,13 +250,9 @@ def build_openkb_handoff_rows(
                 "source_type": "zotero",
             }
 
-            item_type = (
-                attachment.item_type if config.include_item_type else None
-            )
+            item_type = attachment.item_type if config.include_item_type else None
             zotero_version = (
-                attachment.zotero_version
-                if config.include_zotero_version
-                else None
+                attachment.zotero_version if config.include_zotero_version else None
             )
 
             rows.append(
@@ -306,15 +302,11 @@ def validate_openkb_handoff_rows(
         row_failures: list[Exception] = []
 
         if not row.item_key:
-            failures.append(
-                AttachmentIdentityError("item_key: missing required field")
-            )
+            failures.append(AttachmentIdentityError("item_key: missing required field"))
             continue
         if not row.attachment_key:
             failures.append(
-                AttachmentIdentityError(
-                    "attachment_key: missing required field"
-                )
+                AttachmentIdentityError("attachment_key: missing required field")
             )
             continue
 
@@ -329,9 +321,7 @@ def validate_openkb_handoff_rows(
 
         if not (row.canonical_filename or "").strip():
             row_failures.append(
-                AttachmentIdentityError(
-                    "canonical_filename: missing required field"
-                )
+                AttachmentIdentityError("canonical_filename: missing required field")
             )
         elif _is_generic_filename(row.canonical_filename):
             row_failures.append(
@@ -353,9 +343,7 @@ def validate_openkb_handoff_rows(
         seen = canonical_filename_seen.setdefault(row.item_key, set())
         if row.canonical_filename in seen:
             row_failures.append(
-                AttachmentIdentityError(
-                    "canonical_filename: duplicate on same item"
-                )
+                AttachmentIdentityError("canonical_filename: duplicate on same item")
             )
         else:
             seen.add(row.canonical_filename)
@@ -367,16 +355,12 @@ def validate_openkb_handoff_rows(
         ):
             if not getattr(row, req_field, None):
                 row_failures.append(
-                    AttachmentIdentityError(
-                        f"{req_field}: missing required field"
-                    )
+                    AttachmentIdentityError(f"{req_field}: missing required field")
                 )
 
         for msg in _validate_recovery_object(row.recovery):
             row_failures.append(AttachmentIdentityError(msg))
-        for msg in _validate_openkb_policy_hints_object(
-            row.openkb_policy_hints
-        ):
+        for msg in _validate_openkb_policy_hints_object(row.openkb_policy_hints):
             row_failures.append(AttachmentIdentityError(msg))
 
         try:
@@ -388,12 +372,14 @@ def validate_openkb_handoff_rows(
         if not row_failures:
             clean_count += 1
             if row.verification_strength in _WEAK_VERIFICATION_STRENGTHS:
-                weak_rows.append({
-                    "item_key": row.item_key,
-                    "attachment_key": row.attachment_key,
-                    "canonical_filename": row.canonical_filename,
-                    "verification_strength": row.verification_strength,
-                })
+                weak_rows.append(
+                    {
+                        "item_key": row.item_key,
+                        "attachment_key": row.attachment_key,
+                        "canonical_filename": row.canonical_filename,
+                        "verification_strength": row.verification_strength,
+                    }
+                )
 
     report = ValidationReport(
         total_rows=len(rows),
@@ -510,9 +496,7 @@ def build_openkb_acceptance_summary(
     for record in [*handoff, *outcomes, *duplicate_scans]:
         sanitize_handoff_row(record)
 
-    imports = [
-        record for record in outcomes if record.get("event") == "openkb-added"
-    ]
+    imports = [record for record in outcomes if record.get("event") == "openkb-added"]
     skips = [
         record
         for record in outcomes
@@ -520,9 +504,7 @@ def build_openkb_acceptance_summary(
     ]
 
     handoff_by_filename = _group_records_by_field(handoff, "canonical_filename")
-    duplicate_scans_by_slug = _group_records_by_field(
-        duplicate_scans, "document_slug"
-    )
+    duplicate_scans_by_slug = _group_records_by_field(duplicate_scans, "document_slug")
 
     joined_imports: list[dict[str, Any]] = []
     import_join_failures: list[dict[str, Any]] = []
@@ -531,9 +513,7 @@ def build_openkb_acceptance_summary(
         filename = imported.get("canonical_filename")
         document_slug = imported.get("document_slug")
         handoff_matches = (
-            handoff_by_filename.get(filename, [])
-            if isinstance(filename, str)
-            else []
+            handoff_by_filename.get(filename, []) if isinstance(filename, str) else []
         )
         duplicate_matches = (
             duplicate_scans_by_slug.get(document_slug, [])
@@ -541,9 +521,7 @@ def build_openkb_acceptance_summary(
             else []
         )
         handoff_match = handoff_matches[0] if len(handoff_matches) == 1 else None
-        duplicate_scan = (
-            duplicate_matches[0] if len(duplicate_matches) == 1 else None
-        )
+        duplicate_scan = duplicate_matches[0] if len(duplicate_matches) == 1 else None
 
         entry = {
             "canonical_filename": filename,
@@ -562,22 +540,24 @@ def build_openkb_acceptance_summary(
             },
         }
         if handoff_match is not None:
-            entry["handoff"].update({
-                "attachment_key": handoff_match.get("attachment_key"),
-                "verification_strength": handoff_match.get(
-                    "verification_strength"
-                ),
-                "sha256_present": handoff_match.get("sha256") is not None,
-            })
+            entry["handoff"].update(
+                {
+                    "attachment_key": handoff_match.get("attachment_key"),
+                    "verification_strength": handoff_match.get("verification_strength"),
+                    "sha256_present": handoff_match.get("sha256") is not None,
+                }
+            )
         joined_imports.append(entry)
 
         if len(handoff_matches) != 1 or len(duplicate_matches) != 1:
-            import_join_failures.append({
-                "canonical_filename": filename,
-                "document_slug": document_slug,
-                "handoff_match_count": len(handoff_matches),
-                "duplicate_scan_match_count": len(duplicate_matches),
-            })
+            import_join_failures.append(
+                {
+                    "canonical_filename": filename,
+                    "document_slug": document_slug,
+                    "handoff_match_count": len(handoff_matches),
+                    "duplicate_scan_match_count": len(duplicate_matches),
+                }
+            )
 
     import_filenames = {
         record["canonical_filename"]
@@ -717,9 +697,7 @@ def build_openkb_handoff_preview_rows(
                 ),
                 "library_type": row.recovery.get("library_type"),
                 "item_key": _redact_preview_identifier(row.item_key),
-                "attachment_key": _redact_preview_identifier(
-                    row.attachment_key
-                ),
+                "attachment_key": _redact_preview_identifier(row.attachment_key),
                 "item_type": row.item_type,
                 "zotero_version": row.zotero_version,
             },
@@ -858,7 +836,9 @@ def build_export_records(
                     f"fallback pattern. {_ZOTERO_RENAME_HINT}"
                 )
 
-            zotero_uri_web = f"https://www.zotero.org/users/{library_id}/items/{item.key}"
+            zotero_uri_web = (
+                f"https://www.zotero.org/users/{library_id}/items/{item.key}"
+            )
             zotero_uri = zotero_uri_web
             zotero_uri_select = f"zotero://select/library/items/{item.key}"
             zotero_file_url = zotero_client.build_attachment_file_url(
@@ -941,6 +921,4 @@ def write_manifest(
                     leftover.unlink()
             except OSError:
                 pass
-    _logger.info(
-        f"Manifest written to {manifest_path} ({len(records)} records)."
-    )
+    _logger.info(f"Manifest written to {manifest_path} ({len(records)} records).")
