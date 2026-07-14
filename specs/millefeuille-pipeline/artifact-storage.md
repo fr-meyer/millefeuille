@@ -51,6 +51,8 @@ source-packs/
           model-provenance.jsonl
           structure/
           summaries/
+            hierarchical-summary.json
+            texts/
           cards/
           classification/
           index/

@@ -44,6 +44,10 @@ from millefeuille.domain.structure_fixtures import (
     load_structure_sidecar,
     write_structures_from_evidence,
 )
+from millefeuille.domain.summary_fixtures import (
+    load_hierarchical_summary,
+    write_summaries_from_evidence,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_BYTES = b"fixture recovered paper bytes for source-pack intake\n"
@@ -292,6 +296,71 @@ def _write_structure_evidence_json(
         payload["outline_path"] = outline_path.name
     evidence_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return evidence_path
+
+
+def _write_summary_fixture_json(tempdir: str) -> Path:
+    summary_path = Path(tempdir) / "hierarchical-summary-fixture.json"
+    summary_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "millefeuille-hierarchical-summary/v0.1",
+                "paper_id": "fixture-paper",
+                "run_id": "fixture-run",
+                "taxonomy_context": {
+                    "taxonomy_version": "v0-fixture",
+                    "classification_scope": "classification",
+                },
+                "summaries": [
+                    {
+                        "summary_id": "page-1",
+                        "grain": "page",
+                        "scope": "general",
+                        "text_ref": "page-1.md",
+                        "source_locators": ["p.1"],
+                    },
+                    {
+                        "summary_id": "full-paper",
+                        "grain": "full-paper",
+                        "scope": "classification",
+                        "text_ref": "full-paper.md",
+                        "source_locators": ["section:introduction", "section:methods"],
+                        "depends_on": ["page-1"],
+                        "quality_warnings": ["fixture summary only"],
+                    },
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return summary_path
+
+
+def _write_summary_evidence_json(
+    tempdir: str,
+    summary_path: Path,
+) -> Path:
+    evidence_path = Path(tempdir) / "summary-evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "millefeuille-summary-fixture-evidence/v0.1",
+                "source_type": "zotero",
+                "item_key": "ITEM1",
+                "attachment_key": "ATT1",
+                "canonical_filename": "Example Author - 2026 - Intake Fixture.pdf",
+                "summary_path": summary_path.name,
+                "expected_sha256": FIXTURE_SHA256,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
         encoding="utf-8",
     )
     return evidence_path
@@ -1134,6 +1203,145 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
 
             self.assertFalse(
                 (result.source_pack_dir / "structure" / "structure.json").exists()
+            )
+
+    def test_summary_fixture_writes_run_scoped_hierarchical_summary(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            source_pack_root = Path(tempdir) / "source-packs"
+            result = write_source_pack_from_recovered_pdf(
+                evidence=_evidence(source_path),
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+            native_markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\n",
+            )
+            ocr_markdown_path = _write_markdown(
+                tempdir,
+                "ocr-fulltext.md",
+                "OCR fixture page 1\n",
+            )
+            write_native_extractions_from_evidence(
+                evidence_path=_write_native_extraction_evidence_json(
+                    tempdir,
+                    native_markdown_path,
+                ),
+                source_pack_root=source_pack_root,
+            )
+            write_ocr_extractions_from_evidence(
+                evidence_path=_write_ocr_extraction_evidence_json(
+                    tempdir,
+                    ocr_markdown_path,
+                ),
+                source_pack_root=source_pack_root,
+            )
+            write_route_selections_from_evidence(
+                evidence_path=_write_route_selection_evidence_json(
+                    tempdir,
+                    _write_markdown(
+                        tempdir,
+                        "selected-fulltext.md",
+                        "Merged fixture page 1\n",
+                    ),
+                ),
+                source_pack_root=source_pack_root,
+            )
+            write_structures_from_evidence(
+                evidence_path=_write_structure_evidence_json(
+                    tempdir,
+                    _write_structure_payload_json(tempdir),
+                ),
+                source_pack_root=source_pack_root,
+            )
+            _write_markdown(tempdir, "page-1.md", "Page 1 summary.\n")
+            _write_markdown(tempdir, "full-paper.md", "Full paper summary.\n")
+            summary_evidence_path = _write_summary_evidence_json(
+                tempdir,
+                _write_summary_fixture_json(tempdir),
+            )
+
+            write_results = write_summaries_from_evidence(
+                evidence_path=summary_evidence_path,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )
+            rerun_results = write_summaries_from_evidence(
+                evidence_path=summary_evidence_path,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )
+
+            self.assertEqual(len(write_results), 1)
+            self.assertEqual(write_results[0].status, "created")
+            self.assertEqual(rerun_results[0].status, "existing")
+            summary_path = (
+                result.source_pack_dir
+                / "analyses"
+                / "millefeuille"
+                / "run-fixture"
+                / "summaries"
+                / "hierarchical-summary.json"
+            )
+            payload = load_hierarchical_summary(summary_path)
+            self.assertEqual(
+                payload["schema_version"],
+                "millefeuille-hierarchical-summary/v0.1",
+            )
+            self.assertEqual(payload["paper_id"], result.paper_id)
+            self.assertEqual(payload["run_id"], "run-fixture")
+            self.assertEqual(
+                payload["summaries"][0]["text_ref"],
+                "texts/page-1.md",
+            )
+            self.assertEqual(
+                payload["summaries"][1]["depends_on"],
+                ["page-1"],
+            )
+            self.assertEqual(
+                (
+                    summary_path.parent / "texts" / "full-paper.md"
+                ).read_text(encoding="utf-8"),
+                "Full paper summary.\n",
+            )
+
+    def test_summary_fixture_requires_structure_sidecar(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_path = _write_recovered_pdf(tempdir)
+            source_pack_root = Path(tempdir) / "source-packs"
+            result = write_source_pack_from_recovered_pdf(
+                evidence=_evidence(source_path),
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+            _write_markdown(tempdir, "page-1.md", "Page 1 summary.\n")
+            _write_markdown(tempdir, "full-paper.md", "Full paper summary.\n")
+            summary_evidence_path = _write_summary_evidence_json(
+                tempdir,
+                _write_summary_fixture_json(tempdir),
+            )
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "could not read structure evidence",
+            ):
+                write_summaries_from_evidence(
+                    evidence_path=summary_evidence_path,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertFalse(
+                (
+                    result.source_pack_dir
+                    / "analyses"
+                    / "millefeuille"
+                    / "run-fixture"
+                    / "summaries"
+                    / "hierarchical-summary.json"
+                ).exists()
             )
 
 

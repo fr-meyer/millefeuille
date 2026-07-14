@@ -42,6 +42,7 @@ from millefeuille.domain.source_packs import (
     RecoveredPdfEvidence,
     write_source_pack_from_recovered_pdf,
 )
+from millefeuille.domain.summary_fixtures import load_hierarchical_summary
 
 FIXTURE_PDF_BYTES = b"artifact writer source-pack fixture pdf bytes\n"
 FIXTURE_PDF_SHA256 = hashlib.sha256(FIXTURE_PDF_BYTES).hexdigest()
@@ -237,6 +238,70 @@ def _write_structure_evidence_json(
         payload["outline_path"] = outline_path.name
     evidence_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return evidence_path
+
+
+def _write_summary_fixture_json(tempdir: str) -> Path:
+    summary_path = Path(tempdir) / "hierarchical-summary-fixture.json"
+    summary_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "millefeuille-hierarchical-summary/v0.1",
+                "paper_id": "fixture-paper",
+                "run_id": "fixture-run",
+                "taxonomy_context": {
+                    "taxonomy_version": "v0-fixture",
+                    "classification_scope": "classification",
+                },
+                "summaries": [
+                    {
+                        "summary_id": "page-1",
+                        "grain": "page",
+                        "scope": "general",
+                        "text_ref": "page-1.md",
+                        "source_locators": ["p.1"],
+                    },
+                    {
+                        "summary_id": "full-paper",
+                        "grain": "full-paper",
+                        "scope": "classification",
+                        "text_ref": "full-paper.md",
+                        "source_locators": ["section:introduction", "section:methods"],
+                        "depends_on": ["page-1"],
+                    },
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return summary_path
+
+
+def _write_summary_evidence_json(
+    tempdir: str,
+    summary_path: Path,
+) -> Path:
+    evidence_path = Path(tempdir) / "summary-evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "millefeuille-summary-fixture-evidence/v0.1",
+                "source_type": "zotero",
+                "item_key": "ITEM1",
+                "attachment_key": "ATT1",
+                "canonical_filename": "Example Author - 2026 - Artifact Writer.pdf",
+                "summary_path": summary_path.name,
+                "expected_sha256": FIXTURE_PDF_SHA256,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
         encoding="utf-8",
     )
     return evidence_path
@@ -873,6 +938,111 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    def test_summary_fixture_path_feeds_source_pack_artifact_writer(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root = _write_source_pack(tempdir)
+            native_markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\nNative fixture page 2\n",
+            )
+            ocr_markdown_path = _write_markdown(
+                tempdir,
+                "ocr-fulltext.md",
+                "OCR fixture page 1\nOCR fixture page 2\n",
+            )
+            route_markdown_path = _write_markdown(
+                tempdir,
+                "selected-fulltext.md",
+                "Merged fixture page 1\nMerged fixture page 2\n",
+            )
+            _write_markdown(tempdir, "page-1.md", "Page 1 summary.\n")
+            _write_markdown(tempdir, "full-paper.md", "Full paper summary.\n")
+            cfg = _make_app_config(
+                export=ExportConfig(
+                    artifacts=ArtifactExportConfig(
+                        enabled=True,
+                        artifact_root="source-pack",
+                        source_pack_root=str(source_pack_root),
+                        native_extraction_evidence_path=str(
+                            _write_native_extraction_evidence_json(
+                                tempdir,
+                                native_markdown_path,
+                            )
+                        ),
+                        ocr_extraction_evidence_path=str(
+                            _write_ocr_extraction_evidence_json(
+                                tempdir,
+                                ocr_markdown_path,
+                            )
+                        ),
+                        route_selection_evidence_path=str(
+                            _write_route_selection_evidence_json(
+                                tempdir,
+                                route_markdown_path,
+                            )
+                        ),
+                        structure_evidence_path=str(
+                            _write_structure_evidence_json(
+                                tempdir,
+                                _write_structure_payload_json(tempdir),
+                            )
+                        ),
+                        summary_evidence_path=str(
+                            _write_summary_evidence_json(
+                                tempdir,
+                                _write_summary_fixture_json(tempdir),
+                            )
+                        ),
+                        run_id="run-fixture",
+                    )
+                )
+            )
+            logger = MagicMock()
+            mock_zotero = MagicMock()
+            mock_zotero.credentials = SimpleNamespace(library_id="123")
+            mock_zotero.get_items_by_selection.return_value = (
+                [_make_item(sha256=FIXTURE_PDF_SHA256)],
+                _make_discovery_stats(),
+            )
+
+            exit_code = dry_run_command(cfg, logger, mock_zotero)
+
+            run_dir = (
+                source_pack_root
+                / "zotero"
+                / "zotero-ITEM1"
+                / "analyses"
+                / "millefeuille"
+                / "run-fixture"
+            )
+            artifact_index = load_artifact_index(run_dir / "artifact-index.json")
+            summary_path = run_dir / "summaries" / "hierarchical-summary.json"
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(artifact_index.stages["summarize"]["status"], "passed")
+            self.assertIn("hierarchical_summary", artifact_index.artifacts)
+            self.assertIn("summary_texts", artifact_index.artifacts)
+            self.assertEqual(
+                artifact_index.artifacts["hierarchical_summary"]["ref"],
+                "summaries/hierarchical-summary.json",
+            )
+            self.assertEqual(
+                artifact_index.artifacts["summary_texts"]["ref"],
+                "summaries/texts",
+            )
+            payload = load_hierarchical_summary(summary_path)
+            self.assertEqual(payload["run_id"], "run-fixture")
+            self.assertEqual(payload["paper_id"], "zotero-ITEM1")
+            self.assertEqual(
+                payload["summaries"][1]["text_ref"],
+                "texts/full-paper.md",
+            )
+            self.assertTrue((run_dir / "summaries" / "texts" / "page-1.md").is_file())
+            mock_zotero.download_pdf.assert_not_called()
+            mock_zotero.add_tag.assert_not_called()
+            mock_zotero.remove_tag.assert_not_called()
+
     def test_source_pack_intake_fixture_path_rejects_multi_pdf_item_cleanly(self):
         with tempfile.TemporaryDirectory() as tempdir:
             recovered_main = Path(tempdir) / "main.pdf"
@@ -1024,6 +1194,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                     ocr_extraction_evidence_path="/tmp/ocr.json",
                     route_selection_evidence_path="/tmp/route.json",
                     structure_evidence_path="/tmp/structure.json",
+                    summary_evidence_path="/tmp/summary.json",
                 )
             )
         )
@@ -1166,6 +1337,8 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
             "--route-selection-evidence",
             "/tmp/route.jsonl",
             "--structure-evidence=/tmp/structure.jsonl",
+            "--summary-evidence",
+            "/tmp/summary.jsonl",
             "--run-id",
             "run-fixture",
         ])
@@ -1185,6 +1358,7 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
                     "/tmp/route.jsonl"
                 ),
                 "export.artifacts.structure_evidence_path=/tmp/structure.jsonl",
+                "export.artifacts.summary_evidence_path=/tmp/summary.jsonl",
                 "export.artifacts.run_id=run-fixture",
                 "export.artifacts.enabled=true",
             ],

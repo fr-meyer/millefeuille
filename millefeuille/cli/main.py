@@ -318,11 +318,12 @@ def validate_flags(cfg: AppConfig) -> None:
                 )
 
     artifacts = cfg.export.artifacts
-    extraction_fixture_paths = [
+    source_pack_fixture_paths = [
         artifacts.native_extraction_evidence_path,
         artifacts.ocr_extraction_evidence_path,
         artifacts.route_selection_evidence_path,
         artifacts.structure_evidence_path,
+        artifacts.summary_evidence_path,
     ]
     if artifacts.source_pack_intake_evidence_path is not None:
         if not artifacts.enabled:
@@ -345,20 +346,20 @@ def validate_flags(cfg: AppConfig) -> None:
                 "export.artifacts.source_pack_intake_evidence_path requires "
                 "export.openkb_handoff.enabled=true"
             )
-    if any(path is not None for path in extraction_fixture_paths):
+    if any(path is not None for path in source_pack_fixture_paths):
         if not artifacts.enabled:
             raise ConfigError(
-                "source-pack extraction fixture evidence requires "
+                "source-pack stage fixture evidence requires "
                 "export.artifacts.enabled=true"
             )
         if artifacts.artifact_root != "source-pack":
             raise ConfigError(
-                "source-pack extraction fixture evidence requires "
+                "source-pack stage fixture evidence requires "
                 "export.artifacts.artifact_root=source-pack"
             )
         if not artifacts.source_pack_root:
             raise ConfigError(
-                "source-pack extraction fixture evidence requires an explicit "
+                "source-pack stage fixture evidence requires an explicit "
                 "export.artifacts.source_pack_root"
             )
     if artifacts.enabled:
@@ -930,6 +931,25 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
         if arg.startswith("--structure-evidence="):
             translated.append(
                 "export.artifacts.structure_evidence_path="
+                + arg.split("=", 1)[1]
+            )
+            artifact_enable_seen = True
+            idx += 1
+            continue
+        if arg == "--summary-evidence":
+            if idx + 1 >= len(argv):
+                translated.append(arg)
+                idx += 1
+                continue
+            translated.append(
+                "export.artifacts.summary_evidence_path=" + argv[idx + 1]
+            )
+            artifact_enable_seen = True
+            idx += 2
+            continue
+        if arg.startswith("--summary-evidence="):
+            translated.append(
+                "export.artifacts.summary_evidence_path="
                 + arg.split("=", 1)[1]
             )
             artifact_enable_seen = True
