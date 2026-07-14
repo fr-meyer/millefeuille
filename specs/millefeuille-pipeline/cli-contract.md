@@ -51,11 +51,17 @@ state in the stage manifest and artifact index.
 - `extract-native`
   - Extract native text and structural metadata.
   - Emit native extraction evidence.
+  - Preview fixture slice may write `extractions/native/evidence.json` plus
+    `fulltext.md` from explicit local Markdown evidence after source-pack
+    verification.
 
 - `extract-ocr`
   - Run a configured OCR backend adapter.
   - Emit OCR evidence without committed provider payloads.
   - Record requested OCR model and returned provider model/version.
+  - Preview fixture slice may write `extractions/mistral-ocr/evidence.json`
+    plus `fulltext.md` from explicit local Markdown evidence after source-pack
+    verification.
 
 - `route`
   - Select `native`, `ocr`, or `merged-dual`.

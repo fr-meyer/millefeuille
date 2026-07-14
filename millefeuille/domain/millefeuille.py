@@ -287,6 +287,30 @@ class AttachmentEvidenceIdentity:
 
 
 @dataclass
+class NativeExtractionEvidenceRecord:
+    tool: str
+    source_pack: str
+    attachment_identity: AttachmentEvidenceIdentity
+    output_markdown_ref: str
+    page_count: int
+    warnings: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.page_count < 0:
+            raise MillefeuilleContractError("page_count must be non-negative")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "tool": self.tool,
+            "source_pack": self.source_pack,
+            "attachment_identity": self.attachment_identity.to_dict(),
+            "output_markdown_ref": self.output_markdown_ref,
+            "page_count": self.page_count,
+            "warnings": list(self.warnings),
+        }
+
+
+@dataclass
 class OCREvidenceRecord:
     provider: str
     provider_version: str
@@ -295,6 +319,7 @@ class OCREvidenceRecord:
     output_markdown_ref: str
     page_count: int
     provider_payload_disposition: ProviderPayloadDisposition | str
+    requested_model: str | None = None
     warnings: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -306,7 +331,7 @@ class OCREvidenceRecord:
             raise MillefeuilleContractError("page_count must be non-negative")
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "provider": self.provider,
             "provider_version": self.provider_version,
             "source_pack": self.source_pack,
@@ -318,3 +343,6 @@ class OCREvidenceRecord:
             ),
             "warnings": list(self.warnings),
         }
+        if self.requested_model is not None:
+            payload["requested_model"] = self.requested_model
+        return payload

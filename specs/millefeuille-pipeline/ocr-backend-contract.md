@@ -41,6 +41,11 @@ The Mistral OCR 4 adapter should be added after an approved provider-call gate.
 Offline work can define the expected evidence shape and fixture payloads, but
 must not call Mistral or commit real provider responses.
 
+Fixture-first preview work may still populate committed
+`extractions/mistral-ocr/evidence.json` and `fulltext.md` sidecars from local
+fixture Markdown after verifying the existing source-pack manifest identity and
+source hash.
+
 Required evidence:
 
 - model/API identifier;

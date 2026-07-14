@@ -318,6 +318,10 @@ def validate_flags(cfg: AppConfig) -> None:
                 )
 
     artifacts = cfg.export.artifacts
+    extraction_fixture_paths = [
+        artifacts.native_extraction_evidence_path,
+        artifacts.ocr_extraction_evidence_path,
+    ]
     if artifacts.source_pack_intake_evidence_path is not None:
         if not artifacts.enabled:
             raise ConfigError(
@@ -338,6 +342,22 @@ def validate_flags(cfg: AppConfig) -> None:
             raise ConfigError(
                 "export.artifacts.source_pack_intake_evidence_path requires "
                 "export.openkb_handoff.enabled=true"
+            )
+    if any(path is not None for path in extraction_fixture_paths):
+        if not artifacts.enabled:
+            raise ConfigError(
+                "source-pack extraction fixture evidence requires "
+                "export.artifacts.enabled=true"
+            )
+        if artifacts.artifact_root != "source-pack":
+            raise ConfigError(
+                "source-pack extraction fixture evidence requires "
+                "export.artifacts.artifact_root=source-pack"
+            )
+        if not artifacts.source_pack_root:
+            raise ConfigError(
+                "source-pack extraction fixture evidence requires an explicit "
+                "export.artifacts.source_pack_root"
             )
     if artifacts.enabled:
         if not cfg.processing.dry_run:
@@ -730,6 +750,10 @@ Offline source-pack commands:
   millefeuille source-pack intake --evidence recovered-pdf-evidence.json
     --source-pack-root /path/to/source-packs
 
+Artifact-writer extraction fixture flags:
+  --native-extraction-evidence /path/to/native-extraction-evidence.jsonl
+  --ocr-extraction-evidence /path/to/ocr-extraction-evidence.jsonl
+
 Required environment variables:
   ZOTERO_LIBRARY_ID   Your Zotero user-library numeric ID
   ZOTERO_READ_KEY     Zotero API key with read access — required for all runs
@@ -825,6 +849,46 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
             translated.append(
                 "export.artifacts.source_pack_root=" + arg.split("=", 1)[1]
             )
+            idx += 1
+            continue
+        if arg == "--native-extraction-evidence":
+            if idx + 1 >= len(argv):
+                translated.append(arg)
+                idx += 1
+                continue
+            translated.append(
+                "export.artifacts.native_extraction_evidence_path="
+                + argv[idx + 1]
+            )
+            artifact_enable_seen = True
+            idx += 2
+            continue
+        if arg.startswith("--native-extraction-evidence="):
+            translated.append(
+                "export.artifacts.native_extraction_evidence_path="
+                + arg.split("=", 1)[1]
+            )
+            artifact_enable_seen = True
+            idx += 1
+            continue
+        if arg == "--ocr-extraction-evidence":
+            if idx + 1 >= len(argv):
+                translated.append(arg)
+                idx += 1
+                continue
+            translated.append(
+                "export.artifacts.ocr_extraction_evidence_path="
+                + argv[idx + 1]
+            )
+            artifact_enable_seen = True
+            idx += 2
+            continue
+        if arg.startswith("--ocr-extraction-evidence="):
+            translated.append(
+                "export.artifacts.ocr_extraction_evidence_path="
+                + arg.split("=", 1)[1]
+            )
+            artifact_enable_seen = True
             idx += 1
             continue
         if arg == "--run-id":

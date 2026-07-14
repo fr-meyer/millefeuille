@@ -1,0 +1,62 @@
+id: pr-057-source-pack-extraction-fixtures
+title: Add source-pack extraction fixtures
+status: implementation
+branch: feat/pr-057-source-pack-extraction-fixtures
+base_branch: dev
+github:
+  issue: null
+  pull_request: 57
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  head_sha: 3d6cb4fe7b9b2132ec6fa15b74322e153cdd2fbb
+post_merge_expected:
+  pull_request: 57
+  base_branch: dev
+  head_branch: feat/pr-057-source-pack-extraction-fixtures
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - add offline native extraction fixture writers under verified source packs
+  - add offline OCR extraction fixture writers that record requested model plus returned provider model/version without provider payloads
+  - preflight every extraction fixture record against source-pack manifest identity and source hash before writing any sidecars
+  - surface extraction sidecars through source-pack artifact-root stage manifests and artifact indexes
+  - add CLI aliases and config wiring for native and OCR extraction fixture evidence paths
+  - keep the slice offline-only after rebasing it onto merged dev from PR #56
+non_goals:
+  - live Zotero reads or writes, lifecycle tag mutation, or live PDF recovery
+  - OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or index writes
+  - route selection, summaries, paper cards, classification, or retrieval-index population
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - native and OCR fixture evidence preflight against existing source-pack manifests before any extraction sidecar write
+  - rerunning identical extraction fixture evidence is idempotent while drifted sidecars fail loudly
+  - dry-run source-pack artifact-root runs mark extract-native and extract-ocr passed when verified sidecars exist
+  - artifact indexes expose native and OCR evidence plus markdown refs for the staged fixture outputs
+  - extraction fixture flags require artifact_root=source-pack with an explicit source_pack_root
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, and Speculoos validate pass
+validation:
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models"
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest discover -v"
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-057-source-pack-extraction-fixtures --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Fixture-first extraction sidecars only; no live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+notes:
+  - "PR #56 merged to dev as d1add6a5b7a9ae16174186dceeb19e38a7ed4f61; this branch was then rebased onto exact dev before publication."
+evidence:
+  - "Rebased onto merged dev commit d1add6a5b7a9ae16174186dceeb19e38a7ed4f61 after PR #56 merged."
+  - "Focused tests passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (46 tests)."
+  - "Full unittest discovery passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest discover -v (199 tests)."
+  - "Ruff passed: /home/node/.openclaw/repos/millefeuille/.venv/bin/ruff check ."
+  - "Metadata parse passed: ruby -ryaml -rjson -e metadata ok."
+  - "git diff --check passed."
+  - "Speculoos status and validate passed for pr-057-source-pack-extraction-fixtures."
+  - 'PR #57 opened for pr-057-source-pack-extraction-fixtures'
+  - 'PR #57 linked to Project item unavailable'

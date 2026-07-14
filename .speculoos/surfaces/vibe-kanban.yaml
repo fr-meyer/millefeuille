@@ -15,6 +15,6 @@ notes:
   - Bootstrap should not depend on Vibe reachability.
 task:
   status: implementation
-  id: pr-056-source-pack-staged-handoff-intake
-  speculoos_task: .speculoos/tasks/pr-056-source-pack-staged-handoff-intake.yaml
+  id: pr-057-source-pack-extraction-fixtures
+  speculoos_task: .speculoos/tasks/pr-057-source-pack-extraction-fixtures.yaml
   command: null

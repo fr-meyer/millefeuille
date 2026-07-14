@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -37,6 +38,13 @@ from millefeuille.domain.models import (
     DiscoveryStats,
     PaperMetadata,
 )
+from millefeuille.domain.source_packs import (
+    RecoveredPdfEvidence,
+    write_source_pack_from_recovered_pdf,
+)
+
+FIXTURE_PDF_BYTES = b"artifact writer source-pack fixture pdf bytes\n"
+FIXTURE_PDF_SHA256 = hashlib.sha256(FIXTURE_PDF_BYTES).hexdigest()
 
 
 def _make_app_config(**overrides) -> AppConfig:
@@ -68,6 +76,101 @@ def _make_app_config(**overrides) -> AppConfig:
 
 def _make_discovery_stats() -> DiscoveryStats:
     return DiscoveryStats(matched_count=1, excluded_count=0, excluded_by_rule={})
+
+
+def _write_recovered_pdf(tempdir: str) -> Path:
+    source_path = Path(tempdir) / "recovered.pdf"
+    source_path.write_bytes(FIXTURE_PDF_BYTES)
+    return source_path
+
+
+def _write_markdown(tempdir: str, filename: str, text: str) -> Path:
+    markdown_path = Path(tempdir) / filename
+    markdown_path.write_text(text, encoding="utf-8")
+    return markdown_path
+
+
+def _write_native_extraction_evidence_json(
+    tempdir: str,
+    markdown_path: Path,
+) -> Path:
+    evidence_path = Path(tempdir) / "native-extraction-evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "schema_version": (
+                    "millefeuille-native-extraction-evidence/v0.1"
+                ),
+                "source_type": "zotero",
+                "item_key": "ITEM1",
+                "attachment_key": "ATT1",
+                "canonical_filename": (
+                    "Example Author - 2026 - Artifact Writer.pdf"
+                ),
+                "markdown_path": markdown_path.name,
+                "expected_sha256": FIXTURE_PDF_SHA256,
+                "page_count": 2,
+                "tool": "PyPDF2-fixture",
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return evidence_path
+
+
+def _write_ocr_extraction_evidence_json(
+    tempdir: str,
+    markdown_path: Path,
+) -> Path:
+    evidence_path = Path(tempdir) / "ocr-extraction-evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "millefeuille-ocr-extraction-evidence/v0.1",
+                "source_type": "zotero",
+                "item_key": "ITEM1",
+                "attachment_key": "ATT1",
+                "canonical_filename": (
+                    "Example Author - 2026 - Artifact Writer.pdf"
+                ),
+                "markdown_path": markdown_path.name,
+                "expected_sha256": FIXTURE_PDF_SHA256,
+                "page_count": 2,
+                "provider": "mistral-ocr",
+                "requested_model": "mistral-ocr-latest",
+                "provider_version": "mistral-ocr-4-0-fixture",
+                "provider_payload_disposition": "discarded",
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return evidence_path
+
+
+def _write_source_pack(tempdir: str) -> Path:
+    source_path = _write_recovered_pdf(tempdir)
+    source_pack_root = Path(tempdir) / "source-packs"
+    evidence = RecoveredPdfEvidence(
+        item_key="ITEM1",
+        attachment_key="ATT1",
+        canonical_filename="Example Author - 2026 - Artifact Writer.pdf",
+        recovered_pdf_path=source_path,
+        expected_sha256=FIXTURE_PDF_SHA256,
+        file_size_bytes=len(FIXTURE_PDF_BYTES),
+        zotero_version=7,
+    )
+    write_source_pack_from_recovered_pdf(
+        evidence=evidence,
+        source_pack_root=source_pack_root,
+        created_at="2026-07-14T03:00:00+00:00",
+    )
+    return source_pack_root
 
 
 def _make_item(
@@ -397,6 +500,100 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                 "passed",
             )
 
+    def test_extraction_fixture_paths_feed_source_pack_artifact_writer(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root = _write_source_pack(tempdir)
+            native_markdown_path = _write_markdown(
+                tempdir,
+                "native-fulltext.md",
+                "Native fixture page 1\nNative fixture page 2\n",
+            )
+            ocr_markdown_path = _write_markdown(
+                tempdir,
+                "ocr-fulltext.md",
+                "OCR fixture page 1\nOCR fixture page 2\n",
+            )
+            native_evidence_path = _write_native_extraction_evidence_json(
+                tempdir,
+                native_markdown_path,
+            )
+            ocr_evidence_path = _write_ocr_extraction_evidence_json(
+                tempdir,
+                ocr_markdown_path,
+            )
+            cfg = _make_app_config(
+                export=ExportConfig(
+                    artifacts=ArtifactExportConfig(
+                        enabled=True,
+                        artifact_root="source-pack",
+                        source_pack_root=str(source_pack_root),
+                        native_extraction_evidence_path=str(native_evidence_path),
+                        ocr_extraction_evidence_path=str(ocr_evidence_path),
+                        run_id="run-fixture",
+                    )
+                )
+            )
+            logger = MagicMock()
+            mock_zotero = MagicMock()
+            mock_zotero.credentials = SimpleNamespace(library_id="123")
+            mock_zotero.get_items_by_selection.return_value = (
+                [_make_item(sha256=FIXTURE_PDF_SHA256)],
+                _make_discovery_stats(),
+            )
+
+            exit_code = dry_run_command(cfg, logger, mock_zotero)
+
+            run_dir = (
+                source_pack_root
+                / "zotero"
+                / "zotero-ITEM1"
+                / "analyses"
+                / "millefeuille"
+                / "run-fixture"
+            )
+            artifact_index = load_artifact_index(run_dir / "artifact-index.json")
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                artifact_index.stages["extract-native"]["status"],
+                "passed",
+            )
+            self.assertEqual(
+                artifact_index.stages["extract-ocr"]["status"],
+                "passed",
+            )
+            self.assertIn(
+                "native_extraction_evidence",
+                artifact_index.artifacts,
+            )
+            self.assertIn(
+                "ocr_extraction_evidence",
+                artifact_index.artifacts,
+            )
+            self.assertTrue(
+                (
+                    source_pack_root
+                    / "zotero"
+                    / "zotero-ITEM1"
+                    / "extractions"
+                    / "native"
+                    / "evidence.json"
+                ).is_file()
+            )
+            self.assertTrue(
+                (
+                    source_pack_root
+                    / "zotero"
+                    / "zotero-ITEM1"
+                    / "extractions"
+                    / "mistral-ocr"
+                    / "evidence.json"
+                ).is_file()
+            )
+            mock_zotero.download_pdf.assert_not_called()
+            mock_zotero.add_tag.assert_not_called()
+            mock_zotero.remove_tag.assert_not_called()
+
     def test_source_pack_intake_fixture_path_rejects_multi_pdf_item_cleanly(self):
         with tempfile.TemporaryDirectory() as tempdir:
             recovered_main = Path(tempdir) / "main.pdf"
@@ -537,6 +734,21 @@ class TestDryRunArtifactWriter(unittest.TestCase):
 
         validate_flags(cfg)
 
+    def test_validate_flags_accepts_extraction_fixture_paths(self):
+        cfg = _make_app_config(
+            export=ExportConfig(
+                artifacts=ArtifactExportConfig(
+                    enabled=True,
+                    artifact_root="source-pack",
+                    source_pack_root="/tmp/millefeuille-source-packs",
+                    native_extraction_evidence_path="/tmp/native.json",
+                    ocr_extraction_evidence_path="/tmp/ocr.json",
+                )
+            )
+        )
+
+        validate_flags(cfg)
+
     def test_validate_flags_rejects_source_pack_intake_without_handoff(self):
         cfg = _make_app_config(
             export=ExportConfig(
@@ -561,6 +773,20 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                     artifact_root="source-pack",
                     source_pack_intake_evidence_path="/tmp/evidence.json",
                 ),
+            )
+        )
+
+        with self.assertRaisesRegex(ConfigError, "source_pack_root"):
+            validate_flags(cfg)
+
+    def test_validate_flags_rejects_extraction_fixture_without_root(self):
+        cfg = _make_app_config(
+            export=ExportConfig(
+                artifacts=ArtifactExportConfig(
+                    enabled=True,
+                    artifact_root="source-pack",
+                    native_extraction_evidence_path="/tmp/native.json",
+                )
             )
         )
 
@@ -642,6 +868,34 @@ class TestArtifactWriterCliAliases(unittest.TestCase):
                     "export.artifacts.source_pack_intake_evidence_path="
                     "/tmp/evidence.jsonl"
                 ),
+                "export.artifacts.run_id=run-fixture",
+                "export.artifacts.enabled=true",
+            ],
+        )
+
+    def test_extraction_evidence_aliases_are_supported(self):
+        translated = _translate_artifact_writer_args([
+            "--artifact-root",
+            "source-pack",
+            "--source-pack-root",
+            "/tmp/source-packs",
+            "--native-extraction-evidence",
+            "/tmp/native.jsonl",
+            "--ocr-extraction-evidence=/tmp/ocr.jsonl",
+            "--run-id",
+            "run-fixture",
+        ])
+
+        self.assertEqual(
+            translated,
+            [
+                "export.artifacts.artifact_root=source-pack",
+                "export.artifacts.source_pack_root=/tmp/source-packs",
+                (
+                    "export.artifacts.native_extraction_evidence_path="
+                    "/tmp/native.jsonl"
+                ),
+                "export.artifacts.ocr_extraction_evidence_path=/tmp/ocr.jsonl",
                 "export.artifacts.run_id=run-fixture",
                 "export.artifacts.enabled=true",
             ],

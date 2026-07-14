@@ -12,6 +12,14 @@ from typing import Any
 
 from millefeuille.domain.artifacts import ArtifactIndex, write_artifact_index
 from millefeuille.domain.config import ArtifactExportConfig
+from millefeuille.domain.extraction_fixtures import (
+    NATIVE_EVIDENCE_REF,
+    NATIVE_MARKDOWN_REF,
+    OCR_EVIDENCE_REF,
+    OCR_MARKDOWN_REF,
+    load_native_extraction_sidecar,
+    load_ocr_extraction_sidecar,
+)
 from millefeuille.domain.millefeuille import (
     ManualGate,
     RunMode,
@@ -45,6 +53,10 @@ class ArtifactRunContext:
     source_pack_manifest_ref: str | None = None
     source_pack_hash: str | None = None
     source_pack_verified: bool = False
+    native_extraction_evidence_ref: str | None = None
+    native_extraction_markdown_ref: str | None = None
+    ocr_extraction_evidence_ref: str | None = None
+    ocr_extraction_markdown_ref: str | None = None
 
 
 def default_artifact_run_id(now: datetime | None = None) -> str:
@@ -100,6 +112,10 @@ def write_dry_run_artifacts(
             run_id=run_id,
             handoff_enabled=handoff_enabled,
             source_pack_verified=run_context.source_pack_verified,
+            native_extraction_ready=(
+                run_context.native_extraction_evidence_ref is not None
+            ),
+            ocr_extraction_ready=run_context.ocr_extraction_evidence_ref is not None,
         )
         stage_manifest_path = run_dir / "stage-manifest.json"
         write_stage_manifest(stage_manifest, stage_manifest_path)
@@ -113,6 +129,14 @@ def write_dry_run_artifacts(
             source_pack_ref=run_context.source_pack_ref,
             source_pack_manifest_ref=run_context.source_pack_manifest_ref,
             source_pack_hash=run_context.source_pack_hash,
+            native_extraction_evidence_ref=(
+                run_context.native_extraction_evidence_ref
+            ),
+            native_extraction_markdown_ref=(
+                run_context.native_extraction_markdown_ref
+            ),
+            ocr_extraction_evidence_ref=run_context.ocr_extraction_evidence_ref,
+            ocr_extraction_markdown_ref=run_context.ocr_extraction_markdown_ref,
         )
         artifact_index_path = run_dir / "artifact-index.json"
         write_artifact_index(artifact_index, artifact_index_path)
@@ -165,12 +189,21 @@ def resolve_artifact_run_context(
 
     run_dir = source_pack_dir / "analyses" / "millefeuille" / run_id
     manifest_ref = _relative_ref(source_pack_manifest, run_dir)
+    extraction_refs = _resolve_extraction_refs(
+        source_pack_dir=source_pack_dir,
+        run_dir=run_dir,
+        expected_source_hash=source_pack_hash,
+    )
     return ArtifactRunContext(
         run_dir=run_dir,
         source_pack_ref=str(source_pack_dir),
         source_pack_manifest_ref=manifest_ref,
         source_pack_hash=source_pack_hash,
         source_pack_verified=True,
+        native_extraction_evidence_ref=extraction_refs["native_evidence_ref"],
+        native_extraction_markdown_ref=extraction_refs["native_markdown_ref"],
+        ocr_extraction_evidence_ref=extraction_refs["ocr_evidence_ref"],
+        ocr_extraction_markdown_ref=extraction_refs["ocr_markdown_ref"],
     )
 
 
@@ -194,6 +227,8 @@ def build_dry_run_stage_manifest(
     run_id: str,
     handoff_enabled: bool,
     source_pack_verified: bool = False,
+    native_extraction_ready: bool = False,
+    ocr_extraction_ready: bool = False,
 ) -> StageManifest:
     has_pdf = bool(rows)
     manual_gates = []
@@ -276,35 +311,47 @@ def build_dry_run_stage_manifest(
             ),
         ),
     ]
-    stages.extend(
-        StageRecord(
-            name=stage_name,
-            status=(
-                StageStatus.NOT_STARTED
-                if downstream_has_source
-                else StageStatus.SKIPPED
-            ),
-            notes=(
-                ["source-pack evidence available; stage not run in dry-run writer"]
-                if source_pack_verified
-                else ["waiting for source-pack evidence"]
-                if has_pdf
-                else ["skipped because no PDF handoff row exists"]
-            ),
+    for stage_name in (
+        StageName.EXTRACT_NATIVE,
+        StageName.EXTRACT_OCR,
+        StageName.ROUTE,
+        StageName.STRUCTURE,
+        StageName.SUMMARIZE,
+        StageName.CARD,
+        StageName.OPENKB_ADD,
+        StageName.INDEX,
+        StageName.ACCEPTANCE,
+        StageName.CLASSIFY,
+    ):
+        stage_status = (
+            StageStatus.NOT_STARTED
+            if downstream_has_source
+            else StageStatus.SKIPPED
         )
-        for stage_name in (
-            StageName.EXTRACT_NATIVE,
-            StageName.EXTRACT_OCR,
-            StageName.ROUTE,
-            StageName.STRUCTURE,
-            StageName.SUMMARIZE,
-            StageName.CARD,
-            StageName.OPENKB_ADD,
-            StageName.INDEX,
-            StageName.ACCEPTANCE,
-            StageName.CLASSIFY,
+        stage_outputs: list[str] = []
+        stage_notes = (
+            ["source-pack evidence available; stage not run in dry-run writer"]
+            if source_pack_verified
+            else ["waiting for source-pack evidence"]
+            if has_pdf
+            else ["skipped because no PDF handoff row exists"]
         )
-    )
+        if stage_name == StageName.EXTRACT_NATIVE and native_extraction_ready:
+            stage_status = StageStatus.PASSED
+            stage_outputs = ["native extraction evidence", "native markdown"]
+            stage_notes = ["fixture native extraction evidence available"]
+        elif stage_name == StageName.EXTRACT_OCR and ocr_extraction_ready:
+            stage_status = StageStatus.PASSED
+            stage_outputs = ["OCR extraction evidence", "OCR markdown"]
+            stage_notes = ["fixture OCR extraction evidence available"]
+        stages.append(
+            StageRecord(
+                name=stage_name,
+                status=stage_status,
+                outputs=stage_outputs,
+                notes=stage_notes,
+            )
+        )
     stages.append(
         StageRecord(
             name=StageName.WRITEBACK,
@@ -330,6 +377,10 @@ def build_dry_run_artifact_index(
     source_pack_ref: str | None = None,
     source_pack_manifest_ref: str | None = None,
     source_pack_hash: str | None = None,
+    native_extraction_evidence_ref: str | None = None,
+    native_extraction_markdown_ref: str | None = None,
+    ocr_extraction_evidence_ref: str | None = None,
+    ocr_extraction_markdown_ref: str | None = None,
 ) -> ArtifactIndex:
     paper_id = paper_id_for_item(item)
     source_pack = {
@@ -339,6 +390,51 @@ def build_dry_run_artifact_index(
     }
     if source_pack_manifest_ref is not None:
         source_pack["manifest_ref"] = source_pack_manifest_ref
+    artifacts = {
+        "stage_manifest": {
+            "kind": "stage-manifest",
+            "ref": "stage-manifest.json",
+            "format": "json",
+            "stage": "discover",
+            "private_content": False,
+        }
+    }
+    if (
+        native_extraction_evidence_ref is not None
+        and native_extraction_markdown_ref is not None
+    ):
+        artifacts["native_extraction_evidence"] = {
+            "kind": "native-extraction-evidence",
+            "ref": native_extraction_evidence_ref,
+            "format": "json",
+            "stage": "extract-native",
+            "private_content": False,
+        }
+        artifacts["native_extraction_markdown"] = {
+            "kind": "native-extraction-markdown",
+            "ref": native_extraction_markdown_ref,
+            "format": "markdown",
+            "stage": "extract-native",
+            "private_content": True,
+        }
+    if (
+        ocr_extraction_evidence_ref is not None
+        and ocr_extraction_markdown_ref is not None
+    ):
+        artifacts["ocr_extraction_evidence"] = {
+            "kind": "ocr-extraction-evidence",
+            "ref": ocr_extraction_evidence_ref,
+            "format": "json",
+            "stage": "extract-ocr",
+            "private_content": False,
+        }
+        artifacts["ocr_extraction_markdown"] = {
+            "kind": "ocr-extraction-markdown",
+            "ref": ocr_extraction_markdown_ref,
+            "format": "markdown",
+            "stage": "extract-ocr",
+            "private_content": True,
+        }
     return ArtifactIndex(
         paper_id=paper_id,
         run_id=run_id,
@@ -352,15 +448,7 @@ def build_dry_run_artifact_index(
             }
             for stage in stage_manifest.stages
         },
-        artifacts={
-            "stage_manifest": {
-                "kind": "stage-manifest",
-                "ref": "stage-manifest.json",
-                "format": "json",
-                "stage": "discover",
-                "private_content": False,
-            }
-        },
+        artifacts=artifacts,
         indexes=[
             {
                 "lane": "openkb",
@@ -420,3 +508,59 @@ def _source_hash_for_rows(rows: list[OpenKBHandoffRow]) -> str:
 
 def _relative_ref(path: Path, start: Path) -> str:
     return Path(os.path.relpath(path, start=start)).as_posix()
+
+
+def _resolve_extraction_refs(
+    *,
+    source_pack_dir: Path,
+    run_dir: Path,
+    expected_source_hash: str,
+) -> dict[str, str | None]:
+    native_evidence_ref, native_markdown_ref = _resolve_extraction_ref(
+        evidence_path=source_pack_dir / NATIVE_EVIDENCE_REF,
+        markdown_path=source_pack_dir / NATIVE_MARKDOWN_REF,
+        run_dir=run_dir,
+        expected_source_hash=expected_source_hash,
+        loader=load_native_extraction_sidecar,
+        stage="native extraction",
+    )
+    ocr_evidence_ref, ocr_markdown_ref = _resolve_extraction_ref(
+        evidence_path=source_pack_dir / OCR_EVIDENCE_REF,
+        markdown_path=source_pack_dir / OCR_MARKDOWN_REF,
+        run_dir=run_dir,
+        expected_source_hash=expected_source_hash,
+        loader=load_ocr_extraction_sidecar,
+        stage="OCR extraction",
+    )
+    return {
+        "native_evidence_ref": native_evidence_ref,
+        "native_markdown_ref": native_markdown_ref,
+        "ocr_evidence_ref": ocr_evidence_ref,
+        "ocr_markdown_ref": ocr_markdown_ref,
+    }
+
+
+def _resolve_extraction_ref(
+    *,
+    evidence_path: Path,
+    markdown_path: Path,
+    run_dir: Path,
+    expected_source_hash: str,
+    loader: Any,
+    stage: str,
+) -> tuple[str | None, str | None]:
+    evidence_exists = evidence_path.exists()
+    markdown_exists = markdown_path.exists()
+    if not evidence_exists and not markdown_exists:
+        return None, None
+    if not evidence_path.is_file() or not markdown_path.is_file():
+        raise ValueError(f"incomplete {stage} fixture under {evidence_path.parent}")
+    payload = loader(evidence_path)
+    if payload["source_hash"] != expected_source_hash:
+        raise ValueError(
+            f"{stage} evidence source_hash drift at {evidence_path}"
+        )
+    return (
+        _relative_ref(evidence_path, run_dir),
+        _relative_ref(markdown_path, run_dir),
+    )
