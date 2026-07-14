@@ -78,6 +78,23 @@ class RouteSelection(_StringEnum):
     MERGED_DUAL = "merged-dual"
 
 
+class SummaryGrain(_StringEnum):
+    PAGE = "page"
+    SECTION = "section"
+    FIGURE_TABLE = "figure-table"
+    FULL_PAPER = "full-paper"
+    SCOPE_SPECIFIC = "scope-specific"
+
+
+class SummaryScope(_StringEnum):
+    CLASSIFICATION = "classification"
+    LITERATURE_REVIEW = "literature-review"
+    TECHNICAL = "technical"
+    DOMAIN = "domain"
+    QUICK_READ = "quick-read"
+    GENERAL = "general"
+
+
 class ProviderPayloadDisposition(_StringEnum):
     DISCARDED = "discarded"
     QUARANTINED = "quarantined"
@@ -438,3 +455,129 @@ class StructureEvidenceRecord:
         if self.outline_markdown_ref is not None:
             payload["outline_markdown_ref"] = self.outline_markdown_ref
         return payload
+
+
+@dataclass
+class SummaryEntryRecord:
+    summary_id: str
+    grain: SummaryGrain | str
+    scope: SummaryScope | str
+    text_ref: str
+    source_locators: list[str]
+    depends_on: list[str] = field(default_factory=list)
+    model_provenance_ref: str | None = None
+    quality_warnings: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.grain = _coerce_enum(SummaryGrain, self.grain)
+        self.scope = _coerce_enum(SummaryScope, self.scope)
+        if not self.summary_id.strip():
+            raise MillefeuilleContractError("summary_id must not be empty")
+        if not self.text_ref.strip():
+            raise MillefeuilleContractError("text_ref must not be empty")
+        for field_name in ("source_locators", "depends_on", "quality_warnings"):
+            value = getattr(self, field_name)
+            if not isinstance(value, list):
+                raise MillefeuilleContractError(f"{field_name} must be an array")
+            for entry in value:
+                if not isinstance(entry, str) or not entry.strip():
+                    raise MillefeuilleContractError(
+                        f"{field_name} must contain non-empty strings"
+                    )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> SummaryEntryRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("summary entry must be an object")
+        return cls(
+            summary_id=str(payload.get("summary_id", "")).strip(),
+            grain=str(payload.get("grain", "")).strip(),
+            scope=str(payload.get("scope", "")).strip(),
+            text_ref=str(payload.get("text_ref", "")).strip(),
+            source_locators=list(payload.get("source_locators", [])),
+            depends_on=list(payload.get("depends_on", [])),
+            model_provenance_ref=payload.get("model_provenance_ref"),
+            quality_warnings=list(payload.get("quality_warnings", [])),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = {
+            "summary_id": self.summary_id,
+            "grain": self.grain.value,
+            "scope": self.scope.value,
+            "text_ref": self.text_ref,
+            "source_locators": list(self.source_locators),
+        }
+        if self.depends_on:
+            payload["depends_on"] = list(self.depends_on)
+        if self.model_provenance_ref is not None:
+            payload["model_provenance_ref"] = self.model_provenance_ref
+        if self.quality_warnings:
+            payload["quality_warnings"] = list(self.quality_warnings)
+        return payload
+
+
+@dataclass
+class HierarchicalSummaryRecord:
+    paper_id: str
+    run_id: str
+    summaries: list[SummaryEntryRecord | dict[str, Any]]
+    taxonomy_context: dict[str, Any] | None = None
+    schema_version: str = "millefeuille-hierarchical-summary/v0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "millefeuille-hierarchical-summary/v0.1":
+            raise MillefeuilleContractError(
+                f"unsupported schema_version {self.schema_version!r}"
+            )
+        if not self.paper_id.strip():
+            raise MillefeuilleContractError("paper_id must not be empty")
+        if not self.run_id.strip():
+            raise MillefeuilleContractError("run_id must not be empty")
+        if self.taxonomy_context is not None and not isinstance(
+            self.taxonomy_context, dict
+        ):
+            raise MillefeuilleContractError(
+                "taxonomy_context must be an object or null"
+            )
+        self.summaries = [
+            summary
+            if isinstance(summary, SummaryEntryRecord)
+            else SummaryEntryRecord.from_dict(summary)
+            for summary in self.summaries
+        ]
+        if not self.summaries:
+            raise MillefeuilleContractError("summaries must not be empty")
+        summary_ids = [summary.summary_id for summary in self.summaries]
+        if len(summary_ids) != len(set(summary_ids)):
+            raise MillefeuilleContractError("summary_id values must be unique")
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> HierarchicalSummaryRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError(
+                "hierarchical summary must be an object"
+            )
+        summaries = payload.get("summaries")
+        if not isinstance(summaries, list):
+            raise MillefeuilleContractError("summaries must be an array")
+        return cls(
+            paper_id=str(payload.get("paper_id", "")).strip(),
+            run_id=str(payload.get("run_id", "")).strip(),
+            taxonomy_context=payload.get("taxonomy_context"),
+            summaries=summaries,
+            schema_version=str(payload.get("schema_version", "")).strip(),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "paper_id": self.paper_id,
+            "run_id": self.run_id,
+            "taxonomy_context": (
+                None
+                if self.taxonomy_context is None
+                else dict(self.taxonomy_context)
+            ),
+            "summaries": [summary.to_dict() for summary in self.summaries],
+        }

@@ -6,6 +6,7 @@ import unittest
 
 from millefeuille.domain.millefeuille import (
     AttachmentEvidenceIdentity,
+    HierarchicalSummaryRecord,
     ManualGate,
     MillefeuilleContractError,
     NativeExtractionEvidenceRecord,
@@ -19,6 +20,9 @@ from millefeuille.domain.millefeuille import (
     StageRecord,
     StageStatus,
     StructureEvidenceRecord,
+    SummaryEntryRecord,
+    SummaryGrain,
+    SummaryScope,
     TagState,
     can_transition_tag,
 )
@@ -233,6 +237,46 @@ class TestOCREvidenceContract(unittest.TestCase):
         self.assertEqual(payload["source_markdown_ref"], "selected/fulltext.md")
         self.assertEqual(payload["outline_markdown_ref"], "structure/outline.md")
         self.assertEqual(payload["section_count"], 5)
+
+    def test_hierarchical_summary_record_serializes(self):
+        summary = HierarchicalSummaryRecord(
+            paper_id="zotero-ITEM1",
+            run_id="run-fixture",
+            taxonomy_context={
+                "taxonomy_version": "v0-fixture",
+                "classification_scope": "classification",
+            },
+            summaries=[
+                SummaryEntryRecord(
+                    summary_id="page-1",
+                    grain=SummaryGrain.PAGE,
+                    scope=SummaryScope.GENERAL,
+                    text_ref="summaries/texts/page-1.md",
+                    source_locators=["p.1"],
+                ),
+                SummaryEntryRecord(
+                    summary_id="full-paper",
+                    grain=SummaryGrain.FULL_PAPER,
+                    scope=SummaryScope.CLASSIFICATION,
+                    text_ref="summaries/texts/full-paper.md",
+                    source_locators=["section:introduction", "section:methods"],
+                    depends_on=["page-1"],
+                    quality_warnings=["fixture summary only"],
+                ),
+            ],
+        )
+
+        payload = summary.to_dict()
+
+        self.assertEqual(
+            payload["schema_version"],
+            "millefeuille-hierarchical-summary/v0.1",
+        )
+        self.assertEqual(payload["paper_id"], "zotero-ITEM1")
+        self.assertEqual(payload["run_id"], "run-fixture")
+        self.assertEqual(payload["summaries"][0]["grain"], "page")
+        self.assertEqual(payload["summaries"][1]["scope"], "classification")
+        self.assertEqual(payload["summaries"][1]["depends_on"], ["page-1"])
 
     def test_attachment_identity_requires_sha256_shape(self):
         with self.assertRaises(MillefeuilleContractError):

@@ -5,6 +5,7 @@ processing workflows. These commands are called from the main entry point
 after configuration validation and client initialization.
 """
 
+from dataclasses import replace
 import logging
 from typing import Any
 
@@ -12,7 +13,10 @@ from tabulate import tabulate
 
 from millefeuille.clients.ocr_client import OCRClient
 from millefeuille.clients.zotero_client import ZoteroClient
-from millefeuille.domain.artifact_writer import write_dry_run_artifacts
+from millefeuille.domain.artifact_writer import (
+    default_artifact_run_id,
+    write_dry_run_artifacts,
+)
 from millefeuille.domain.config import AppConfig
 from millefeuille.domain.extraction_fixtures import (
     write_native_extractions_from_evidence,
@@ -22,6 +26,7 @@ from millefeuille.domain.models import OpenKBHandoffRow, TagAddingResult
 from millefeuille.domain.route_fixtures import write_route_selections_from_evidence
 from millefeuille.domain.source_packs import write_source_packs_from_handoff_evidence
 from millefeuille.domain.structure_fixtures import write_structures_from_evidence
+from millefeuille.domain.summary_fixtures import write_summaries_from_evidence
 from millefeuille.domain.tree_processor import TreeStructureProcessor
 from millefeuille.orchestration.pipeline import (
     Pipeline,
@@ -293,15 +298,19 @@ def dry_run_command(
                 f"({len(openkb_handoff_rows)} rows validated)"
             )
 
-    if (
-        cfg.export.artifacts.enabled
-        and cfg.export.artifacts.source_pack_intake_evidence_path
-    ):
-        assert cfg.export.artifacts.source_pack_root is not None
+    artifact_cfg = cfg.export.artifacts
+    if artifact_cfg.enabled and artifact_cfg.run_id is None:
+        artifact_cfg = replace(
+            artifact_cfg,
+            run_id=default_artifact_run_id(),
+        )
+
+    if artifact_cfg.enabled and artifact_cfg.source_pack_intake_evidence_path:
+        assert artifact_cfg.source_pack_root is not None
         intake_results = write_source_packs_from_handoff_evidence(
             handoff_rows=openkb_handoff_rows,
-            evidence_path=cfg.export.artifacts.source_pack_intake_evidence_path,
-            source_pack_root=cfg.export.artifacts.source_pack_root,
+            evidence_path=artifact_cfg.source_pack_intake_evidence_path,
+            source_pack_root=artifact_cfg.source_pack_root,
         )
         logger.info(
             "[DRY-RUN] Source-pack intake fixtures written: "
@@ -315,14 +324,11 @@ def dry_run_command(
                 result.manifest_path,
             )
 
-    if (
-        cfg.export.artifacts.enabled
-        and cfg.export.artifacts.native_extraction_evidence_path
-    ):
-        assert cfg.export.artifacts.source_pack_root is not None
+    if artifact_cfg.enabled and artifact_cfg.native_extraction_evidence_path:
+        assert artifact_cfg.source_pack_root is not None
         native_results = write_native_extractions_from_evidence(
-            evidence_path=cfg.export.artifacts.native_extraction_evidence_path,
-            source_pack_root=cfg.export.artifacts.source_pack_root,
+            evidence_path=artifact_cfg.native_extraction_evidence_path,
+            source_pack_root=artifact_cfg.source_pack_root,
         )
         logger.info(
             "[DRY-RUN] Native extraction fixtures written: %s",
@@ -336,14 +342,11 @@ def dry_run_command(
                 result.evidence_path,
             )
 
-    if (
-        cfg.export.artifacts.enabled
-        and cfg.export.artifacts.ocr_extraction_evidence_path
-    ):
-        assert cfg.export.artifacts.source_pack_root is not None
+    if artifact_cfg.enabled and artifact_cfg.ocr_extraction_evidence_path:
+        assert artifact_cfg.source_pack_root is not None
         ocr_results = write_ocr_extractions_from_evidence(
-            evidence_path=cfg.export.artifacts.ocr_extraction_evidence_path,
-            source_pack_root=cfg.export.artifacts.source_pack_root,
+            evidence_path=artifact_cfg.ocr_extraction_evidence_path,
+            source_pack_root=artifact_cfg.source_pack_root,
         )
         logger.info(
             "[DRY-RUN] OCR extraction fixtures written: %s",
@@ -357,14 +360,11 @@ def dry_run_command(
                 result.evidence_path,
             )
 
-    if (
-        cfg.export.artifacts.enabled
-        and cfg.export.artifacts.route_selection_evidence_path
-    ):
-        assert cfg.export.artifacts.source_pack_root is not None
+    if artifact_cfg.enabled and artifact_cfg.route_selection_evidence_path:
+        assert artifact_cfg.source_pack_root is not None
         route_results = write_route_selections_from_evidence(
-            evidence_path=cfg.export.artifacts.route_selection_evidence_path,
-            source_pack_root=cfg.export.artifacts.source_pack_root,
+            evidence_path=artifact_cfg.route_selection_evidence_path,
+            source_pack_root=artifact_cfg.source_pack_root,
         )
         logger.info(
             "[DRY-RUN] Route selection fixtures written: %s",
@@ -378,14 +378,11 @@ def dry_run_command(
                 result.evidence_path,
             )
 
-    if (
-        cfg.export.artifacts.enabled
-        and cfg.export.artifacts.structure_evidence_path
-    ):
-        assert cfg.export.artifacts.source_pack_root is not None
+    if artifact_cfg.enabled and artifact_cfg.structure_evidence_path:
+        assert artifact_cfg.source_pack_root is not None
         structure_results = write_structures_from_evidence(
-            evidence_path=cfg.export.artifacts.structure_evidence_path,
-            source_pack_root=cfg.export.artifacts.source_pack_root,
+            evidence_path=artifact_cfg.structure_evidence_path,
+            source_pack_root=artifact_cfg.source_pack_root,
         )
         logger.info(
             "[DRY-RUN] Structure fixtures written: %s",
@@ -399,11 +396,32 @@ def dry_run_command(
                 result.evidence_path,
             )
 
-    if cfg.export.artifacts.enabled:
+    if artifact_cfg.enabled and artifact_cfg.summary_evidence_path:
+        assert artifact_cfg.source_pack_root is not None
+        assert artifact_cfg.run_id is not None
+        summary_results = write_summaries_from_evidence(
+            evidence_path=artifact_cfg.summary_evidence_path,
+            source_pack_root=artifact_cfg.source_pack_root,
+            run_id=artifact_cfg.run_id,
+        )
+        logger.info(
+            "[DRY-RUN] Summary fixtures written: %s",
+            len(summary_results),
+        )
+        for result in summary_results:
+            logger.info(
+                "  - paper_id=%s run_id=%s status=%s summary=%s",
+                result.paper_id,
+                result.run_id,
+                result.status,
+                result.summary_path,
+            )
+
+    if artifact_cfg.enabled:
         artifact_results = write_dry_run_artifacts(
             items=items,
             handoff_rows=openkb_handoff_rows,
-            config=cfg.export.artifacts,
+            config=artifact_cfg,
             handoff_enabled=cfg.export.openkb_handoff.enabled,
         )
         logger.info(

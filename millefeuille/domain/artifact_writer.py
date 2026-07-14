@@ -45,6 +45,11 @@ from millefeuille.domain.structure_fixtures import (
     STRUCTURE_OUTLINE_REF,
     load_structure_sidecar,
 )
+from millefeuille.domain.summary_fixtures import (
+    SUMMARY_ARTIFACT_REF,
+    SUMMARY_TEXT_DIR_REF,
+    load_hierarchical_summary,
+)
 
 
 @dataclass(frozen=True)
@@ -71,6 +76,8 @@ class ArtifactRunContext:
     route_markdown_ref: str | None = None
     structure_evidence_ref: str | None = None
     structure_outline_ref: str | None = None
+    summary_artifact_ref: str | None = None
+    summary_text_dir_ref: str | None = None
 
 
 def default_artifact_run_id(now: datetime | None = None) -> str:
@@ -133,6 +140,7 @@ def write_dry_run_artifacts(
             route_ready=run_context.route_evidence_ref is not None,
             structure_ready=run_context.structure_evidence_ref is not None,
             structure_outline_ready=run_context.structure_outline_ref is not None,
+            summarize_ready=run_context.summary_artifact_ref is not None,
         )
         stage_manifest_path = run_dir / "stage-manifest.json"
         write_stage_manifest(stage_manifest, stage_manifest_path)
@@ -158,6 +166,8 @@ def write_dry_run_artifacts(
             route_markdown_ref=run_context.route_markdown_ref,
             structure_evidence_ref=run_context.structure_evidence_ref,
             structure_outline_ref=run_context.structure_outline_ref,
+            summary_artifact_ref=run_context.summary_artifact_ref,
+            summary_text_dir_ref=run_context.summary_text_dir_ref,
         )
         artifact_index_path = run_dir / "artifact-index.json"
         write_artifact_index(artifact_index, artifact_index_path)
@@ -215,6 +225,11 @@ def resolve_artifact_run_context(
         run_dir=run_dir,
         expected_source_hash=source_pack_hash,
     )
+    summary_refs = _resolve_summary_refs(
+        run_dir=run_dir,
+        paper_id=paper_id,
+        run_id=run_id,
+    )
     return ArtifactRunContext(
         run_dir=run_dir,
         source_pack_ref=str(source_pack_dir),
@@ -229,6 +244,8 @@ def resolve_artifact_run_context(
         route_markdown_ref=extraction_refs["route_markdown_ref"],
         structure_evidence_ref=extraction_refs["structure_evidence_ref"],
         structure_outline_ref=extraction_refs["structure_outline_ref"],
+        summary_artifact_ref=summary_refs["summary_artifact_ref"],
+        summary_text_dir_ref=summary_refs["summary_text_dir_ref"],
     )
 
 
@@ -257,6 +274,7 @@ def build_dry_run_stage_manifest(
     route_ready: bool = False,
     structure_ready: bool = False,
     structure_outline_ready: bool = False,
+    summarize_ready: bool = False,
 ) -> StageManifest:
     has_pdf = bool(rows)
     manual_gates = []
@@ -382,6 +400,10 @@ def build_dry_run_stage_manifest(
             if structure_outline_ready:
                 stage_outputs.append("structure outline")
             stage_notes = ["fixture structure evidence available"]
+        elif stage_name == StageName.SUMMARIZE and summarize_ready:
+            stage_status = StageStatus.PASSED
+            stage_outputs = ["hierarchical summary", "summary texts"]
+            stage_notes = ["fixture hierarchical summary available"]
         stages.append(
             StageRecord(
                 name=stage_name,
@@ -423,6 +445,8 @@ def build_dry_run_artifact_index(
     route_markdown_ref: str | None = None,
     structure_evidence_ref: str | None = None,
     structure_outline_ref: str | None = None,
+    summary_artifact_ref: str | None = None,
+    summary_text_dir_ref: str | None = None,
 ) -> ArtifactIndex:
     paper_id = paper_id_for_item(item)
     source_pack = {
@@ -506,6 +530,22 @@ def build_dry_run_artifact_index(
                 "ref": structure_outline_ref,
                 "format": "markdown",
                 "stage": "structure",
+                "private_content": True,
+            }
+    if summary_artifact_ref is not None:
+        artifacts["hierarchical_summary"] = {
+            "kind": "hierarchical-summary",
+            "ref": summary_artifact_ref,
+            "format": "json",
+            "stage": "summarize",
+            "private_content": False,
+        }
+        if summary_text_dir_ref is not None:
+            artifacts["summary_texts"] = {
+                "kind": "summary-texts",
+                "ref": summary_text_dir_ref,
+                "format": "directory",
+                "stage": "summarize",
                 "private_content": True,
             }
     return ArtifactIndex(
@@ -681,3 +721,38 @@ def _resolve_structure_ref(
         raise ValueError(f"structure evidence source_hash drift at {evidence_path}")
     outline_ref = _relative_ref(outline_path, run_dir) if outline_exists else None
     return _relative_ref(evidence_path, run_dir), outline_ref
+
+
+def _resolve_summary_refs(
+    *,
+    run_dir: Path,
+    paper_id: str,
+    run_id: str,
+) -> dict[str, str | None]:
+    summary_path = run_dir / SUMMARY_ARTIFACT_REF
+    summary_text_dir = run_dir / SUMMARY_TEXT_DIR_REF
+    summary_exists = summary_path.exists()
+    text_dir_exists = summary_text_dir.exists()
+    if not summary_exists and not text_dir_exists:
+        return {
+            "summary_artifact_ref": None,
+            "summary_text_dir_ref": None,
+        }
+    if not summary_path.is_file() or not summary_text_dir.is_dir():
+        raise ValueError(f"incomplete summary fixture under {summary_path.parent}")
+    payload = load_hierarchical_summary(summary_path)
+    if payload["paper_id"] != paper_id:
+        raise ValueError(f"hierarchical summary paper_id drift at {summary_path}")
+    if payload["run_id"] != run_id:
+        raise ValueError(f"hierarchical summary run_id drift at {summary_path}")
+    for summary in payload["summaries"]:
+        text_ref = str(summary["text_ref"])
+        text_path = summary_path.parent / text_ref
+        if not text_path.is_file():
+            raise ValueError(
+                f"incomplete summary fixture under {summary_path.parent}"
+            )
+    return {
+        "summary_artifact_ref": _relative_ref(summary_path, run_dir),
+        "summary_text_dir_ref": _relative_ref(summary_text_dir, run_dir),
+    }

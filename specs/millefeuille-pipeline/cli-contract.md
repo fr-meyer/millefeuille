@@ -84,6 +84,10 @@ state in the stage manifest and artifact index.
   - Support configurable grains and scopes such as `classification`,
     `literature-review`, `technical`, `domain`, and `quick-read`.
   - Record model profile and source refs for every summary output.
+  - Preview fixture slice may write
+    `analyses/millefeuille/<run-id>/summaries/hierarchical-summary.json` plus
+    `summaries/texts/*.md` only after the source-pack manifest and structure
+    sidecar are already verified.
 
 - `card`
   - Produce Markdown and JSON paper card artifacts.

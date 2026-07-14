@@ -369,6 +369,27 @@ selected fulltext are verified. The dry-run artifact index then marks
 `structure` passed and exposes the structure refs without calling model
 providers or writing OpenKB/index lanes.
 
+Once the structure sidecar exists, the same dry-run path can stage
+hierarchical-summary fixture evidence:
+
+```bash
+millefeuille --artifact-root source-pack \
+  --source-pack-root /path/to/source-packs \
+  --structure-evidence /path/to/structure-evidence.jsonl \
+  --summary-evidence /path/to/summary-evidence.jsonl \
+  --run-id dry-run-demo \
+  processing.dry_run=true
+```
+
+Summary fixture evidence points to a local
+`millefeuille-hierarchical-summary/v0.1` JSON file whose `text_ref` files
+resolve beside the fixture. The dry-run path preflights the source-pack
+manifest plus existing structure sidecar, then writes
+`analyses/millefeuille/<run-id>/summaries/hierarchical-summary.json` and
+`summaries/texts/*.md` under the run directory. The artifact index marks
+`summarize` passed and exposes the summary bundle without calling model
+providers or writing OpenKB/index lanes.
+
 ### Command-Line Configuration
 
 Override configuration from the command line:
