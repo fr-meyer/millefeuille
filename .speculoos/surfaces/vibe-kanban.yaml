@@ -15,6 +15,6 @@ notes:
   - Bootstrap should not depend on Vibe reachability.
 task:
   status: implementation
-  id: pr-061-card-fixtures
-  speculoos_task: .speculoos/tasks/pr-061-card-fixtures.yaml
+  id: pr-062-index-fixtures
+  speculoos_task: .speculoos/tasks/pr-062-index-fixtures.yaml
   command: null

@@ -325,6 +325,7 @@ def validate_flags(cfg: AppConfig) -> None:
         artifacts.structure_evidence_path,
         artifacts.summary_evidence_path,
         artifacts.card_evidence_path,
+        artifacts.index_evidence_path,
     ]
     if artifacts.source_pack_intake_evidence_path is not None:
         if not artifacts.enabled:
@@ -759,6 +760,9 @@ Artifact-writer source-pack fixture flags:
   --ocr-extraction-evidence /path/to/ocr-extraction-evidence.jsonl
   --route-selection-evidence /path/to/route-selection-evidence.jsonl
   --structure-evidence /path/to/structure-evidence.jsonl
+  --summary-evidence /path/to/summary-evidence.jsonl
+  --card-evidence /path/to/card-evidence.jsonl
+  --index-evidence /path/to/index-evidence.jsonl
 
 Required environment variables:
   ZOTERO_LIBRARY_ID   Your Zotero user-library numeric ID
@@ -970,6 +974,25 @@ def _translate_artifact_writer_args(argv: list[str]) -> list[str]:
         if arg.startswith("--card-evidence="):
             translated.append(
                 "export.artifacts.card_evidence_path="
+                + arg.split("=", 1)[1]
+            )
+            artifact_enable_seen = True
+            idx += 1
+            continue
+        if arg == "--index-evidence":
+            if idx + 1 >= len(argv):
+                translated.append(arg)
+                idx += 1
+                continue
+            translated.append(
+                "export.artifacts.index_evidence_path=" + argv[idx + 1]
+            )
+            artifact_enable_seen = True
+            idx += 2
+            continue
+        if arg.startswith("--index-evidence="):
+            translated.append(
+                "export.artifacts.index_evidence_path="
                 + arg.split("=", 1)[1]
             )
             artifact_enable_seen = True

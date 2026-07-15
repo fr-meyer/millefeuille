@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/retrieval-index-status.schema.json",
+  "title": "Millefeuille Retrieval Index Status",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "paper_id",
+    "run_id",
+    "source_hash",
+    "selected_fulltext_ref",
+    "summary_ref",
+    "paper_card_ref",
+    "lanes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-retrieval-index-status/v0.1"
+    },
+    "paper_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "selected_fulltext_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "paper_card_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lanes": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["lane", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "lane": {
+            "enum": ["openkb", "pageindex", "condb", "chatindex", "other"]
+          },
+          "status": {
+            "enum": ["skipped", "previewed", "written", "failed", "needs-review"]
+          },
+          "skip_reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "chunking_profile": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "quality_warnings": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "duplicate_scan": {
+      "type": ["object", "null"],
+      "additionalProperties": true
+    },
+    "collision_summary": {
+      "type": ["object", "null"],
+      "additionalProperties": true
+    },
+    "quality_warnings": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

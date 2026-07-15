@@ -104,8 +104,8 @@ state in the stage manifest and artifact index.
 
 - `index`
   - Update local OpenKB/PageIndex and optional ConDB/ChatIndex lanes.
-  - Emit lane status, duplicate/collision evidence, skip reasons, and result
-    refs.
+  - Emit `millefeuille-retrieval-index-status/v0.1` with lane status,
+    duplicate/collision evidence, skip reasons, and result refs.
 
 - `retrieve`
   - Query a paper package or corpus by paper id, Zotero key, DOI, title,

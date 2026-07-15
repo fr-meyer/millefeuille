@@ -410,6 +410,25 @@ under `analyses/millefeuille/<run-id>/`. The artifact index marks `card`
 passed and exposes both refs without calling model providers or writing
 OpenKB/index lanes.
 
+Once the paper-card bundle exists, the same dry-run path can stage retrieval
+and index fixture evidence:
+
+```bash
+millefeuille --artifact-root source-pack \
+  --source-pack-root /path/to/source-packs \
+  --card-evidence /path/to/card-evidence.jsonl \
+  --index-evidence /path/to/index-evidence.jsonl \
+  --run-id dry-run-demo \
+  processing.dry_run=true
+```
+
+Index fixture evidence points to a local
+`millefeuille-retrieval-index-status/v0.1` JSON file. The dry-run path
+preflights the source-pack manifest, selected fulltext, hierarchical summary,
+and paper card, then writes `index/index-status.json` under
+`analyses/millefeuille/<run-id>/`. The artifact index marks `index` passed and
+surfaces the lane statuses without writing OpenKB/PageIndex/ConDB/ChatIndex.
+
 ### Command-Line Configuration
 
 Override configuration from the command line:

@@ -25,6 +25,10 @@ from millefeuille.domain.extraction_fixtures import (
     load_native_extraction_sidecar,
     load_ocr_extraction_sidecar,
 )
+from millefeuille.domain.index_fixtures import (
+    INDEX_STATUS_REF,
+    load_retrieval_index_status,
+)
 from millefeuille.domain.millefeuille import (
     ManualGate,
     RunMode,
@@ -85,6 +89,8 @@ class ArtifactRunContext:
     summary_text_dir_ref: str | None = None
     paper_card_json_ref: str | None = None
     paper_card_markdown_ref: str | None = None
+    retrieval_index_status_ref: str | None = None
+    index_records: list[dict[str, Any]] | None = None
 
 
 def default_artifact_run_id(now: datetime | None = None) -> str:
@@ -149,6 +155,7 @@ def write_dry_run_artifacts(
             structure_outline_ready=run_context.structure_outline_ref is not None,
             summarize_ready=run_context.summary_artifact_ref is not None,
             card_ready=run_context.paper_card_json_ref is not None,
+            index_ready=run_context.retrieval_index_status_ref is not None,
         )
         stage_manifest_path = run_dir / "stage-manifest.json"
         write_stage_manifest(stage_manifest, stage_manifest_path)
@@ -178,6 +185,8 @@ def write_dry_run_artifacts(
             summary_text_dir_ref=run_context.summary_text_dir_ref,
             paper_card_json_ref=run_context.paper_card_json_ref,
             paper_card_markdown_ref=run_context.paper_card_markdown_ref,
+            retrieval_index_status_ref=run_context.retrieval_index_status_ref,
+            index_records=run_context.index_records,
         )
         artifact_index_path = run_dir / "artifact-index.json"
         write_artifact_index(artifact_index, artifact_index_path)
@@ -245,6 +254,13 @@ def resolve_artifact_run_context(
         paper_id=paper_id,
         expected_source_hash=source_pack_hash,
     )
+    index_refs = _resolve_index_refs(
+        source_pack_dir=source_pack_dir,
+        run_dir=run_dir,
+        paper_id=paper_id,
+        run_id=run_id,
+        expected_source_hash=source_pack_hash,
+    )
     return ArtifactRunContext(
         run_dir=run_dir,
         source_pack_ref=str(source_pack_dir),
@@ -263,6 +279,8 @@ def resolve_artifact_run_context(
         summary_text_dir_ref=summary_refs["summary_text_dir_ref"],
         paper_card_json_ref=card_refs["paper_card_json_ref"],
         paper_card_markdown_ref=card_refs["paper_card_markdown_ref"],
+        retrieval_index_status_ref=index_refs["retrieval_index_status_ref"],
+        index_records=index_refs["index_records"],
     )
 
 
@@ -293,6 +311,7 @@ def build_dry_run_stage_manifest(
     structure_outline_ready: bool = False,
     summarize_ready: bool = False,
     card_ready: bool = False,
+    index_ready: bool = False,
 ) -> StageManifest:
     has_pdf = bool(rows)
     manual_gates = []
@@ -426,6 +445,10 @@ def build_dry_run_stage_manifest(
             stage_status = StageStatus.PASSED
             stage_outputs = ["paper card json", "paper card markdown"]
             stage_notes = ["fixture paper card available"]
+        elif stage_name == StageName.INDEX and index_ready:
+            stage_status = StageStatus.PASSED
+            stage_outputs = ["retrieval index status"]
+            stage_notes = ["fixture retrieval/index status available"]
         stages.append(
             StageRecord(
                 name=stage_name,
@@ -471,6 +494,8 @@ def build_dry_run_artifact_index(
     summary_text_dir_ref: str | None = None,
     paper_card_json_ref: str | None = None,
     paper_card_markdown_ref: str | None = None,
+    retrieval_index_status_ref: str | None = None,
+    index_records: list[dict[str, Any]] | None = None,
 ) -> ArtifactIndex:
     paper_id = paper_id_for_item(item)
     source_pack = {
@@ -588,6 +613,16 @@ def build_dry_run_artifact_index(
                 "stage": "card",
                 "private_content": True,
             }
+    indexes = _default_index_records()
+    if retrieval_index_status_ref is not None:
+        artifacts["retrieval_index_status"] = {
+            "kind": "retrieval-index-status",
+            "ref": retrieval_index_status_ref,
+            "format": "json",
+            "stage": "index",
+            "private_content": False,
+        }
+        indexes = _merge_index_records(index_records)
     return ArtifactIndex(
         paper_id=paper_id,
         run_id=run_id,
@@ -602,28 +637,7 @@ def build_dry_run_artifact_index(
             for stage in stage_manifest.stages
         },
         artifacts=artifacts,
-        indexes=[
-            {
-                "lane": "openkb",
-                "status": "skipped",
-                "skip_reason": "dry-run artifact writer does not write OpenKB",
-            },
-            {
-                "lane": "pageindex",
-                "status": "skipped",
-                "skip_reason": "dry-run artifact writer does not write indexes",
-            },
-            {
-                "lane": "condb",
-                "status": "skipped",
-                "skip_reason": "optional support lane not run",
-            },
-            {
-                "lane": "chatindex",
-                "status": "skipped",
-                "skip_reason": "optional support lane not run",
-            },
-        ],
+        indexes=indexes,
         zotero_writeback={
             "mode": "none",
             "status": "not-planned",
@@ -825,3 +839,111 @@ def _resolve_card_refs(
         "paper_card_json_ref": _relative_ref(card_json_path, run_dir),
         "paper_card_markdown_ref": _relative_ref(card_markdown_path, run_dir),
     }
+
+
+def _resolve_index_refs(
+    *,
+    source_pack_dir: Path,
+    run_dir: Path,
+    paper_id: str,
+    run_id: str,
+    expected_source_hash: str,
+) -> dict[str, str | list[dict[str, Any]] | None]:
+    index_status_path = run_dir / INDEX_STATUS_REF
+    if not index_status_path.exists():
+        return {
+            "retrieval_index_status_ref": None,
+            "index_records": None,
+        }
+    if not index_status_path.is_file():
+        raise ValueError(
+            "incomplete retrieval index fixture under "
+            f"{index_status_path.parent}"
+        )
+    payload = load_retrieval_index_status(index_status_path)
+    if payload["paper_id"] != paper_id:
+        raise ValueError(f"retrieval index paper_id drift at {index_status_path}")
+    if payload["run_id"] != run_id:
+        raise ValueError(f"retrieval index run_id drift at {index_status_path}")
+    if payload["source_hash"] != expected_source_hash:
+        raise ValueError(f"retrieval index source_hash drift at {index_status_path}")
+    index_dir = index_status_path.parent
+    expected_selected_ref = _relative_ref(
+        source_pack_dir / ROUTE_MARKDOWN_REF,
+        index_dir,
+    )
+    expected_summary_ref = _relative_ref(run_dir / SUMMARY_ARTIFACT_REF, index_dir)
+    expected_card_ref = _relative_ref(run_dir / CARD_JSON_REF, index_dir)
+    if payload["selected_fulltext_ref"] != expected_selected_ref:
+        raise ValueError(
+            f"retrieval index selected_fulltext_ref drift at {index_status_path}"
+        )
+    if payload["summary_ref"] != expected_summary_ref:
+        raise ValueError(f"retrieval index summary_ref drift at {index_status_path}")
+    if payload["paper_card_ref"] != expected_card_ref:
+        raise ValueError(
+            f"retrieval index paper_card_ref drift at {index_status_path}"
+        )
+    for ref_name in ("selected_fulltext_ref", "summary_ref", "paper_card_ref"):
+        ref = str(payload[ref_name])
+        if not (index_dir / ref).is_file():
+            raise ValueError(
+                f"incomplete retrieval index fixture under {index_status_path.parent}"
+            )
+    return {
+        "retrieval_index_status_ref": _relative_ref(index_status_path, run_dir),
+        "index_records": _merge_index_records(list(payload["lanes"])),
+    }
+
+
+def _default_index_records() -> list[dict[str, Any]]:
+    return [
+        {
+            "lane": "openkb",
+            "status": "skipped",
+            "skip_reason": "dry-run artifact writer does not write OpenKB",
+        },
+        {
+            "lane": "pageindex",
+            "status": "skipped",
+            "skip_reason": "dry-run artifact writer does not write indexes",
+        },
+        {
+            "lane": "condb",
+            "status": "skipped",
+            "skip_reason": "optional support lane not run",
+        },
+        {
+            "lane": "chatindex",
+            "status": "skipped",
+            "skip_reason": "optional support lane not run",
+        },
+    ]
+
+
+def _merge_index_records(
+    records: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    merged = _default_index_records()
+    if records is None:
+        return merged
+    by_lane = {record["lane"]: dict(record) for record in merged}
+    for record in records:
+        by_lane[str(record["lane"])] = _project_index_record(record)
+    order = ["openkb", "pageindex", "condb", "chatindex"]
+    projected = [by_lane[lane] for lane in order if lane in by_lane]
+    for lane, record in by_lane.items():
+        if lane not in order:
+            projected.append(record)
+    return projected
+
+
+def _project_index_record(record: dict[str, Any]) -> dict[str, Any]:
+    projected = {
+        "lane": str(record["lane"]),
+        "status": str(record["status"]),
+    }
+    skip_reason = record.get("skip_reason")
+    if isinstance(skip_reason, str) and skip_reason.strip():
+        projected["skip_reason"] = skip_reason
+    return projected

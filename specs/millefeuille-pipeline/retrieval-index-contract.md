@@ -19,6 +19,9 @@ The index stage must record:
 - duplicate-scan or collision results when available;
 - skip reasons for disabled lanes.
 
+The offline fixture-first status shape is
+`millefeuille-retrieval-index-status/v0.1`.
+
 ## Optional Lanes
 
 ConDB may be used for hierarchy or tree experiments. A ConDB run must emit a

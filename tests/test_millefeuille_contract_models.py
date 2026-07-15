@@ -7,12 +7,14 @@ import unittest
 from millefeuille.domain.millefeuille import (
     AttachmentEvidenceIdentity,
     HierarchicalSummaryRecord,
+    IndexLaneRecord,
     ManualGate,
     MillefeuilleContractError,
     NativeExtractionEvidenceRecord,
     OCREvidenceRecord,
     PaperCardRecord,
     ProviderPayloadDisposition,
+    RetrievalIndexRecord,
     RouteEvidenceRecord,
     RouteSelection,
     RunMode,
@@ -308,6 +310,48 @@ class TestOCREvidenceContract(unittest.TestCase):
             "../summaries/hierarchical-summary.json",
         )
         self.assertEqual(payload["model_provenance"]["profile_id"], "fixture-card")
+
+    def test_retrieval_index_record_serializes(self):
+        index_record = RetrievalIndexRecord(
+            paper_id="zotero-ITEM1",
+            run_id="run-fixture",
+            source_hash="sha256:" + ("a" * 64),
+            selected_fulltext_ref="../../../selected/fulltext.md",
+            summary_ref="../summaries/hierarchical-summary.json",
+            paper_card_ref="../cards/paper-card.json",
+            lanes=[
+                IndexLaneRecord(
+                    lane="openkb",
+                    status="skipped",
+                    skip_reason="fixture-only run",
+                ),
+                IndexLaneRecord(
+                    lane="pageindex",
+                    status="previewed",
+                    target={"service": "pageindex-local"},
+                    chunking_profile={"strategy": "section", "max_chars": 1200},
+                ),
+            ],
+            duplicate_scan={"status": "not-run", "reason": "fixture-only run"},
+        )
+
+        payload = index_record.to_dict()
+
+        self.assertEqual(
+            payload["schema_version"],
+            "millefeuille-retrieval-index-status/v0.1",
+        )
+        self.assertEqual(payload["paper_id"], "zotero-ITEM1")
+        self.assertEqual(payload["run_id"], "run-fixture")
+        self.assertEqual(
+            payload["selected_fulltext_ref"],
+            "../../../selected/fulltext.md",
+        )
+        self.assertEqual(payload["lanes"][0]["skip_reason"], "fixture-only run")
+        self.assertEqual(
+            payload["lanes"][1]["chunking_profile"]["strategy"],
+            "section",
+        )
 
     def test_attachment_identity_requires_sha256_shape(self):
         with self.assertRaises(MillefeuilleContractError):

@@ -1,15 +1,15 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-061-card-fixtures
+canonical_task: pr-062-index-fixtures
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
-  local_path: /tmp/millefeuille-pr61
+  local_path: /tmp/millefeuille-pr62
   base_branch: dev
-  working_branch: feat/pr-061-card-fixtures
+  working_branch: feat/pr-062-index-fixtures
 status:
-  phase: implementation
+  phase: in_review
   pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 215 passed, 0 failed
+    result: 219 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -58,11 +58,11 @@ surfaces:
   github_pull_request:
     enabled: true
     status: open
-    number: 61
-    url: https://github.com/fr-meyer/millefeuille/pull/61
+    number: 62
+    url: https://github.com/fr-meyer/millefeuille/pull/62
     base_branch: dev
-    head_branch: feat/pr-061-card-fixtures
-    head_sha: 3ed3470f03ee97c1d11d2360e44503d960bc5170
+    head_branch: feat/pr-062-index-fixtures
+    head_sha: 101e7a1a5159a6ee9c7403a3d9db68a337651111
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
@@ -94,13 +94,13 @@ gates:
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
 current_task:
-  id: pr-061-card-fixtures
-  title: Add card fixtures
+  id: pr-062-index-fixtures
+  title: Add index fixtures
   status: implementation
-  branch: feat/pr-061-card-fixtures
+  branch: feat/pr-062-index-fixtures
   base_branch: dev
-  task_file: .speculoos/tasks/pr-061-card-fixtures.yaml
-  started_from: 96717617811703d8327b1f4575aa000fd80b49c7
+  task_file: .speculoos/tasks/pr-062-index-fixtures.yaml
+  started_from: c81f0256b577b18145961a2b828163088bc7e094
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap

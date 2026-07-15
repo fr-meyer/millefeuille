@@ -1,0 +1,63 @@
+id: pr-062-index-fixtures
+title: Add index fixtures
+status: implementation
+branch: feat/pr-062-index-fixtures
+base_branch: dev
+github:
+  issue: null
+  pull_request: 62
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  head_sha: 101e7a1a5159a6ee9c7403a3d9db68a337651111
+post_merge_expected:
+  pull_request: 62
+  base_branch: dev
+  head_branch: feat/pr-062-index-fixtures
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - add offline retrieval/index fixture writers under verified source packs
+  - require index writes to match the source-pack manifest plus existing route, summary, and paper-card artifacts before writing any run-scoped index status
+  - materialize run-scoped retrieval/index status under analyses/millefeuille/<run-id>/index
+  - surface retrieval/index refs and lane statuses through source-pack artifact-root stage manifests and artifact indexes
+  - add CLI aliases, config wiring, and contract schemas for index fixture evidence paths
+  - keep the slice offline-only on top of merged dev after PR #61
+non_goals:
+  - live Zotero reads or writes, lifecycle tag mutation, or live PDF recovery
+  - OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, or live index writes
+  - acceptance synthesis, classification, or live tree extraction
+  - changing credential values or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - retrieval/index fixture evidence preflights against existing source-pack manifests, selected fulltext, hierarchical summaries, and paper cards before any write
+  - retrieval/index fixture writes emit run-scoped index status json under the analyses directory
+  - rerunning identical index fixture evidence is idempotent while drifted index artifacts fail loudly
+  - dry-run source-pack artifact-root runs mark index passed when verified retrieval/index status artifacts exist
+  - artifact indexes expose retrieval/index status refs and lane summaries for the staged fixture outputs
+  - index fixture flags require artifact_root=source-pack with an explicit source_pack_root
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, and Speculoos validate pass
+validation:
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models"
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/python -m unittest discover -v"
+  - "/home/node/.openclaw/repos/millefeuille/.venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-062-index-fixtures --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: "Fixture-first retrieval/index status only. No live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, live index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+documentation_impact:
+  status: none
+  rationale: Repo-local Speculoos PR-tracking metadata only after publication; the user-facing README and pipeline docs were already updated in the published PR packet.
+notes:
+  - "PR #61 merged to dev as c81f0256b577b18145961a2b828163088bc7e094; this branch starts from that exact dev head before PR #62 publication."
+evidence:
+  - "Branched from merged dev commit c81f0256b577b18145961a2b828163088bc7e094 after PR #61 merged."
+  - "Focused unit tests passed: tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models (66 tests)."
+  - "Full unittest discovery passed: 219 tests."
+  - 'PR #62 opened for pr-062-index-fixtures'
+  - 'PR #62 linked to Project item unavailable'
+  - "Published as PR #62 at https://github.com/fr-meyer/millefeuille/pull/62 with exact head 101e7a1a5159a6ee9c7403a3d9db68a337651111."
