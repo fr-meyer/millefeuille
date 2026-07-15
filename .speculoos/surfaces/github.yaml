@@ -19,12 +19,12 @@ current_task:
   status: In Progress
   branch: feat/pr-063-acceptance-classification-cli
   speculoos_task: .speculoos/tasks/pr-063-acceptance-classification-cli.yaml
-  pull_request: null
+  pull_request: 63
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
-  head_sha: null
-pull_request: null
+  head_sha: 43a4b280b39787fab40a9220d7b7eb16cd2249ea
+pull_request: 63
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36

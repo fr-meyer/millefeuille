@@ -5,14 +5,14 @@ branch: feat/pr-063-acceptance-classification-cli
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 63
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
-  head_sha: null
+  head_sha: 43a4b280b39787fab40a9220d7b7eb16cd2249ea
 post_merge_expected:
-  pull_request: null
+  pull_request: 63
   base_branch: dev
   head_branch: feat/pr-063-acceptance-classification-cli
   head_sha: merge-plan-exact-head
@@ -59,3 +59,4 @@ evidence:
   - "Focused offline unit tests passed: 71 tests."
   - "Full unittest discovery passed: 224 tests."
   - "Ruff, metadata parse, and git diff --check passed after reconstruction."
+  - 'PR #63 opened for pr-063-acceptance-classification-cli'
