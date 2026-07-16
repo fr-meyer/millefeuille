@@ -70,8 +70,7 @@ class IndexFixtureEvidence:
         )
         if schema_version != INDEX_FIXTURE_SCHEMA_VERSION:
             raise MillefeuilleContractError(
-                "unsupported index fixture evidence schema_version "
-                f"{schema_version!r}"
+                f"unsupported index fixture evidence schema_version {schema_version!r}"
             )
         index_status_path = Path(
             _required_string(
@@ -315,14 +314,12 @@ def _existing_index_status(
         return None
     if not index_status_output_path.is_file():
         raise MillefeuilleContractError(
-            "existing retrieval index status is not a file: "
-            f"{index_status_output_path}"
+            f"existing retrieval index status is not a file: {index_status_output_path}"
         )
     existing_payload = load_retrieval_index_status(index_status_output_path)
     if existing_payload != expected_payload:
         raise MillefeuilleContractError(
-            "existing retrieval index status drift for "
-            f"{index_status_output_path}"
+            f"existing retrieval index status drift for {index_status_output_path}"
         )
     return "existing"
 

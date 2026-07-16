@@ -1,13 +1,13 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-062-index-fixtures
+canonical_task: pr-063-acceptance-classification-cli
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
-  local_path: /tmp/millefeuille-pr62
+  local_path: /tmp/millefeuille-pr63
   base_branch: dev
-  working_branch: feat/pr-062-index-fixtures
+  working_branch: feat/pr-063-acceptance-classification-cli
 status:
   phase: in_review
   pret_a_coder: in_progress
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 219 passed, 0 failed
+    result: 224 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -58,11 +58,11 @@ surfaces:
   github_pull_request:
     enabled: true
     status: open
-    number: 62
-    url: https://github.com/fr-meyer/millefeuille/pull/62
+    number: null
+    url: null
     base_branch: dev
-    head_branch: feat/pr-062-index-fixtures
-    head_sha: 101e7a1a5159a6ee9c7403a3d9db68a337651111
+    head_branch: feat/pr-063-acceptance-classification-cli
+    head_sha: null
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
@@ -94,13 +94,13 @@ gates:
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
 current_task:
-  id: pr-062-index-fixtures
-  title: Add index fixtures
+  id: pr-063-acceptance-classification-cli
+  title: Add acceptance, classification, and stage CLI previews
   status: implementation
-  branch: feat/pr-062-index-fixtures
+  branch: feat/pr-063-acceptance-classification-cli
   base_branch: dev
-  task_file: .speculoos/tasks/pr-062-index-fixtures.yaml
-  started_from: c81f0256b577b18145961a2b828163088bc7e094
+  task_file: .speculoos/tasks/pr-063-acceptance-classification-cli.yaml
+  started_from: 16f904be6212ade3c0d8b19acd9d1ccc8b81bbf1
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -279,3 +279,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/55#pullrequestreview-4684962077
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86824278156
+    - id: pr-062-index-fixtures
+      status: merged
+      branch: feat/pr-062-index-fixtures
+      base_branch: dev
+      pull_request: 62
+      url: https://github.com/fr-meyer/millefeuille/pull/62
+      head_sha: b5cc4232cb119a41b95d3603fd373a4b94e72df7
+      merge_commit: 16f904be6212ade3c0d8b19acd9d1ccc8b81bbf1
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/62#pullrequestreview-4706544285
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87422246923

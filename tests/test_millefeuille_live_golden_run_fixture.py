@@ -67,12 +67,8 @@ class TestMillefeuilleLiveGoldenRunFixture(unittest.TestCase):
     def test_fixture_records_the_first_successful_live_lane(self):
         data = self.fixture
 
-        self.assertEqual(
-            data["schema_version"], "millefeuille-live-golden-run/v0.1"
-        )
-        self.assertEqual(
-            data["run_id"], "millefeuille-live-20260711-2345-kst"
-        )
+        self.assertEqual(data["schema_version"], "millefeuille-live-golden-run/v0.1")
+        self.assertEqual(data["run_id"], "millefeuille-live-20260711-2345-kst")
         self.assertEqual(data["captured_from"], "approved-live-run-aggregate")
         self.assertEqual(data["discovery"]["matched_items"], 1)
         self.assertEqual(data["discovery"]["attachments_total"], 2)
@@ -97,18 +93,14 @@ class TestMillefeuilleLiveGoldenRunFixture(unittest.TestCase):
             "openai/openkb-qwen",
         )
         self.assertEqual(openkb["local_proxy_smoke_status"], "passed")
-        self.assertIn(
-            "reproducibility-in-deep-learning", openkb["concepts_created"]
-        )
+        self.assertIn("reproducibility-in-deep-learning", openkb["concepts_created"])
         self.assertIn("random-seed-variance", openkb["concepts_created"])
 
     def test_writeback_plan_stays_explicit_and_gated(self):
         plan = self.fixture["zotero_writeback_plan"]
 
         self.assertEqual(plan["approval_status"], "approved-by-operator")
-        self.assertEqual(
-            plan["execution_status"], "blocked-missing-zotero-write-key"
-        )
+        self.assertEqual(plan["execution_status"], "blocked-missing-zotero-write-key")
         self.assertEqual(plan["required_credential"], "ZOTERO_WRITE_KEY")
         self.assertEqual(plan["remove_tags"], ["millefeuille"])
         self.assertIn("millefeuille-classified", plan["add_tags"])

@@ -60,9 +60,8 @@ def attachment_is_pdf(content_type: str | None, filename: str | None) -> bool:
     """Return True if an attachment should be treated as a PDF."""
     normalized_content_type = (content_type or "").lower()
     normalized_filename = (filename or "").lower()
-    return (
-        normalized_content_type == "application/pdf"
-        or normalized_filename.endswith(".pdf")
+    return normalized_content_type == "application/pdf" or normalized_filename.endswith(
+        ".pdf"
     )
 
 
@@ -212,9 +211,7 @@ def dry_run_command(
         logger.info(f"  Unmatched assignment keys: {len(unmatched_keys)}")
         if unmatched_keys:
             example_count = min(5, len(unmatched_keys))
-            logger.info(
-                f"  First {example_count} example(s): {unmatched_keys[:5]}"
-            )
+            logger.info(f"  First {example_count} example(s): {unmatched_keys[:5]}")
 
     if cfg.selection_tagging.enabled:
         logger.info("")
@@ -267,8 +264,7 @@ def dry_run_command(
             log_export_records(records, logger)
         if cfg.export.attachment_urls.write_manifest:
             logger.info(
-                "  [dry-run] Manifest write suppressed "
-                "(no writes in dry-run mode)"
+                "  [dry-run] Manifest write suppressed (no writes in dry-run mode)"
             )
 
     openkb_handoff_rows: list[OpenKBHandoffRow] = []
@@ -279,9 +275,7 @@ def dry_run_command(
         report = validate_openkb_handoff_rows(
             openkb_handoff_rows, mode="dry_run", source_items=items
         )
-        log_openkb_weak_verification_warnings(
-            logger, report.weak_verification_rows
-        )
+        log_openkb_weak_verification_warnings(logger, report.weak_verification_rows)
         if report.failures:
             for failure in report.failures:
                 logger.error(str(failure))
@@ -315,8 +309,7 @@ def dry_run_command(
             source_pack_root=artifact_cfg.source_pack_root,
         )
         logger.info(
-            "[DRY-RUN] Source-pack intake fixtures written: "
-            f"{len(intake_results)}"
+            f"[DRY-RUN] Source-pack intake fixtures written: {len(intake_results)}"
         )
         for result in intake_results:
             logger.info(
@@ -469,13 +462,11 @@ def dry_run_command(
             handoff_enabled=cfg.export.openkb_handoff.enabled,
         )
         logger.info(
-            "[DRY-RUN] Millefeuille artifact indexes written: "
-            f"{len(artifact_results)}"
+            f"[DRY-RUN] Millefeuille artifact indexes written: {len(artifact_results)}"
         )
         for result in artifact_results:
             logger.info(
-                "  - paper_id=%s run_id=%s artifact_index=%s "
-                "stage_manifest=%s",
+                "  - paper_id=%s run_id=%s artifact_index=%s stage_manifest=%s",
                 result.paper_id,
                 result.run_id,
                 result.artifact_index_path,
@@ -535,9 +526,7 @@ def _determine_exit_code(
         total_pdfs_downloaded = summary.get("total_pdfs_downloaded", 0)
         if not isinstance(total_pdfs_downloaded, int):
             total_pdfs_downloaded = 0
-        severities.append(
-            _failure_severity(total_pdfs_failed, total_pdfs_downloaded)
-        )
+        severities.append(_failure_severity(total_pdfs_failed, total_pdfs_downloaded))
 
     tag_adding_failed = summary.get("tag_adding_failed", 0)
     if not isinstance(tag_adding_failed, int):
@@ -546,9 +535,7 @@ def _determine_exit_code(
         tag_adding_succeeded = summary.get("tag_adding_succeeded", 0)
         if not isinstance(tag_adding_succeeded, int):
             tag_adding_succeeded = 0
-        severities.append(
-            _failure_severity(tag_adding_failed, tag_adding_succeeded)
-        )
+        severities.append(_failure_severity(tag_adding_failed, tag_adding_succeeded))
 
     st_item_failed = summary.get("selection_tagging_item_failed", 0)
     if not isinstance(st_item_failed, int):
@@ -787,9 +774,7 @@ def process_command(
 
     # Route to appropriate summary display based on mode
     if tag_adding_only:
-        _display_tag_adding_summary(
-            logger, summary.get("tag_adding_results", [])
-        )
+        _display_tag_adding_summary(logger, summary.get("tag_adding_results", []))
         no_key = summary.get("tag_adding_no_key", 0)
         logger.info(
             _format_with_emoji(
@@ -817,9 +802,7 @@ def process_command(
                 "[ELIGIBLE]",
             )
         )
-        _display_tag_adding_summary(
-            logger, summary.get("tag_adding_results", [])
-        )
+        _display_tag_adding_summary(logger, summary.get("tag_adding_results", []))
         no_key = summary.get("tag_adding_no_key", 0)
         logger.info(
             _format_with_emoji(
@@ -838,9 +821,7 @@ def process_command(
     elif download_and_ocr:
         _display_combined_summary(logger, summary)
         if cfg.tag_adding.enabled:
-            _display_tag_adding_summary(
-                logger, summary.get("tag_adding_results", [])
-            )
+            _display_tag_adding_summary(logger, summary.get("tag_adding_results", []))
             no_key = summary.get("tag_adding_no_key", 0)
             logger.info(
                 _format_with_emoji(
@@ -874,9 +855,7 @@ def process_command(
         log_error_summary(logger, results)
 
         if cfg.tag_adding.enabled:
-            _display_tag_adding_summary(
-                logger, summary.get("tag_adding_results", [])
-            )
+            _display_tag_adding_summary(logger, summary.get("tag_adding_results", []))
             no_key = summary.get("tag_adding_no_key", 0)
             logger.info(
                 _format_with_emoji(

@@ -52,17 +52,13 @@ class TestSanitizeHandoffRow(unittest.TestCase):
     def test_signed_url_access_token_param(self):
         with self.assertRaises(HandoffSecurityError):
             sanitize_handoff_row(
-                _row(
-                    zotero_file_url="https://example.com/file?access_token=abc"
-                )
+                _row(zotero_file_url="https://example.com/file?access_token=abc")
             )
 
     def test_signed_url_expires_param(self):
         with self.assertRaises(HandoffSecurityError):
             sanitize_handoff_row(
-                _row(
-                    zotero_file_url="https://example.com/file?expires=1234567890"
-                )
+                _row(zotero_file_url="https://example.com/file?expires=1234567890")
             )
 
     def test_signed_url_x_amz_param(self):
@@ -70,8 +66,7 @@ class TestSanitizeHandoffRow(unittest.TestCase):
             sanitize_handoff_row(
                 _row(
                     zotero_file_url=(
-                        "https://s3.amazonaws.com/bucket/file"
-                        "?X-Amz-Signature=abc"
+                        "https://s3.amazonaws.com/bucket/file?X-Amz-Signature=abc"
                     )
                 )
             )
@@ -104,9 +99,7 @@ class TestSanitizeHandoffRow(unittest.TestCase):
 
     def test_pdf_base64_data_uri(self):
         with self.assertRaises(HandoffSecurityError):
-            sanitize_handoff_row(
-                _row(note="data:application/pdf;base64,JVBERi...")
-            )
+            sanitize_handoff_row(_row(note="data:application/pdf;base64,JVBERi..."))
 
     def test_large_base64_blob(self):
         blob = "A" * 600
@@ -119,9 +112,7 @@ class TestSanitizeHandoffRow(unittest.TestCase):
 
     def test_nested_field_checked(self):
         with self.assertRaises(HandoffSecurityError):
-            sanitize_handoff_row(
-                _row(recovery={"method": "Bearer eyJhbGci..."})
-            )
+            sanitize_handoff_row(_row(recovery={"method": "Bearer eyJhbGci..."}))
 
     def test_relative_url_with_sensitive_param(self):
         with self.assertRaises(HandoffSecurityError):

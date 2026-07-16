@@ -212,9 +212,7 @@ class TestDryRunPreview(unittest.TestCase):
         mock_zotero_client.remove_tag.assert_not_called()
         mock_build_export.assert_called_once()
 
-        info_messages = [
-            str(c.args[0]) for c in logger.info.call_args_list if c.args
-        ]
+        info_messages = [str(c.args[0]) for c in logger.info.call_args_list if c.args]
         joined = " ".join(info_messages)
         self.assertNotIn("On success", joined)
         self.assertNotIn("On failure", joined)
@@ -279,9 +277,7 @@ class TestDryRunManifestSuppression(unittest.TestCase):
         mock_write_manifest.assert_not_called()
         mock_log_export_records.assert_called_once()
 
-        info_messages = [
-            str(c.args[0]) for c in logger.info.call_args_list if c.args
-        ]
+        info_messages = [str(c.args[0]) for c in logger.info.call_args_list if c.args]
         self.assertTrue(
             any("[dry-run] Manifest write suppressed" in msg for msg in info_messages),
             (
@@ -322,9 +318,7 @@ class TestCombinedDryRunPreview(unittest.TestCase):
         mock_zotero_client.add_tag.assert_not_called()
         mock_zotero_client.remove_tag.assert_not_called()
 
-        info_messages = [
-            str(c.args[0]) for c in logger.info.call_args_list if c.args
-        ]
+        info_messages = [str(c.args[0]) for c in logger.info.call_args_list if c.args]
         joined = " ".join(info_messages)
         # Selection-tagging preview must be present
         self.assertIn("Selection Tagging Preview", joined)
@@ -570,9 +564,7 @@ class TestLiveSelectionTaggingExportLogOrder(unittest.TestCase):
 
         process_command(cfg, logger, mock_zotero_client, None)
 
-        info_messages = [
-            str(c.args[0]) for c in logger.info.call_args_list if c.args
-        ]
+        info_messages = [str(c.args[0]) for c in logger.info.call_args_list if c.args]
         summary_count = sum(
             1 for msg in info_messages if "Selection Tagging Summary" in msg
         )
@@ -693,9 +685,7 @@ class TestLiveExportRunsAfterSelectionTagging(unittest.TestCase):
             patch.object(
                 pipeline, "_discover_items", return_value=([item], discovery_stats)
             ),
-            patch.object(
-                pipeline, "_apply_selection_tagging", side_effect=track_apply
-            ),
+            patch.object(pipeline, "_apply_selection_tagging", side_effect=track_apply),
             patch(
                 "millefeuille.orchestration.pipeline.build_export_records",
                 side_effect=track_export,
@@ -807,9 +797,7 @@ class TestProcessCommandSummaryOrdering(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_display_selection.assert_called_once()
         mock_display_download.assert_called_once()
-        self.assertEqual(
-            call_order, ["selection_tagging", "download"]
-        )
+        self.assertEqual(call_order, ["selection_tagging", "download"])
 
 
 if __name__ == "__main__":

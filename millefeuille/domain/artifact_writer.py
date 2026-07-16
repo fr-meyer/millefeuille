@@ -169,12 +169,8 @@ def write_dry_run_artifacts(
             source_pack_ref=run_context.source_pack_ref,
             source_pack_manifest_ref=run_context.source_pack_manifest_ref,
             source_pack_hash=run_context.source_pack_hash,
-            native_extraction_evidence_ref=(
-                run_context.native_extraction_evidence_ref
-            ),
-            native_extraction_markdown_ref=(
-                run_context.native_extraction_markdown_ref
-            ),
+            native_extraction_evidence_ref=(run_context.native_extraction_evidence_ref),
+            native_extraction_markdown_ref=(run_context.native_extraction_markdown_ref),
             ocr_extraction_evidence_ref=run_context.ocr_extraction_evidence_ref,
             ocr_extraction_markdown_ref=run_context.ocr_extraction_markdown_ref,
             route_evidence_ref=run_context.route_evidence_ref,
@@ -329,9 +325,7 @@ def build_dry_run_stage_manifest(
             name=StageName.HANDOFF,
             status=StageStatus.PASSED if has_pdf else StageStatus.SKIPPED,
             inputs=[f"zotero:item:{item.key}"],
-            outputs=["openkb-millefeuille-handoff-preview"]
-            if has_pdf
-            else [],
+            outputs=["openkb-millefeuille-handoff-preview"] if has_pdf else [],
             notes=[
                 f"{len(rows)} PDF handoff row(s) available for preview"
                 if has_pdf
@@ -407,9 +401,7 @@ def build_dry_run_stage_manifest(
         StageName.CLASSIFY,
     ):
         stage_status = (
-            StageStatus.NOT_STARTED
-            if downstream_has_source
-            else StageStatus.SKIPPED
+            StageStatus.NOT_STARTED if downstream_has_source else StageStatus.SKIPPED
         )
         stage_outputs: list[str] = []
         stage_notes = (
@@ -742,9 +734,7 @@ def _resolve_extraction_ref(
         raise ValueError(f"incomplete {stage} fixture under {evidence_path.parent}")
     payload = loader(evidence_path)
     if payload["source_hash"] != expected_source_hash:
-        raise ValueError(
-            f"{stage} evidence source_hash drift at {evidence_path}"
-        )
+        raise ValueError(f"{stage} evidence source_hash drift at {evidence_path}")
     return (
         _relative_ref(evidence_path, run_dir),
         _relative_ref(markdown_path, run_dir),
@@ -763,13 +753,9 @@ def _resolve_structure_ref(
     if not evidence_exists and not outline_exists:
         return None, None
     if not evidence_path.is_file():
-        raise ValueError(
-            f"incomplete structure fixture under {evidence_path.parent}"
-        )
+        raise ValueError(f"incomplete structure fixture under {evidence_path.parent}")
     if outline_exists and not outline_path.is_file():
-        raise ValueError(
-            f"incomplete structure fixture under {evidence_path.parent}"
-        )
+        raise ValueError(f"incomplete structure fixture under {evidence_path.parent}")
     payload = load_structure_sidecar(evidence_path)
     if payload["source_hash"] != expected_source_hash:
         raise ValueError(f"structure evidence source_hash drift at {evidence_path}")
@@ -803,9 +789,7 @@ def _resolve_summary_refs(
         text_ref = str(summary["text_ref"])
         text_path = summary_path.parent / text_ref
         if not text_path.is_file():
-            raise ValueError(
-                f"incomplete summary fixture under {summary_path.parent}"
-            )
+            raise ValueError(f"incomplete summary fixture under {summary_path.parent}")
     return {
         "summary_artifact_ref": _relative_ref(summary_path, run_dir),
         "summary_text_dir_ref": _relative_ref(summary_text_dir, run_dir),
@@ -857,8 +841,7 @@ def _resolve_index_refs(
         }
     if not index_status_path.is_file():
         raise ValueError(
-            "incomplete retrieval index fixture under "
-            f"{index_status_path.parent}"
+            f"incomplete retrieval index fixture under {index_status_path.parent}"
         )
     payload = load_retrieval_index_status(index_status_path)
     if payload["paper_id"] != paper_id:
@@ -881,9 +864,7 @@ def _resolve_index_refs(
     if payload["summary_ref"] != expected_summary_ref:
         raise ValueError(f"retrieval index summary_ref drift at {index_status_path}")
     if payload["paper_card_ref"] != expected_card_ref:
-        raise ValueError(
-            f"retrieval index paper_card_ref drift at {index_status_path}"
-        )
+        raise ValueError(f"retrieval index paper_card_ref drift at {index_status_path}")
     for ref_name in ("selected_fulltext_ref", "summary_ref", "paper_card_ref"):
         ref = str(payload[ref_name])
         if not (index_dir / ref).is_file():

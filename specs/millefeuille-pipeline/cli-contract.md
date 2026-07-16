@@ -1,25 +1,72 @@
 # CLI Contract
 
-The future CLI should make each Millefeuille stage explicit. Existing Hydra
-flags can stay supported, but operator-facing commands should make live
-boundaries, artifact locations, model profiles, and Zotero writeback harder to
-cross accidentally.
+The CLI now exposes preview/read-only stage commands for `extract-native`,
+`extract-ocr`, `route`, `structure`, `summarize`, `card`, `index`,
+`acceptance`, `classify`, `writeback`, `retrieve`, `models`, and `run`,
+alongside the older `artifacts`, `status`, and `source-pack` helpers. The
+remaining command-surface goal is to make discovery, handoff, recovery,
+source-pack intake, OpenKB addition, and approved-live execution equally
+explicit without weakening their manual gates.
 
 ## Global Options
 
-Every command that reads or writes derived artifacts should accept:
+Implemented stage-command controls are:
 
 - `--mode preview|read-only-live|approved-live`
-- `--artifact-root source-pack|<path>`
-- `--source-pack-root <path>` when `--artifact-root source-pack` should resolve
-  against a non-default source-pack base directory
+- `--source-pack-root <path>` plus `--paper-id|--item-key` and `--run-id`
 - `--model-profile <profile-id-or-file>` for model-using stages
-- `--run-id <id>` for resumable runs
-- `--stage-manifest <path>` when resuming or inspecting a prior run
 - `--writeback none|preview|approved-live` for commands that can affect Zotero
+- `run --resume`, which skips only passed stages after their expected outputs
+  and paper/run/source identity revalidate
 
-The CLI should record the resolved artifact-root, model profile, and approval
-state in the stage manifest and artifact index.
+Arbitrary `--artifact-root <path>` selection and an explicit
+`--stage-manifest <path>` override remain contract work. The current stage
+surface deliberately resolves the canonical run directory from the verified
+source-pack root and rejects cross-wired manifest/index identity before any
+derived artifact write.
+
+## Current Preview Surface
+
+- `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
+  and `index`
+  - Implemented as fixture-only, single-paper stage adapters over existing
+    verified source-pack writers.
+  - Update the run-scoped stage manifest and artifact index after each write.
+  - Preflight identity and refuse drift; `extract-ocr`, `summarize`, `card`,
+    and `index` do not call providers or live stores in this mode.
+
+- `acceptance`
+  - Implemented for verified source-pack runs.
+  - Requires explicit handoff evidence plus an existing run-scoped artifact
+    package.
+  - Writes `reports/acceptance-summary.json` and updates the stage manifest and
+    artifact index.
+
+- `classify`
+  - Implemented for accepted runs from explicit local evidence.
+  - Writes classification plan/decision artifacts plus a Zotero writeback
+    preview without model/provider calls.
+
+- `writeback`
+  - Implemented in preview mode only.
+  - Materializes a governed Zotero writeback plan and optional preview note.
+
+- `retrieve`
+  - Implemented as a read-only ref resolver over an existing artifact package.
+  - Returns summary, card, index, acceptance, classification, and writeback
+    refs instead of private paper content.
+
+- `models`
+  - Implemented as a bundled profile lister for preview and planning use.
+
+- `run`
+  - Implements the canonical preview chain from `extract-native` and
+    `extract-ocr` through `acceptance`, `classify`, and `writeback`, with
+    optional local release preflight.
+  - Preflights stage order and required evidence before writing, rejects
+    duplicate/out-of-order stages, and supports output-revalidating resume.
+  - Does not orchestrate discovery, handoff, recovery, source-pack intake, or
+    approved-live stages.
 
 ## Command Groups
 
@@ -108,26 +155,29 @@ state in the stage manifest and artifact index.
     duplicate/collision evidence, skip reasons, and result refs.
 
 - `retrieve`
-  - Query a paper package or corpus by paper id, Zotero key, DOI, title,
-    section, page, summary scope, or classification evidence need.
-  - Return artifact refs by default instead of dumping full private text.
+  - Current preview implementation queries a verified paper package by paper
+    id or item key, plus summary/index filters, and returns artifact refs.
+  - Future expansion should support corpus lookup by DOI, title, section, page,
+    or broader classification evidence need.
 
 - `acceptance`
-  - Join handoff, skip, source-pack, extraction, structure, summary, card,
-    OpenKB, index, duplicate-scan, and writeback-preview evidence.
-  - Emit `openkb-millefeuille-acceptance-summary/v0.1` plus the artifact-index
-    completion verdict.
+  - Current preview implementation joins handoff, source-pack, extraction,
+    route, structure, summary, card, index, and duplicate-scan evidence.
+  - Future expansion should add broader skip/OpenKB/live-state joins and
+    approval-aware waivers.
 
 - `classify`
-  - Start only after acceptance evidence is complete or explicitly waived.
-  - Run `single`, `batch`, `review`, `adjudicate`, or optional `multi-agent`
-    mode against a locked taxonomy version.
-  - Emit evidence-backed decision records before any Zotero mutation.
+  - Current preview implementation starts only after acceptance evidence is
+    complete and emits evidence-backed decision records before any Zotero
+    mutation.
+  - Future expansion should cover richer batch/review/adjudicate routing and
+    optional `multi-agent` execution.
 
 - `writeback`
-  - Apply verified Zotero lifecycle tags, compact notes, or collection updates.
-  - Default to preview.
-  - Require explicit approval and `ZOTERO_WRITE_KEY` for live mutation.
+  - Current implementation is preview-only and writes governed plans rather
+    than mutating Zotero.
+  - Future approved-live mutation still requires explicit approval and
+    `ZOTERO_WRITE_KEY`.
 
 - `models`
   - List, validate, and explain available model profiles for each model-using
@@ -142,19 +192,33 @@ state in the stage manifest and artifact index.
     index state.
 
 - `run`
-  - Execute a staged pipeline with explicit stage selection, artifact-root,
-    model profile, writeback mode, and approval gates.
+  - Current implementation sequences the fixture-only extraction, route,
+    structure, summary, card, and index stages followed by preview
+    `acceptance`, `classify`, and `writeback`.
+  - `--resume` revalidates before skipping; idempotent reruns preserve the
+    artifact package byte-for-byte for identical evidence.
+  - Future expansion should add discovery/source-pack/OpenKB and approved-live
+    execution with explicit artifact-root and approval-token gates.
 
 ## Example
 
 ```bash
 millefeuille run \
-  --from-zotero-tag millefeuille-test \
-  --stages discover,handoff,recover,source-pack,extract-native,extract-ocr,route,structure,summarize,card,index,acceptance \
-  --artifact-root source-pack \
-  --model-profile research-default \
-  --mode approved-live \
-  --writeback preview
+  --source-pack-root /path/to/source-packs \
+  --paper-id zotero-ITEM1 \
+  --run-id run-fixture \
+  --stages extract-native,extract-ocr,route,structure,summarize,card,index,acceptance,classify,writeback \
+  --native-extraction-evidence /path/to/native-evidence.json \
+  --ocr-extraction-evidence /path/to/ocr-evidence.json \
+  --route-selection-evidence /path/to/route-evidence.json \
+  --structure-evidence /path/to/structure-evidence.json \
+  --summary-evidence /path/to/summary-evidence.json \
+  --card-evidence /path/to/card-evidence.json \
+  --index-evidence /path/to/index-evidence.json \
+  --handoff /path/to/handoff.jsonl \
+  --classification-evidence /path/to/classification-evidence.json \
+  --writeback preview \
+  --release-preflight
 ```
 
 ## Run Modes
@@ -176,6 +240,8 @@ millefeuille run \
     files.
   - Used for PDF recovery, OCR calls, model calls, source-pack writes, OpenKB
     writes, index writes, Zotero writes, and release actions.
+  - The current stage-oriented preview CLI stops with exit code `3`; it does
+    not implement approved-live execution.
 
 ## Exit Rules
 

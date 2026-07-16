@@ -58,9 +58,7 @@ class StructureFixtureEvidence:
             raise MillefeuilleContractError("page_count must be non-negative")
         for field_name in ("sections", "tables", "figures", "references"):
             if getattr(self, field_name) < 0:
-                raise MillefeuilleContractError(
-                    f"{field_name} must be non-negative"
-                )
+                raise MillefeuilleContractError(f"{field_name} must be non-negative")
         if self.locators is not None and self.locators < 0:
             raise MillefeuilleContractError("locators must be non-negative")
         object.__setattr__(self, "structure_path", Path(self.structure_path))
@@ -92,8 +90,7 @@ class StructureFixtureEvidence:
         )
         if schema_version != STRUCTURE_EVIDENCE_SCHEMA_VERSION:
             raise MillefeuilleContractError(
-                "unsupported structure evidence schema_version "
-                f"{schema_version!r}"
+                f"unsupported structure evidence schema_version {schema_version!r}"
             )
         structure_path = Path(
             _required_string(

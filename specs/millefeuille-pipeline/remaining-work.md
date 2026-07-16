@@ -15,6 +15,13 @@
   artifact-root control, model profiles, hierarchical summaries, paper cards,
   retrieval/index lanes, CLI-owned classification orchestration, and Zotero
   writeback separation.
+- PR #62 adds offline retrieval/index fixture writers plus source-pack
+  artifact-index exposure.
+- PR #63 adds offline acceptance synthesis, classification and writeback
+  previews, fixture-stage commands from extraction through index, resumable
+  canonical `run` orchestration, identity/drift guards, read-only retrieval,
+  model-profile listing, and local release-candidate preflight artifacts on
+  top of merged PR #62.
 - Current integration branch is `dev`; stable branch is `main`.
 - Current package version is `0.4.0`.
 
@@ -25,6 +32,9 @@
      contract, artifact storage, model profile, paper-card, summary,
      retrieval/index, classification, and release/version policy.
    - Add fixture-only tests and parse checks.
+   - Current PR #63 coverage includes full-chain preview, revalidated resume,
+     idempotent rerun, metadata drift, failure isolation, and manual-gate exit
+     behavior.
    - Manual gate: none while changes stay local/offline.
 
 2. **Feature PR To `dev`**
@@ -96,34 +106,39 @@
       duplicate scan against live local state.
 
 13. **Acceptance**
-    - Join handoff, recovery, source-pack, extraction, route, structure,
-      summary, paper card, index, duplicate-scan, and writeback-preview
-      evidence.
-    - Emit `openkb-millefeuille-acceptance-summary/v0.1` and artifact-index
-      completion verdicts.
+    - Offline preview implementation now exists via `millefeuille acceptance`.
+    - It joins handoff, source-pack, extraction, route, structure, summary,
+      paper card, index, and duplicate-scan evidence into
+      `openkb-millefeuille-acceptance-summary/v0.1`, then updates the
+      run-scoped stage manifest and artifact index.
+    - Remaining work: batch acceptance, live OpenKB/source-pack/index
+      reconciliation, and any approval-aware waivers.
     - Manual gate: none for offline fixture acceptance; live index/source-pack
       state checks require their applicable approvals.
 
 14. **Classification**
-    - Start only after the paper evidence package is complete or a reduced
-      pipeline waiver is recorded.
-    - Use the taxonomy and evidence-first classification workflow through
-      CLI-owned `single`, `batch`, `review`, `adjudicate`, or optional
-      `multi-agent` modes.
-    - Emit decision records, rejected alternatives, QA/adjudication queues, and
-      Zotero writeback previews.
+    - Offline preview implementation now exists via `millefeuille classify`.
+    - It starts only after acceptance passes and emits classification plans,
+      decision records, rejected alternatives, adjudication queues, and Zotero
+      writeback previews from explicit local evidence.
+    - Remaining work: live model-backed classification, larger batch routing,
+      worker-agent execution, and taxonomy-gap automation beyond preview
+      artifacts.
     - Manual gate: model/provider calls and worker-agent execution when used.
 
 15. **Zotero Writeback**
-    - Apply verified lifecycle tags, compact notes, or collection moves only
-      after preview and approval.
-    - Keep Zotero state secondary to manifests and artifact indexes.
+    - Offline preview implementation now exists via `millefeuille writeback`.
+    - It materializes governed tag/note/collection plans without mutating
+      Zotero and records preview state in the artifact index.
+    - Remaining work: approved-live execution, failure handling against real
+      Zotero state, and policy-specific note/tag mutation safeguards.
     - Manual gate: Zotero write credentials and explicit approval.
 
 16. **Release Candidate**
-    - Stabilize `dev` with offline and approved live evidence.
-    - Prepare version bump and changelog/release notes.
-    - Open `dev` to `main` promotion PR.
+    - Local preview artifacts now exist via `millefeuille run --release-preflight`
+      and `release-candidate-preflight.md`.
+    - Remaining work: stabilize `dev` with approved live evidence, commit any
+      version bump/changelog, and open the `dev` to `main` promotion PR.
     - Manual gate: stable-branch promotion.
 
 17. **Tag And Package Publication**

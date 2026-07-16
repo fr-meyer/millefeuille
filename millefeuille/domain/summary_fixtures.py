@@ -202,9 +202,7 @@ def write_summaries_from_evidence(
     resolved_run_id = _required_string(run_id, "run_id")
     records = load_summary_fixture_evidence_batch(evidence_path)
     _reject_duplicate_records(records)
-    planned = [
-        _plan_summary(record, root, resolved_run_id) for record in records
-    ]
+    planned = [_plan_summary(record, root, resolved_run_id) for record in records]
     return [_apply_planned_summary_write(plan) for plan in planned]
 
 
@@ -353,9 +351,7 @@ def _existing_summary_status(
             f"existing hierarchical summary drift: {summary_output_path}"
         )
     existing_text_paths = {
-        path
-        for path in summary_text_dir.glob("*.md")
-        if path.is_file()
+        path for path in summary_text_dir.glob("*.md") if path.is_file()
     }
     if existing_text_paths != set(expected_texts):
         raise MillefeuilleContractError(
@@ -369,9 +365,7 @@ def _existing_summary_status(
                 f"could not read existing summary text {text_path}: {exc}"
             ) from exc
         if existing_text != expected_text:
-            raise MillefeuilleContractError(
-                f"existing summary text drift: {text_path}"
-            )
+            raise MillefeuilleContractError(f"existing summary text drift: {text_path}")
     return "existing"
 
 
@@ -497,9 +491,7 @@ def _read_fixture_text(path: Path, *, kind: str) -> str:
     try:
         return path.read_text(encoding="utf-8")
     except OSError as exc:
-        raise MillefeuilleContractError(
-            f"could not read {kind} {path}: {exc}"
-        ) from exc
+        raise MillefeuilleContractError(f"could not read {kind} {path}: {exc}") from exc
 
 
 def _load_json_object(path: str | Path, kind: str) -> dict[str, Any]:

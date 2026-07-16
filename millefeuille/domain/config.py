@@ -91,9 +91,7 @@ class TaggingConfig:
     def __post_init__(self) -> None:
         """Validate and normalize tagging configuration."""
         if not self.selection.include.values:
-            raise ConfigError(
-                "tagging.selection.include.values cannot be empty"
-            )
+            raise ConfigError("tagging.selection.include.values cannot be empty")
 
         if self.selection.include.operator not in {"and", "or"}:
             raise ConfigError(
@@ -187,9 +185,7 @@ def _validate_tag_values(values: list[object], field_name: str) -> None:
     """Validate that tag values are strings and not empty after trimming."""
     for v in values:
         if not isinstance(v, str):
-            raise ConfigError(
-                f"{field_name} contains a non-string tag value: {v!r}"
-            )
+            raise ConfigError(f"{field_name} contains a non-string tag value: {v!r}")
         if not v.strip():
             raise ConfigError(
                 f"{field_name} contains a whitespace-only or empty tag: {v!r}"
@@ -202,9 +198,7 @@ def _strip_dedup(values: list[object], field_name: str) -> list[str]:
     result: list[str] = []
     for v in values:
         if not isinstance(v, str):
-            raise ConfigError(
-                f"{field_name} contains a non-string tag value: {v!r}"
-            )
+            raise ConfigError(f"{field_name} contains a non-string tag value: {v!r}")
         stripped = v.strip()
         if stripped and stripped not in seen:
             seen.add(stripped)
@@ -753,54 +747,56 @@ class ArtifactExportConfig:
             )
         if self.source_pack_root is not None and not str(self.source_pack_root).strip():
             raise ConfigError("export.artifacts.source_pack_root cannot be empty")
-        if self.source_pack_intake_evidence_path is not None and not str(
-            self.source_pack_intake_evidence_path
-        ).strip():
+        if (
+            self.source_pack_intake_evidence_path is not None
+            and not str(self.source_pack_intake_evidence_path).strip()
+        ):
             raise ConfigError(
                 "export.artifacts.source_pack_intake_evidence_path cannot be empty"
             )
-        if self.native_extraction_evidence_path is not None and not str(
-            self.native_extraction_evidence_path
-        ).strip():
+        if (
+            self.native_extraction_evidence_path is not None
+            and not str(self.native_extraction_evidence_path).strip()
+        ):
             raise ConfigError(
                 "export.artifacts.native_extraction_evidence_path cannot be empty"
             )
-        if self.ocr_extraction_evidence_path is not None and not str(
-            self.ocr_extraction_evidence_path
-        ).strip():
+        if (
+            self.ocr_extraction_evidence_path is not None
+            and not str(self.ocr_extraction_evidence_path).strip()
+        ):
             raise ConfigError(
                 "export.artifacts.ocr_extraction_evidence_path cannot be empty"
             )
-        if self.route_selection_evidence_path is not None and not str(
-            self.route_selection_evidence_path
-        ).strip():
+        if (
+            self.route_selection_evidence_path is not None
+            and not str(self.route_selection_evidence_path).strip()
+        ):
             raise ConfigError(
                 "export.artifacts.route_selection_evidence_path cannot be empty"
             )
-        if self.structure_evidence_path is not None and not str(
-            self.structure_evidence_path
-        ).strip():
+        if (
+            self.structure_evidence_path is not None
+            and not str(self.structure_evidence_path).strip()
+        ):
             raise ConfigError(
                 "export.artifacts.structure_evidence_path cannot be empty"
             )
-        if self.summary_evidence_path is not None and not str(
-            self.summary_evidence_path
-        ).strip():
-            raise ConfigError(
-                "export.artifacts.summary_evidence_path cannot be empty"
-            )
-        if self.card_evidence_path is not None and not str(
-            self.card_evidence_path
-        ).strip():
-            raise ConfigError(
-                "export.artifacts.card_evidence_path cannot be empty"
-            )
-        if self.index_evidence_path is not None and not str(
-            self.index_evidence_path
-        ).strip():
-            raise ConfigError(
-                "export.artifacts.index_evidence_path cannot be empty"
-            )
+        if (
+            self.summary_evidence_path is not None
+            and not str(self.summary_evidence_path).strip()
+        ):
+            raise ConfigError("export.artifacts.summary_evidence_path cannot be empty")
+        if (
+            self.card_evidence_path is not None
+            and not str(self.card_evidence_path).strip()
+        ):
+            raise ConfigError("export.artifacts.card_evidence_path cannot be empty")
+        if (
+            self.index_evidence_path is not None
+            and not str(self.index_evidence_path).strip()
+        ):
+            raise ConfigError("export.artifacts.index_evidence_path cannot be empty")
         if self.run_id is not None and not str(self.run_id).strip():
             raise ConfigError("export.artifacts.run_id cannot be empty")
 

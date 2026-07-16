@@ -5,7 +5,14 @@ from pathlib import Path
 import unittest
 
 from millefeuille.domain.millefeuille import (
+    AcceptanceCheckRecord,
+    AcceptanceStatus,
+    AcceptanceSummaryRecord,
     AttachmentEvidenceIdentity,
+    ClassificationDecisionRecord,
+    ClassificationMode,
+    ClassificationPlanRecord,
+    ClassificationStatus,
     HierarchicalSummaryRecord,
     IndexLaneRecord,
     ManualGate,
@@ -14,6 +21,8 @@ from millefeuille.domain.millefeuille import (
     OCREvidenceRecord,
     PaperCardRecord,
     ProviderPayloadDisposition,
+    RejectedAlternativeRecord,
+    ReleaseCandidatePreflightRecord,
     RetrievalIndexRecord,
     RouteEvidenceRecord,
     RouteSelection,
@@ -27,6 +36,7 @@ from millefeuille.domain.millefeuille import (
     SummaryGrain,
     SummaryScope,
     TagState,
+    ZoteroWritebackPlanRecord,
     can_transition_tag,
 )
 
@@ -64,9 +74,7 @@ class TestStageManifestContractModels(unittest.TestCase):
 
         payload = manifest.to_dict()
 
-        self.assertEqual(
-            payload["schema_version"], "millefeuille-stage-manifest/v0.1"
-        )
+        self.assertEqual(payload["schema_version"], "millefeuille-stage-manifest/v0.1")
         self.assertEqual(payload["source_type"], "zotero")
         self.assertEqual(payload["mode"], "preview")
         self.assertEqual(payload["manual_gates"], ["pdf_recovery"])
@@ -103,9 +111,7 @@ class TestStageManifestContractModels(unittest.TestCase):
 
 class TestTagStateContract(unittest.TestCase):
     def test_allowed_forward_transitions(self):
-        self.assertTrue(
-            can_transition_tag(TagState.SELECTED, TagState.PREVIEWED)
-        )
+        self.assertTrue(can_transition_tag(TagState.SELECTED, TagState.PREVIEWED))
         self.assertTrue(
             can_transition_tag(
                 TagState.ACCEPTANCE_PASSED,
@@ -121,9 +127,7 @@ class TestTagStateContract(unittest.TestCase):
         self.assertTrue(can_transition_tag(TagState.CARD_READY, TagState.INDEXED))
 
     def test_classification_before_acceptance_is_not_allowed(self):
-        self.assertFalse(
-            can_transition_tag(TagState.OPENKB_ADDED, TagState.CLASSIFIED)
-        )
+        self.assertFalse(can_transition_tag(TagState.OPENKB_ADDED, TagState.CLASSIFIED))
 
     def test_review_and_error_are_allowed_from_any_state(self):
         self.assertTrue(can_transition_tag(TagState.SELECTED, TagState.ERROR))
@@ -361,6 +365,90 @@ class TestOCREvidenceContract(unittest.TestCase):
                 canonical_filename="Redacted.pdf",
                 sha256="short",
             )
+
+    def test_acceptance_summary_record_serializes(self):
+        summary = AcceptanceSummaryRecord(
+            paper_id="zotero-ITEM1",
+            run_id="run-fixture",
+            source_hash="sha256:" + ("a" * 64),
+            source_pack_ref="../../..",
+            status=AcceptanceStatus.PASS,
+            counts={"handoff_rows": 1, "summary": 1},
+            checks=[
+                AcceptanceCheckRecord(
+                    name="handoff",
+                    status="passed",
+                    refs=["../../handoff.jsonl"],
+                ),
+                AcceptanceCheckRecord(
+                    name="summarize",
+                    status="passed",
+                    refs=["summaries/hierarchical-summary.json"],
+                ),
+            ],
+        )
+
+        payload = summary.to_dict()
+
+        self.assertEqual(
+            payload["schema_version"],
+            "openkb-millefeuille-acceptance-summary/v0.1",
+        )
+        self.assertEqual(payload["status"], "pass")
+        self.assertEqual(payload["checks"][0]["name"], "handoff")
+
+    def test_classification_and_writeback_records_serialize(self):
+        decision = ClassificationDecisionRecord(
+            paper_id="zotero-ITEM1",
+            run_id="run-fixture",
+            source_hash="sha256:" + ("a" * 64),
+            taxonomy_version="taxonomy-v1",
+            mode=ClassificationMode.SINGLE,
+            status=ClassificationStatus.CLASSIFIED,
+            primary_path="Methods > Optimization",
+            confidence="high",
+            evidence_refs=["summaries/hierarchical-summary.json"],
+            rejected_alternatives=[
+                RejectedAlternativeRecord(
+                    path="Applications > Vision",
+                    reason="method-first contribution",
+                )
+            ],
+            writeback_preview_ref="classification/zotero-writeback-preview.json",
+        )
+        plan = ClassificationPlanRecord(
+            run_id="run-fixture",
+            taxonomy_version="taxonomy-v1",
+            mode="single",
+            papers=[
+                {
+                    "paper_id": "zotero-ITEM1",
+                    "decision_ref": "classification/decision-records/zotero-ITEM1.json",
+                }
+            ],
+            default_profile="research-default",
+        )
+        writeback = ZoteroWritebackPlanRecord(
+            paper_id="zotero-ITEM1",
+            run_id="run-fixture",
+            source_hash="sha256:" + ("a" * 64),
+            mode="preview",
+            status="previewed",
+            add_tags=["millefeuille-classified"],
+            remove_tags=["millefeuille"],
+        )
+        preflight = ReleaseCandidatePreflightRecord(
+            current_version="0.4.0",
+            candidate_version="0.5.0-rc1",
+            completed_stages=["acceptance", "classify", "writeback"],
+            manual_gates_remaining=["release_tag", "package_publication"],
+            readiness="ready-for-rc-review",
+        )
+
+        self.assertEqual(decision.to_dict()["mode"], "single")
+        self.assertEqual(plan.to_dict()["default_profile"], "research-default")
+        self.assertEqual(writeback.to_dict()["status"], "previewed")
+        self.assertEqual(preflight.to_dict()["readiness"], "ready-for-rc-review")
 
 
 if __name__ == "__main__":

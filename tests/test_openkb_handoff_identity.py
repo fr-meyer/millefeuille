@@ -74,9 +74,7 @@ def _make_config(**overrides):
 
 def _build_rows(attachment, **item_kwargs):
     item = _make_item(attachments=[attachment], **item_kwargs)
-    return build_openkb_handoff_rows(
-        [item], _make_zotero_client(), _make_config()
-    )
+    return build_openkb_handoff_rows([item], _make_zotero_client(), _make_config())
 
 
 def _make_valid_row(**overrides):
@@ -113,53 +111,39 @@ class TestBuildOpenkbHandoffRows(unittest.TestCase):
     def test_valid_attachment_produces_row(self):
         attachment = _make_attachment()
         item = _make_item(attachments=[attachment])
-        rows = build_openkb_handoff_rows(
-            [item], _make_zotero_client(), _make_config()
-        )
+        rows = build_openkb_handoff_rows([item], _make_zotero_client(), _make_config())
         self.assertEqual(len(rows), 1)
         self.assertIsInstance(rows[0], OpenKBHandoffRow)
         self.assertTrue(rows[0].is_pdf)
 
     def test_non_pdf_attachment_skipped(self):
-        attachment = _make_attachment(
-            filename="photo.png", content_type="image/png"
-        )
+        attachment = _make_attachment(filename="photo.png", content_type="image/png")
         item = _make_item(attachments=[attachment])
-        rows = build_openkb_handoff_rows(
-            [item], _make_zotero_client(), _make_config()
-        )
+        rows = build_openkb_handoff_rows([item], _make_zotero_client(), _make_config())
         self.assertEqual(rows, [])
 
     def test_verification_strength_hash_only(self):
         attachment = _make_attachment(md5="abc123")
         item = _make_item(attachments=[attachment])
-        rows = build_openkb_handoff_rows(
-            [item], _make_zotero_client(), _make_config()
-        )
+        rows = build_openkb_handoff_rows([item], _make_zotero_client(), _make_config())
         self.assertEqual(rows[0].verification_strength, "hash-only")
 
     def test_verification_strength_metadata_only(self):
         attachment = _make_attachment(file_size_bytes=1024)
         item = _make_item(attachments=[attachment])
-        rows = build_openkb_handoff_rows(
-            [item], _make_zotero_client(), _make_config()
-        )
+        rows = build_openkb_handoff_rows([item], _make_zotero_client(), _make_config())
         self.assertEqual(rows[0].verification_strength, "metadata-only")
 
     def test_verification_strength_key_only(self):
         attachment = _make_attachment()
         item = _make_item(attachments=[attachment])
-        rows = build_openkb_handoff_rows(
-            [item], _make_zotero_client(), _make_config()
-        )
+        rows = build_openkb_handoff_rows([item], _make_zotero_client(), _make_config())
         self.assertEqual(rows[0].verification_strength, "key-only")
 
     def test_sha256_optional_in_v0_1(self):
         attachment = _make_attachment()
         item = _make_item(attachments=[attachment])
-        rows = build_openkb_handoff_rows(
-            [item], _make_zotero_client(), _make_config()
-        )
+        rows = build_openkb_handoff_rows([item], _make_zotero_client(), _make_config())
         self.assertIsNone(rows[0].sha256)
         self.assertNotEqual(rows[0].verification_strength, "full")
 
@@ -200,25 +184,19 @@ class TestBuildOpenkbHandoffRows(unittest.TestCase):
     def test_no_auth_url_in_recovery(self):
         attachment = _make_attachment()
         item = _make_item(attachments=[attachment])
-        rows = build_openkb_handoff_rows(
-            [item], _make_zotero_client(), _make_config()
-        )
+        rows = build_openkb_handoff_rows([item], _make_zotero_client(), _make_config())
         self.assertNotIn("url", rows[0].recovery)
 
     def test_openkb_policy_hints_present(self):
         attachment = _make_attachment()
         item = _make_item(attachments=[attachment])
-        rows = build_openkb_handoff_rows(
-            [item], _make_zotero_client(), _make_config()
-        )
+        rows = build_openkb_handoff_rows([item], _make_zotero_client(), _make_config())
         self.assertTrue(rows[0].openkb_policy_hints["no_auth_url"])
 
     def test_recovery_dict_has_no_url_field(self):
         attachment = _make_attachment()
         item = _make_item(attachments=[attachment])
-        rows = build_openkb_handoff_rows(
-            [item], _make_zotero_client(), _make_config()
-        )
+        rows = build_openkb_handoff_rows([item], _make_zotero_client(), _make_config())
         recovery = rows[0].recovery
         self.assertNotIn("url", recovery)
         self.assertEqual(
@@ -246,9 +224,7 @@ class TestValidateOpenkbHandoffRows(unittest.TestCase):
         row = _make_valid_row()
         linked = _make_attachment(key="ATT1", link_mode="linked_url")
         source = _make_item(attachments=[linked])
-        report = validate_openkb_handoff_rows(
-            [row], mode="test", source_items=[source]
-        )
+        report = validate_openkb_handoff_rows([row], mode="test", source_items=[source])
         self.assertTrue(
             any(isinstance(f, AttachmentIdentityError) for f in report.failures)
         )

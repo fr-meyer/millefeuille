@@ -15,16 +15,16 @@ notes:
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
-  id: pr-062-index-fixtures
+  id: pr-063-acceptance-classification-cli
   status: In Progress
-  branch: feat/pr-062-index-fixtures
-  speculoos_task: .speculoos/tasks/pr-062-index-fixtures.yaml
-  pull_request: 62
+  branch: feat/pr-063-acceptance-classification-cli
+  speculoos_task: .speculoos/tasks/pr-063-acceptance-classification-cli.yaml
+  pull_request: 63
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
-  head_sha: 101e7a1a5159a6ee9c7403a3d9db68a337651111
-pull_request: 62
+  head_sha: c334f2cc756863ed423639751e96663800b29774
+pull_request: 63
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
@@ -186,3 +186,13 @@ completed_pull_requests:
     merge_commit: ec22c60e3a69c940b9203923d9a76e29459b1497
     mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/55#pullrequestreview-4684962077
     mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86824278156
+  - id: pr-062-index-fixtures
+    number: 62
+    url: https://github.com/fr-meyer/millefeuille/pull/62
+    status: merged
+    base_branch: dev
+    head_branch: feat/pr-062-index-fixtures
+    head_sha: b5cc4232cb119a41b95d3603fd373a4b94e72df7
+    merge_commit: 16f904be6212ade3c0d8b19acd9d1ccc8b81bbf1
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/62#pullrequestreview-4706544285
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87422246923

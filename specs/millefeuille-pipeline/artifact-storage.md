@@ -49,7 +49,6 @@ source-packs/
           stage-manifest.json
           artifact-index.json
           model-provenance.jsonl
-          structure/
           summaries/
             hierarchical-summary.json
             texts/
@@ -57,9 +56,18 @@ source-packs/
             paper-card.json
             paper-card.md
           classification/
+            classification-plan.json
+            decision-records/
+            rejected-alternatives.jsonl
+            adjudication-queue.jsonl
+            zotero-writeback-preview.json
           index/
             index-status.json
           reports/
+            acceptance-summary.json
+            acceptance-summary.md
+            release-candidate-preflight.json
+            release-candidate-preflight.md
           zotero-writeback-plan.json
 ```
 
@@ -101,6 +109,11 @@ Every non-trivial run should emit:
 - `stage-manifest.json`
 - `artifact-index.json`
 - `model-provenance.jsonl` when any model or OCR provider is used
+- `reports/acceptance-summary.json` once the acceptance stage is synthesized
+- `classification/classification-plan.json` when classification preview or live
+  classification runs
+- `classification/zotero-writeback-preview.json` when classification proposes
+  future Zotero state
 - `quality-report.md`
 - `completion-gate-result.json`
 - `zotero-writeback-plan.json` when Zotero state would change

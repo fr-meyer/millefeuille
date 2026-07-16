@@ -107,9 +107,7 @@ class TestFetchItemsForTagLogging(unittest.TestCase):
 
     def test_single_page_no_info_log(self):
         client, mock_zr = _make_client()
-        mock_zr.everything.return_value = [
-            _make_raw_item(f"K{i}") for i in range(5)
-        ]
+        mock_zr.everything.return_value = [_make_raw_item(f"K{i}") for i in range(5)]
 
         with self.assertLogs(
             "millefeuille.clients.zotero_client", level="DEBUG"
@@ -140,9 +138,7 @@ class TestFetchItemsForTagLogging(unittest.TestCase):
 
     def test_large_result_emits_info_log(self):
         client, mock_zr = _make_client()
-        mock_zr.everything.return_value = [
-            _make_raw_item(f"K{i}") for i in range(150)
-        ]
+        mock_zr.everything.return_value = [_make_raw_item(f"K{i}") for i in range(150)]
 
         with self.assertLogs(
             "millefeuille.clients.zotero_client", level="DEBUG"
@@ -306,9 +302,7 @@ class TestGetItemsBySelectionSetLogic(unittest.TestCase):
             exclude=TagRuleConfig(values=["done"], operator="or"),
             conflict_resolution="exclude_wins",
         )
-        discovered, stats = self._run_selection(
-            client, selection, fetch_side_effect
-        )
+        discovered, stats = self._run_selection(client, selection, fetch_side_effect)
         keys = {item.key for item in discovered}
         self.assertEqual(keys, {"K2"})
         self.assertEqual(stats.excluded_count, 1)
@@ -333,22 +327,28 @@ class TestGetItemsByTagLegacyPath(unittest.TestCase):
     def test_propagates_zotero_auth_error(self):
         client, _ = _make_client()
         auth_error = ZoteroAuthError("auth", None)
-        with patch.object(
-            client,
-            "_fetch_items_for_tag",
-            side_effect=auth_error,
-        ), self.assertRaises(ZoteroAuthError) as cm:
+        with (
+            patch.object(
+                client,
+                "_fetch_items_for_tag",
+                side_effect=auth_error,
+            ),
+            self.assertRaises(ZoteroAuthError) as cm,
+        ):
             client.get_items_by_tag("millefeuille")
         self.assertIs(cm.exception, auth_error)
 
     def test_propagates_zotero_api_error(self):
         client, _ = _make_client()
         api_error = ZoteroAPIError("api", None)
-        with patch.object(
-            client,
-            "_fetch_items_for_tag",
-            side_effect=api_error,
-        ), self.assertRaises(ZoteroAPIError) as cm:
+        with (
+            patch.object(
+                client,
+                "_fetch_items_for_tag",
+                side_effect=api_error,
+            ),
+            self.assertRaises(ZoteroAPIError) as cm,
+        ):
             client.get_items_by_tag("millefeuille")
         self.assertIs(cm.exception, api_error)
 

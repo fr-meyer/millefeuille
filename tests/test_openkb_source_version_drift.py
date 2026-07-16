@@ -33,9 +33,7 @@ class TestOpenkbSourceVersionDriftFixture(unittest.TestCase):
         row = _load_handoff_row(fixture)
         recovered_bytes = fixture["matching_recovered_bytes_utf8"].encode()
 
-        actual_sha256 = verify_openkb_handoff_recovered_bytes(
-            row, recovered_bytes
-        )
+        actual_sha256 = verify_openkb_handoff_recovered_bytes(row, recovered_bytes)
 
         self.assertEqual(actual_sha256, fixture["expected_matching_sha256"])
 

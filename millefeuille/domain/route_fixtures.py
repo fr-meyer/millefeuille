@@ -25,9 +25,7 @@ from millefeuille.domain.source_packs import (
     paper_id_for_zotero_item_key,
 )
 
-ROUTE_SELECTION_EVIDENCE_SCHEMA_VERSION = (
-    "millefeuille-route-selection-evidence/v0.1"
-)
+ROUTE_SELECTION_EVIDENCE_SCHEMA_VERSION = "millefeuille-route-selection-evidence/v0.1"
 ROUTE_MARKDOWN_REF = Path("selected/fulltext.md")
 ROUTE_EVIDENCE_REF = Path("selected/route.json")
 
@@ -55,9 +53,7 @@ class RouteSelectionFixtureEvidence:
         if self.page_count < 0:
             raise MillefeuilleContractError("page_count must be non-negative")
         if self.character_count is not None and self.character_count < 0:
-            raise MillefeuilleContractError(
-                "character_count must be non-negative"
-            )
+            raise MillefeuilleContractError("character_count must be non-negative")
         object.__setattr__(self, "markdown_path", Path(self.markdown_path))
         object.__setattr__(
             self,
@@ -389,9 +385,8 @@ def _validate_route_dependencies(
         raise MillefeuilleContractError(
             f"route selection requires OCR extraction evidence for {source_pack_dir}"
         )
-    if (
-        selected_route == RouteSelection.MERGED_DUAL
-        and (native_payload is None or ocr_payload is None)
+    if selected_route == RouteSelection.MERGED_DUAL and (
+        native_payload is None or ocr_payload is None
     ):
         raise MillefeuilleContractError(
             "route selection merged-dual requires both native and OCR "

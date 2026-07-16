@@ -407,9 +407,7 @@ class TestOpenkbWeakVerificationWarningLogs(unittest.TestCase):
             summary = pipeline.run()
 
         self.assertEqual(summary["openkb_handoff_rows_written"], 1)
-        _assert_weak_warning_messages(
-            self, pipeline.logger, weak_rows=weak_rows
-        )
+        _assert_weak_warning_messages(self, pipeline.logger, weak_rows=weak_rows)
 
     def test_live_export_truncates_weak_verification_warnings_after_ten_rows(self):
         pipeline = TestStandaloneOpenkbHandoffPipeline()._make_standalone_pipeline()
@@ -449,9 +447,7 @@ class TestOpenkbWeakVerificationWarningLogs(unittest.TestCase):
             if msg.startswith("  item_key=")
         ]
         self.assertEqual(len(detail_warnings), 10)
-        _assert_weak_warning_messages(
-            self, pipeline.logger, weak_rows=weak_rows
-        )
+        _assert_weak_warning_messages(self, pipeline.logger, weak_rows=weak_rows)
 
     def test_live_export_logs_weak_warnings_before_validation_abort(self):
         pipeline = TestStandaloneOpenkbHandoffPipeline()._make_standalone_pipeline()
@@ -486,9 +482,7 @@ class TestOpenkbWeakVerificationWarningLogs(unittest.TestCase):
         ):
             pipeline.run()
 
-        _assert_weak_warning_messages(
-            self, pipeline.logger, weak_rows=weak_rows
-        )
+        _assert_weak_warning_messages(self, pipeline.logger, weak_rows=weak_rows)
         pipeline.logger.error.assert_called()
         mock_write.assert_not_called()
 

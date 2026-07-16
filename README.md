@@ -218,6 +218,44 @@ The read-only artifact commands inspect Millefeuille artifact indexes without
 initializing Zotero, OCR providers, OpenKB, PageIndex, ConDB, ChatIndex, or
 model clients.
 
+### Preview Stage Commands
+
+For offline artifact-package validation, Millefeuille also exposes preview and
+read-only stage commands that operate on a verified source-pack run directory:
+
+```bash
+millefeuille extract-native --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --evidence native-evidence.json
+millefeuille acceptance --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --handoff handoff.jsonl
+millefeuille classify --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --evidence classification-evidence.json
+millefeuille writeback --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --writeback preview
+millefeuille retrieve --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001
+millefeuille models
+millefeuille run --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --stages acceptance,classify,writeback --handoff handoff.jsonl --classification-evidence classification-evidence.json --release-preflight
+```
+
+These commands stay offline and preview-only in the current contract slice:
+
+- `acceptance` synthesizes a final verdict from handoff, source-pack,
+  extraction, route, structure, summary, card, and index evidence.
+- `classify` materializes classification plans, decision records, review
+  queues, and writeback previews from explicit local evidence.
+- `writeback` turns the preview classification output into a governed Zotero
+  writeback plan without mutating Zotero.
+- `retrieve` lists stored artifact references for downstream inspection.
+- `models` prints the bundled offline model-profile catalog.
+- `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
+  and `index` expose the existing fixture writers as explicit single-paper
+  stages and update the run manifest and artifact index.
+- `run` chains those fixture stages through `acceptance`, `classify`, and
+  `writeback` in canonical order, supports `--resume` with output
+  revalidation, and can emit optional release-candidate preflight reporting.
+- Derived writes and resume fail closed when paper, run, source hash, source
+  identity, stage set, or stage status differs across the source-pack manifest,
+  stage manifest, and artifact index.
+- `--mode approved-live` and approved-live writeback stop at exit code `3`;
+  these commands never turn a preview invocation into a live provider or
+  Zotero mutation.
+
 ```bash
 millefeuille artifacts --index /path/to/artifact-index.json
 millefeuille status --index /path/to/artifact-index.json

@@ -5,11 +5,7 @@ from pathlib import Path
 import re
 import unittest
 
-SPEC_DIR = (
-    Path(__file__).resolve().parents[1]
-    / "specs"
-    / "millefeuille-pipeline"
-)
+SPEC_DIR = Path(__file__).resolve().parents[1] / "specs" / "millefeuille-pipeline"
 
 REQUIRED_DOCS = [
     "README.md",
@@ -22,6 +18,7 @@ REQUIRED_DOCS = [
     "tag-state-machine.md",
     "ocr-backend-contract.md",
     "release-version-policy.md",
+    "release-candidate-preflight.md",
     "live-run-plan.md",
 ]
 
@@ -114,8 +111,7 @@ class TestMillefeuilleContractArtifacts(unittest.TestCase):
 
     def test_contract_docs_keep_manual_gates_visible(self):
         combined = "\n".join(
-            (SPEC_DIR / name).read_text(encoding="utf-8")
-            for name in REQUIRED_DOCS
+            (SPEC_DIR / name).read_text(encoding="utf-8") for name in REQUIRED_DOCS
         )
         for term in MANUAL_GATE_TERMS:
             self.assertIn(term, combined, f"contract packet is missing {term!r}")
