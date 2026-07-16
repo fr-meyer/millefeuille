@@ -10,7 +10,7 @@ github:
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
-  head_sha: 43a4b280b39787fab40a9220d7b7eb16cd2249ea
+  head_sha: c334f2cc756863ed423639751e96663800b29774
 post_merge_expected:
   pull_request: 63
   base_branch: dev
@@ -65,3 +65,4 @@ evidence:
   - "Full unittest discovery passed: 230 tests."
   - "Ruff, metadata parse, and git diff --check passed after reconstruction."
   - 'PR #63 opened for pr-063-acceptance-classification-cli'
+  - "Resumable offline stage continuation published at c334f2cc756863ed423639751e96663800b29774."

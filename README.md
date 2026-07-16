@@ -249,6 +249,9 @@ These commands stay offline and preview-only in the current contract slice:
 - `run` chains those fixture stages through `acceptance`, `classify`, and
   `writeback` in canonical order, supports `--resume` with output
   revalidation, and can emit optional release-candidate preflight reporting.
+- Derived writes and resume fail closed when paper, run, source hash, source
+  identity, stage set, or stage status differs across the source-pack manifest,
+  stage manifest, and artifact index.
 - `--mode approved-live` and approved-live writeback stop at exit code `3`;
   these commands never turn a preview invocation into a live provider or
   Zotero mutation.
