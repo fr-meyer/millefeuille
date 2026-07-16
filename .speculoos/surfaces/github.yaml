@@ -14,26 +14,8 @@ notes:
   - Container gh is intentionally not the GitHub write path.
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
-current_task:
-  id: pr-069-multi-pdf-source-packs
-  status: Review
-  branch: feat/pr-069-multi-pdf-source-packs
-  speculoos_task: .speculoos/tasks/pr-069-multi-pdf-source-packs.yaml
-  pull_request: 69
-  project_item: unavailable
-  pull_request_project_item: unavailable
-  project_status: In Progress
-  head_sha: 54ffea247de53369a1bca91e83de0ea8cc39cd1c
-pull_request:
-  number: 69
-  url: https://github.com/fr-meyer/millefeuille/pull/69
-  status: open
-  base_branch: dev
-  head_branch: feat/pr-069-multi-pdf-source-packs
-  head_sha: 54ffea247de53369a1bca91e83de0ea8cc39cd1c
-  author: fr-meyer
-  project_item: unavailable
-  project_status: In Progress
+current_task: null
+pull_request: null
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
@@ -305,3 +287,13 @@ completed_pull_requests:
     merge_commit: 1d01c8cc9079c93a7cfd0599298ab1a7b4414912
     mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/67#pullrequestreview-4710870157
     mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87547552904
+  - id: pr-069-multi-pdf-source-packs
+    number: 69
+    url: https://github.com/fr-meyer/millefeuille/pull/69
+    status: merged
+    base_branch: dev
+    head_branch: feat/pr-069-multi-pdf-source-packs
+    head_sha: 5eeaa0c49fb71052c667be94fc86cba810b40c88
+    merge_commit: 3754c4ada646e2812489746f54742351828df39c
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/69#pullrequestreview-4711191661
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87555055863
