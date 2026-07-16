@@ -1,6 +1,6 @@
 id: pr-075-classification-review-adjudication
 title: Add deterministic offline classification review and adjudication actions
-status: review
+status: merged
 branch: feat/pr-075-classification-review-adjudication
 base_branch: dev
 github:
@@ -8,13 +8,13 @@ github:
   pull_request: 75
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/75
-  head_sha: 70b3257106c1201b4ef24d6c2e90bd815bea1b50
-  merge_commit: null
-  mergeguez_review: null
-  mergeguez_check_run: null
+  head_sha: 7aa88ca8785f723aba0dc1ae77fc384b68e53768
+  merge_commit: 5a153d2634c2679d3a72a057c22f773504dda73a
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/75#pullrequestreview-4712161582
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87580972882
 post_merge_expected:
   pull_request: 75
   base_branch: dev
@@ -70,3 +70,11 @@ evidence:
   - "Regression coverage proves strict input preflight, identity/taxonomy lineage checks, immutable action ids and action-scoped previews, chained review-to-adjudication history preservation, byte-stable exact reruns, and resolved/unresolved routing."
   - "Speculoos validation, private-data scan, documentation sync, and publication checks passed."
   - "Published as user-authored PR #75 at https://github.com/fr-meyer/millefeuille/pull/75 from verified implementation head 70b3257106c1201b4ef24d6c2e90bd815bea1b50 onto dev."
+  - "Final publication-metadata continuation published at 7aa88ca8785f723aba0dc1ae77fc384b68e53768."
+  - "Mergeguez approved exact head 7aa88ca8785f723aba0dc1ae77fc384b68e53768 with zero findings and zero blockers: https://github.com/fr-meyer/millefeuille/pull/75#pullrequestreview-4712161582."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87580972882."
+  - "PR #75 squash-merged to dev as 5a153d2634c2679d3a72a057c22f773504dda73a by mergeguez[bot]."
+  - "Remote feature branch feat/pr-075-classification-review-adjudication deleted after exact-SHA branch-cleanup verification."
+  - "Local feature branch deleted after dev synchronized to 5a153d2634c2679d3a72a057c22f773504dda73a."
+  - "Post-merge validation on synchronized dev passed: 254 tests, Ruff, metadata parse, and Speculoos status."
+  - "Project item unavailable moved to Done; repo-local active task metadata cleared."
