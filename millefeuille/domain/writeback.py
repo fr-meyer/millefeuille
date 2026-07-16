@@ -18,6 +18,7 @@ from millefeuille.domain.stage_runtime import (
     persist_run_artifacts,
     relative_ref,
     resolve_run_artifacts,
+    stage_status_map,
     update_artifact_index,
     upsert_artifact_record,
     upsert_stage_record,
@@ -67,15 +68,36 @@ def write_writeback_plan(
         else resolved.run_dir / WRITEBACK_PREVIEW_REF
     )
     preview = load_json_object(preview_json_path, "writeback preview")
+    if stage_status_map(resolved.stage_manifest).get(StageName.CLASSIFY.value) != (
+        StageStatus.PASSED.value
+    ):
+        raise MillefeuilleContractError(
+            "writeback preview requires a passed classification stage"
+        )
+    if preview.get("schema_version") != ("millefeuille-zotero-writeback-preview/v0.1"):
+        raise MillefeuilleContractError("unsupported writeback preview schema_version")
     if str(preview.get("mode", "")).strip() != "preview":
         raise MillefeuilleContractError("writeback preview mode must be preview")
+    if str(preview.get("status", "")).strip() != "previewed":
+        raise MillefeuilleContractError("writeback preview status must be previewed")
+    expected_preview_identity = {
+        "paper_id": resolved.paper_id,
+        "run_id": resolved.run_id,
+        "source_hash": resolved.source_hash,
+    }
+    for field_name, expected in expected_preview_identity.items():
+        actual = preview.get(field_name)
+        if actual != expected:
+            raise MillefeuilleContractError(
+                f"writeback preview {field_name} drift: "
+                f"expected {expected!r}, got {actual!r}"
+            )
 
     note_path: Path | None = None
     note_markdown_ref: str | None = None
     note_markdown = preview.get("note_markdown")
     if isinstance(note_markdown, str) and note_markdown.strip():
         note_path = resolved.run_dir / WRITEBACK_NOTE_REF
-        write_text(note_path, note_markdown.strip() + "\n")
         note_markdown_ref = relative_ref(note_path, resolved.run_dir)
 
     classification_ref = str(preview.get("classification_ref", "")).strip() or None
@@ -93,6 +115,8 @@ def write_writeback_plan(
         execution_notes=["preview-only plan; no live Zotero mutation"],
     )
     plan_path = resolved.run_dir / WRITEBACK_PLAN_REF
+    if note_path is not None:
+        write_text(note_path, note_markdown.strip() + "\n")
     write_json_object(plan_path, plan.to_dict())
 
     stage_manifest = upsert_stage_record(

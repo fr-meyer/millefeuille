@@ -143,6 +143,122 @@ def _prepare_fixture_run(tempdir: str) -> tuple[Path, Path]:
     return source_pack_root, run_dir
 
 
+def _prepare_source_pack_run(tempdir: str) -> tuple[Path, Path]:
+    source_pack_root = Path(tempdir) / "source-packs"
+    source_path = _write_recovered_pdf(tempdir)
+    write_source_pack_from_recovered_pdf(
+        evidence=_evidence(source_path),
+        source_pack_root=source_pack_root,
+        created_at="2026-07-14T01:00:00+00:00",
+    )
+    write_dry_run_artifacts(
+        items=[_make_item()],
+        handoff_rows=[_make_handoff_row()],
+        config=ArtifactExportConfig(
+            enabled=True,
+            artifact_root="source-pack",
+            source_pack_root=str(source_pack_root),
+            run_id=RUN_ID,
+        ),
+        handoff_enabled=True,
+    )
+    run_dir = (
+        source_pack_root / "zotero" / PAPER_ID / "analyses" / "millefeuille" / RUN_ID
+    )
+    return source_pack_root, run_dir
+
+
+def _write_offline_stage_evidence(tempdir: str) -> dict[str, Path]:
+    native_markdown = _write_markdown(tempdir, "native-fulltext.md", "Native text\n")
+    native_evidence = _write_native_extraction_evidence_json(
+        tempdir,
+        native_markdown,
+    )
+    ocr_markdown = _write_markdown(tempdir, "ocr-fulltext.md", "OCR text\n")
+    ocr_evidence = _write_ocr_extraction_evidence_json(tempdir, ocr_markdown)
+    route_markdown = _write_markdown(tempdir, "selected-fulltext.md", "Selected\n")
+    route_evidence = _write_route_selection_evidence_json(tempdir, route_markdown)
+    structure_payload = _write_structure_payload_json(tempdir)
+    outline_path = _write_markdown(tempdir, "outline.md", "# Outline\n")
+    structure_evidence = _write_structure_evidence_json(
+        tempdir,
+        structure_payload,
+        outline_path,
+    )
+    _write_markdown(tempdir, "page-1.md", "Page 1 summary.\n")
+    _write_markdown(tempdir, "full-paper.md", "Full paper summary.\n")
+    summary_fixture = _write_summary_fixture_json(tempdir)
+    summary_evidence = _write_summary_evidence_json(tempdir, summary_fixture)
+    card_fixture = _write_card_fixture_json(tempdir)
+    card_markdown = _write_markdown(tempdir, "paper-card.md", "# Card\n")
+    card_evidence = _write_card_evidence_json(
+        tempdir,
+        card_fixture,
+        card_markdown,
+    )
+    index_fixture = _write_index_fixture_json(tempdir)
+    index_evidence = _write_index_evidence_json(tempdir, index_fixture)
+    return {
+        "native": native_evidence,
+        "ocr": ocr_evidence,
+        "route": route_evidence,
+        "structure": structure_evidence,
+        "summary": summary_evidence,
+        "card": card_evidence,
+        "index": index_evidence,
+    }
+
+
+def _full_run_args(
+    *,
+    source_pack_root: Path,
+    evidence: dict[str, Path],
+    handoff_path: Path,
+    classification_path: Path,
+) -> list[str]:
+    return [
+        "run",
+        "--source-pack-root",
+        str(source_pack_root),
+        "--paper-id",
+        PAPER_ID,
+        "--run-id",
+        RUN_ID,
+        "--stages",
+        (
+            "extract-native,extract-ocr,route,structure,summarize,card,index,"
+            "acceptance,classify,writeback"
+        ),
+        "--native-extraction-evidence",
+        str(evidence["native"]),
+        "--ocr-extraction-evidence",
+        str(evidence["ocr"]),
+        "--route-selection-evidence",
+        str(evidence["route"]),
+        "--structure-evidence",
+        str(evidence["structure"]),
+        "--summary-evidence",
+        str(evidence["summary"]),
+        "--card-evidence",
+        str(evidence["card"]),
+        "--index-evidence",
+        str(evidence["index"]),
+        "--handoff",
+        str(handoff_path),
+        "--classification-evidence",
+        str(classification_path),
+        "--json",
+    ]
+
+
+def _snapshot_files(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
 def _write_handoff_jsonl(tempdir: str) -> Path:
     path = Path(tempdir) / "handoff.jsonl"
     path.write_text(
@@ -356,6 +472,250 @@ class TestMillefeuilleStageCli(unittest.TestCase):
             self.assertEqual(models_exit, 0)
             models_payload = json.loads(models_stdout.getvalue())
             self.assertEqual(models_payload["default_profile"], "research-default")
+
+    def test_run_executes_full_fixture_pipeline_and_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir = _prepare_source_pack_run(tempdir)
+            evidence = _write_offline_stage_evidence(tempdir)
+            handoff_path = _write_handoff_jsonl(tempdir)
+            classification_path = _write_classification_evidence_json(tempdir)
+            args = _full_run_args(
+                source_pack_root=source_pack_root,
+                evidence=evidence,
+                handoff_path=handoff_path,
+                classification_path=classification_path,
+            )
+
+            first_stdout = StringIO()
+            first_exit = run_stage_cli(args, stdout=first_stdout)
+
+            self.assertEqual(first_exit, 0)
+            first_payload = json.loads(first_stdout.getvalue())
+            self.assertEqual(first_payload["resumed"], [])
+            self.assertEqual(first_payload["extract-native"]["write_status"], "created")
+            stage_manifest = load_stage_manifest(run_dir / "stage-manifest.json")
+            stage_map = {
+                stage.name.value: stage.status.value for stage in stage_manifest.stages
+            }
+            for stage_name in (
+                "extract-native",
+                "extract-ocr",
+                "route",
+                "structure",
+                "summarize",
+                "card",
+                "index",
+                "acceptance",
+                "classify",
+                "writeback",
+            ):
+                self.assertEqual(stage_map[stage_name], "passed")
+
+            first_snapshot = _snapshot_files(source_pack_root)
+            second_stdout = StringIO()
+            second_exit = run_stage_cli(args, stdout=second_stdout)
+
+            self.assertEqual(second_exit, 0)
+            second_payload = json.loads(second_stdout.getvalue())
+            self.assertEqual(
+                second_payload["extract-native"]["write_status"],
+                "existing",
+            )
+            self.assertEqual(_snapshot_files(source_pack_root), first_snapshot)
+
+    def test_run_resume_revalidates_outputs_without_stage_evidence(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, _run_dir = _prepare_source_pack_run(tempdir)
+            evidence = _write_offline_stage_evidence(tempdir)
+            handoff_path = _write_handoff_jsonl(tempdir)
+            classification_path = _write_classification_evidence_json(tempdir)
+            full_args = _full_run_args(
+                source_pack_root=source_pack_root,
+                evidence=evidence,
+                handoff_path=handoff_path,
+                classification_path=classification_path,
+            )
+            self.assertEqual(run_stage_cli(full_args, stdout=StringIO()), 0)
+            before = _snapshot_files(source_pack_root)
+
+            stdout = StringIO()
+            exit_code = run_stage_cli(
+                [
+                    "run",
+                    "--source-pack-root",
+                    str(source_pack_root),
+                    "--paper-id",
+                    PAPER_ID,
+                    "--run-id",
+                    RUN_ID,
+                    "--stages",
+                    (
+                        "extract-native,extract-ocr,route,structure,summarize,"
+                        "card,index,acceptance,classify,writeback"
+                    ),
+                    "--resume",
+                    "--json",
+                ],
+                stdout=stdout,
+            )
+
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["resumed"], payload["stages"])
+            self.assertEqual(_snapshot_files(source_pack_root), before)
+
+    def test_run_rejects_out_of_order_stages_before_writing(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir = _prepare_fixture_run(tempdir)
+            handoff_path = _write_handoff_jsonl(tempdir)
+            classification_path = _write_classification_evidence_json(tempdir)
+            acceptance_path = run_dir / ACCEPTANCE_SUMMARY_REF
+            self.assertFalse(acceptance_path.exists())
+
+            stderr = StringIO()
+            exit_code = run_stage_cli(
+                [
+                    "run",
+                    "--source-pack-root",
+                    str(source_pack_root),
+                    "--paper-id",
+                    PAPER_ID,
+                    "--run-id",
+                    RUN_ID,
+                    "--stages",
+                    "classify,acceptance",
+                    "--handoff",
+                    str(handoff_path),
+                    "--classification-evidence",
+                    str(classification_path),
+                ],
+                stderr=stderr,
+            )
+
+            self.assertEqual(exit_code, 2)
+            self.assertIn("canonical pipeline order", stderr.getvalue())
+            self.assertFalse(acceptance_path.exists())
+
+    def test_classification_failure_does_not_leave_partial_preview(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir = _prepare_fixture_run(tempdir)
+            handoff_path = _write_handoff_jsonl(tempdir)
+            self.assertEqual(
+                run_stage_cli(
+                    [
+                        "acceptance",
+                        "--source-pack-root",
+                        str(source_pack_root),
+                        "--paper-id",
+                        PAPER_ID,
+                        "--run-id",
+                        RUN_ID,
+                        "--handoff",
+                        str(handoff_path),
+                    ],
+                    stdout=StringIO(),
+                ),
+                0,
+            )
+            classification_path = _write_classification_evidence_json(tempdir)
+            payload = json.loads(classification_path.read_text(encoding="utf-8"))
+            payload["evidence_refs"] = ["missing-evidence.json"]
+            classification_path.write_text(
+                json.dumps(payload, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+
+            stderr = StringIO()
+            exit_code = run_stage_cli(
+                [
+                    "classify",
+                    "--source-pack-root",
+                    str(source_pack_root),
+                    "--paper-id",
+                    PAPER_ID,
+                    "--run-id",
+                    RUN_ID,
+                    "--evidence",
+                    str(classification_path),
+                ],
+                stderr=stderr,
+            )
+
+            self.assertEqual(exit_code, 2)
+            self.assertIn("does not exist", stderr.getvalue())
+            self.assertFalse((run_dir / WRITEBACK_PREVIEW_REF).exists())
+            self.assertFalse((run_dir / CLASSIFICATION_PLAN_REF).exists())
+
+    def test_run_identity_drift_blocks_retrieval(self):
+        drift_cases = (
+            ("run_id", "artifact index run_id drift"),
+            ("source_hash", "artifact index source_hash drift"),
+            ("source_identity", "artifact index canonical_filename drift"),
+            ("stage_status", "stage status drift"),
+            ("stage_set", "stage set drift"),
+        )
+        for drift_case, expected_error in drift_cases:
+            with (
+                self.subTest(drift_case=drift_case),
+                tempfile.TemporaryDirectory() as tempdir,
+            ):
+                source_pack_root, run_dir = _prepare_fixture_run(tempdir)
+                artifact_index_path = run_dir / "artifact-index.json"
+                payload = json.loads(artifact_index_path.read_text(encoding="utf-8"))
+                if drift_case == "run_id":
+                    payload["run_id"] = "wrong-run"
+                elif drift_case == "source_hash":
+                    payload["source_pack"]["source_hash"] = "sha256:" + ("0" * 64)
+                elif drift_case == "source_identity":
+                    payload["source_identity"]["canonical_filename"] = "other.pdf"
+                elif drift_case == "stage_status":
+                    payload["stages"]["summarize"]["status"] = "failed"
+                else:
+                    payload["stages"].pop("summarize")
+                artifact_index_path.write_text(
+                    json.dumps(payload, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+
+                stderr = StringIO()
+                exit_code = run_stage_cli(
+                    [
+                        "retrieve",
+                        "--source-pack-root",
+                        str(source_pack_root),
+                        "--paper-id",
+                        PAPER_ID,
+                        "--run-id",
+                        RUN_ID,
+                    ],
+                    stderr=stderr,
+                )
+
+                self.assertEqual(exit_code, 2)
+                self.assertIn(expected_error, stderr.getvalue())
+
+    def test_live_modes_stop_at_manual_gate(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, _run_dir = _prepare_fixture_run(tempdir)
+            stderr = StringIO()
+
+            exit_code = run_stage_cli(
+                [
+                    "writeback",
+                    "--source-pack-root",
+                    str(source_pack_root),
+                    "--paper-id",
+                    PAPER_ID,
+                    "--run-id",
+                    RUN_ID,
+                    "--mode",
+                    "approved-live",
+                ],
+                stderr=stderr,
+            )
+
+            self.assertEqual(exit_code, 3)
+            self.assertIn("separate manual approval", stderr.getvalue())
 
 
 if __name__ == "__main__":

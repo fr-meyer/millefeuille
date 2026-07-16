@@ -18,8 +18,10 @@
 - PR #62 adds offline retrieval/index fixture writers plus source-pack
   artifact-index exposure.
 - PR #63 adds offline acceptance synthesis, classification and writeback
-  previews, stage-oriented `retrieve/models/run` commands, and local
-  release-candidate preflight artifacts on top of merged PR #62.
+  previews, fixture-stage commands from extraction through index, resumable
+  canonical `run` orchestration, identity/drift guards, read-only retrieval,
+  model-profile listing, and local release-candidate preflight artifacts on
+  top of merged PR #62.
 - Current integration branch is `dev`; stable branch is `main`.
 - Current package version is `0.4.0`.
 
@@ -30,6 +32,9 @@
      contract, artifact storage, model profile, paper-card, summary,
      retrieval/index, classification, and release/version policy.
    - Add fixture-only tests and parse checks.
+   - Current PR #63 coverage includes full-chain preview, revalidated resume,
+     idempotent rerun, metadata drift, failure isolation, and manual-gate exit
+     behavior.
    - Manual gate: none while changes stay local/offline.
 
 2. **Feature PR To `dev`**

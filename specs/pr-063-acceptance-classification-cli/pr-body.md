@@ -7,8 +7,11 @@ This branch:
 - adds acceptance synthesis across source-pack, extraction, route, structure,
   summary, card, and index artifacts;
 - adds offline classification orchestration and governed writeback previews;
-- exposes preview/read-only stage CLI commands for `acceptance`, `classify`,
-  `writeback`, `retrieve`, `models`, and `run`;
+- exposes fixture-only stage CLI commands from extraction through index plus
+  preview/read-only `acceptance`, `classify`, `writeback`, `retrieve`, and
+  `models` commands;
+- adds canonical full-chain orchestration, revalidated resume, idempotent
+  reruns, cross-artifact identity guards, and failure-isolation coverage;
 - prepares local release-candidate preflight documentation;
 - keeps the slice offline-only on top of merged PR `#62`.
 
@@ -35,6 +38,7 @@ Feature PRs target `dev`. Release/promotion PRs target `main`.
 - `millefeuille/domain/index_fixtures.py`
 - `millefeuille/domain/millefeuille.py`
 - `millefeuille/domain/model_profiles.py`
+- `millefeuille/domain/offline_stages.py`
 - `millefeuille/domain/release_preflight.py`
 - `millefeuille/domain/retrieve.py`
 - `millefeuille/domain/route_fixtures.py`
@@ -73,7 +77,9 @@ Feature PRs target `dev`. Release/promotion PRs target `main`.
 # Validation
 
 - `.venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_models tests.test_millefeuille_stage_cli`
+  — 77 tests passed
 - `.venv/bin/python -m unittest discover -v`
+  — 230 tests passed
 - `.venv/bin/ruff check .`
 - `ruby -ryaml -rjson -e 'Dir[".speculoos/**/*.yaml", "specs/**/*.yaml"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[".speculoos/**/*.json", "specs/**/*.json"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts "metadata ok"'`
 - `git diff --check`
@@ -83,8 +89,9 @@ Feature PRs target `dev`. Release/promotion PRs target `main`.
 # Documentation Impact
 
 - updates the root `README.md` with the preview-stage command surface;
-- refreshes the pipeline contract docs for acceptance, classification,
-  writeback preview, retrieval, and release-candidate preflight behavior.
+- refreshes the pipeline contract docs for fixture-stage parity, resumable
+  orchestration, acceptance, classification, writeback preview, retrieval,
+  and release-candidate preflight behavior.
 
 # Publication Boundary
 

@@ -86,6 +86,14 @@ def resolve_run_artifacts(
     source_pack_manifest = load_source_pack_manifest(manifest_path)
     stage_manifest = load_stage_manifest(stage_manifest_path)
     artifact_index = load_artifact_index(artifact_index_path)
+    _validate_run_identity(
+        paper_id=resolved_paper_id,
+        run_id=resolved_run_id,
+        run_dir=artifact_index_path.parent,
+        source_pack_manifest=source_pack_manifest,
+        stage_manifest=stage_manifest,
+        artifact_index=artifact_index,
+    )
     return ResolvedRunArtifacts(
         paper_id=resolved_paper_id,
         run_id=resolved_run_id,
@@ -99,6 +107,92 @@ def resolve_run_artifacts(
         stage_manifest=stage_manifest,
         artifact_index=artifact_index,
     )
+
+
+def _validate_run_identity(
+    *,
+    paper_id: str,
+    run_id: str,
+    run_dir: Path,
+    source_pack_manifest: dict[str, Any],
+    stage_manifest: StageManifest,
+    artifact_index: ArtifactIndex,
+) -> None:
+    """Reject cross-wired run metadata before any derived artifact is written."""
+
+    if source_pack_manifest.get("paper_id") != paper_id:
+        raise MillefeuilleContractError(
+            "source-pack manifest paper_id drift: "
+            f"expected {paper_id!r}, got {source_pack_manifest.get('paper_id')!r}"
+        )
+    if stage_manifest.run_id != run_id:
+        raise MillefeuilleContractError(
+            "stage manifest run_id drift: "
+            f"expected {run_id!r}, got {stage_manifest.run_id!r}"
+        )
+    if artifact_index.paper_id != paper_id:
+        raise MillefeuilleContractError(
+            "artifact index paper_id drift: "
+            f"expected {paper_id!r}, got {artifact_index.paper_id!r}"
+        )
+    if artifact_index.run_id != run_id:
+        raise MillefeuilleContractError(
+            "artifact index run_id drift: "
+            f"expected {run_id!r}, got {artifact_index.run_id!r}"
+        )
+
+    source_hash = str(source_pack_manifest.get("source_hash", ""))
+    indexed_source_hash = str(artifact_index.source_pack.get("source_hash", ""))
+    if indexed_source_hash != source_hash:
+        raise MillefeuilleContractError(
+            "artifact index source_hash drift: "
+            f"expected {source_hash!r}, got {indexed_source_hash!r}"
+        )
+
+    source_type = str(source_pack_manifest.get("source_type", ""))
+    indexed_source_type = str(artifact_index.source_pack.get("source_type", ""))
+    if indexed_source_type != source_type:
+        raise MillefeuilleContractError(
+            "artifact index source_type drift: "
+            f"expected {source_type!r}, got {indexed_source_type!r}"
+        )
+
+    manifest_identity = source_pack_manifest.get("identity")
+    if isinstance(manifest_identity, dict):
+        for field_name in (
+            "zotero_item_key",
+            "zotero_attachment_key",
+            "canonical_filename",
+        ):
+            expected = manifest_identity.get(field_name)
+            indexed = artifact_index.source_identity.get(field_name)
+            if expected is not None and indexed != expected:
+                raise MillefeuilleContractError(
+                    f"artifact index {field_name} drift: "
+                    f"expected {expected!r}, got {indexed!r}"
+                )
+
+    manifest_statuses = stage_status_map(stage_manifest)
+    manifest_stage_names = set(manifest_statuses)
+    indexed_stage_names = set(artifact_index.stages)
+    if indexed_stage_names != manifest_stage_names:
+        missing = sorted(manifest_stage_names - indexed_stage_names)
+        unexpected = sorted(indexed_stage_names - manifest_stage_names)
+        raise MillefeuilleContractError(
+            "stage set drift between manifest and artifact index: "
+            f"missing={missing!r}, unexpected={unexpected!r}"
+        )
+    for stage_name, record in artifact_index.stages.items():
+        manifest_status = manifest_statuses.get(stage_name)
+        indexed_status = str(record.get("status", ""))
+        if indexed_status != manifest_status:
+            raise MillefeuilleContractError(
+                f"stage status drift for {stage_name!r}: "
+                f"manifest={manifest_status!r}, index={indexed_status!r}"
+            )
+
+    if not run_dir.is_dir():  # defensive: callers resolve an existing run directory
+        raise MillefeuilleContractError(f"run directory is missing: {run_dir}")
 
 
 def load_stage_manifest(path: str | Path) -> StageManifest:

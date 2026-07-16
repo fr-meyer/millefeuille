@@ -36,7 +36,11 @@ records, writeback plans, and release-preflight records without requiring live
 provider or Zotero mutation.
 
 Preview/read-only stage commands now live under `millefeuille/cli/stages.py`:
-`acceptance`, `classify`, `writeback`, `retrieve`, `models`, and `run`.
+`extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
+`index`, `acceptance`, `classify`, `writeback`, `retrieve`, `models`, and
+`run`. The fixture-only stages can run as one canonical, resumable chain;
+resume skips only passed stages whose paper/run/source identity and expected
+outputs revalidate.
 
 Manual gates remain explicit: live Zotero reads/writes, PDF recovery/download,
 OCR/Mistral/PageIndex calls, model calls, worker-agent execution, OpenKB

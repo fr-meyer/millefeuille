@@ -790,6 +790,13 @@ def entrypoint() -> None:
     if argv and argv[0] == "source-pack":
         sys.exit(run_source_pack_cli(argv))
     if argv and argv[0] in {
+        "extract-native",
+        "extract-ocr",
+        "route",
+        "structure",
+        "summarize",
+        "card",
+        "index",
         "acceptance",
         "classify",
         "writeback",

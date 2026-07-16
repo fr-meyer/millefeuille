@@ -87,6 +87,18 @@ def write_classification_from_evidence(
         raise MillefeuilleContractError(
             "classification preview requires an acceptance summary with status pass"
         )
+    expected_acceptance_identity = {
+        "paper_id": resolved.paper_id,
+        "run_id": resolved.run_id,
+        "source_hash": resolved.source_hash,
+    }
+    for field_name, expected in expected_acceptance_identity.items():
+        actual = acceptance_summary.get(field_name)
+        if actual != expected:
+            raise MillefeuilleContractError(
+                f"acceptance summary {field_name} drift: "
+                f"expected {expected!r}, got {actual!r}"
+            )
 
     evidence = _load_classification_evidence(evidence_path)
     taxonomy_version = str(evidence["taxonomy_version"])
@@ -112,7 +124,10 @@ def write_classification_from_evidence(
         evidence=evidence,
     )
     preview_path = resolved.run_dir / WRITEBACK_PREVIEW_REF
-    write_json_object(preview_path, preview_payload)
+    evidence_refs = _normalize_evidence_refs(
+        evidence_refs=list(evidence.get("evidence_refs", [])),
+        run_dir=resolved.run_dir,
+    )
 
     decision_dir = resolved.run_dir / DECISION_DIR_REF
     decision_json_path = decision_dir / f"{resolved.paper_id}.json"
@@ -126,16 +141,14 @@ def write_classification_from_evidence(
         status=status,
         primary_path=str(evidence["primary_path"]),
         confidence=str(evidence["confidence"]),
-        evidence_refs=_normalize_evidence_refs(
-            evidence_refs=list(evidence.get("evidence_refs", [])),
-            run_dir=resolved.run_dir,
-        ),
+        evidence_refs=evidence_refs,
         strongest_rejected_path=evidence.get("strongest_rejected_path"),
         rejected_alternatives=rejected_alternatives,
         review_reasons=review_reasons,
         qa_flags=qa_flags,
         writeback_preview_ref=relative_ref(preview_path, resolved.run_dir),
     )
+    write_json_object(preview_path, preview_payload)
     write_json_object(decision_json_path, decision.to_dict())
     write_text(decision_markdown_path, _render_decision_markdown(decision))
 

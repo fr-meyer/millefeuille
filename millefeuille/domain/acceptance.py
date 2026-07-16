@@ -258,8 +258,16 @@ def _build_acceptance_summary(
     stage_statuses = {
         stage.name.value: stage.status.value for stage in resolved.stage_manifest.stages
     }
+    downstream_stages = {
+        StageName.ACCEPTANCE.value,
+        StageName.CLASSIFY.value,
+        StageName.WRITEBACK.value,
+        StageName.RELEASE.value,
+    }
     counts["passed_stages_before_acceptance"] = sum(
-        1 for status in stage_statuses.values() if status == StageStatus.PASSED.value
+        1
+        for stage_name, status in stage_statuses.items()
+        if stage_name not in downstream_stages and status == StageStatus.PASSED.value
     )
     status = (
         AcceptanceStatus.PASS if not review_reasons else AcceptanceStatus.NEEDS_REVIEW

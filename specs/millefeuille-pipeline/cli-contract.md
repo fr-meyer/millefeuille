@@ -1,29 +1,39 @@
 # CLI Contract
 
-The CLI now exposes preview/read-only stage commands for `acceptance`,
-`classify`, `writeback`, `retrieve`, `models`, and `run`, alongside the older
-`artifacts`, `status`, and `source-pack` helpers. The remaining goal is to
-make the earlier discovery/live stages equally explicit so operator-facing
-commands make live boundaries, artifact locations, model profiles, and Zotero
-writeback harder to cross accidentally.
+The CLI now exposes preview/read-only stage commands for `extract-native`,
+`extract-ocr`, `route`, `structure`, `summarize`, `card`, `index`,
+`acceptance`, `classify`, `writeback`, `retrieve`, `models`, and `run`,
+alongside the older `artifacts`, `status`, and `source-pack` helpers. The
+remaining command-surface goal is to make discovery, handoff, recovery,
+source-pack intake, OpenKB addition, and approved-live execution equally
+explicit without weakening their manual gates.
 
 ## Global Options
 
-Every command that reads or writes derived artifacts should accept:
+Implemented stage-command controls are:
 
 - `--mode preview|read-only-live|approved-live`
-- `--artifact-root source-pack|<path>`
-- `--source-pack-root <path>` when `--artifact-root source-pack` should resolve
-  against a non-default source-pack base directory
+- `--source-pack-root <path>` plus `--paper-id|--item-key` and `--run-id`
 - `--model-profile <profile-id-or-file>` for model-using stages
-- `--run-id <id>` for resumable runs
-- `--stage-manifest <path>` when resuming or inspecting a prior run
 - `--writeback none|preview|approved-live` for commands that can affect Zotero
+- `run --resume`, which skips only passed stages after their expected outputs
+  and paper/run/source identity revalidate
 
-The CLI should record the resolved artifact-root, model profile, and approval
-state in the stage manifest and artifact index.
+Arbitrary `--artifact-root <path>` selection and an explicit
+`--stage-manifest <path>` override remain contract work. The current stage
+surface deliberately resolves the canonical run directory from the verified
+source-pack root and rejects cross-wired manifest/index identity before any
+derived artifact write.
 
 ## Current Preview Surface
+
+- `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
+  and `index`
+  - Implemented as fixture-only, single-paper stage adapters over existing
+    verified source-pack writers.
+  - Update the run-scoped stage manifest and artifact index after each write.
+  - Preflight identity and refuse drift; `extract-ocr`, `summarize`, `card`,
+    and `index` do not call providers or live stores in this mode.
 
 - `acceptance`
   - Implemented for verified source-pack runs.
@@ -50,9 +60,13 @@ state in the stage manifest and artifact index.
   - Implemented as a bundled profile lister for preview and planning use.
 
 - `run`
-  - Implemented for the preview chain
-    `acceptance,classify,writeback[,release-preflight]`.
-  - Does not yet orchestrate the earlier discovery/source-pack stages.
+  - Implements the canonical preview chain from `extract-native` and
+    `extract-ocr` through `acceptance`, `classify`, and `writeback`, with
+    optional local release preflight.
+  - Preflights stage order and required evidence before writing, rejects
+    duplicate/out-of-order stages, and supports output-revalidating resume.
+  - Does not orchestrate discovery, handoff, recovery, source-pack intake, or
+    approved-live stages.
 
 ## Command Groups
 
@@ -178,10 +192,13 @@ state in the stage manifest and artifact index.
     index state.
 
 - `run`
-  - Current implementation sequences preview `acceptance`, `classify`, and
-    `writeback`, with optional local release-preflight output.
-  - Future expansion should execute the broader staged pipeline with explicit
-    artifact-root, mode, model profile, writeback mode, and approval gates.
+  - Current implementation sequences the fixture-only extraction, route,
+    structure, summary, card, and index stages followed by preview
+    `acceptance`, `classify`, and `writeback`.
+  - `--resume` revalidates before skipping; idempotent reruns preserve the
+    artifact package byte-for-byte for identical evidence.
+  - Future expansion should add discovery/source-pack/OpenKB and approved-live
+    execution with explicit artifact-root and approval-token gates.
 
 ## Example
 
@@ -190,9 +207,17 @@ millefeuille run \
   --source-pack-root /path/to/source-packs \
   --paper-id zotero-ITEM1 \
   --run-id run-fixture \
-  --stages acceptance,classify,writeback \
+  --stages extract-native,extract-ocr,route,structure,summarize,card,index,acceptance,classify,writeback \
+  --native-extraction-evidence /path/to/native-evidence.json \
+  --ocr-extraction-evidence /path/to/ocr-evidence.json \
+  --route-selection-evidence /path/to/route-evidence.json \
+  --structure-evidence /path/to/structure-evidence.json \
+  --summary-evidence /path/to/summary-evidence.json \
+  --card-evidence /path/to/card-evidence.json \
+  --index-evidence /path/to/index-evidence.json \
   --handoff /path/to/handoff.jsonl \
   --classification-evidence /path/to/classification-evidence.json \
+  --writeback preview \
   --release-preflight
 ```
 
@@ -215,6 +240,8 @@ millefeuille run \
     files.
   - Used for PDF recovery, OCR calls, model calls, source-pack writes, OpenKB
     writes, index writes, Zotero writes, and release actions.
+  - The current stage-oriented preview CLI stops with exit code `3`; it does
+    not implement approved-live execution.
 
 ## Exit Rules
 

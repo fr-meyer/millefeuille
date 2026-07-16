@@ -14,6 +14,7 @@ from millefeuille.domain.index_fixtures import (
     INDEX_STATUS_REF,
     load_retrieval_index_status,
 )
+from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.stage_runtime import (
     load_json_object,
     relative_ref,
@@ -42,6 +43,13 @@ def retrieve_artifact_refs(
         item_key=item_key,
     )
     summary_payload = load_hierarchical_summary(resolved.run_dir / SUMMARY_ARTIFACT_REF)
+    _require_identity(
+        payload=summary_payload,
+        label="hierarchical summary",
+        paper_id=resolved.paper_id,
+        run_id=resolved.run_id,
+        source_hash=None,
+    )
     summaries = [
         dict(entry)
         for entry in summary_payload["summaries"]
@@ -49,6 +57,13 @@ def retrieve_artifact_refs(
         and (grain is None or entry["grain"] == grain)
     ]
     index_payload = load_retrieval_index_status(resolved.run_dir / INDEX_STATUS_REF)
+    _require_identity(
+        payload=index_payload,
+        label="retrieval index status",
+        paper_id=resolved.paper_id,
+        run_id=resolved.run_id,
+        source_hash=resolved.source_hash,
+    )
     lanes = [
         dict(entry)
         for entry in index_payload["lanes"]
@@ -91,3 +106,25 @@ def retrieve_artifact_refs(
             resolved.run_dir,
         )
     return result
+
+
+def _require_identity(
+    *,
+    payload: dict[str, Any],
+    label: str,
+    paper_id: str,
+    run_id: str,
+    source_hash: str | None,
+) -> None:
+    expected_identity = {
+        "paper_id": paper_id,
+        "run_id": run_id,
+    }
+    if source_hash is not None:
+        expected_identity["source_hash"] = source_hash
+    for field_name, expected in expected_identity.items():
+        actual = payload.get(field_name)
+        if actual != expected:
+            raise MillefeuilleContractError(
+                f"{label} {field_name} drift: expected {expected!r}, got {actual!r}"
+            )

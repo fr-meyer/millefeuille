@@ -1,1 +1,1 @@
-feat: add acceptance and classification preview stages
+feat: add resumable offline stage previews
