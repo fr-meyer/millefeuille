@@ -1,0 +1,7 @@
+chore: make Speculoos path metadata portable
+
+Clear the transient worktree location from the committed manifest and keep
+repo-local task surfaces aligned with the metadata correction.
+
+No live Zotero, PDF, OCR, PageIndex, OpenKB, index, source-pack, credential,
+main-branch, release, or package publication actions.

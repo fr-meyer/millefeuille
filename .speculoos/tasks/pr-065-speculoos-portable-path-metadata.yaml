@@ -1,0 +1,57 @@
+id: pr-065-speculoos-portable-path-metadata
+title: Remove transient worktree path from Speculoos metadata
+status: implementation
+branch: chore/pr-065-speculoos-portable-path-metadata
+base_branch: dev
+github:
+  issue: null
+  pull_request: 65
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/65
+  head_sha: 995468af5e12853e61c59fb61e672e07a96530cb
+post_merge_expected:
+  pull_request: 65
+  base_branch: dev
+  head_branch: chore/pr-065-speculoos-portable-path-metadata
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - clear the transient worktree location from the committed Speculoos manifest
+  - keep repository discovery portable across canonical clones and temporary worktrees
+  - record this metadata-only correction in the repo-local task and surface ledgers
+non_goals:
+  - application code or behavior changes
+  - live Zotero reads or writes
+  - PDF recovery, OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, index writes, or source-pack writes
+  - changing credential values, permissions, rulesets, or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - repository.local_path is null in the committed manifest
+  - Speculoos resolves the current checkout from the command repository root
+  - the active task, GitHub surface, and local Plancha surface agree on the correction branch
+  - metadata parse, diff check, Speculoos status, validation, and publication checks pass
+validation:
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-065-speculoos-portable-path-metadata --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-065-speculoos-portable-path-metadata --pr-body specs/pr-065-speculoos-portable-path-metadata/pr-body.md --commit-message specs/pr-065-speculoos-portable-path-metadata/commit-message.txt --json"
+publication_boundary:
+  statement: "Metadata-only portability correction. No live Zotero read or write, PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, source-pack write, credential or permission change, main-branch merge, release tag, package publication, or approval bypass."
+documentation_impact:
+  status: none
+  rationale: The correction changes only repo-local workflow metadata and does not alter user-facing behavior.
+notes:
+  - "Started from remote dev commit eda00b941a33a3d0ce6841f46ac8b7d57059fa01 after broker synchronization."
+evidence:
+  - "The previously committed transient worktree location no longer exists."
+  - "Sibling Speculoos manifests demonstrate that repository.local_path accepts null for portable checkout discovery."
+  - "Full unittest discovery passed: 230 tests."
+  - "Ruff, metadata parse, diff check, Speculoos status, validation, and publication checks passed."
+  - "PR #65 opened as a user-authored pull request targeting dev."
+  - "Live PR title, body, base, head, author, commit list, and hosted patch matched the sanitized publication packet."
+  - "Project item unavailable; no ProjectV2 mutation was attempted."
