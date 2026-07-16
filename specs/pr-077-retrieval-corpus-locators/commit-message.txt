@@ -1,0 +1,12 @@
+feat: add corpus-aware artifact retrieval
+
+Complete task pr-077-retrieval-corpus-locators with deterministic read-only
+package lookup by direct identity, normalized DOI, or normalized title plus
+section, page, index, summary, and classification-evidence ref filters.
+
+Fail closed on traversal, identity drift, symlinked cards, and missing or
+ambiguous corpus matches without returning private paper content or performing
+live Zotero, provider, source-pack, OpenKB, index, release, or publication
+operations.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

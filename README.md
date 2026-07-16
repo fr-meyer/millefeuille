@@ -229,6 +229,7 @@ millefeuille acceptance --source-pack-root ./source-packs --paper-id zotero-ITEM
 millefeuille classify --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --evidence classification-evidence.json
 millefeuille writeback --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --writeback preview
 millefeuille retrieve --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001
+millefeuille retrieve --source-pack-root ./source-packs --doi https://doi.org/10.1234/example --run-id run-001 --section methods --evidence-need classification --json
 millefeuille models
 millefeuille run --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --stages acceptance,classify,writeback --handoff handoff.jsonl --classification-evidence classification-evidence.json --release-preflight
 ```
@@ -241,7 +242,12 @@ These commands stay offline and preview-only in the current contract slice:
   queues, and writeback previews from explicit local evidence.
 - `writeback` turns the preview classification output into a governed Zotero
   writeback plan without mutating Zotero.
-- `retrieve` lists stored artifact references for downstream inspection.
+- `retrieve` resolves verified packages by paper id, Zotero item key, source-pack
+  slug, normalized DOI, or normalized exact title, then lists stored artifact
+  references for downstream inspection. Optional scope, grain, index-lane,
+  section, page, and classification-evidence filters never paste private paper
+  content. Corpus ambiguity, identity drift, traversal, and invalid page queries
+  fail closed.
 - `models` prints the bundled offline model-profile catalog.
 - `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
   and `index` expose the existing fixture writers as explicit single-paper

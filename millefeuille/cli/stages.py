@@ -147,9 +147,15 @@ def run_stage_cli(
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                slug=args.slug,
+                doi=args.doi,
+                title=args.title,
                 summary_scope=args.summary_scope,
                 grain=args.grain,
                 index_lane=args.index_lane,
+                section=args.section,
+                page=args.page,
+                evidence_need=args.evidence_need,
             )
         elif args.command == "models":
             payload = DEFAULT_MODEL_PROFILE_BUNDLE
@@ -291,10 +297,24 @@ def _build_parser() -> argparse.ArgumentParser:
         "retrieve",
         help="Return refs into an existing Millefeuille artifact package.",
     )
-    _add_run_locator_args(retrieve)
+    _add_mode_arg(retrieve)
+    retrieve.add_argument("--source-pack-root", required=True)
+    retrieve_source = retrieve.add_mutually_exclusive_group(required=True)
+    retrieve_source.add_argument("--paper-id")
+    retrieve_source.add_argument("--item-key")
+    retrieve_source.add_argument("--slug")
+    retrieve_source.add_argument("--doi")
+    retrieve_source.add_argument("--title")
+    retrieve.add_argument("--run-id", required=True)
     retrieve.add_argument("--summary-scope")
     retrieve.add_argument("--grain")
     retrieve.add_argument("--index-lane")
+    retrieve.add_argument("--section")
+    retrieve.add_argument("--page", type=int)
+    retrieve.add_argument(
+        "--evidence-need",
+        choices=("classification",),
+    )
     retrieve.add_argument("--json", action="store_true")
 
     models = subparsers.add_parser(
