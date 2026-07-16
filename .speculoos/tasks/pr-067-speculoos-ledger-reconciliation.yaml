@@ -1,0 +1,66 @@
+id: pr-067-speculoos-ledger-reconciliation
+title: Reconcile merged Speculoos task ledgers
+status: implementation
+branch: chore/pr-067-speculoos-ledger-reconciliation
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  url: null
+  head_sha: null
+post_merge_expected:
+  pull_request: 67
+  base_branch: dev
+  head_branch: chore/pr-067-speculoos-ledger-reconciliation
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - reconcile merged task files whose status or GitHub evidence remained stale
+  - add PR #39 and PRs #56 through #61 to both completed ledgers
+  - record exact reviewed heads, merge commits, review URLs, and check-run URLs from live readback
+  - document the disposition of historical informational findings without changing application behavior
+  - keep the manifest, GitHub surface, and local Plancha surface aligned on this reconciliation task
+non_goals:
+  - application code or behavior changes
+  - reinterpretation of historical review conclusions
+  - live Zotero reads or writes
+  - PDF recovery, OCR/Mistral/PageIndex provider calls, model calls, worker-agent execution, OpenKB writes, index writes, or source-pack writes
+  - changing credential values, permissions, rulesets, or secret handling
+  - dev-to-main promotion, release tag, or package publication
+acceptance:
+  - every merged task file has a matching entry in both completed ledgers
+  - every completed-ledger entry maps to a task file whose status is merged
+  - manifest and GitHub completed-ledger task IDs agree exactly
+  - reconciled PR evidence matches live PR base, head, merge, review, and check facts
+  - all historical non-blocking findings are explicitly dispositioned
+  - application code and user-facing documentation remain unchanged
+  - tests, Ruff, metadata parse, ledger audit, diff check, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "merged-task and completed-ledger consistency audit"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-067-speculoos-ledger-reconciliation --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-067-speculoos-ledger-reconciliation --pr-body specs/pr-067-speculoos-ledger-reconciliation/pr-body.md --commit-message specs/pr-067-speculoos-ledger-reconciliation/commit-message.txt --json"
+publication_boundary:
+  statement: "Metadata-only ledger reconciliation. No application behavior change, live Zotero read or write, PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, source-pack write, credential or permission change, main-branch merge, release tag, package publication, or approval bypass."
+documentation_impact:
+  status: none
+  rationale: The reconciliation changes only repo-local workflow metadata and does not alter user-facing behavior.
+notes:
+  - "Started from synchronized dev commit 9dcbbed58863834d1c6b590a065b4450f715298e."
+evidence:
+  - "Live readback confirms PR #39 and PRs #44, #46, #49, and #56 through #61 are closed and merged into dev."
+  - "Each reconciled feature or metadata PR has an approved exact-head Mergeguez review and zero blocking findings."
+  - "Historical informational findings are recorded in the affected task files with their non-remediation rationale."
+  - "Historical check-run URLs use the current repository slug while preserving their original run IDs."
+  - "Full unittest discovery passed: 230 tests."
+  - "Ruff, hard-rename identity guard, metadata parse, ledger audit, diff check, Speculoos validation, and publication checks passed."
+  - "No ProjectV2 item is linked; no ProjectV2 mutation is attempted."

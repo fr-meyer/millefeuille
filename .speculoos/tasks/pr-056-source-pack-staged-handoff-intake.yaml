@@ -1,6 +1,6 @@
 id: pr-056-source-pack-staged-handoff-intake
 title: Wire source-pack intake into staged handoff path
-status: implementation
+status: merged
 branch: feat/pr-056-source-pack-staged-handoff-intake
 base_branch: dev
 github:
@@ -8,9 +8,13 @@ github:
   pull_request: 56
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
-  head_sha: 119c52920c8c53fcede2193a81ac5b36bd9d2155
+  head_sha: 29fc20793770022a9c3557633462933051c16bd9
+  url: https://github.com/fr-meyer/millefeuille/pull/56
+  merge_commit: d1add6a5b7a9ae16174186dceeb19e38a7ed4f61
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/56#pullrequestreview-4690892419
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87001132751
 post_merge_expected:
   pull_request: 56
   base_branch: dev
@@ -67,3 +71,6 @@ evidence:
   - "Manual reproduction of a two-PDF same-item handoff now fails before any source-pack directory is created."
   - 'PR #56 opened for pr-056-source-pack-staged-handoff-intake'
   - 'PR #56 linked to Project item unavailable'
+  - "Final exact head 29fc20793770022a9c3557633462933051c16bd9 was approved by Mergeguez with zero findings and zero blocking findings."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87001132751."
+  - "PR #56 squash-merged to dev as d1add6a5b7a9ae16174186dceeb19e38a7ed4f61 by mergeguez[bot]."

@@ -1,6 +1,6 @@
 id: pr-060-summary-fixtures
 title: Add summary fixtures
-status: implementation
+status: merged
 branch: feat/pr-060-summary-fixtures
 base_branch: dev
 github:
@@ -8,8 +8,13 @@ github:
   pull_request: 60
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
+  head_sha: 2cfbfa634ebafefd65a1e8668dd88abd7db74459
+  url: https://github.com/fr-meyer/millefeuille/pull/60
+  merge_commit: 96717617811703d8327b1f4575aa000fd80b49c7
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/60#pullrequestreview-4691410002
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87015614273
 post_merge_expected:
   pull_request: 60
   base_branch: dev
@@ -56,3 +61,6 @@ evidence:
   - "Full unittest discovery passed: 211 tests."
   - "Ruff, metadata parse, git diff --check, speculoos status, speculoos validate, and speculoos publish-check passed."
   - "Published as PR #60 at https://github.com/fr-meyer/millefeuille/pull/60 with exact head d1a24321c4745aff557fb76dbecbf0519c01ffb0."
+  - "Final exact head 2cfbfa634ebafefd65a1e8668dd88abd7db74459 was approved by Mergeguez with zero findings and zero blocking findings."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87015614273."
+  - "PR #60 squash-merged to dev as 96717617811703d8327b1f4575aa000fd80b49c7 by mergeguez[bot]."

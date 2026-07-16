@@ -1,6 +1,6 @@
 id: pr-057-source-pack-extraction-fixtures
 title: Add source-pack extraction fixtures
-status: implementation
+status: merged
 branch: feat/pr-057-source-pack-extraction-fixtures
 base_branch: dev
 github:
@@ -8,9 +8,13 @@ github:
   pull_request: 57
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
-  head_sha: 3d6cb4fe7b9b2132ec6fa15b74322e153cdd2fbb
+  head_sha: 0831599321ae4a35d55e07a57a204efb2d88a35f
+  url: https://github.com/fr-meyer/millefeuille/pull/57
+  merge_commit: cbe60b8916d231c484ad44cec11498c1146a5f86
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/57#pullrequestreview-4690957725
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87002985860
 post_merge_expected:
   pull_request: 57
   base_branch: dev
@@ -60,3 +64,7 @@ evidence:
   - "Speculoos status and validate passed for pr-057-source-pack-extraction-fixtures."
   - 'PR #57 opened for pr-057-source-pack-extraction-fixtures'
   - 'PR #57 linked to Project item unavailable'
+  - "Final exact head 0831599321ae4a35d55e07a57a204efb2d88a35f was approved by Mergeguez with four informational review-coverage notes and zero blocking findings."
+  - "The four notes concerned truncated review payloads rather than identified product defects; the reviewer requested no remediation."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87002985860."
+  - "PR #57 squash-merged to dev as cbe60b8916d231c484ad44cec11498c1146a5f86 by mergeguez[bot]."

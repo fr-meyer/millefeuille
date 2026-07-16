@@ -1,6 +1,6 @@
 id: pr-059-structure-fixtures
 title: Add structure fixtures
-status: implementation
+status: merged
 branch: feat/pr-059-structure-fixtures
 base_branch: dev
 github:
@@ -8,8 +8,13 @@ github:
   pull_request: 59
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
+  head_sha: 68c12cd4261b1afe03910801d154556a3206747b
+  url: https://github.com/fr-meyer/millefeuille/pull/59
+  merge_commit: 7187e2652bd1b16292eb73fdcd5cc2c01658ea02
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/59#pullrequestreview-4691226267
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87011029019
 post_merge_expected:
   pull_request: 59
   base_branch: dev
@@ -56,3 +61,7 @@ evidence:
   - "Full unittest discovery passed: 207 tests."
   - "Ruff, metadata parse, git diff --check, and speculoos validate passed."
   - "Published as PR #59 at https://github.com/fr-meyer/millefeuille/pull/59 with exact head 4f607cb4096e00e3fb474fce4427cdbae176cd4e."
+  - "Final exact head 68c12cd4261b1afe03910801d154556a3206747b was approved by Mergeguez with two non-blocking notes and zero blocking findings."
+  - "The truncated-payload note was a review-coverage limitation; the suggested CLI simplification was stylistic, did not affect correctness, and is outside this metadata-only reconciliation."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87011029019."
+  - "PR #59 squash-merged to dev as 7187e2652bd1b16292eb73fdcd5cc2c01658ea02 by mergeguez[bot]."
