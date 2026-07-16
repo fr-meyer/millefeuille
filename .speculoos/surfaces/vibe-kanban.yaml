@@ -14,7 +14,7 @@ notes:
   - No Vibe cloud or org API is configured for this repo.
   - Bootstrap should not depend on Vibe reachability.
 task:
-  status: review
-  id: pr-071-batch-acceptance
-  speculoos_task: .speculoos/tasks/pr-071-batch-acceptance.yaml
+  status: idle
+  id: null
+  speculoos_task: null
   command: null
