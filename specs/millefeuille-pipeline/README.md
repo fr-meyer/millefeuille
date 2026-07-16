@@ -22,6 +22,10 @@ Files:
 - `acceptance-batch-manifest.schema.json` - deterministic offline batch input
   locators.
 - `acceptance-batch-summary.schema.json` - aggregate pass/review result shape.
+- `classification-batch-manifest.schema.json` - locked-taxonomy offline batch
+  routing inputs and evidence refs.
+- `classification-batch-summary.schema.json` - aggregate classification routes,
+  counts, and review/adjudication status.
 - `retrieval-index-contract.md` - OpenKB/PageIndex and optional index lanes.
 - `classification-orchestration.md` - CLI-owned classification modes and
   multi-agent governance.
@@ -35,8 +39,8 @@ Files:
 Executable offline contract models live in
 `millefeuille/domain/millefeuille.py`. They cover stage manifests,
 manual gates, tag-state transitions, single-run and batch acceptance summaries,
-classification records, writeback plans, and release-preflight records without
-requiring live provider or Zotero mutation.
+single-run and batch classification records, writeback plans, and
+release-preflight records without requiring live provider or Zotero mutation.
 
 Preview/read-only stage commands now live under `millefeuille/cli/stages.py`:
 `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,

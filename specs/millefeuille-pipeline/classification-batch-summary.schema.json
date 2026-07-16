@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Millefeuille classification batch summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "batch_id",
+    "taxonomy_version",
+    "status",
+    "counts",
+    "routes",
+    "runs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-classification-batch-summary/v0.1"
+    },
+    "batch_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "taxonomy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "classified",
+        "needs-review",
+        "adjudication-required"
+      ]
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runs",
+        "classified",
+        "needs_review",
+        "adjudication_required"
+      ],
+      "properties": {
+        "runs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "classified": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "needs_review": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "adjudication_required": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "primary_path",
+          "count",
+          "runs"
+        ],
+        "properties": {
+          "primary_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "runs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "paper_id",
+                "run_id",
+                "status",
+                "decision_ref"
+              ],
+              "properties": {
+                "paper_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "run_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "enum": [
+                    "classified",
+                    "needs-review",
+                    "adjudication-required"
+                  ]
+                },
+                "decision_ref": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "paper_id",
+          "run_id",
+          "source_hash",
+          "taxonomy_version",
+          "status",
+          "primary_path",
+          "decision_ref",
+          "writeback_preview_ref"
+        ],
+        "properties": {
+          "paper_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "run_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_hash": {
+            "type": "string",
+            "pattern": "^sha256(?:-aggregate)?:[a-f0-9]{64}$"
+          },
+          "taxonomy_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "classified",
+              "needs-review",
+              "adjudication-required"
+            ]
+          },
+          "primary_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decision_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "writeback_preview_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "review_reasons": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

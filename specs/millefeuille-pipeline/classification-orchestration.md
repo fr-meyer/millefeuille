@@ -32,7 +32,12 @@ contains deeper paper evidence needed to resolve the decision.
 
 - `batch`
   - Many paper packages under one taxonomy version.
-  - Produces a batch manifest and aggregate report.
+  - The offline CLI accepts an explicit versioned manifest whose evidence refs
+    resolve relative to that manifest.
+  - Every run, passing acceptance summary, evidence package, taxonomy version,
+    and resolved identity preflights before classification output begins.
+  - Produces deterministic per-run decisions plus aggregate JSON and Markdown
+    routing reports under `batches/millefeuille/<batch-id>/classification/`.
 
 - `review`
   - Rechecks prior classifications or QA samples.
@@ -102,6 +107,14 @@ Classification should create:
 - `adjudication-queue.jsonl` for unresolved cases
 - `taxonomy-change-requests.jsonl` when the locked taxonomy appears inadequate
 - `zotero-writeback-preview.json`
+
+Offline batch input and output follow
+`millefeuille-classification-batch-manifest/v0.1` and
+`millefeuille-classification-batch-summary/v0.1`. Batch evidence must declare
+`mode: batch` and match the manifest's locked taxonomy version. The aggregate
+sorts run identities and primary-path routes deterministically, records
+classified/review/adjudication counts, and returns a review exit without
+dropping other valid decisions.
 
 ## Zotero Writeback
 

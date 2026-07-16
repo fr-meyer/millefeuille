@@ -283,6 +283,38 @@ This path remains local and fixture-only. It does not read or mutate live
 Zotero data, recover PDFs, call OCR/model/OpenKB/index providers, execute
 worker agents, or approve a release.
 
+### Offline Batch Classification
+
+To route several accepted runs under one locked taxonomy without model or
+worker execution, provide a classification batch manifest:
+
+```bash
+millefeuille classify \
+  --source-pack-root /path/to/source-packs \
+  --batch-manifest /path/to/classification-batch.json \
+  --json
+```
+
+The manifest uses `millefeuille-classification-batch-manifest/v0.1`, supplies
+one traversal-safe `batch_id` and `taxonomy_version`, and lists unique
+`paper_id` or `item_key` plus `run_id` locators. Each entry also supplies a
+traversal-safe `evidence_ref` relative to the manifest. Every run must already
+have passing acceptance evidence, and every referenced classification evidence
+file must declare `mode: batch` and the locked taxonomy version.
+
+Millefeuille preflights the complete batch before writing. It preserves the
+existing per-run classification artifacts and emits deterministic aggregate
+routing output at
+`batches/millefeuille/<batch-id>/classification/batch-classification-summary.json`
+and `batch-classification-report.md`. The aggregate groups decisions by primary
+taxonomy path and counts `classified`, `needs-review`, and
+`adjudication-required` results. Review and adjudication outcomes return exit
+code `2` without suppressing valid per-run outputs.
+
+This path consumes explicit local evidence only. It does not call a model,
+execute worker agents, mutate a taxonomy, write Zotero/OpenKB/index state, or
+grant approval for any live or release operation.
+
 ```bash
 millefeuille artifacts --index /path/to/artifact-index.json
 millefeuille status --index /path/to/artifact-index.json

@@ -1,0 +1,12 @@
+feat: add offline batch classification
+
+Complete task pr-073-batch-classification with a locked-taxonomy batch
+manifest, preflight-all run and evidence validation, deterministic aggregate
+routing reports, and regression coverage for classified, review,
+adjudication, duplicate, taxonomy-drift, and traversal cases.
+
+Document the offline CLI and storage contract without performing live Zotero,
+OCR, model, worker, OpenKB, index, source-pack, release, or publication
+operations.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

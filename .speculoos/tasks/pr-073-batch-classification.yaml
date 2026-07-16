@@ -1,0 +1,71 @@
+id: pr-073-batch-classification
+title: Add deterministic offline batch classification routing
+status: implementation
+branch: feat/pr-073-batch-classification
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  url: null
+  head_sha: pending-publication
+  merge_commit: null
+  mergeguez_review: null
+  mergeguez_check_run: null
+post_merge_expected:
+  pull_request: 73
+  base_branch: dev
+  head_branch: feat/pr-073-batch-classification
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - extend the existing offline classify command with an explicit versioned batch manifest
+  - lock one taxonomy version across all listed existing paper/run packages
+  - preflight every acceptance summary, evidence package, locator, taxonomy, and resolved identity before writes begin
+  - reject traversal-unsafe batch ids or evidence refs, invalid types, unsupported fields, and duplicate resolved identities
+  - preserve deterministic per-run classification artifacts and emit aggregate JSON and Markdown routing reports
+  - aggregate classified, needs-review, and adjudication-required outcomes without skipping valid runs
+  - keep exact-input reruns byte-stable and document the batch storage and CLI contracts
+non_goals:
+  - live model-backed classification or provider calls
+  - multi-agent or worker-agent execution
+  - review/adjudication execution or automated taxonomy mutation
+  - live Zotero, OpenKB, PageIndex, ConDB, ChatIndex, source-pack, or index writes
+  - credentials, permissions, rulesets, or secret handling changes
+  - dev-to-main promotion, release tag, package publication, or production deployment
+acceptance:
+  - a batch manifest identifies a non-empty set of unique paper or item locators, run ids, and relative evidence refs
+  - one locked taxonomy version and batch mode are enforced across every evidence package
+  - all run packages and evidence preflight before any per-run or aggregate classification output is written
+  - per-run outputs and aggregate routes are sorted deterministically and remain byte-stable on exact reruns
+  - aggregate counts and status distinguish classified, needs-review, and adjudication-required runs
+  - review or adjudication outcomes do not suppress other valid run results and produce a non-zero CLI status
+  - input/output JSON schemas and user-facing CLI/storage documentation describe the offline contract
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_classification_batch tests.test_millefeuille_stage_cli tests.test_millefeuille_contract_artifacts tests.test_millefeuille_contract_models -v"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-073-batch-classification --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-073-batch-classification --pr-body specs/pr-073-batch-classification/pr-body.md --commit-message specs/pr-073-batch-classification/commit-message.txt --json"
+publication_boundary:
+  statement: "Offline fixture-only batch classification over existing temporary source-pack runs and explicit local evidence. No live Zotero read or write, PDF recovery, source-pack mutation against real documents, OCR/model/provider call, worker-agent execution, OpenKB/index write, credential or permission change, main-branch merge, release, package publication, production deployment, or approval bypass."
+documentation_impact:
+  status: updated
+  rationale: Root and pipeline documentation now describe deterministic offline batch classification, its schemas, aggregate routes, exit semantics, and manual boundaries.
+notes:
+  - "Started from synchronized dev commit 40db3ff7460464d628009a30b0f7f2dd4d752b52."
+  - "The remaining-work pipeline explicitly lists larger batch routing, and PR #71 deliberately excluded batch classification from its acceptance-only scope."
+evidence:
+  - "Focused batch-classification, stage-CLI, contract-artifact, and contract-model suites passed: 37 tests."
+  - "Full unittest discovery passed: 243 tests."
+  - "Ruff, hard-rename guard, YAML/JSON parse, and diff check passed."
+  - "Regression coverage proves deterministic ordering, byte-stable reruns, locked taxonomy enforcement, aggregate classified/review/adjudication behavior, and preflight failure before writes for duplicate, taxonomy-drift, invalid-type, or traversal-unsafe inputs."
+  - "Speculoos validation, private-data scan, documentation sync, and publication checks passed."

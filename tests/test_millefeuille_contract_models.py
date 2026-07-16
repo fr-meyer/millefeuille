@@ -11,6 +11,8 @@ from millefeuille.domain.millefeuille import (
     AcceptanceStatus,
     AcceptanceSummaryRecord,
     AttachmentEvidenceIdentity,
+    ClassificationBatchRunRecord,
+    ClassificationBatchSummaryRecord,
     ClassificationDecisionRecord,
     ClassificationMode,
     ClassificationPlanRecord,
@@ -497,6 +499,68 @@ class TestOCREvidenceContract(unittest.TestCase):
         self.assertEqual(plan.to_dict()["default_profile"], "research-default")
         self.assertEqual(writeback.to_dict()["status"], "previewed")
         self.assertEqual(preflight.to_dict()["readiness"], "ready-for-rc-review")
+
+    def test_classification_batch_summary_enforces_routes_and_counts(self):
+        decision_ref = (
+            "zotero/zotero-ITEM1/analyses/millefeuille/"
+            "run-1/classification/decision-records/zotero-ITEM1.json"
+        )
+        run = ClassificationBatchRunRecord(
+            paper_id="zotero-ITEM1",
+            run_id="run-1",
+            source_hash="sha256:" + ("a" * 64),
+            taxonomy_version="taxonomy-v1",
+            status=ClassificationStatus.CLASSIFIED,
+            primary_path="Methods > Optimization",
+            decision_ref=decision_ref,
+            writeback_preview_ref=(
+                "zotero/zotero-ITEM1/analyses/millefeuille/"
+                "run-1/classification/zotero-writeback-preview.json"
+            ),
+        )
+        summary = ClassificationBatchSummaryRecord(
+            batch_id="classification-fixture",
+            taxonomy_version="taxonomy-v1",
+            status=ClassificationStatus.CLASSIFIED,
+            counts={
+                "runs": 1,
+                "classified": 1,
+                "needs_review": 0,
+                "adjudication_required": 0,
+            },
+            routes=[
+                {
+                    "primary_path": "Methods > Optimization",
+                    "count": 1,
+                    "runs": [
+                        {
+                            "paper_id": "zotero-ITEM1",
+                            "run_id": "run-1",
+                            "status": "classified",
+                            "decision_ref": decision_ref,
+                        }
+                    ],
+                }
+            ],
+            runs=[run],
+        )
+
+        payload = summary.to_dict()
+
+        self.assertEqual(
+            payload["schema_version"],
+            "millefeuille-classification-batch-summary/v0.1",
+        )
+        self.assertEqual(payload["routes"][0]["count"], 1)
+        with self.assertRaises(MillefeuilleContractError):
+            ClassificationBatchSummaryRecord(
+                batch_id="classification-fixture",
+                taxonomy_version="taxonomy-v1",
+                status=ClassificationStatus.NEEDS_REVIEW,
+                counts=summary.counts,
+                routes=summary.routes,
+                runs=summary.runs,
+            )
 
 
 if __name__ == "__main__":
