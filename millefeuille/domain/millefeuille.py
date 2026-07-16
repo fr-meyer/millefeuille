@@ -120,6 +120,14 @@ class ClassificationStatus(_StringEnum):
     ADJUDICATION_REQUIRED = "adjudication-required"
 
 
+class ClassificationActionOutcome(_StringEnum):
+    NO_CHANGE = "no-change"
+    CORRECTED = "corrected"
+    ESCALATED = "escalated"
+    CONFIRMED = "confirmed"
+    TAXONOMY_CHANGE_REQUESTED = "taxonomy-change-requested"
+
+
 class ProviderPayloadDisposition(_StringEnum):
     DISCARDED = "discarded"
     QUARANTINED = "quarantined"
@@ -1426,6 +1434,166 @@ class ClassificationDecisionRecord:
             payload["qa_flags"] = list(self.qa_flags)
         if self.writeback_preview_ref is not None:
             payload["writeback_preview_ref"] = self.writeback_preview_ref
+        return payload
+
+
+@dataclass
+class ClassificationActionRecord:
+    action_id: str
+    paper_id: str
+    run_id: str
+    source_hash: str
+    taxonomy_version: str
+    mode: ClassificationMode | str
+    outcome: ClassificationActionOutcome | str
+    status: ClassificationStatus | str
+    summary: str
+    prior_decision_ref: str
+    final_decision_ref: str
+    writeback_preview_ref: str
+    evidence_refs: list[str]
+    taxonomy_change_request_ref: str | None = None
+    schema_version: str = "millefeuille-classification-action/v0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "millefeuille-classification-action/v0.1":
+            raise MillefeuilleContractError(
+                f"unsupported schema_version {self.schema_version!r}"
+            )
+        for field_name in (
+            "action_id",
+            "paper_id",
+            "run_id",
+            "source_hash",
+            "taxonomy_version",
+            "summary",
+            "prior_decision_ref",
+            "final_decision_ref",
+            "writeback_preview_ref",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string"
+                )
+        self.mode = _coerce_enum(ClassificationMode, self.mode)
+        if self.mode not in {
+            ClassificationMode.REVIEW,
+            ClassificationMode.ADJUDICATE,
+        }:
+            raise MillefeuilleContractError(
+                "classification action mode must be review or adjudicate"
+            )
+        self.outcome = _coerce_enum(ClassificationActionOutcome, self.outcome)
+        allowed_outcomes = {
+            ClassificationMode.REVIEW: {
+                ClassificationActionOutcome.NO_CHANGE,
+                ClassificationActionOutcome.CORRECTED,
+                ClassificationActionOutcome.ESCALATED,
+            },
+            ClassificationMode.ADJUDICATE: {
+                ClassificationActionOutcome.CONFIRMED,
+                ClassificationActionOutcome.CORRECTED,
+                ClassificationActionOutcome.TAXONOMY_CHANGE_REQUESTED,
+            },
+        }
+        if self.outcome not in allowed_outcomes[self.mode]:
+            raise MillefeuilleContractError(
+                f"outcome {self.outcome.value!r} is invalid for mode "
+                f"{self.mode.value!r}"
+            )
+        self.status = _coerce_enum(ClassificationStatus, self.status)
+        unresolved = self.outcome in {
+            ClassificationActionOutcome.ESCALATED,
+            ClassificationActionOutcome.TAXONOMY_CHANGE_REQUESTED,
+        }
+        expected_status = (
+            ClassificationStatus.ADJUDICATION_REQUIRED
+            if unresolved
+            else ClassificationStatus.CLASSIFIED
+        )
+        if self.status != expected_status:
+            raise MillefeuilleContractError(
+                "classification action status must reflect its outcome"
+            )
+        if not isinstance(self.evidence_refs, list) or not self.evidence_refs:
+            raise MillefeuilleContractError(
+                "classification action evidence_refs must be a non-empty array"
+            )
+        for ref in self.evidence_refs:
+            if not isinstance(ref, str) or not ref.strip():
+                raise MillefeuilleContractError(
+                    "classification action evidence_refs must contain "
+                    "non-empty strings"
+                )
+        if self.taxonomy_change_request_ref is not None and (
+            not isinstance(self.taxonomy_change_request_ref, str)
+            or not self.taxonomy_change_request_ref.strip()
+        ):
+            raise MillefeuilleContractError(
+                "taxonomy_change_request_ref must be a non-empty string when "
+                "provided"
+            )
+        requires_taxonomy_request = (
+            self.outcome == ClassificationActionOutcome.TAXONOMY_CHANGE_REQUESTED
+        )
+        if requires_taxonomy_request != (
+            self.taxonomy_change_request_ref is not None
+        ):
+            raise MillefeuilleContractError(
+                "taxonomy-change-requested actions require exactly one "
+                "taxonomy_change_request_ref"
+            )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ClassificationActionRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError(
+                "classification action must be an object"
+            )
+        return cls(
+            action_id=str(payload.get("action_id", "")).strip(),
+            paper_id=str(payload.get("paper_id", "")).strip(),
+            run_id=str(payload.get("run_id", "")).strip(),
+            source_hash=str(payload.get("source_hash", "")).strip(),
+            taxonomy_version=str(payload.get("taxonomy_version", "")).strip(),
+            mode=str(payload.get("mode", "")).strip(),
+            outcome=str(payload.get("outcome", "")).strip(),
+            status=str(payload.get("status", "")).strip(),
+            summary=str(payload.get("summary", "")).strip(),
+            prior_decision_ref=str(payload.get("prior_decision_ref", "")).strip(),
+            final_decision_ref=str(payload.get("final_decision_ref", "")).strip(),
+            writeback_preview_ref=str(
+                payload.get("writeback_preview_ref", "")
+            ).strip(),
+            evidence_refs=list(payload.get("evidence_refs", [])),
+            taxonomy_change_request_ref=payload.get(
+                "taxonomy_change_request_ref"
+            ),
+            schema_version=str(payload.get("schema_version", "")).strip(),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "schema_version": self.schema_version,
+            "action_id": self.action_id,
+            "paper_id": self.paper_id,
+            "run_id": self.run_id,
+            "source_hash": self.source_hash,
+            "taxonomy_version": self.taxonomy_version,
+            "mode": self.mode.value,
+            "outcome": self.outcome.value,
+            "status": self.status.value,
+            "summary": self.summary,
+            "prior_decision_ref": self.prior_decision_ref,
+            "final_decision_ref": self.final_decision_ref,
+            "writeback_preview_ref": self.writeback_preview_ref,
+            "evidence_refs": list(self.evidence_refs),
+        }
+        if self.taxonomy_change_request_ref is not None:
+            payload["taxonomy_change_request_ref"] = (
+                self.taxonomy_change_request_ref
+            )
         return payload
 
 

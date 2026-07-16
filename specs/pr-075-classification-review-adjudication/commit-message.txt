@@ -1,0 +1,11 @@
+feat: add offline classification actions
+
+Complete task pr-075-classification-review-adjudication with deterministic,
+lineage-checked review and adjudication action records over explicit local
+evidence, including resolved and unresolved routing and regression coverage.
+
+Document the offline CLI and storage contract without performing live Zotero,
+OCR, model, worker, taxonomy mutation, OpenKB, index, source-pack, release, or
+publication operations.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

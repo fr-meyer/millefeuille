@@ -41,12 +41,16 @@ contains deeper paper evidence needed to resolve the decision.
 
 - `review`
   - Rechecks prior classifications or QA samples.
-  - Produces correction or no-change records.
+  - Consumes strict local action evidence and an existing run-relative prior
+    decision after passing acceptance.
+  - Produces `no-change`, `corrected`, or `escalated` action records.
 
 - `adjudicate`
   - Resolves low-confidence, conflict, or taxonomy-gap cases.
-  - Produces final adjudication records and taxonomy-change requests when
-    needed.
+  - Starts only from a `needs-review` or `adjudication-required` prior
+    decision.
+  - Produces `confirmed`, `corrected`, or `taxonomy-change-requested` action
+    records and a reviewable taxonomy-change request when needed.
 
 - `multi-agent`
   - Optional mode for large, ambiguous, audit-heavy, or QA/adjudication batches.
@@ -115,6 +119,21 @@ Offline batch input and output follow
 sorts run identities and primary-path routes deterministically, records
 classified/review/adjudication counts, and returns a review exit without
 dropping other valid decisions.
+
+Offline review/adjudication input follows
+`millefeuille-classification-action-evidence/v0.1`; each output action record
+follows `millefeuille-classification-action/v0.1`. Before any write, the CLI
+checks the accepted run, prior paper/run/source identity, locked taxonomy,
+safe existing evidence refs, mode/outcome rules, and adjudication eligibility.
+It writes an immutable package under `classification/actions/<action-id>/`,
+preserves the prior decision, and advances the current plan, stage state,
+artifact refs, and canonical writeback preview to the action's final decision.
+Resolved actions pass. Escalations and taxonomy-change requests emit their
+queue/request evidence and leave the classify stage in `needs-review`.
+
+These action modes materialize already-supplied local decisions. They do not
+perform model classification, execute worker agents, approve or mutate a
+taxonomy, or write Zotero/OpenKB/index/source-pack state.
 
 ## Zotero Writeback
 

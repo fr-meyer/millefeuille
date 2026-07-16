@@ -28,6 +28,9 @@
   validation and aggregate pass/review reporting.
 - PR #73 adds locked-taxonomy offline batch classification with deterministic
   aggregate routing and review/adjudication reporting.
+- PR #75 adds lineage-checked offline classification review and adjudication
+  actions with immutable final records, escalation queues, and taxonomy-change
+  request artifacts.
 - Current integration branch is `dev`; stable branch is `main`.
 - Current package version is `0.4.0`.
 
@@ -133,9 +136,13 @@
     - Offline batch routing now accepts a versioned manifest, locks one taxonomy
       version, preflights every accepted run and evidence ref, preserves
       deterministic per-run decisions, and emits aggregate route/review reports.
+    - Offline review and adjudication now accept strict action evidence,
+      validate prior-decision lineage and taxonomy identity, preserve immutable
+      action/final-decision packages, and advance canonical run refs. Escalation
+      and taxonomy-gap outcomes retain deterministic queue/request artifacts.
     - Remaining work: live model-backed classification, worker-agent execution,
-      richer review/adjudication execution, and taxonomy-gap automation beyond
-      preview artifacts.
+      and taxonomy governance automation beyond reviewable change-request
+      artifacts.
     - Manual gate: model/provider calls and worker-agent execution when used.
 
 15. **Zotero Writeback**

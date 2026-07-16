@@ -315,6 +315,43 @@ This path consumes explicit local evidence only. It does not call a model,
 execute worker agents, mutate a taxonomy, write Zotero/OpenKB/index state, or
 grant approval for any live or release operation.
 
+### Offline Classification Review And Adjudication
+
+To record a deterministic review or adjudication action for one accepted run,
+provide a versioned action-evidence file alongside the run locator:
+
+```bash
+millefeuille classify \
+  --source-pack-root /path/to/source-packs \
+  --paper-id zotero-ITEM1 \
+  --run-id run-fixture \
+  --action-evidence /path/to/classification-action.json \
+  --json
+```
+
+Action evidence uses
+`millefeuille-classification-action-evidence/v0.1`, names a traversal-safe
+`action_id`, and identifies an existing run-relative decision record under the
+same accepted paper package. Millefeuille validates the prior paper, run,
+source hash, taxonomy version, and evidence refs before writing. Review accepts
+`no-change`, `corrected`, or `escalated`; adjudication accepts `confirmed`,
+`corrected`, or `taxonomy-change-requested`. Adjudication starts only from a
+`needs-review` or `adjudication-required` decision.
+
+Each immutable action package is written under
+`classification/actions/<action-id>/` with an action record, final decision,
+Markdown views, writeback preview, and deterministic queue or taxonomy-request
+JSONL when applicable. The current classification plan, artifact-index refs,
+stage status, and canonical writeback preview then point to the final action
+state while preserving the prior decision. Exact reruns are byte-stable; reuse
+of an action ID with drift is rejected before overwrite.
+
+Resolved actions return exit code `0`. `escalated` and
+`taxonomy-change-requested` actions materialize their audit artifacts and return
+exit code `2`. This path consumes explicit local evidence only: it does not call
+a model, execute worker agents, mutate the locked taxonomy, or write live
+Zotero/OpenKB/index/source-pack state.
+
 ```bash
 millefeuille artifacts --index /path/to/artifact-index.json
 millefeuille status --index /path/to/artifact-index.json

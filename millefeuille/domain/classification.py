@@ -9,6 +9,8 @@ from typing import Any
 
 from millefeuille.domain.acceptance import ACCEPTANCE_SUMMARY_REF
 from millefeuille.domain.millefeuille import (
+    ClassificationActionOutcome,
+    ClassificationActionRecord,
     ClassificationBatchRunRecord,
     ClassificationBatchSummaryRecord,
     ClassificationDecisionRecord,
@@ -24,6 +26,7 @@ from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
 from millefeuille.domain.stage_runtime import (
     ResolvedRunArtifacts,
     load_json_object,
+    load_jsonl_records,
     persist_run_artifacts,
     relative_ref,
     resolve_run_artifacts,
@@ -55,6 +58,19 @@ CLASSIFICATION_BATCH_REPORT_REF = Path(
 )
 CLASSIFICATION_BATCH_MANIFEST_SCHEMA = (
     "millefeuille-classification-batch-manifest/v0.1"
+)
+CLASSIFICATION_ACTION_EVIDENCE_SCHEMA_VERSION = (
+    "millefeuille-classification-action-evidence/v0.1"
+)
+CLASSIFICATION_ACTION_ROOT_REF = CLASSIFICATION_DIR_REF / "actions"
+CLASSIFICATION_ACTION_RECORD_REF = Path("action-record.json")
+CLASSIFICATION_ACTION_MARKDOWN_REF = Path("action-record.md")
+CLASSIFICATION_ACTION_FINAL_DECISION_REF = Path("final-decision.json")
+CLASSIFICATION_ACTION_FINAL_MARKDOWN_REF = Path("final-decision.md")
+CLASSIFICATION_ACTION_PREVIEW_REF = Path("zotero-writeback-preview.json")
+CLASSIFICATION_ACTION_ADJUDICATION_QUEUE_REF = Path("adjudication-queue.jsonl")
+CLASSIFICATION_ACTION_TAXONOMY_REQUESTS_REF = Path(
+    "taxonomy-change-requests.jsonl"
 )
 _SAFE_BATCH_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _SAFE_BATCH_LOCATOR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,255}\Z")
@@ -106,6 +122,32 @@ class ClassificationBatchWriteResult:
 
 
 @dataclass(frozen=True)
+class ClassificationActionWriteResult:
+    action_id: str
+    paper_id: str
+    run_id: str
+    mode: str
+    outcome: str
+    status: str
+    action_record_path: Path
+    final_decision_path: Path
+    writeback_preview_path: Path
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "action_id": self.action_id,
+            "paper_id": self.paper_id,
+            "run_id": self.run_id,
+            "mode": self.mode,
+            "outcome": self.outcome,
+            "status": self.status,
+            "action_record_path": str(self.action_record_path),
+            "final_decision_path": str(self.final_decision_path),
+            "writeback_preview_path": str(self.writeback_preview_path),
+        }
+
+
+@dataclass(frozen=True)
 class _PreparedClassification:
     resolved: ResolvedRunArtifacts
     decision: ClassificationDecisionRecord
@@ -120,6 +162,26 @@ class _PreparedClassification:
     taxonomy_requests_path: Path
     preview_path: Path
     batch_report_path: Path
+
+
+@dataclass(frozen=True)
+class _PreparedClassificationAction:
+    resolved: ResolvedRunArtifacts
+    action: ClassificationActionRecord
+    final_decision: ClassificationDecisionRecord
+    plan: ClassificationPlanRecord
+    preview_payload: dict[str, Any]
+    taxonomy_records: list[dict[str, Any]]
+    adjudication_records: list[dict[str, Any]]
+    action_record_path: Path
+    action_markdown_path: Path
+    final_decision_path: Path
+    final_markdown_path: Path
+    action_preview_path: Path
+    canonical_preview_path: Path
+    taxonomy_requests_path: Path
+    adjudication_queue_path: Path
+    plan_path: Path
 
 
 def write_classification_from_evidence(
@@ -140,6 +202,29 @@ def write_classification_from_evidence(
         default_profile=default_profile,
     )
     return _persist_classification(prepared)
+
+
+def write_classification_action_from_evidence(
+    *,
+    action_evidence_path: str | Path,
+    source_pack_root: str | Path,
+    run_id: str,
+    paper_id: str | None = None,
+    item_key: str | None = None,
+    default_profile: str | None = None,
+) -> ClassificationActionWriteResult:
+    """Materialize one deterministic offline review or adjudication action."""
+
+    prepared = _prepare_classification_action_from_evidence(
+        action_evidence_path=action_evidence_path,
+        source_pack_root=source_pack_root,
+        run_id=run_id,
+        paper_id=paper_id,
+        item_key=item_key,
+        default_profile=default_profile,
+    )
+    _preflight_existing_action(prepared)
+    return _persist_classification_action(prepared)
 
 
 def write_classification_batch_summary(
@@ -253,6 +338,276 @@ def write_classification_batch_summary(
     )
 
 
+def _prepare_classification_action_from_evidence(
+    *,
+    action_evidence_path: str | Path,
+    source_pack_root: str | Path,
+    run_id: str,
+    paper_id: str | None,
+    item_key: str | None,
+    default_profile: str | None,
+) -> _PreparedClassificationAction:
+    resolved = resolve_run_artifacts(
+        source_pack_root=source_pack_root,
+        run_id=run_id,
+        paper_id=paper_id,
+        item_key=item_key,
+    )
+    _require_passing_acceptance(resolved)
+    evidence = _load_classification_action_evidence(action_evidence_path)
+    action_id = str(evidence["action_id"])
+    mode = ClassificationMode(str(evidence["mode"]))
+    outcome = ClassificationActionOutcome(str(evidence["outcome"]))
+    prior_path = _resolve_safe_run_file_ref(
+        ref=str(evidence["prior_decision_ref"]),
+        run_dir=resolved.run_dir,
+        label="classification action prior_decision_ref",
+    )
+    try:
+        prior = ClassificationDecisionRecord.from_dict(
+            load_json_object(prior_path, "prior classification decision")
+        )
+    except MillefeuilleContractError:
+        raise
+    except (AttributeError, TypeError) as exc:
+        raise MillefeuilleContractError(
+            "prior classification decision has invalid field types"
+        ) from exc
+    expected_identity = {
+        "paper_id": resolved.paper_id,
+        "run_id": resolved.run_id,
+        "source_hash": resolved.source_hash,
+    }
+    for field_name, expected in expected_identity.items():
+        actual = getattr(prior, field_name)
+        if actual != expected:
+            raise MillefeuilleContractError(
+                f"prior classification decision {field_name} drift: "
+                f"expected {expected!r}, got {actual!r}"
+            )
+    taxonomy_version = str(evidence["taxonomy_version"])
+    if prior.taxonomy_version != taxonomy_version:
+        raise MillefeuilleContractError(
+            "classification action taxonomy drift: expected prior decision "
+            f"taxonomy {prior.taxonomy_version!r}, got {taxonomy_version!r}"
+        )
+    if mode == ClassificationMode.ADJUDICATE and prior.status not in {
+        ClassificationStatus.NEEDS_REVIEW,
+        ClassificationStatus.ADJUDICATION_REQUIRED,
+    }:
+        raise MillefeuilleContractError(
+            "adjudication requires a needs-review or adjudication-required "
+            "prior decision"
+        )
+
+    primary_path = str(evidence["primary_path"])
+    if outcome in {
+        ClassificationActionOutcome.NO_CHANGE,
+        ClassificationActionOutcome.CONFIRMED,
+    } and primary_path != prior.primary_path:
+        raise MillefeuilleContractError(
+            f"{outcome.value} action must retain prior primary_path "
+            f"{prior.primary_path!r}"
+        )
+    unresolved = outcome in {
+        ClassificationActionOutcome.ESCALATED,
+        ClassificationActionOutcome.TAXONOMY_CHANGE_REQUESTED,
+    }
+    review_reasons = list(evidence.get("review_reasons", []))
+    if unresolved and not review_reasons:
+        raise MillefeuilleContractError(
+            f"{outcome.value} action requires non-empty review_reasons"
+        )
+    if not unresolved and review_reasons:
+        raise MillefeuilleContractError(
+            f"resolved {outcome.value} action must not retain review_reasons"
+        )
+    taxonomy_request = evidence.get("taxonomy_change_request")
+    requires_taxonomy_request = (
+        outcome == ClassificationActionOutcome.TAXONOMY_CHANGE_REQUESTED
+    )
+    if requires_taxonomy_request != isinstance(taxonomy_request, dict):
+        raise MillefeuilleContractError(
+            "taxonomy-change-requested requires exactly one "
+            "taxonomy_change_request object"
+        )
+
+    evidence_refs = _normalize_action_evidence_refs(
+        evidence_refs=list(evidence["evidence_refs"]),
+        run_dir=resolved.run_dir,
+    )
+    action_dir = resolved.run_dir / CLASSIFICATION_ACTION_ROOT_REF / action_id
+    action_record_path = action_dir / CLASSIFICATION_ACTION_RECORD_REF
+    action_markdown_path = action_dir / CLASSIFICATION_ACTION_MARKDOWN_REF
+    final_decision_path = action_dir / CLASSIFICATION_ACTION_FINAL_DECISION_REF
+    final_markdown_path = action_dir / CLASSIFICATION_ACTION_FINAL_MARKDOWN_REF
+    action_preview_path = action_dir / CLASSIFICATION_ACTION_PREVIEW_REF
+    canonical_preview_path = resolved.run_dir / WRITEBACK_PREVIEW_REF
+    taxonomy_requests_path = (
+        action_dir / CLASSIFICATION_ACTION_TAXONOMY_REQUESTS_REF
+    )
+    adjudication_queue_path = (
+        action_dir / CLASSIFICATION_ACTION_ADJUDICATION_QUEUE_REF
+    )
+    status = (
+        ClassificationStatus.ADJUDICATION_REQUIRED
+        if unresolved
+        else ClassificationStatus.CLASSIFIED
+    )
+    rejected_alternatives: list[RejectedAlternativeRecord] = []
+    for record in evidence.get("rejected_alternatives", []):
+        alternative = RejectedAlternativeRecord.from_dict(record)
+        rejected_alternatives.append(
+            RejectedAlternativeRecord(
+                path=alternative.path,
+                reason=alternative.reason,
+                evidence_refs=(
+                    _normalize_action_evidence_refs(
+                        evidence_refs=alternative.evidence_refs,
+                        run_dir=resolved.run_dir,
+                    )
+                    if alternative.evidence_refs
+                    else []
+                ),
+            )
+        )
+    final_decision = ClassificationDecisionRecord(
+        paper_id=resolved.paper_id,
+        run_id=resolved.run_id,
+        source_hash=resolved.source_hash,
+        taxonomy_version=taxonomy_version,
+        mode=mode,
+        status=status,
+        primary_path=primary_path,
+        confidence=str(evidence["confidence"]),
+        evidence_refs=evidence_refs,
+        strongest_rejected_path=evidence.get("strongest_rejected_path"),
+        rejected_alternatives=rejected_alternatives,
+        review_reasons=review_reasons,
+        qa_flags=list(evidence.get("qa_flags", [])),
+        writeback_preview_ref=relative_ref(
+            action_preview_path,
+            resolved.run_dir,
+        ),
+    )
+    preview_config = evidence.get("writeback_preview") or {}
+    if unresolved and "millefeuille-classified" in preview_config.get(
+        "add_tags", []
+    ):
+        raise MillefeuilleContractError(
+            "unresolved classification action must not preview the "
+            "millefeuille-classified tag"
+        )
+    preview_payload = _build_writeback_preview(
+        paper_id=resolved.paper_id,
+        run_id=resolved.run_id,
+        source_hash=resolved.source_hash,
+        evidence=evidence,
+        classified=not unresolved,
+    )
+    taxonomy_records: list[dict[str, Any]] = []
+    taxonomy_request_ref: str | None = None
+    if requires_taxonomy_request:
+        assert isinstance(taxonomy_request, dict)
+        request_evidence_refs = _normalize_action_evidence_refs(
+            evidence_refs=list(taxonomy_request.get("evidence_refs", [])),
+            run_dir=resolved.run_dir,
+        ) if taxonomy_request.get("evidence_refs") else []
+        taxonomy_records.append(
+            {
+                "action_id": action_id,
+                "paper_id": resolved.paper_id,
+                "run_id": resolved.run_id,
+                "taxonomy_version": taxonomy_version,
+                "proposed_path": taxonomy_request["proposed_path"],
+                "reason": taxonomy_request["reason"],
+                **(
+                    {"evidence_refs": request_evidence_refs}
+                    if request_evidence_refs
+                    else {}
+                ),
+            }
+        )
+        taxonomy_request_ref = relative_ref(
+            taxonomy_requests_path,
+            resolved.run_dir,
+        )
+    adjudication_records: list[dict[str, Any]] = []
+    if unresolved:
+        adjudication_records.append(
+            {
+                "action_id": action_id,
+                "paper_id": resolved.paper_id,
+                "run_id": resolved.run_id,
+                "taxonomy_version": taxonomy_version,
+                "primary_path": primary_path,
+                "review_reasons": review_reasons,
+                "status": status.value,
+            }
+        )
+    action = ClassificationActionRecord(
+        action_id=action_id,
+        paper_id=resolved.paper_id,
+        run_id=resolved.run_id,
+        source_hash=resolved.source_hash,
+        taxonomy_version=taxonomy_version,
+        mode=mode,
+        outcome=outcome,
+        status=status,
+        summary=str(evidence["summary"]),
+        prior_decision_ref=relative_ref(prior_path, resolved.run_dir),
+        final_decision_ref=relative_ref(final_decision_path, resolved.run_dir),
+        writeback_preview_ref=relative_ref(
+            action_preview_path,
+            resolved.run_dir,
+        ),
+        evidence_refs=evidence_refs,
+        taxonomy_change_request_ref=taxonomy_request_ref,
+    )
+    plan_path = resolved.run_dir / CLASSIFICATION_PLAN_REF
+    bundled_default = default_profile or DEFAULT_MODEL_PROFILE_BUNDLE["default_profile"]
+    plan = ClassificationPlanRecord(
+        run_id=resolved.run_id,
+        taxonomy_version=taxonomy_version,
+        mode=mode,
+        papers=[
+            {
+                "paper_id": resolved.paper_id,
+                "decision_ref": relative_ref(final_decision_path, resolved.run_dir),
+                "decision_markdown_ref": relative_ref(
+                    final_markdown_path,
+                    resolved.run_dir,
+                ),
+                "status": status.value,
+                "writeback_preview_ref": relative_ref(
+                    canonical_preview_path,
+                    resolved.run_dir,
+                ),
+                "action_ref": relative_ref(action_record_path, resolved.run_dir),
+            }
+        ],
+        default_profile=bundled_default,
+    )
+    return _PreparedClassificationAction(
+        resolved=resolved,
+        action=action,
+        final_decision=final_decision,
+        plan=plan,
+        preview_payload=preview_payload,
+        taxonomy_records=taxonomy_records,
+        adjudication_records=adjudication_records,
+        action_record_path=action_record_path,
+        action_markdown_path=action_markdown_path,
+        final_decision_path=final_decision_path,
+        final_markdown_path=final_markdown_path,
+        action_preview_path=action_preview_path,
+        canonical_preview_path=canonical_preview_path,
+        taxonomy_requests_path=taxonomy_requests_path,
+        adjudication_queue_path=adjudication_queue_path,
+        plan_path=plan_path,
+    )
+
+
 def _prepare_classification_from_evidence(
     *,
     evidence_path: str | Path,
@@ -268,26 +623,7 @@ def _prepare_classification_from_evidence(
         paper_id=paper_id,
         item_key=item_key,
     )
-    acceptance_summary = load_json_object(
-        resolved.run_dir / ACCEPTANCE_SUMMARY_REF,
-        "acceptance summary",
-    )
-    if acceptance_summary.get("status") != "pass":
-        raise MillefeuilleContractError(
-            "classification preview requires an acceptance summary with status pass"
-        )
-    expected_acceptance_identity = {
-        "paper_id": resolved.paper_id,
-        "run_id": resolved.run_id,
-        "source_hash": resolved.source_hash,
-    }
-    for field_name, expected in expected_acceptance_identity.items():
-        actual = acceptance_summary.get(field_name)
-        if actual != expected:
-            raise MillefeuilleContractError(
-                f"acceptance summary {field_name} drift: "
-                f"expected {expected!r}, got {actual!r}"
-            )
+    _require_passing_acceptance(resolved)
 
     evidence = _load_classification_evidence(evidence_path)
     taxonomy_version = str(evidence["taxonomy_version"])
@@ -379,6 +715,29 @@ def _prepare_classification_from_evidence(
         preview_path=preview_path,
         batch_report_path=resolved.run_dir / BATCH_REPORT_REF,
     )
+
+
+def _require_passing_acceptance(resolved: ResolvedRunArtifacts) -> None:
+    acceptance_summary = load_json_object(
+        resolved.run_dir / ACCEPTANCE_SUMMARY_REF,
+        "acceptance summary",
+    )
+    if acceptance_summary.get("status") != "pass":
+        raise MillefeuilleContractError(
+            "classification preview requires an acceptance summary with status pass"
+        )
+    expected_acceptance_identity = {
+        "paper_id": resolved.paper_id,
+        "run_id": resolved.run_id,
+        "source_hash": resolved.source_hash,
+    }
+    for field_name, expected in expected_acceptance_identity.items():
+        actual = acceptance_summary.get(field_name)
+        if actual != expected:
+            raise MillefeuilleContractError(
+                f"acceptance summary {field_name} drift: "
+                f"expected {expected!r}, got {actual!r}"
+            )
 
 
 def _persist_classification(
@@ -492,6 +851,184 @@ def _persist_classification(
         plan_path=prepared.plan_path,
         decision_json_path=prepared.decision_json_path,
         writeback_preview_path=prepared.preview_path,
+    )
+
+
+def _preflight_existing_action(prepared: _PreparedClassificationAction) -> None:
+    action_dir = prepared.action_record_path.parent
+    if not action_dir.exists():
+        return
+    expected_files = {
+        prepared.action_record_path,
+        prepared.action_markdown_path,
+        prepared.final_decision_path,
+        prepared.final_markdown_path,
+        prepared.action_preview_path,
+        prepared.taxonomy_requests_path,
+        prepared.adjudication_queue_path,
+    }
+    existing_files = {path for path in action_dir.rglob("*") if path.is_file()}
+    if existing_files != expected_files:
+        raise MillefeuilleContractError(
+            f"classification action {prepared.action.action_id!r} already "
+            "exists with incomplete or unexpected artifacts"
+        )
+    expected_json = {
+        prepared.action_record_path: prepared.action.to_dict(),
+        prepared.final_decision_path: prepared.final_decision.to_dict(),
+        prepared.action_preview_path: prepared.preview_payload,
+    }
+    for path, expected in expected_json.items():
+        if load_json_object(path, "existing classification action artifact") != (
+            expected
+        ):
+            raise MillefeuilleContractError(
+                f"classification action {prepared.action.action_id!r} already "
+                f"exists with drift at {path.name}"
+            )
+    expected_text = {
+        prepared.action_markdown_path: _render_classification_action_markdown(
+            prepared.action
+        ),
+        prepared.final_markdown_path: _render_decision_markdown(
+            prepared.final_decision
+        ),
+    }
+    for path, expected in expected_text.items():
+        if path.read_text(encoding="utf-8") != expected:
+            raise MillefeuilleContractError(
+                f"classification action {prepared.action.action_id!r} already "
+                f"exists with drift at {path.name}"
+            )
+    expected_jsonl = {
+        prepared.taxonomy_requests_path: prepared.taxonomy_records,
+        prepared.adjudication_queue_path: prepared.adjudication_records,
+    }
+    for path, expected in expected_jsonl.items():
+        if load_jsonl_records(
+            path,
+            "existing classification action JSONL",
+        ) != expected:
+            raise MillefeuilleContractError(
+                f"classification action {prepared.action.action_id!r} already "
+                f"exists with drift at {path.name}"
+            )
+
+
+def _persist_classification_action(
+    prepared: _PreparedClassificationAction,
+) -> ClassificationActionWriteResult:
+    resolved = prepared.resolved
+    action = prepared.action
+    decision = prepared.final_decision
+    write_json_object(prepared.action_preview_path, prepared.preview_payload)
+    write_json_object(prepared.canonical_preview_path, prepared.preview_payload)
+    write_json_object(prepared.final_decision_path, decision.to_dict())
+    write_text(
+        prepared.final_markdown_path,
+        _render_decision_markdown(decision),
+    )
+    write_jsonl_records(
+        prepared.taxonomy_requests_path,
+        prepared.taxonomy_records,
+    )
+    write_jsonl_records(
+        prepared.adjudication_queue_path,
+        prepared.adjudication_records,
+    )
+    write_json_object(prepared.action_record_path, action.to_dict())
+    write_text(
+        prepared.action_markdown_path,
+        _render_classification_action_markdown(action),
+    )
+    write_json_object(prepared.plan_path, prepared.plan.to_dict())
+
+    stage_status = (
+        StageStatus.PASSED.value
+        if decision.status == ClassificationStatus.CLASSIFIED
+        else StageStatus.NEEDS_REVIEW.value
+    )
+    stage_manifest = upsert_stage_record(
+        resolved.stage_manifest,
+        name=StageName.CLASSIFY,
+        status=stage_status,
+        inputs=[action.prior_decision_ref, *action.evidence_refs],
+        outputs=[
+            relative_ref(prepared.plan_path, resolved.run_dir),
+            action.final_decision_ref,
+            relative_ref(prepared.action_record_path, resolved.run_dir),
+            action.writeback_preview_ref,
+            relative_ref(prepared.canonical_preview_path, resolved.run_dir),
+        ],
+        notes=[
+            f"classification {action.mode.value} action "
+            f"{action.action_id} recorded as {action.outcome.value}"
+        ],
+    )
+    artifact_index = upsert_artifact_record(
+        resolved.artifact_index,
+        name="classification_action",
+        kind="classification-action",
+        ref=relative_ref(prepared.action_record_path, resolved.run_dir),
+        format="json",
+        stage=StageName.CLASSIFY.value,
+        private_content=False,
+    )
+    artifact_index = upsert_artifact_record(
+        artifact_index,
+        name="classification_decision",
+        kind="classification-decision",
+        ref=action.final_decision_ref,
+        format="json",
+        stage=StageName.CLASSIFY.value,
+        private_content=False,
+    )
+    artifact_index = upsert_artifact_record(
+        artifact_index,
+        name="classification_decision_markdown",
+        kind="classification-decision-markdown",
+        ref=relative_ref(prepared.final_markdown_path, resolved.run_dir),
+        format="markdown",
+        stage=StageName.CLASSIFY.value,
+        private_content=False,
+    )
+    artifact_index = upsert_artifact_record(
+        artifact_index,
+        name="zotero_writeback_preview",
+        kind="zotero-writeback-preview",
+        ref=relative_ref(prepared.canonical_preview_path, resolved.run_dir),
+        format="json",
+        stage=StageName.CLASSIFY.value,
+        private_content=False,
+    )
+    artifact_index = update_artifact_index(
+        artifact_index,
+        stage_name=StageName.CLASSIFY,
+        stage_status=stage_status,
+        zotero_writeback={
+            "mode": "preview",
+            "status": "previewed",
+            "plan_ref": relative_ref(
+                prepared.canonical_preview_path,
+                resolved.run_dir,
+            ),
+        },
+    )
+    persist_run_artifacts(
+        resolved,
+        stage_manifest=stage_manifest,
+        artifact_index=artifact_index,
+    )
+    return ClassificationActionWriteResult(
+        action_id=action.action_id,
+        paper_id=resolved.paper_id,
+        run_id=resolved.run_id,
+        mode=action.mode.value,
+        outcome=action.outcome.value,
+        status=action.status.value,
+        action_record_path=prepared.action_record_path,
+        final_decision_path=prepared.final_decision_path,
+        writeback_preview_path=prepared.canonical_preview_path,
     )
 
 
@@ -716,6 +1253,273 @@ def _load_classification_evidence(path: str | Path) -> dict[str, Any]:
     return payload
 
 
+def _load_classification_action_evidence(path: str | Path) -> dict[str, Any]:
+    payload = load_json_object(path, "classification action evidence")
+    allowed_fields = {
+        "schema_version",
+        "action_id",
+        "mode",
+        "outcome",
+        "taxonomy_version",
+        "prior_decision_ref",
+        "primary_path",
+        "confidence",
+        "summary",
+        "evidence_refs",
+        "strongest_rejected_path",
+        "rejected_alternatives",
+        "qa_flags",
+        "review_reasons",
+        "taxonomy_change_request",
+        "writeback_preview",
+    }
+    unexpected = sorted(set(payload) - allowed_fields)
+    if unexpected:
+        raise MillefeuilleContractError(
+            "classification action evidence has unsupported fields: "
+            + ", ".join(unexpected)
+        )
+    schema_version = payload.get("schema_version")
+    if not isinstance(schema_version, str):
+        raise MillefeuilleContractError(
+            "classification action evidence schema_version must be a string"
+        )
+    if schema_version != CLASSIFICATION_ACTION_EVIDENCE_SCHEMA_VERSION:
+        raise MillefeuilleContractError(
+            "unsupported classification action evidence schema_version "
+            f"{schema_version!r}"
+        )
+    required_strings = (
+        "action_id",
+        "mode",
+        "outcome",
+        "taxonomy_version",
+        "prior_decision_ref",
+        "primary_path",
+        "confidence",
+        "summary",
+    )
+    for field_name in required_strings:
+        value = payload.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            raise MillefeuilleContractError(
+                f"classification action evidence {field_name} must be a "
+                "non-empty string"
+            )
+    action_id = payload["action_id"]
+    if action_id in {".", ".."} or _SAFE_BATCH_ID.fullmatch(action_id) is None:
+        raise MillefeuilleContractError(
+            "classification action_id must be traversal-safe and use only "
+            "letters, numbers, '.', '_', or '-'"
+        )
+    try:
+        mode = ClassificationMode(payload["mode"])
+    except ValueError as exc:
+        raise MillefeuilleContractError(
+            f"unsupported classification action mode {payload['mode']!r}"
+        ) from exc
+    if mode not in {ClassificationMode.REVIEW, ClassificationMode.ADJUDICATE}:
+        raise MillefeuilleContractError(
+            "classification action mode must be review or adjudicate"
+        )
+    try:
+        outcome = ClassificationActionOutcome(payload["outcome"])
+    except ValueError as exc:
+        raise MillefeuilleContractError(
+            f"unsupported classification action outcome {payload['outcome']!r}"
+        ) from exc
+    allowed_outcomes = {
+        ClassificationMode.REVIEW: {
+            ClassificationActionOutcome.NO_CHANGE,
+            ClassificationActionOutcome.CORRECTED,
+            ClassificationActionOutcome.ESCALATED,
+        },
+        ClassificationMode.ADJUDICATE: {
+            ClassificationActionOutcome.CONFIRMED,
+            ClassificationActionOutcome.CORRECTED,
+            ClassificationActionOutcome.TAXONOMY_CHANGE_REQUESTED,
+        },
+    }
+    if outcome not in allowed_outcomes[mode]:
+        raise MillefeuilleContractError(
+            f"outcome {outcome.value!r} is invalid for mode {mode.value!r}"
+        )
+    for field_name in ("evidence_refs", "qa_flags", "review_reasons"):
+        value = payload.get(field_name, [])
+        if not isinstance(value, list):
+            raise MillefeuilleContractError(
+                f"classification action evidence {field_name} must be an array"
+            )
+        for entry in value:
+            if not isinstance(entry, str) or not entry.strip():
+                raise MillefeuilleContractError(
+                    f"classification action evidence {field_name} must contain "
+                    "non-empty strings"
+                )
+    if not payload.get("evidence_refs"):
+        raise MillefeuilleContractError(
+            "classification action evidence evidence_refs must be non-empty"
+        )
+    strongest = payload.get("strongest_rejected_path")
+    if strongest is not None and (
+        not isinstance(strongest, str) or not strongest.strip()
+    ):
+        raise MillefeuilleContractError(
+            "classification action evidence strongest_rejected_path must be "
+            "a non-empty string when provided"
+        )
+    rejected = payload.get("rejected_alternatives", [])
+    if not isinstance(rejected, list):
+        raise MillefeuilleContractError(
+            "classification action evidence rejected_alternatives must be an array"
+        )
+    for index, record in enumerate(rejected):
+        if not isinstance(record, dict):
+            raise MillefeuilleContractError(
+                f"classification action rejected alternative {index} must be "
+                "an object"
+            )
+        extra = sorted(set(record) - {"path", "reason", "evidence_refs"})
+        if extra:
+            raise MillefeuilleContractError(
+                f"classification action rejected alternative {index} has "
+                "unsupported fields: " + ", ".join(extra)
+            )
+        for field_name in ("path", "reason"):
+            value = record.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"classification action rejected alternative {index} "
+                    f"{field_name} must be a non-empty string"
+                )
+        alternative_refs = record.get("evidence_refs", [])
+        if not isinstance(alternative_refs, list):
+            raise MillefeuilleContractError(
+                f"classification action rejected alternative {index} "
+                "evidence_refs must be an array"
+            )
+        for ref in alternative_refs:
+            if not isinstance(ref, str) or not ref.strip():
+                raise MillefeuilleContractError(
+                    f"classification action rejected alternative {index} "
+                    "evidence_refs must contain non-empty strings"
+                )
+        RejectedAlternativeRecord.from_dict(record)
+    taxonomy_request = payload.get("taxonomy_change_request")
+    if taxonomy_request is not None:
+        if not isinstance(taxonomy_request, dict):
+            raise MillefeuilleContractError(
+                "classification action taxonomy_change_request must be an object"
+            )
+        extra = sorted(
+            set(taxonomy_request) - {"proposed_path", "reason", "evidence_refs"}
+        )
+        if extra:
+            raise MillefeuilleContractError(
+                "classification action taxonomy_change_request has unsupported "
+                "fields: " + ", ".join(extra)
+            )
+        for field_name in ("proposed_path", "reason"):
+            value = taxonomy_request.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    "classification action taxonomy_change_request "
+                    f"{field_name} must be a non-empty string"
+                )
+        request_refs = taxonomy_request.get("evidence_refs", [])
+        if not isinstance(request_refs, list):
+            raise MillefeuilleContractError(
+                "classification action taxonomy_change_request evidence_refs "
+                "must be an array"
+            )
+        for ref in request_refs:
+            if not isinstance(ref, str) or not ref.strip():
+                raise MillefeuilleContractError(
+                    "classification action taxonomy_change_request evidence_refs "
+                    "must contain non-empty strings"
+                )
+    preview = payload.get("writeback_preview")
+    if preview is not None:
+        if not isinstance(preview, dict):
+            raise MillefeuilleContractError(
+                "classification action writeback_preview must be an object"
+            )
+        extra = sorted(
+            set(preview)
+            - {"add_tags", "remove_tags", "destination_collection", "note_markdown"}
+        )
+        if extra:
+            raise MillefeuilleContractError(
+                "classification action writeback_preview has unsupported fields: "
+                + ", ".join(extra)
+            )
+        for field_name in ("add_tags", "remove_tags"):
+            values = preview.get(field_name, [])
+            if not isinstance(values, list) or any(
+                not isinstance(value, str) or not value.strip() for value in values
+            ):
+                raise MillefeuilleContractError(
+                    "classification action writeback_preview "
+                    f"{field_name} must be an array of non-empty strings"
+                )
+        for field_name in ("destination_collection", "note_markdown"):
+            value = preview.get(field_name)
+            if value is not None and (
+                not isinstance(value, str) or not value.strip()
+            ):
+                raise MillefeuilleContractError(
+                    "classification action writeback_preview "
+                    f"{field_name} must be a non-empty string when provided"
+                )
+    return payload
+
+
+def _resolve_safe_run_file_ref(*, ref: str, run_dir: Path, label: str) -> Path:
+    if "\\" in ref:
+        raise MillefeuilleContractError(f"{label} must use '/' path separators")
+    relative = Path(ref)
+    if (
+        relative.is_absolute()
+        or not relative.parts
+        or any(part in {"", ".", ".."} for part in relative.parts)
+        or any(
+            _SAFE_EVIDENCE_REF_PART.fullmatch(part) is None
+            for part in relative.parts
+        )
+    ):
+        raise MillefeuilleContractError(
+            f"{label} must be a traversal-safe relative path under the run"
+        )
+    target = run_dir / relative
+    try:
+        target.resolve().relative_to(run_dir.resolve())
+    except ValueError as exc:
+        raise MillefeuilleContractError(
+            f"{label} resolves outside the run directory"
+        ) from exc
+    if not target.is_file():
+        raise MillefeuilleContractError(f"{label} does not exist: {ref}")
+    return target
+
+
+def _normalize_action_evidence_refs(
+    *,
+    evidence_refs: list[str],
+    run_dir: Path,
+) -> list[str]:
+    return [
+        relative_ref(
+            _resolve_safe_run_file_ref(
+                ref=ref,
+                run_dir=run_dir,
+                label="classification action evidence_ref",
+            ),
+            run_dir,
+        )
+        for ref in evidence_refs
+    ]
+
+
 def _normalize_evidence_refs(
     *,
     evidence_refs: list[str],
@@ -742,16 +1546,21 @@ def _build_writeback_preview(
     run_id: str,
     source_hash: str,
     evidence: dict[str, Any],
+    classified: bool = True,
 ) -> dict[str, Any]:
     preview = dict(evidence.get("writeback_preview") or {})
     add_tags = list(preview.get("add_tags") or [])
     remove_tags = list(preview.get("remove_tags") or [])
     if not add_tags:
-        add_tags = [
-            "millefeuille-acceptance-passed",
-            "millefeuille-ready-for-classification",
-            "millefeuille-classified",
-        ]
+        add_tags = (
+            [
+                "millefeuille-acceptance-passed",
+                "millefeuille-ready-for-classification",
+                "millefeuille-classified",
+            ]
+            if classified
+            else ["millefeuille-classification-review"]
+        )
     if not remove_tags:
         remove_tags = ["millefeuille"]
     payload: dict[str, Any] = {
@@ -796,6 +1605,42 @@ def _render_decision_markdown(decision: ClassificationDecisionRecord) -> str:
         lines.extend(["", "## Review Reasons"])
         for reason in decision.review_reasons:
             lines.append(f"- {reason}")
+    return "\n".join(lines) + "\n"
+
+
+def _render_classification_action_markdown(
+    action: ClassificationActionRecord,
+) -> str:
+    lines = [
+        f"# Classification Action: {action.action_id}",
+        "",
+        f"- Paper: `{action.paper_id}`",
+        f"- Run: `{action.run_id}`",
+        f"- Taxonomy version: `{action.taxonomy_version}`",
+        f"- Mode: `{action.mode.value}`",
+        f"- Outcome: `{action.outcome.value}`",
+        f"- Status: `{action.status.value}`",
+        f"- Prior decision: `{action.prior_decision_ref}`",
+        f"- Final decision: `{action.final_decision_ref}`",
+        f"- Writeback preview: `{action.writeback_preview_ref}`",
+        "",
+        "## Summary",
+        "",
+        action.summary,
+        "",
+        "## Evidence Refs",
+    ]
+    for ref in action.evidence_refs:
+        lines.append(f"- `{ref}`")
+    if action.taxonomy_change_request_ref is not None:
+        lines.extend(
+            [
+                "",
+                "## Taxonomy Change Request",
+                "",
+                f"- `{action.taxonomy_change_request_ref}`",
+            ]
+        )
     return "\n".join(lines) + "\n"
 
 
