@@ -9,7 +9,7 @@ repository:
   base_branch: dev
   working_branch: feat/pr-069-multi-pdf-source-packs
 status:
-  phase: implementation
+  phase: review
   pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: planned
-    number: null
-    url: null
+    status: open
+    number: 69
+    url: https://github.com/fr-meyer/millefeuille/pull/69
     base_branch: dev
     head_branch: feat/pr-069-multi-pdf-source-packs
-    head_sha: null
+    head_sha: 54ffea247de53369a1bca91e83de0ea8cc39cd1c
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
