@@ -14,17 +14,8 @@ notes:
   - Container gh is intentionally not the GitHub write path.
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
-current_task:
-  id: pr-063-acceptance-classification-cli
-  status: In Progress
-  branch: feat/pr-063-acceptance-classification-cli
-  speculoos_task: .speculoos/tasks/pr-063-acceptance-classification-cli.yaml
-  pull_request: 63
-  project_item: unavailable
-  pull_request_project_item: unavailable
-  project_status: In Progress
-  head_sha: c334f2cc756863ed423639751e96663800b29774
-pull_request: 63
+current_task: null
+pull_request: null
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
@@ -196,3 +187,13 @@ completed_pull_requests:
     merge_commit: 16f904be6212ade3c0d8b19acd9d1ccc8b81bbf1
     mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/62#pullrequestreview-4706544285
     mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87422246923
+  - id: pr-063-acceptance-classification-cli
+    number: 63
+    url: https://github.com/fr-meyer/millefeuille/pull/63
+    status: merged
+    base_branch: dev
+    head_branch: feat/pr-063-acceptance-classification-cli
+    head_sha: 25fde832edbc745e8f02a595afecf7f1f81b4471
+    merge_commit: 43af99fe66abf93185b2533c351a466388a65d52
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/63#pullrequestreview-4709900555
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87519740147
