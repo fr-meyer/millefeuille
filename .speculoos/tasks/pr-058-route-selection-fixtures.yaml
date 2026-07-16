@@ -1,6 +1,6 @@
 id: pr-058-route-selection-fixtures
 title: Add route-selection fixtures
-status: implementation
+status: merged
 branch: feat/pr-058-route-selection-fixtures
 base_branch: dev
 github:
@@ -8,9 +8,13 @@ github:
   pull_request: 58
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
-  head_sha: 5c1a1455d5a93684e46850229c99774d49628f60
+  head_sha: f9ac7a330596d57a30f63f90e484972c5e4f8c0d
+  url: https://github.com/fr-meyer/millefeuille/pull/58
+  merge_commit: 602112498dd02ddbc09c5e724292793742d42721
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/58#pullrequestreview-4691095875
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87007246282
 post_merge_expected:
   pull_request: 58
   base_branch: dev
@@ -63,3 +67,7 @@ evidence:
   - "Speculoos publish-check passed with the committed PR58 packet."
   - 'PR #58 opened for pr-058-route-selection-fixtures'
   - 'PR #58 linked to Project item unavailable'
+  - "Final exact head f9ac7a330596d57a30f63f90e484972c5e4f8c0d was approved by Mergeguez with six informational observations and zero blocking findings."
+  - "The review summary identified no defect or requested remediation and affirmed the offline-only implementation and coverage."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87007246282."
+  - "PR #58 squash-merged to dev as 602112498dd02ddbc09c5e724292793742d42721 by mergeguez[bot]."

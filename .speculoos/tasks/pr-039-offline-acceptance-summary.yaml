@@ -11,8 +11,10 @@ github:
   project_status: Done
   project_item: null
   url: https://github.com/fr-meyer/millefeuille/pull/39
-  head_sha: null
+  head_sha: 4e33716a769236289205e2359c332333fe2bcc95
   merge_commit: c8e97cfbfca38542cf472e581c672980d82a33b7
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/39#pullrequestreview-4677434673
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86533784679
 post_merge_expected:
   pull_request: 39
   base_branch: dev
@@ -67,6 +69,8 @@ evidence:
   - speculoos status, actors, and validate passed with only expected local unpublished/dirty warnings before commit
   - fixture/contract/docs marker scan found no credential, signed URL, or PDF payload markers
   - 'PR #39 merged with merge commit c8e97cfbfca38542cf472e581c672980d82a33b7'
+  - "PR #39 exact head 4e33716a769236289205e2359c332333fe2bcc95 was approved by Mergeguez with five informational findings and zero blocking findings."
+  - "The review summary affirmed the offline boundary, test coverage, and gated dev auto-merge policy and requested no remediation."
   - Project item unavailable; closeout recorded without ProjectV2 mutation
   - surface-sync --close-merged-task cleared repo-local active task metadata
 publication_boundary:

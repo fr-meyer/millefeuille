@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: null
+canonical_task: pr-067-speculoos-ledger-reconciliation
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: null
+  working_branch: chore/pr-067-speculoos-ledger-reconciliation
 status:
-  phase: idle
-  pret_a_coder: idle
+  phase: implementation
+  pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: none-active
-    number: null
-    url: null
+    status: open
+    number: 67
+    url: https://github.com/fr-meyer/millefeuille/pull/67
     base_branch: dev
-    head_branch: null
-    head_sha: null
+    head_branch: chore/pr-067-speculoos-ledger-reconciliation
+    head_sha: fa0cca2fa0762b724984c6bb4b183c36a5df3b09
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
@@ -93,7 +93,14 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: null
+current_task:
+  id: pr-067-speculoos-ledger-reconciliation
+  title: Reconcile merged Speculoos task ledgers
+  status: review
+  branch: chore/pr-067-speculoos-ledger-reconciliation
+  base_branch: dev
+  task_file: .speculoos/tasks/pr-067-speculoos-ledger-reconciliation.yaml
+  started_from: 9dcbbed58863834d1c6b590a065b4450f715298e
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -129,6 +136,17 @@ history:
       merged_by: fr-meyer
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/38#pullrequestreview-4676416510
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86508434593
+    - id: pr-039-offline-acceptance-summary
+      status: merged
+      branch: test/pr-039-offline-acceptance-summary
+      base_branch: dev
+      pull_request: 39
+      url: https://github.com/fr-meyer/millefeuille/pull/39
+      head_sha: 4e33716a769236289205e2359c332333fe2bcc95
+      merge_commit: c8e97cfbfca38542cf472e581c672980d82a33b7
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/39#pullrequestreview-4677434673
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86533784679
     - id: pr-041-live-golden-route-evidence
       status: merged
       branch: test/pr-041-live-golden-route-evidence
@@ -160,8 +178,8 @@ history:
       head_sha: 39c9d543d190ed125407d9a4593601c817469038
       merge_commit: ad5e58ddc22642068bf067a6f77e3e1ab270e58b
       merged_by: mergeguez[bot]
-      mergeguez_review: null
-      mergeguez_check_run: null
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/44#pullrequestreview-4679491326
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86619567686
     - id: pr-045-zotero-credential-guidance
       status: merged
       branch: fix/pr-045-zotero-credential-guidance
@@ -171,8 +189,8 @@ history:
       head_sha: c8031914fc4e6dc4789f37711bdc3b6ad8c2416b
       merge_commit: f7923c1710ffd935433ebf2d37197c722f8ca175
       merged_by: mergeguez[bot]
-      mergeguez_review: null
-      mergeguez_check_run: null
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/46#pullrequestreview-4679878451
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86641146376
     - id: pr-047-millefeuille-product-vision
       status: merged
       branch: docs/pr-047-millefeuille-product-vision
@@ -272,6 +290,72 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/55#pullrequestreview-4684962077
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86824278156
+    - id: pr-056-source-pack-staged-handoff-intake
+      status: merged
+      branch: feat/pr-056-source-pack-staged-handoff-intake
+      base_branch: dev
+      pull_request: 56
+      url: https://github.com/fr-meyer/millefeuille/pull/56
+      head_sha: 29fc20793770022a9c3557633462933051c16bd9
+      merge_commit: d1add6a5b7a9ae16174186dceeb19e38a7ed4f61
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/56#pullrequestreview-4690892419
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87001132751
+    - id: pr-057-source-pack-extraction-fixtures
+      status: merged
+      branch: feat/pr-057-source-pack-extraction-fixtures
+      base_branch: dev
+      pull_request: 57
+      url: https://github.com/fr-meyer/millefeuille/pull/57
+      head_sha: 0831599321ae4a35d55e07a57a204efb2d88a35f
+      merge_commit: cbe60b8916d231c484ad44cec11498c1146a5f86
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/57#pullrequestreview-4690957725
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87002985860
+    - id: pr-058-route-selection-fixtures
+      status: merged
+      branch: feat/pr-058-route-selection-fixtures
+      base_branch: dev
+      pull_request: 58
+      url: https://github.com/fr-meyer/millefeuille/pull/58
+      head_sha: f9ac7a330596d57a30f63f90e484972c5e4f8c0d
+      merge_commit: 602112498dd02ddbc09c5e724292793742d42721
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/58#pullrequestreview-4691095875
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87007246282
+    - id: pr-059-structure-fixtures
+      status: merged
+      branch: feat/pr-059-structure-fixtures
+      base_branch: dev
+      pull_request: 59
+      url: https://github.com/fr-meyer/millefeuille/pull/59
+      head_sha: 68c12cd4261b1afe03910801d154556a3206747b
+      merge_commit: 7187e2652bd1b16292eb73fdcd5cc2c01658ea02
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/59#pullrequestreview-4691226267
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87011029019
+    - id: pr-060-summary-fixtures
+      status: merged
+      branch: feat/pr-060-summary-fixtures
+      base_branch: dev
+      pull_request: 60
+      url: https://github.com/fr-meyer/millefeuille/pull/60
+      head_sha: 2cfbfa634ebafefd65a1e8668dd88abd7db74459
+      merge_commit: 96717617811703d8327b1f4575aa000fd80b49c7
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/60#pullrequestreview-4691410002
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87015614273
+    - id: pr-061-card-fixtures
+      status: merged
+      branch: feat/pr-061-card-fixtures
+      base_branch: dev
+      pull_request: 61
+      url: https://github.com/fr-meyer/millefeuille/pull/61
+      head_sha: 272c12b630219ab3b13c93dc53c4604cf9f37880
+      merge_commit: c81f0256b577b18145961a2b828163088bc7e094
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/61#pullrequestreview-4691492884
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87018053639
     - id: pr-062-index-fixtures
       status: merged
       branch: feat/pr-062-index-fixtures

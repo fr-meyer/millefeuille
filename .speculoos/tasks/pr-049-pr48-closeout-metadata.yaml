@@ -1,6 +1,6 @@
 id: pr-049-pr48-closeout-metadata
 title: Close PR 48 Millefeuille artifact status metadata
-status: metadata_closeout
+status: merged
 branch: chore/pr-049-pr48-closeout-metadata
 base_branch: dev
 github:
@@ -8,8 +8,13 @@ github:
   pull_request: 49
   issue_project_item: null
   pull_request_project_item: null
-  project_status: In Progress
+  project_status: Done
   project_item: null
+  url: https://github.com/fr-meyer/millefeuille/pull/49
+  head_sha: 2d41a389a1717694872056c878bf37a47687f5f8
+  merge_commit: 380fea3f40b9ad1118ba49363a780a7252a75460
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/49#pullrequestreview-4683542433
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/86784610113
 scope:
   - clear repo-local active task metadata after PR #48 merged to dev
   - mark PR #48 task as merged and Done
@@ -33,3 +38,8 @@ validation:
   - "speculoos validate --task pr-049-pr48-closeout-metadata --validation \"git diff --check\" --json"
 publication_boundary:
   statement: "Metadata-only closeout; no live Zotero read or write, PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, index write, source-pack write, credential change, main-branch merge, release tag, package publication, or approval bypass."
+evidence:
+  - "PR #49 exact head 2d41a389a1717694872056c878bf37a47687f5f8 was approved by Mergeguez with two informational findings and zero blocking findings."
+  - "Both findings affirmed the metadata-only closeout scope and required no remediation."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/86784610113."
+  - "PR #49 squash-merged to dev as 380fea3f40b9ad1118ba49363a780a7252a75460 by mergeguez[bot]."

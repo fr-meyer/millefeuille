@@ -1,0 +1,9 @@
+chore: reconcile merged Speculoos ledgers
+
+Align merged task status, completed histories, and exact GitHub evidence for
+the offline feature sequence and earlier metadata closeouts.
+
+No application behavior, live provider, credential, stable-branch, release,
+or package publication changes.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>
