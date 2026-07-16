@@ -89,8 +89,10 @@ derived artifact write.
   - Create or update source packs after identity verification.
   - Initial fixture command:
     `millefeuille source-pack intake --evidence <json> --source-pack-root <dir>`.
-  - Verify recovered local bytes against expected SHA-256 before writing
-    `source.pdf` or `manifest.json`.
+  - Verify all recovered local bytes against expected SHA-256 before writing
+    `manifest.json`, v0.1 `source.pdf`, or v0.2 `sources/*.pdf` entries.
+  - Group same-item PDF handoff rows into one v0.2 source pack with per-source
+    identity and a deterministic aggregate source hash.
   - Refuse to overwrite source packs whose source hash or manifest identity has
     drifted from the supplied evidence.
   - Emit disposal/import manifest rows.

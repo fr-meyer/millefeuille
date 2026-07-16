@@ -1,0 +1,9 @@
+feat: support same-item multi-PDF source packs
+
+Preserve the v0.1 one-PDF contract while adding deterministic v0.2 source
+entries and aggregate source hashes for verified same-item handoff groups.
+
+No live provider, credential, stable-branch, release, package publication, or
+production changes.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

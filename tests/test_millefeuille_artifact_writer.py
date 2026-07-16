@@ -41,6 +41,7 @@ from millefeuille.domain.models import (
 )
 from millefeuille.domain.source_packs import (
     RecoveredPdfEvidence,
+    load_source_pack_manifest,
     write_source_pack_from_recovered_pdf,
 )
 from millefeuille.domain.summary_fixtures import load_hierarchical_summary
@@ -468,14 +469,20 @@ def _make_item(
     )
 
 
-def _make_multi_pdf_item() -> DiscoveredItem:
+def _make_multi_pdf_item(
+    *,
+    main_size: int = 12345,
+    main_sha256: str = "a" * 64,
+    supplement_size: int = 23456,
+    supplement_sha256: str = "b" * 64,
+) -> DiscoveredItem:
     attachment_one = AttachmentInfo(
         key="ATT1",
         filename="Example Author - 2026 - Main paper.pdf",
         content_type="application/pdf",
         link_mode="imported_file",
-        file_size_bytes=12345,
-        sha256="a" * 64,
+        file_size_bytes=main_size,
+        sha256=main_sha256,
         zotero_version=7,
         item_type="journalArticle",
     )
@@ -484,8 +491,8 @@ def _make_multi_pdf_item() -> DiscoveredItem:
         filename="Example Author - 2026 - Supplement.pdf",
         content_type="application/pdf",
         link_mode="imported_file",
-        file_size_bytes=23456,
-        sha256="b" * 64,
+        file_size_bytes=supplement_size,
+        sha256=supplement_sha256,
         zotero_version=7,
         item_type="journalArticle",
     )
@@ -1384,12 +1391,14 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
-    def test_source_pack_intake_fixture_path_rejects_multi_pdf_item_cleanly(self):
+    def test_source_pack_intake_fixture_path_writes_multi_pdf_item(self):
         with tempfile.TemporaryDirectory() as tempdir:
             recovered_main = Path(tempdir) / "main.pdf"
             recovered_supplement = Path(tempdir) / "supplement.pdf"
             main_bytes = b"main pdf bytes\n"
             supplement_bytes = b"supplement pdf bytes\n"
+            main_sha256 = hashlib.sha256(main_bytes).hexdigest()
+            supplement_sha256 = hashlib.sha256(supplement_bytes).hexdigest()
             recovered_main.write_bytes(main_bytes)
             recovered_supplement.write_bytes(supplement_bytes)
             evidence_path = Path(tempdir) / "recovered-pdf-evidence.jsonl"
@@ -1408,7 +1417,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                                     "Example Author - 2026 - Main paper.pdf"
                                 ),
                                 "recovered_pdf_path": recovered_main.name,
-                                "expected_sha256": "a" * 64,
+                                "expected_sha256": main_sha256,
                                 "content_type": "application/pdf",
                                 "file_size_bytes": len(main_bytes),
                                 "zotero_version": 7,
@@ -1426,7 +1435,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                                     "Example Author - 2026 - Supplement.pdf"
                                 ),
                                 "recovered_pdf_path": recovered_supplement.name,
-                                "expected_sha256": "b" * 64,
+                                "expected_sha256": supplement_sha256,
                                 "content_type": "application/pdf",
                                 "file_size_bytes": len(supplement_bytes),
                                 "zotero_version": 7,
@@ -1454,17 +1463,38 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero = MagicMock()
             mock_zotero.credentials = SimpleNamespace(library_id="123")
             mock_zotero.get_items_by_selection.return_value = (
-                [_make_multi_pdf_item()],
+                [
+                    _make_multi_pdf_item(
+                        main_size=len(main_bytes),
+                        main_sha256=main_sha256,
+                        supplement_size=len(supplement_bytes),
+                        supplement_sha256=supplement_sha256,
+                    )
+                ],
                 _make_discovery_stats(),
             )
 
-            with self.assertRaisesRegex(
-                ValueError,
-                "exactly one PDF handoff row per Zotero item/source pack",
-            ):
-                dry_run_command(cfg, logger, mock_zotero)
+            exit_code = dry_run_command(cfg, logger, mock_zotero)
 
-            self.assertFalse((source_pack_root / "zotero").exists())
+            self.assertEqual(exit_code, 0)
+            source_pack_dir = source_pack_root / "zotero" / "zotero-ITEM1"
+            manifest = load_source_pack_manifest(source_pack_dir / "manifest.json")
+            self.assertEqual(
+                manifest["schema_version"],
+                "millefeuille-source-pack-manifest/v0.2",
+            )
+            self.assertEqual(len(manifest["sources"]), 2)
+            artifact_index = load_artifact_index(
+                source_pack_dir
+                / "analyses"
+                / "millefeuille"
+                / "run-fixture"
+                / "artifact-index.json"
+            )
+            self.assertEqual(
+                artifact_index.source_pack["source_hash"],
+                manifest["source_hash"],
+            )
             mock_zotero.download_pdf.assert_not_called()
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()

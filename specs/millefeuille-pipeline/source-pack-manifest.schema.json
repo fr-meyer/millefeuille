@@ -3,102 +3,20 @@
   "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/source-pack-manifest.schema.json",
   "title": "Millefeuille Source Pack Manifest",
   "type": "object",
-  "additionalProperties": true,
-  "required": [
-    "schema_version",
-    "paper_id",
-    "source_type",
-    "source_hash",
-    "created_at",
-    "source",
-    "identity",
-    "verification",
-    "provenance"
+  "oneOf": [
+    {
+      "$ref": "#/$defs/single_source_manifest"
+    },
+    {
+      "$ref": "#/$defs/multi_source_manifest"
+    }
   ],
-  "properties": {
-    "schema_version": {
-      "const": "millefeuille-source-pack-manifest/v0.1"
-    },
-    "paper_id": {
+  "$defs": {
+    "sha256": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^[0-9a-f]{64}$"
     },
-    "source_type": {
-      "const": "zotero"
-    },
-    "source_hash": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "created_at": {
-      "type": "string",
-      "minLength": 1
-    },
-    "source": {
-      "type": "object",
-      "additionalProperties": true,
-      "required": ["kind", "ref", "format", "byte_size", "sha256"],
-      "properties": {
-        "kind": {
-          "const": "recovered-pdf"
-        },
-        "ref": {
-          "const": "source.pdf"
-        },
-        "format": {
-          "const": "pdf"
-        },
-        "byte_size": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "content_type": {
-          "type": "string"
-        }
-      }
-    },
-    "identity": {
-      "type": "object",
-      "additionalProperties": true,
-      "required": [
-        "zotero_item_key",
-        "zotero_attachment_key",
-        "canonical_filename"
-      ],
-      "properties": {
-        "zotero_item_key": {
-          "type": "string",
-          "minLength": 1
-        },
-        "zotero_attachment_key": {
-          "type": "string",
-          "minLength": 1
-        },
-        "canonical_filename": {
-          "type": "string",
-          "minLength": 1
-        },
-        "item_title": {
-          "type": "string"
-        },
-        "citation_key": {
-          "type": "string"
-        },
-        "file_size_bytes": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "zotero_version": {
-          "type": "integer",
-          "minimum": 0
-        }
-      }
-    },
-    "verification": {
+    "source_verification": {
       "type": "object",
       "additionalProperties": true,
       "required": ["status", "method", "expected_sha256", "actual_sha256"],
@@ -110,16 +28,14 @@
           "const": "sha256"
         },
         "expected_sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "$ref": "#/$defs/sha256"
         },
         "actual_sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "$ref": "#/$defs/sha256"
         }
       }
     },
-    "provenance": {
+    "source_provenance": {
       "type": "object",
       "additionalProperties": true,
       "required": ["intake_method", "evidence_schema_version"],
@@ -141,6 +57,258 @@
         },
         "openkb_policy_hints": {
           "type": "object"
+        }
+      }
+    },
+    "attachment_identity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["zotero_attachment_key", "canonical_filename"],
+      "properties": {
+        "zotero_attachment_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_filename": {
+          "type": "string",
+          "minLength": 1
+        },
+        "file_size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "zotero_version": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "single_source_manifest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "schema_version",
+        "paper_id",
+        "source_type",
+        "source_hash",
+        "created_at",
+        "source",
+        "identity",
+        "verification",
+        "provenance"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "millefeuille-source-pack-manifest/v0.1"
+        },
+        "paper_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "const": "zotero"
+        },
+        "source_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "created_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["kind", "ref", "format", "byte_size", "sha256"],
+          "properties": {
+            "kind": {
+              "const": "recovered-pdf"
+            },
+            "ref": {
+              "const": "source.pdf"
+            },
+            "format": {
+              "const": "pdf"
+            },
+            "byte_size": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "content_type": {
+              "type": "string"
+            }
+          }
+        },
+        "identity": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/attachment_identity"
+            },
+            {
+              "type": "object",
+              "required": ["zotero_item_key"],
+              "properties": {
+                "zotero_item_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "item_title": {
+                  "type": "string"
+                },
+                "citation_key": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        },
+        "verification": {
+          "$ref": "#/$defs/source_verification"
+        },
+        "provenance": {
+          "$ref": "#/$defs/source_provenance"
+        }
+      }
+    },
+    "multi_source_manifest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "schema_version",
+        "paper_id",
+        "source_type",
+        "source_hash",
+        "created_at",
+        "sources",
+        "identity",
+        "verification",
+        "provenance"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "millefeuille-source-pack-manifest/v0.2"
+        },
+        "paper_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "const": "zotero"
+        },
+        "source_hash": {
+          "type": "string",
+          "pattern": "^sha256-aggregate:[0-9a-f]{64}$"
+        },
+        "created_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "kind",
+              "ref",
+              "format",
+              "byte_size",
+              "sha256",
+              "identity",
+              "verification",
+              "provenance"
+            ],
+            "properties": {
+              "kind": {
+                "const": "recovered-pdf"
+              },
+              "ref": {
+                "type": "string",
+                "pattern": "^sources/[A-Za-z0-9._-]+\\.pdf$"
+              },
+              "format": {
+                "const": "pdf"
+              },
+              "byte_size": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "content_type": {
+                "type": "string"
+              },
+              "identity": {
+                "$ref": "#/$defs/attachment_identity"
+              },
+              "verification": {
+                "$ref": "#/$defs/source_verification"
+              },
+              "provenance": {
+                "$ref": "#/$defs/source_provenance"
+              }
+            }
+          }
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["zotero_item_key", "pdf_count"],
+          "properties": {
+            "zotero_item_key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pdf_count": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "item_title": {
+              "type": "string"
+            },
+            "citation_key": {
+              "type": "string"
+            }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["status", "method", "source_count"],
+          "properties": {
+            "status": {
+              "const": "verified"
+            },
+            "method": {
+              "const": "sha256-aggregate"
+            },
+            "source_count": {
+              "type": "integer",
+              "minimum": 2
+            }
+          }
+        },
+        "provenance": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/source_provenance"
+            },
+            {
+              "type": "object",
+              "required": ["evidence_count"],
+              "properties": {
+                "evidence_count": {
+                  "type": "integer",
+                  "minimum": 2
+                }
+              }
+            }
+          ]
         }
       }
     }
