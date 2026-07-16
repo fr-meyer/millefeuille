@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: null
+canonical_task: pr-065-speculoos-portable-path-metadata
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
-  local_path: /tmp/millefeuille-pr63
+  local_path: null
   base_branch: dev
-  working_branch: null
+  working_branch: chore/pr-065-speculoos-portable-path-metadata
 status:
-  phase: idle
-  pret_a_coder: idle
+  phase: implementation
+  pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,11 +57,11 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: none-active
+    status: planned
     number: null
     url: null
     base_branch: dev
-    head_branch: null
+    head_branch: chore/pr-065-speculoos-portable-path-metadata
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -93,7 +93,14 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: null
+current_task:
+  id: pr-065-speculoos-portable-path-metadata
+  title: Remove transient worktree path from Speculoos metadata
+  status: implementation
+  branch: chore/pr-065-speculoos-portable-path-metadata
+  base_branch: dev
+  task_file: .speculoos/tasks/pr-065-speculoos-portable-path-metadata.yaml
+  started_from: eda00b941a33a3d0ce6841f46ac8b7d57059fa01
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
