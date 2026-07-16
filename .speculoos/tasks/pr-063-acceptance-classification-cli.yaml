@@ -1,6 +1,6 @@
 id: pr-063-acceptance-classification-cli
 title: Add acceptance, classification, and stage CLI previews
-status: implementation
+status: merged
 branch: feat/pr-063-acceptance-classification-cli
 base_branch: dev
 github:
@@ -8,9 +8,13 @@ github:
   pull_request: 63
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
-  head_sha: c334f2cc756863ed423639751e96663800b29774
+  url: https://github.com/fr-meyer/millefeuille/pull/63
+  head_sha: 25fde832edbc745e8f02a595afecf7f1f81b4471
+  merge_commit: 43af99fe66abf93185b2533c351a466388a65d52
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/63#pullrequestreview-4709900555
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87519740147
 post_merge_expected:
   pull_request: 63
   base_branch: dev
@@ -53,8 +57,8 @@ validation:
 publication_boundary:
   statement: "Offline acceptance/classification/writeback preview and stage CLI slice only. No live Zotero read or write, lifecycle tag mutation, live PDF recovery, OCR/Mistral/PageIndex provider call, model call, worker-agent execution, OpenKB write, live index write, credential change, main-branch merge, release tag, package publication, or approval bypass."
 documentation_impact:
-  status: completed
-  rationale: README and pipeline contract docs describe fixture-stage parity, revalidated resume, acceptance, classification, writeback preview, retrieve, models, run, and release-preflight behavior.
+  status: none
+  rationale: Repo-local Speculoos closeout metadata only; README and pipeline contract documentation was already updated in PR #63.
 notes:
   - "Reconstructed from the preserved 183d549fafda8a2b04246c78f50fe402360b668a offline slice on merged PR #62 dev commit 16f904be6212ade3c0d8b19acd9d1ccc8b81bbf1."
 evidence:
@@ -66,3 +70,10 @@ evidence:
   - "Ruff, metadata parse, and git diff --check passed after reconstruction."
   - 'PR #63 opened for pr-063-acceptance-classification-cli'
   - "Resumable offline stage continuation published at c334f2cc756863ed423639751e96663800b29774."
+  - "Final documentation and metadata continuation published at 25fde832edbc745e8f02a595afecf7f1f81b4471."
+  - "Mergeguez approved exact head 25fde832edbc745e8f02a595afecf7f1f81b4471 with zero findings and zero blockers: https://github.com/fr-meyer/millefeuille/pull/63#pullrequestreview-4709900555."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87519740147."
+  - 'PR #63 squash-merged to dev as 43af99fe66abf93185b2533c351a466388a65d52 by mergeguez[bot].'
+  - Remote feature branch feat/pr-063-acceptance-classification-cli deleted after exact-SHA branch-cleanup verification
+  - Project item unavailable moved to Done
+  - surface-sync --close-merged-task cleared repo-local active task metadata

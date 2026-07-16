@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-063-acceptance-classification-cli
+canonical_task: null
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: /tmp/millefeuille-pr63
   base_branch: dev
-  working_branch: feat/pr-063-acceptance-classification-cli
+  working_branch: null
 status:
-  phase: in_review
-  pret_a_coder: in_progress
+  phase: idle
+  pret_a_coder: idle
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,11 +57,11 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
+    status: none-active
     number: null
     url: null
     base_branch: dev
-    head_branch: feat/pr-063-acceptance-classification-cli
+    head_branch: null
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -93,14 +93,7 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task:
-  id: pr-063-acceptance-classification-cli
-  title: Add acceptance, classification, and stage CLI previews
-  status: implementation
-  branch: feat/pr-063-acceptance-classification-cli
-  base_branch: dev
-  task_file: .speculoos/tasks/pr-063-acceptance-classification-cli.yaml
-  started_from: 16f904be6212ade3c0d8b19acd9d1ccc8b81bbf1
+current_task: null
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -290,3 +283,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/62#pullrequestreview-4706544285
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87422246923
+    - id: pr-063-acceptance-classification-cli
+      status: merged
+      branch: feat/pr-063-acceptance-classification-cli
+      base_branch: dev
+      pull_request: 63
+      url: https://github.com/fr-meyer/millefeuille/pull/63
+      head_sha: 25fde832edbc745e8f02a595afecf7f1f81b4471
+      merge_commit: 43af99fe66abf93185b2533c351a466388a65d52
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/63#pullrequestreview-4709900555
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87519740147
