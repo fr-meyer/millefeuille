@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: null
+canonical_task: pr-071-batch-acceptance
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: null
+  working_branch: feat/pr-071-batch-acceptance
 status:
-  phase: idle
-  pret_a_coder: idle
+  phase: review
+  pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 230 passed, 0 failed
+    result: 237 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: none-active
-    number: null
-    url: null
+    status: open
+    number: 71
+    url: https://github.com/fr-meyer/millefeuille/pull/71
     base_branch: dev
-    head_branch: null
-    head_sha: null
+    head_branch: feat/pr-071-batch-acceptance
+    head_sha: 451a15544f7853104bd3603eefa2d7084f813b1a
     merge_commit: null
     project_status: In Progress
   vibe_kanban:

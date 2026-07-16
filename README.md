@@ -256,6 +256,33 @@ These commands stay offline and preview-only in the current contract slice:
   these commands never turn a preview invocation into a live provider or
   Zotero mutation.
 
+### Offline Batch Acceptance
+
+To validate several existing source-pack runs in one deterministic offline
+operation, provide a versioned batch manifest instead of a single paper and run
+identifier:
+
+```bash
+millefeuille acceptance \
+  --source-pack-root /path/to/source-packs \
+  --batch-manifest /path/to/acceptance-batch.json \
+  --handoff /path/to/handoff.jsonl \
+  --json
+```
+
+The manifest uses `millefeuille-acceptance-batch-manifest/v0.1`, has one safe
+`batch_id`, and lists unique `paper_id` or `item_key` plus `run_id` locators.
+Millefeuille verifies every referenced package and the shared handoff before it
+writes any acceptance output. Successful preflight writes the existing
+per-run summaries plus a sorted aggregate report at
+`batches/millefeuille/<batch-id>/reports/acceptance-batch-summary.{json,md}`.
+The aggregate passes only when every run passes; otherwise it records
+`needs-review` while retaining the valid per-run results.
+
+This path remains local and fixture-only. It does not read or mutate live
+Zotero data, recover PDFs, call OCR/model/OpenKB/index providers, execute
+worker agents, or approve a release.
+
 ```bash
 millefeuille artifacts --index /path/to/artifact-index.json
 millefeuille status --index /path/to/artifact-index.json

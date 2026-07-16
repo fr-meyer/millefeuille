@@ -9,7 +9,10 @@ from pathlib import Path
 import sys
 from typing import Any, TextIO
 
-from millefeuille.domain.acceptance import write_acceptance_summary
+from millefeuille.domain.acceptance import (
+    write_acceptance_batch_summary,
+    write_acceptance_summary,
+)
 from millefeuille.domain.classification import write_classification_from_evidence
 from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
@@ -76,14 +79,23 @@ def run_stage_cli(
             )
             payload = result.to_dict()
         elif args.command == "acceptance":
-            result = write_acceptance_summary(
-                source_pack_root=args.source_pack_root,
-                run_id=args.run_id,
-                paper_id=args.paper_id,
-                item_key=args.item_key,
-                handoff_path=args.handoff,
-                duplicate_scan_path=args.duplicate_scans,
-            )
+            _validate_acceptance_args(args)
+            if args.batch_manifest:
+                result = write_acceptance_batch_summary(
+                    source_pack_root=args.source_pack_root,
+                    batch_manifest_path=args.batch_manifest,
+                    handoff_path=args.handoff,
+                    duplicate_scan_path=args.duplicate_scans,
+                )
+            else:
+                result = write_acceptance_summary(
+                    source_pack_root=args.source_pack_root,
+                    run_id=args.run_id,
+                    paper_id=args.paper_id,
+                    item_key=args.item_key,
+                    handoff_path=args.handoff,
+                    duplicate_scan_path=args.duplicate_scans,
+                )
             payload = result.to_dict()
         elif args.command == "classify":
             result = write_classification_from_evidence(
@@ -182,9 +194,21 @@ def _build_parser() -> argparse.ArgumentParser:
 
     acceptance = subparsers.add_parser(
         "acceptance",
-        help="Synthesize run-scoped acceptance summary artifacts.",
+        help="Synthesize run-scoped or offline batch acceptance artifacts.",
     )
-    _add_run_locator_args(acceptance)
+    _add_mode_arg(acceptance)
+    acceptance.add_argument("--source-pack-root", required=True)
+    acceptance_source = acceptance.add_mutually_exclusive_group()
+    acceptance_source.add_argument("--paper-id")
+    acceptance_source.add_argument("--item-key")
+    acceptance.add_argument("--run-id")
+    acceptance.add_argument(
+        "--batch-manifest",
+        help=(
+            "Path to a millefeuille-acceptance-batch-manifest/v0.1 JSON file; "
+            "cannot be combined with single-run locators."
+        ),
+    )
     acceptance.add_argument(
         "--handoff",
         required=True,
@@ -459,6 +483,22 @@ def _mode_gate(args: argparse.Namespace, err: TextIO) -> int | None:
         )
         return 3
     return None
+
+
+def _validate_acceptance_args(args: argparse.Namespace) -> None:
+    single_locator_supplied = bool(args.paper_id or args.item_key or args.run_id)
+    if args.batch_manifest:
+        if single_locator_supplied:
+            raise MillefeuilleContractError(
+                "acceptance --batch-manifest cannot be combined with "
+                "--paper-id, --item-key, or --run-id"
+            )
+        return
+    if not args.run_id or not (args.paper_id or args.item_key):
+        raise MillefeuilleContractError(
+            "acceptance requires --batch-manifest or a single-run locator "
+            "(--paper-id|--item-key plus --run-id)"
+        )
 
 
 def _print_payload(command: str, payload: dict[str, Any], out: TextIO) -> None:

@@ -5,6 +5,8 @@ from pathlib import Path
 import unittest
 
 from millefeuille.domain.millefeuille import (
+    AcceptanceBatchRunRecord,
+    AcceptanceBatchSummaryRecord,
     AcceptanceCheckRecord,
     AcceptanceStatus,
     AcceptanceSummaryRecord,
@@ -396,6 +398,52 @@ class TestOCREvidenceContract(unittest.TestCase):
         )
         self.assertEqual(payload["status"], "pass")
         self.assertEqual(payload["checks"][0]["name"], "handoff")
+
+    def test_acceptance_batch_summary_enforces_aggregate_counts(self):
+        batch = AcceptanceBatchSummaryRecord(
+            batch_id="batch-fixture",
+            status=AcceptanceStatus.NEEDS_REVIEW,
+            counts={"runs": 2, "passed": 1, "needs_review": 1},
+            runs=[
+                AcceptanceBatchRunRecord(
+                    paper_id="zotero-ITEM1",
+                    run_id="run-1",
+                    source_hash="sha256:" + ("a" * 64),
+                    status=AcceptanceStatus.PASS,
+                    summary_ref=(
+                        "zotero/zotero-ITEM1/analyses/millefeuille/"
+                        "run-1/reports/acceptance-summary.json"
+                    ),
+                ),
+                AcceptanceBatchRunRecord(
+                    paper_id="zotero-ITEM2",
+                    run_id="run-2",
+                    source_hash="sha256:" + ("b" * 64),
+                    status=AcceptanceStatus.NEEDS_REVIEW,
+                    summary_ref=(
+                        "zotero/zotero-ITEM2/analyses/millefeuille/"
+                        "run-2/reports/acceptance-summary.json"
+                    ),
+                    review_reasons=["duplicate scan flagged an existing match"],
+                ),
+            ],
+        )
+
+        payload = batch.to_dict()
+
+        self.assertEqual(
+            payload["schema_version"],
+            "millefeuille-acceptance-batch-summary/v0.1",
+        )
+        self.assertEqual(payload["status"], "needs-review")
+        self.assertEqual(payload["counts"]["needs_review"], 1)
+        with self.assertRaises(MillefeuilleContractError):
+            AcceptanceBatchSummaryRecord(
+                batch_id="batch-fixture",
+                status=AcceptanceStatus.PASS,
+                counts={"runs": 2, "passed": 2, "needs_review": 0},
+                runs=batch.runs,
+            )
 
     def test_classification_and_writeback_records_serialize(self):
         decision = ClassificationDecisionRecord(

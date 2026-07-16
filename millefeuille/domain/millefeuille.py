@@ -1134,6 +1134,148 @@ class AcceptanceSummaryRecord:
 
 
 @dataclass
+class AcceptanceBatchRunRecord:
+    paper_id: str
+    run_id: str
+    source_hash: str
+    status: AcceptanceStatus | str
+    summary_ref: str
+    review_reasons: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "paper_id",
+            "run_id",
+            "source_hash",
+            "summary_ref",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string"
+                )
+        self.status = _coerce_enum(AcceptanceStatus, self.status)
+        if not isinstance(self.review_reasons, list):
+            raise MillefeuilleContractError("review_reasons must be an array")
+        for reason in self.review_reasons:
+            if not isinstance(reason, str) or not reason.strip():
+                raise MillefeuilleContractError(
+                    "review_reasons must contain non-empty strings"
+                )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> AcceptanceBatchRunRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError("acceptance batch run must be an object")
+        return cls(
+            paper_id=str(payload.get("paper_id", "")).strip(),
+            run_id=str(payload.get("run_id", "")).strip(),
+            source_hash=str(payload.get("source_hash", "")).strip(),
+            status=str(payload.get("status", "")).strip(),
+            summary_ref=str(payload.get("summary_ref", "")).strip(),
+            review_reasons=list(payload.get("review_reasons", [])),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "paper_id": self.paper_id,
+            "run_id": self.run_id,
+            "source_hash": self.source_hash,
+            "status": self.status.value,
+            "summary_ref": self.summary_ref,
+        }
+        if self.review_reasons:
+            payload["review_reasons"] = list(self.review_reasons)
+        return payload
+
+
+@dataclass
+class AcceptanceBatchSummaryRecord:
+    batch_id: str
+    status: AcceptanceStatus | str
+    counts: dict[str, int]
+    runs: list[AcceptanceBatchRunRecord | dict[str, Any]]
+    schema_version: str = "millefeuille-acceptance-batch-summary/v0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "millefeuille-acceptance-batch-summary/v0.1":
+            raise MillefeuilleContractError(
+                f"unsupported schema_version {self.schema_version!r}"
+            )
+        if not isinstance(self.batch_id, str) or not self.batch_id.strip():
+            raise MillefeuilleContractError("batch_id must be a non-empty string")
+        self.status = _coerce_enum(AcceptanceStatus, self.status)
+        if not isinstance(self.counts, dict):
+            raise MillefeuilleContractError("counts must be an object")
+        for key, value in self.counts.items():
+            if not isinstance(key, str) or not key.strip():
+                raise MillefeuilleContractError("counts keys must be non-empty")
+            if not isinstance(value, int) or value < 0:
+                raise MillefeuilleContractError("counts values must be non-negative")
+        if not isinstance(self.runs, list):
+            raise MillefeuilleContractError("runs must be an array")
+        self.runs = [
+            run
+            if isinstance(run, AcceptanceBatchRunRecord)
+            else AcceptanceBatchRunRecord.from_dict(run)
+            for run in self.runs
+        ]
+        if not self.runs:
+            raise MillefeuilleContractError("runs must not be empty")
+        identities = [(run.paper_id, run.run_id) for run in self.runs]
+        if len(identities) != len(set(identities)):
+            raise MillefeuilleContractError(
+                "acceptance batch runs must have unique paper_id/run_id pairs"
+            )
+        expected_counts = {
+            "runs": len(self.runs),
+            "passed": sum(run.status == AcceptanceStatus.PASS for run in self.runs),
+            "needs_review": sum(
+                run.status == AcceptanceStatus.NEEDS_REVIEW for run in self.runs
+            ),
+        }
+        if self.counts != expected_counts:
+            raise MillefeuilleContractError(
+                f"acceptance batch counts drift: expected {expected_counts!r}"
+            )
+        expected_status = (
+            AcceptanceStatus.PASS
+            if expected_counts["needs_review"] == 0
+            else AcceptanceStatus.NEEDS_REVIEW
+        )
+        if self.status != expected_status:
+            raise MillefeuilleContractError(
+                "acceptance batch status must reflect its run results"
+            )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> AcceptanceBatchSummaryRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError(
+                "acceptance batch summary must be an object"
+            )
+        runs = payload.get("runs")
+        if not isinstance(runs, list):
+            raise MillefeuilleContractError("runs must be an array")
+        return cls(
+            batch_id=str(payload.get("batch_id", "")).strip(),
+            status=str(payload.get("status", "")).strip(),
+            counts=dict(payload.get("counts", {})),
+            runs=runs,
+            schema_version=str(payload.get("schema_version", "")).strip(),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "batch_id": self.batch_id,
+            "status": self.status.value,
+            "counts": dict(self.counts),
+            "runs": [run.to_dict() for run in self.runs],
+        }
+
+
+@dataclass
 class RejectedAlternativeRecord:
     path: str
     reason: str
