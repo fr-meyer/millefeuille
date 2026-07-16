@@ -1,6 +1,6 @@
 id: pr-069-multi-pdf-source-packs
 title: Support same-item multi-PDF source packs
-status: review
+status: merged
 branch: feat/pr-069-multi-pdf-source-packs
 base_branch: dev
 github:
@@ -8,13 +8,13 @@ github:
   pull_request: 69
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/69
-  head_sha: 54ffea247de53369a1bca91e83de0ea8cc39cd1c
-  merge_commit: null
-  mergeguez_review: null
-  mergeguez_check_run: null
+  head_sha: 5eeaa0c49fb71052c667be94fc86cba810b40c88
+  merge_commit: 3754c4ada646e2812489746f54742351828df39c
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/69#pullrequestreview-4711191661
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87555055863
 post_merge_expected:
   pull_request: 69
   base_branch: dev
@@ -67,3 +67,11 @@ evidence:
   - "Full unittest discovery passed: 230 tests."
   - "Ruff, hard-rename guard, YAML/JSON parse, diff check, Speculoos validation, private-data scan, and publication checks passed."
   - "The end-to-end dry-run regression creates one v0.2 pack and artifact index for a same-item two-PDF handoff without calling live download or Zotero mutation methods."
+  - "Final publication-metadata continuation published at 5eeaa0c49fb71052c667be94fc86cba810b40c88."
+  - "Mergeguez approved exact head 5eeaa0c49fb71052c667be94fc86cba810b40c88 with zero findings and zero blockers: https://github.com/fr-meyer/millefeuille/pull/69#pullrequestreview-4711191661."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87555055863."
+  - "PR #69 squash-merged to dev as 3754c4ada646e2812489746f54742351828df39c by mergeguez[bot]."
+  - "Remote feature branch feat/pr-069-multi-pdf-source-packs deleted after exact-SHA branch-cleanup verification."
+  - "Local feature branch deleted after dev synchronized to 3754c4ada646e2812489746f54742351828df39c."
+  - "Post-merge validation on synchronized dev passed: 230 tests, Ruff, and metadata parse."
+  - "Project item unavailable moved to Done; repo-local active task metadata cleared."

@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-069-multi-pdf-source-packs
+canonical_task: null
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: feat/pr-069-multi-pdf-source-packs
+  working_branch: null
 status:
-  phase: review
-  pret_a_coder: in_progress
+  phase: idle
+  pret_a_coder: idle
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
-    number: 69
-    url: https://github.com/fr-meyer/millefeuille/pull/69
+    status: none-active
+    number: null
+    url: null
     base_branch: dev
-    head_branch: feat/pr-069-multi-pdf-source-packs
-    head_sha: 54ffea247de53369a1bca91e83de0ea8cc39cd1c
+    head_branch: null
+    head_sha: null
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
@@ -393,3 +393,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/67#pullrequestreview-4710870157
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87547552904
+    - id: pr-069-multi-pdf-source-packs
+      status: merged
+      branch: feat/pr-069-multi-pdf-source-packs
+      base_branch: dev
+      pull_request: 69
+      url: https://github.com/fr-meyer/millefeuille/pull/69
+      head_sha: 5eeaa0c49fb71052c667be94fc86cba810b40c88
+      merge_commit: 3754c4ada646e2812489746f54742351828df39c
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/69#pullrequestreview-4711191661
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87555055863
