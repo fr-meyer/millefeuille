@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import re
 from typing import Any
 
 from millefeuille.domain.artifacts import (
@@ -23,6 +24,8 @@ from millefeuille.domain.source_packs import (
     load_source_pack_manifest,
     paper_id_for_zotero_item_key,
 )
+
+_SAFE_PACKAGE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 
 
 @dataclass(frozen=True)
@@ -47,15 +50,25 @@ def resolve_run_artifacts(
     paper_id: str | None = None,
     item_key: str | None = None,
 ) -> ResolvedRunArtifacts:
+    requested_item_key: str | None = None
+    if item_key is not None:
+        requested_item_key = str(item_key).strip()
+        if not requested_item_key:
+            raise MillefeuilleContractError("item_key must not be empty")
     resolved_paper_id = paper_id or (
-        paper_id_for_zotero_item_key(item_key) if item_key else None
+        paper_id_for_zotero_item_key(requested_item_key)
+        if requested_item_key
+        else None
     )
     if not isinstance(resolved_paper_id, str) or not resolved_paper_id.strip():
         raise MillefeuilleContractError("paper_id or item_key is required")
+    resolved_paper_id = resolved_paper_id.strip()
+    require_safe_package_id(resolved_paper_id, "paper_id")
 
     resolved_run_id = str(run_id).strip()
     if not resolved_run_id:
         raise MillefeuilleContractError("run_id must not be empty")
+    require_safe_package_id(resolved_run_id, "run_id")
 
     root = Path(source_pack_root)
     source_pack_dir = root / "zotero" / resolved_paper_id
@@ -84,6 +97,18 @@ def resolve_run_artifacts(
         )
 
     source_pack_manifest = load_source_pack_manifest(manifest_path)
+    if requested_item_key is not None:
+        manifest_identity = source_pack_manifest.get("identity")
+        actual_item_key = (
+            manifest_identity.get("zotero_item_key")
+            if isinstance(manifest_identity, dict)
+            else None
+        )
+        if actual_item_key != requested_item_key:
+            raise MillefeuilleContractError(
+                "source-pack item_key drift: "
+                f"expected {requested_item_key!r}, got {actual_item_key!r}"
+            )
     stage_manifest = load_stage_manifest(stage_manifest_path)
     artifact_index = load_artifact_index(artifact_index_path)
     _validate_run_identity(
@@ -107,6 +132,14 @@ def resolve_run_artifacts(
         stage_manifest=stage_manifest,
         artifact_index=artifact_index,
     )
+
+
+def require_safe_package_id(value: str, field_name: str) -> None:
+    if value in {".", ".."} or _SAFE_PACKAGE_ID.fullmatch(value) is None:
+        raise MillefeuilleContractError(
+            f"{field_name} must be traversal-safe and use only letters, numbers, "
+            "dots, underscores, and hyphens"
+        )
 
 
 def _validate_run_identity(

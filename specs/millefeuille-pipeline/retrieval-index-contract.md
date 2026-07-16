@@ -35,16 +35,23 @@ later Speculoos task promotes it.
 
 ## Retrieval Command
 
-The future `retrieve` command should query a paper package or batch by:
+The read-only `retrieve` command queries a verified paper package by:
 
-- paper id, slug, Zotero key, DOI, or title;
-- page or section range;
+- paper id, source-pack slug, Zotero key, normalized DOI, or normalized exact
+  title;
+- page or exact section locator;
 - summary scope;
 - classification evidence need;
 - index lane.
 
-It should return refs into the artifact package rather than pasting full private
-paper content by default.
+It requires a run id, validates the source-pack manifest, stage manifest,
+artifact index, paper card, summary bundle, and index status before returning
+anything, and fails closed when a DOI/title lookup is missing or ambiguous.
+Section/page filters operate on structured summary source locators. The command
+returns refs into the artifact package rather than pasting full private paper
+content.
+
+Explicit multi-run or batch retrieval manifests remain future work.
 
 ## Acceptance
 

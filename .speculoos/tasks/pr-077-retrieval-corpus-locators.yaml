@@ -1,0 +1,69 @@
+id: pr-077-retrieval-corpus-locators
+title: Add corpus-aware read-only retrieval locators and filters
+status: in_progress
+branch: feat/pr-077-retrieval-corpus-locators
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  url: null
+  head_sha: pending-publication
+  merge_commit: null
+  mergeguez_review: null
+  mergeguez_check_run: null
+post_merge_expected:
+  pull_request: 77
+  base_branch: dev
+  head_branch: feat/pr-077-retrieval-corpus-locators
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - extend the read-only retrieve command with paper-id, Zotero-key, source-pack-slug, DOI, and title locators
+  - normalize exact DOI and title queries while rejecting missing or ambiguous corpus matches
+  - validate every resolved source pack, run manifest, artifact index, paper card, summary bundle, and index status before returning refs
+  - add section, page, and classification-evidence summary filtering without returning private paper content
+  - reject traversal-unsafe package ids, invalid pages, cross-wired card identities, and symlinked corpus cards
+  - document the offline retrieval surface and retain deterministic ref-only output
+non_goals:
+  - multi-run or batch retrieval result manifests
+  - reading or returning full paper, summary, or card content
+  - live OpenKB, PageIndex, ConDB, ChatIndex, Zotero, source-pack, or index writes
+  - live provider/model calls, PDF recovery, OCR, or worker-agent execution
+  - credentials, permissions, rulesets, or secret handling changes
+  - dev-to-main promotion, release tag, package publication, or production deployment
+acceptance:
+  - direct paper-id, Zotero-key, and source-pack-slug locators resolve one verified run package
+  - DOI URLs/prefixes and title whitespace/case normalize to one exact local paper-card identity match
+  - missing and ambiguous corpus identity queries fail closed without returning content
+  - page and exact section filters select matching structured summary refs
+  - classification-evidence mode selects classification-scoped summaries and retains card, index, acceptance, classification, and writeback refs when present
+  - paper/run traversal, invalid pages, conflicting filters, symlinked cards, and identity drift fail closed
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_retrieve tests.test_millefeuille_stage_cli -v"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-077-retrieval-corpus-locators --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-077-retrieval-corpus-locators --pr-body specs/pr-077-retrieval-corpus-locators/pr-body.md --commit-message specs/pr-077-retrieval-corpus-locators/commit-message.txt --json"
+publication_boundary:
+  statement: "Offline, read-only ref resolution over existing temporary fixture source-pack runs. No private paper content return, live Zotero read or write, PDF recovery, durable source-pack mutation, OCR/model/provider call, worker-agent execution, OpenKB/index write, credential or permission change, main-branch merge, release, package publication, production deployment, or approval bypass."
+documentation_impact:
+  status: user-facing
+  rationale: README and pipeline contracts document the new local locators, filters, fail-closed behavior, and remaining batch boundary.
+notes:
+  - "Started from synchronized dev commit 50f4cdfb159096afb11d9122023a32fb7fd5841e."
+  - "The retrieval/index and CLI contracts explicitly leave DOI/title and section/page corpus lookup unfinished while allowing read-only local inspection."
+evidence:
+  - "Focused retrieval and stage-CLI suites passed: 16 tests."
+  - "Full unittest discovery passed: 261 tests."
+  - "Ruff, hard-rename identity guard, YAML/JSON parse, and diff check passed."
+  - "Regression coverage proves normalized exact DOI/title resolution, direct paper/key/slug lookup, ambiguity and missing-match rejection, item-key identity verification, traversal rejection, symlink rejection, canonical index refs, optional-preview identity, and section/page/classification filters."
+  - "Speculoos validation, private-data scan, documentation sync, and publication checks passed."

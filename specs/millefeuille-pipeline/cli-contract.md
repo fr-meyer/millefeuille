@@ -55,9 +55,15 @@ derived artifact write.
   - Materializes a governed Zotero writeback plan and optional preview note.
 
 - `retrieve`
-  - Implemented as a read-only ref resolver over an existing artifact package.
+  - Implemented as a read-only ref resolver over verified artifact packages.
+  - Resolves a known package by paper id, Zotero item key, or source-pack slug,
+    and scans the local source-pack corpus for one normalized exact DOI or title
+    match at the requested run id.
+  - Filters summary refs by scope, grain, exact section locator, page locator,
+    or the classification-evidence shortcut and filters index refs by lane.
   - Returns summary, card, index, acceptance, classification, and writeback
-    refs instead of private paper content.
+    refs instead of private paper content; missing, ambiguous, cross-wired,
+    symlinked, or traversal-unsafe corpus matches fail closed.
 
 - `models`
   - Implemented as a bundled profile lister for preview and planning use.
@@ -161,9 +167,14 @@ derived artifact write.
 
 - `retrieve`
   - Current preview implementation queries a verified paper package by paper
-    id or item key, plus summary/index filters, and returns artifact refs.
-  - Future expansion should support corpus lookup by DOI, title, section, page,
-    or broader classification evidence need.
+    id, Zotero item key, source-pack slug, normalized DOI, or normalized exact
+    title and returns artifact refs.
+  - Section and page filters match structured summary source locators;
+    `--evidence-need classification` selects classification-scoped summary refs
+    while retaining the card, index, acceptance, decision, and writeback refs.
+  - Corpus lookup rejects missing or ambiguous identity matches and validates
+    every candidate package before returning refs.
+  - Future expansion may add explicit multi-run or batch result manifests.
 
 - `acceptance`
   - Current preview implementation joins handoff, source-pack, extraction,

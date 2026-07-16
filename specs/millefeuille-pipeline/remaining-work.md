@@ -31,6 +31,9 @@
 - PR #75 adds lineage-checked offline classification review and adjudication
   actions with immutable final records, escalation queues, and taxonomy-change
   request artifacts.
+- PR #77 adds corpus-aware read-only artifact retrieval by paper id, Zotero key,
+  source-pack slug, normalized DOI, or normalized exact title, with strict
+  identity, ambiguity, section, page, and classification-evidence handling.
 - Current integration branch is `dev`; stable branch is `main`.
 - Current package version is `0.4.0`.
 
@@ -111,6 +114,11 @@
     - Add selected Markdown and approved refs to OpenKB/PageIndex.
     - Optionally run ConDB or ChatIndex support lanes with explicit verdicts.
     - Run duplicate/collision checks and emit index status.
+    - Offline read-only retrieval now resolves verified run packages through
+      direct or corpus identity locators and returns filtered artifact refs
+      without returning private content.
+    - Remaining work: explicit multi-run/batch retrieval manifests and approved
+      live index reconciliation.
     - Manual gate: OpenKB write, PageIndex/ConDB/ChatIndex index writes, and
       duplicate scan against live local state.
 
