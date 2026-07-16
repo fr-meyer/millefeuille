@@ -1,6 +1,6 @@
 id: pr-071-batch-acceptance
 title: Add deterministic offline batch acceptance
-status: review
+status: merged
 branch: feat/pr-071-batch-acceptance
 base_branch: dev
 github:
@@ -8,13 +8,13 @@ github:
   pull_request: 71
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/71
-  head_sha: 451a15544f7853104bd3603eefa2d7084f813b1a
-  merge_commit: null
-  mergeguez_review: null
-  mergeguez_check_run: null
+  head_sha: af6af7470434ebdeea2c25c6b8ccf444014b7118
+  merge_commit: fd61dbcac385b886d477e1a72861c3db5b9d4279
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/71#pullrequestreview-4711463581
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87563190038
 post_merge_expected:
   pull_request: 71
   base_branch: dev
@@ -70,3 +70,11 @@ evidence:
   - "Regression coverage proves deterministic ordering, byte-stable reruns, aggregate needs-review behavior, strict manifest types, and preflight failure before writes for duplicate, missing, or traversal-unsafe runs."
   - "Duplicate-scan existing-match evidence now contributes an explicit review reason so single-run and batch acceptance statuses cannot incorrectly pass."
   - "Published as user-authored PR #71 at https://github.com/fr-meyer/millefeuille/pull/71 from verified implementation head 451a15544f7853104bd3603eefa2d7084f813b1a onto dev."
+  - "Final publication-metadata continuation published at af6af7470434ebdeea2c25c6b8ccf444014b7118."
+  - "Mergeguez approved exact head af6af7470434ebdeea2c25c6b8ccf444014b7118 with zero findings and zero blockers: https://github.com/fr-meyer/millefeuille/pull/71#pullrequestreview-4711463581."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87563190038."
+  - "PR #71 squash-merged to dev as fd61dbcac385b886d477e1a72861c3db5b9d4279 by mergeguez[bot]."
+  - "Remote feature branch feat/pr-071-batch-acceptance deleted after exact-SHA branch-cleanup verification."
+  - "Local feature branch deleted after dev synchronized to fd61dbcac385b886d477e1a72861c3db5b9d4279."
+  - "Post-merge validation on synchronized dev passed: 237 tests, Ruff, metadata parse, and Speculoos status."
+  - "Project item unavailable moved to Done; repo-local active task metadata cleared."
