@@ -1,17 +1,17 @@
 id: pr-075-classification-review-adjudication
 title: Add deterministic offline classification review and adjudication actions
-status: in_progress
+status: review
 branch: feat/pr-075-classification-review-adjudication
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 75
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
-  url: null
-  head_sha: pending-publication
+  url: https://github.com/fr-meyer/millefeuille/pull/75
+  head_sha: 70b3257106c1201b4ef24d6c2e90bd815bea1b50
   merge_commit: null
   mergeguez_review: null
   mergeguez_check_run: null
@@ -58,14 +58,8 @@ validation:
 publication_boundary:
   statement: "Offline fixture-only classification review and adjudication action records over existing temporary accepted runs and explicit local evidence. No live Zotero read or write, PDF recovery, source-pack mutation against real documents, OCR/model/provider call, worker-agent execution, automatic taxonomy mutation, OpenKB/index write, credential or permission change, main-branch merge, release, package publication, production deployment, or approval bypass."
 documentation_impact:
-  status: updated
-  paths:
-    - README.md
-    - specs/millefeuille-pipeline/README.md
-    - specs/millefeuille-pipeline/artifact-storage.md
-    - specs/millefeuille-pipeline/classification-orchestration.md
-    - specs/millefeuille-pipeline/cli-contract.md
-    - specs/millefeuille-pipeline/remaining-work.md
+  status: none
+  rationale: This metadata-only continuation records the live PR identity; the user-facing documentation updates are already present in the published implementation commit.
 notes:
   - "Started from synchronized dev commit 1bcafe756c1ff2d9f5020403ce945c6eef7fb343."
   - "The remaining-work and classification contracts explicitly leave richer offline review/adjudication execution unfinished, while model/provider and worker execution remain separately gated."
@@ -75,3 +69,4 @@ evidence:
   - "Ruff, hard-rename guard, YAML/JSON parse, and diff check passed."
   - "Regression coverage proves strict input preflight, identity/taxonomy lineage checks, immutable action ids and action-scoped previews, chained review-to-adjudication history preservation, byte-stable exact reruns, and resolved/unresolved routing."
   - "Speculoos validation, private-data scan, documentation sync, and publication checks passed."
+  - "Published as user-authored PR #75 at https://github.com/fr-meyer/millefeuille/pull/75 from verified implementation head 70b3257106c1201b4ef24d6c2e90bd815bea1b50 onto dev."

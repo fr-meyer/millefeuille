@@ -9,7 +9,7 @@ repository:
   base_branch: dev
   working_branch: feat/pr-075-classification-review-adjudication
 status:
-  phase: implementation
+  phase: review
   pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: planned
-    number: null
-    url: null
+    status: open
+    number: 75
+    url: https://github.com/fr-meyer/millefeuille/pull/75
     base_branch: dev
     head_branch: feat/pr-075-classification-review-adjudication
-    head_sha: null
+    head_sha: 70b3257106c1201b4ef24d6c2e90bd815bea1b50
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
