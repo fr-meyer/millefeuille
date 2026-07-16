@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: planned
-    number: null
-    url: null
+    status: open
+    number: 67
+    url: https://github.com/fr-meyer/millefeuille/pull/67
     base_branch: dev
     head_branch: chore/pr-067-speculoos-ledger-reconciliation
-    head_sha: null
+    head_sha: fa0cca2fa0762b724984c6bb4b183c36a5df3b09
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
@@ -96,7 +96,7 @@ gates:
 current_task:
   id: pr-067-speculoos-ledger-reconciliation
   title: Reconcile merged Speculoos task ledgers
-  status: implementation
+  status: review
   branch: chore/pr-067-speculoos-ledger-reconciliation
   base_branch: dev
   task_file: .speculoos/tasks/pr-067-speculoos-ledger-reconciliation.yaml

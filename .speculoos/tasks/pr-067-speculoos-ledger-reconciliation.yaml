@@ -1,17 +1,17 @@
 id: pr-067-speculoos-ledger-reconciliation
 title: Reconcile merged Speculoos task ledgers
-status: implementation
+status: review
 branch: chore/pr-067-speculoos-ledger-reconciliation
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 67
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
-  url: null
-  head_sha: null
+  url: https://github.com/fr-meyer/millefeuille/pull/67
+  head_sha: fa0cca2fa0762b724984c6bb4b183c36a5df3b09
 post_merge_expected:
   pull_request: 67
   base_branch: dev
@@ -56,6 +56,7 @@ documentation_impact:
   rationale: The reconciliation changes only repo-local workflow metadata and does not alter user-facing behavior.
 notes:
   - "Started from synchronized dev commit 9dcbbed58863834d1c6b590a065b4450f715298e."
+  - "PR #67 was opened by fr-meyer at initial published head fa0cca2fa0762b724984c6bb4b183c36a5df3b09."
 evidence:
   - "Live readback confirms PR #39 and PRs #44, #46, #49, and #56 through #61 are closed and merged into dev."
   - "Each reconciled feature or metadata PR has an approved exact-head Mergeguez review and zero blocking findings."
@@ -64,3 +65,4 @@ evidence:
   - "Full unittest discovery passed: 230 tests."
   - "Ruff, hard-rename identity guard, metadata parse, ledger audit, diff check, Speculoos validation, and publication checks passed."
   - "No ProjectV2 item is linked; no ProjectV2 mutation is attempted."
+  - "Live PR readback confirms author fr-meyer, base dev, branch chore/pr-067-speculoos-ledger-reconciliation, and initial head fa0cca2fa0762b724984c6bb4b183c36a5df3b09."
