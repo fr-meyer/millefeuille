@@ -316,11 +316,11 @@ millefeuille source-pack intake \
 
 The evidence JSON must include the Zotero item key, attachment key, canonical
 filename, local recovered PDF path, and expected SHA-256. The command verifies
-the recovered bytes before writing
-`<source-pack-root>/zotero/<paper-id>/source.pdf` and `manifest.json`; it
-refuses mismatched hashes or existing pack drift. It does not read Zotero,
-download PDFs, call OCR/model providers, write OpenKB/index data, or mutate
-Zotero.
+the recovered bytes before writing `manifest.json` and either `source.pdf` for
+a one-PDF item or deterministic `sources/*.pdf` entries for a same-item
+multi-PDF group. It refuses mismatched hashes or existing pack drift. It does
+not read Zotero, download PDFs, call OCR/model providers, write OpenKB/index
+data, or mutate Zotero.
 
 The staged dry-run handoff path can also create source packs from explicit
 fixture evidence before writing the run artifacts:
@@ -342,11 +342,12 @@ and Millefeuille artifact manifests under the explicit `--source-pack-root`;
 it does not write Zotero, OCR/model providers, OpenKB, PageIndex, ConDB, or
 ChatIndex.
 
-The current source-pack schema is still single-source: one `source.pdf` and one
-`manifest.json` per Zotero item-derived source pack. If a discovered Zotero item
-has multiple PDF handoff rows, this staged intake lane now aborts before any
-write rather than partially creating a source pack and drifting on a later
-attachment. Multi-PDF item support needs a dedicated follow-up slice.
+One-PDF source packs retain the v0.1 `source.pdf` manifest contract. Same-item
+multi-PDF handoff groups use the v0.2 manifest contract: each attachment has a
+deterministic traversal-safe `sources/*.pdf` ref, per-source identity and hash
+evidence, and the pack has a deterministic `sha256-aggregate:<hex>` hash. The
+intake result is one source pack per Zotero item and is idempotent regardless of
+handoff-row order.
 
 Once a source pack already exists, the dry-run artifact lane can also stage
 fixture extraction sidecars before writing the run artifacts:

@@ -43,6 +43,7 @@ from millefeuille.domain.route_fixtures import (
 )
 from millefeuille.domain.source_packs import (
     RecoveredPdfEvidence,
+    aggregate_source_hash,
     load_recovered_pdf_evidence,
     load_source_pack_manifest,
     write_source_pack_from_recovered_pdf,
@@ -821,7 +822,7 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                     created_at="2026-07-13T12:00:00+00:00",
                 )
 
-    def test_handoff_intake_rejects_multi_pdf_same_item_before_any_write(self):
+    def test_handoff_intake_writes_idempotent_multi_pdf_same_item_pack(self):
         with tempfile.TemporaryDirectory() as tempdir:
             bytes_one = b"main paper bytes\n"
             bytes_two = b"supplement paper bytes\n"
@@ -873,31 +874,112 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                 encoding="utf-8",
             )
 
+            handoff_rows = [
+                _make_handoff_row(
+                    attachment_key="ATT1",
+                    canonical_filename="Main.pdf",
+                    sha256=sha_one,
+                    file_size_bytes=len(bytes_one),
+                ),
+                _make_handoff_row(
+                    attachment_key="ATT2",
+                    canonical_filename="Supplement.pdf",
+                    sha256=sha_two,
+                    file_size_bytes=len(bytes_two),
+                ),
+            ]
+            source_pack_root = Path(tempdir) / "source-packs"
+            results = write_source_packs_from_handoff_evidence(
+                handoff_rows=handoff_rows,
+                evidence_path=evidence_path,
+                source_pack_root=source_pack_root,
+                created_at="2026-07-13T12:00:00+00:00",
+            )
+
+            self.assertEqual(len(results), 1)
+            result = results[0]
+            self.assertEqual(result.status, "created")
+            self.assertEqual(len(result.source_paths), 2)
+            self.assertFalse((result.source_pack_dir / "source.pdf").exists())
+            self.assertEqual(
+                {path.read_bytes() for path in result.source_paths},
+                {bytes_one, bytes_two},
+            )
+            expected_pack_hash = aggregate_source_hash([sha_one, sha_two])
+            self.assertEqual(result.source_hash, expected_pack_hash)
+            manifest = load_source_pack_manifest(result.manifest_path)
+            self.assertEqual(
+                manifest["schema_version"],
+                "millefeuille-source-pack-manifest/v0.2",
+            )
+            self.assertEqual(manifest["identity"]["pdf_count"], 2)
+            self.assertEqual(len(manifest["sources"]), 2)
+            self.assertTrue(
+                all(
+                    source["ref"].startswith("sources/")
+                    for source in manifest["sources"]
+                )
+            )
+            supplement_entry = next(
+                source
+                for source in manifest["sources"]
+                if source["identity"]["zotero_attachment_key"] == "ATT2"
+            )
+            self.assertEqual(supplement_entry["sha256"], sha_two)
+
+            rerun = write_source_packs_from_handoff_evidence(
+                handoff_rows=list(reversed(handoff_rows)),
+                evidence_path=evidence_path,
+                source_pack_root=source_pack_root,
+                created_at="2026-07-14T12:00:00+00:00",
+            )
+            self.assertEqual(rerun[0].status, "existing")
+            self.assertEqual(rerun[0].source_paths, result.source_paths)
+
+            artifacts = write_dry_run_artifacts(
+                items=[_make_item()],
+                handoff_rows=handoff_rows,
+                config=ArtifactExportConfig(
+                    enabled=True,
+                    artifact_root="source-pack",
+                    source_pack_root=str(source_pack_root),
+                    run_id="run-multi-fixture",
+                ),
+                handoff_enabled=True,
+            )
+            artifact_index = load_artifact_index(artifacts[0].artifact_index_path)
+            self.assertEqual(
+                artifact_index.source_pack["source_hash"],
+                expected_pack_hash,
+            )
+
+            drifted_manifest = dict(manifest)
+            drifted_manifest["source_hash"] = "sha256-aggregate:" + ("0" * 64)
+            result.manifest_path.write_text(
+                json.dumps(drifted_manifest),
+                encoding="utf-8",
+            )
             with self.assertRaisesRegex(
                 MillefeuilleContractError,
-                "exactly one PDF handoff row per Zotero item/source pack",
+                "does not match sources aggregate",
+            ):
+                load_source_pack_manifest(result.manifest_path)
+
+            result.manifest_path.write_text(
+                json.dumps(manifest),
+                encoding="utf-8",
+            )
+            result.source_paths[1].write_bytes(b"drifted supplement bytes\n")
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "source hash drift",
             ):
                 write_source_packs_from_handoff_evidence(
-                    handoff_rows=[
-                        _make_handoff_row(
-                            attachment_key="ATT1",
-                            canonical_filename="Main.pdf",
-                            sha256=sha_one,
-                            file_size_bytes=len(bytes_one),
-                        ),
-                        _make_handoff_row(
-                            attachment_key="ATT2",
-                            canonical_filename="Supplement.pdf",
-                            sha256=sha_two,
-                            file_size_bytes=len(bytes_two),
-                        ),
-                    ],
+                    handoff_rows=handoff_rows,
                     evidence_path=evidence_path,
-                    source_pack_root=Path(tempdir) / "source-packs",
-                    created_at="2026-07-13T12:00:00+00:00",
+                    source_pack_root=source_pack_root,
+                    created_at="2026-07-14T12:00:00+00:00",
                 )
-
-            self.assertFalse((Path(tempdir) / "source-packs" / "zotero").exists())
 
     def test_native_extraction_fixture_writes_sidecars_after_source_pack_verification(
         self,

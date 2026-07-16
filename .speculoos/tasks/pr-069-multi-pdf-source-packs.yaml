@@ -1,0 +1,68 @@
+id: pr-069-multi-pdf-source-packs
+title: Support same-item multi-PDF source packs
+status: implementation
+branch: feat/pr-069-multi-pdf-source-packs
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  url: null
+  head_sha: pending-publication
+  merge_commit: null
+  mergeguez_review: null
+  mergeguez_check_run: null
+post_merge_expected:
+  pull_request: 69
+  base_branch: dev
+  head_branch: feat/pr-069-multi-pdf-source-packs
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - preserve v0.1 source.pdf output for one-PDF Zotero items
+  - add a v0.2 source-pack manifest for same-item multi-PDF handoff groups
+  - write deterministic traversal-safe per-attachment source refs under sources/
+  - compute one order-independent sha256-aggregate pack hash from verified source hashes
+  - keep grouped intake idempotent and fail closed on manifest or source-byte drift
+  - allow the existing artifact-root lane to consume a verified aggregate source hash
+  - document the v0.1 and v0.2 compatibility contract
+non_goals:
+  - merging multiple PDFs into one extraction, route, structure, summary, card, or index artifact
+  - live Zotero reads or writes, PDF recovery, or durable source-pack writes against real documents
+  - OCR, model, OpenKB, PageIndex, ConDB, ChatIndex, or worker-agent execution
+  - credentials, permissions, rulesets, or secret handling changes
+  - dev-to-main promotion, release tag, package publication, or production deployment
+acceptance:
+  - single-PDF intake remains v0.1-compatible and writes source.pdf
+  - same-item multi-PDF handoff rows create one v0.2 pack with one verified sources entry per attachment
+  - v0.2 refs are deterministic and traversal-safe and the aggregate hash is row-order independent
+  - exact-evidence reruns are idempotent while source or manifest drift fails closed
+  - artifact indexes accept the verified v0.2 aggregate source hash
+  - source-pack schema and user-facing contract documentation cover both versions
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_source_pack_writer tests.test_millefeuille_artifact_writer tests.test_millefeuille_contract_artifacts -v"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-069-multi-pdf-source-packs --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-069-multi-pdf-source-packs --pr-body specs/pr-069-multi-pdf-source-packs/pr-body.md --commit-message specs/pr-069-multi-pdf-source-packs/commit-message.txt --json"
+publication_boundary:
+  statement: "Offline fixture-only multi-PDF source-pack schema and intake support under explicit temporary roots. No live Zotero read or write, PDF recovery, real-document source-pack write, OCR/model/provider call, worker-agent execution, OpenKB/index write, credential or permission change, main-branch merge, release, package publication, production deployment, or approval bypass."
+documentation_impact:
+  status: updated
+  rationale: README and storage/CLI contracts now explain v0.1 single-source compatibility and v0.2 multi-source packs.
+notes:
+  - "Started from synchronized dev commit d5b1d0faf4038055ffc9e952ec1c0a27704a1f72."
+  - "PR #56 explicitly deferred same-item multi-PDF intake until the source-pack schema could represent more than one source.pdf."
+evidence:
+  - "Focused source-pack intake, artifact-writer, and contract suites passed: 57 tests."
+  - "Full unittest discovery passed: 230 tests."
+  - "Ruff, hard-rename guard, YAML/JSON parse, diff check, Speculoos validation, private-data scan, and publication checks passed."
+  - "The end-to-end dry-run regression creates one v0.2 pack and artifact index for a same-item two-PDF handoff without calling live download or Zotero mutation methods."

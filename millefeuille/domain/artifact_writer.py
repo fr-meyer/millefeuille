@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -46,6 +45,7 @@ from millefeuille.domain.route_fixtures import (
 from millefeuille.domain.source_packs import (
     DEFAULT_SOURCE_PACK_ROOT,
     SOURCE_PACK_ARTIFACT_ROOT,
+    aggregate_source_hash,
     load_source_pack_manifest_source_hash,
     paper_id_for_zotero_item_key,
 )
@@ -657,11 +657,8 @@ def _source_identity_for_item(
 
 def _source_hash_for_rows(rows: list[OpenKBHandoffRow]) -> str:
     hashes = sorted(row.sha256 for row in rows if row.sha256)
-    if len(hashes) == 1:
-        return f"sha256:{hashes[0]}"
-    if len(hashes) > 1:
-        digest = hashlib.sha256("\n".join(hashes).encode("utf-8")).hexdigest()
-        return f"sha256-aggregate:{digest}"
+    if hashes:
+        return aggregate_source_hash(hashes)
     return "not-computed:dry-run"
 
 

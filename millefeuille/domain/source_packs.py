@@ -7,6 +7,7 @@ index lanes, or mutate Zotero state.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import hashlib
@@ -22,6 +23,9 @@ from millefeuille.domain.models import OpenKBHandoffRow
 SOURCE_PACK_ARTIFACT_ROOT = "source-pack"
 DEFAULT_SOURCE_PACK_ROOT = "/srv/openkb/source-packs"
 SOURCE_PACK_MANIFEST_SCHEMA_VERSION = "millefeuille-source-pack-manifest/v0.1"
+SOURCE_PACK_MULTI_MANIFEST_SCHEMA_VERSION = (
+    "millefeuille-source-pack-manifest/v0.2"
+)
 RECOVERED_PDF_EVIDENCE_SCHEMA_VERSION = "millefeuille-recovered-pdf-evidence/v0.1"
 SOURCE_PACK_SOURCE_REF = "source.pdf"
 
@@ -157,6 +161,7 @@ class SourcePackIntakeResult:
     source_path: Path
     source_hash: str
     manifest: dict[str, Any]
+    source_paths: tuple[Path, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -167,6 +172,7 @@ class SourcePackIntakeResult:
             "source_path": str(self.source_path),
             "source_hash": self.source_hash,
             "manifest": dict(self.manifest),
+            "source_paths": [str(path) for path in self.source_paths],
         }
 
 
@@ -283,12 +289,11 @@ def write_source_packs_from_handoff_evidence(
     rows = [row for row in handoff_rows if row.is_pdf]
     if not rows:
         return []
-    _reject_multi_pdf_handoff_groups(rows)
 
     evidence_records = load_recovered_pdf_evidence_batch(evidence_path)
     evidence_by_key = _evidence_by_handoff_key(evidence_records)
 
-    planned: list[RecoveredPdfEvidence] = []
+    planned_by_item: dict[str, list[RecoveredPdfEvidence]] = {}
     missing: list[str] = []
     for row in rows:
         key = _handoff_key(row.item_key, row.attachment_key)
@@ -298,7 +303,7 @@ def write_source_packs_from_handoff_evidence(
             continue
         _validate_evidence_matches_handoff_row(evidence, row)
         verify_recovered_pdf_evidence(evidence)
-        planned.append(evidence)
+        planned_by_item.setdefault(row.item_key, []).append(evidence)
 
     if missing:
         raise MillefeuilleContractError(
@@ -306,14 +311,26 @@ def write_source_packs_from_handoff_evidence(
             f"handoff rows: {', '.join(sorted(missing))}"
         )
 
-    return [
-        write_source_pack_from_recovered_pdf(
-            evidence=evidence,
-            source_pack_root=root,
-            created_at=created_at,
-        )
-        for evidence in planned
-    ]
+    results: list[SourcePackIntakeResult] = []
+    for item_key in sorted(planned_by_item):
+        item_evidence = planned_by_item[item_key]
+        if len(item_evidence) == 1:
+            results.append(
+                write_source_pack_from_recovered_pdf(
+                    evidence=item_evidence[0],
+                    source_pack_root=root,
+                    created_at=created_at,
+                )
+            )
+        else:
+            results.append(
+                write_source_pack_from_recovered_pdfs(
+                    evidence_records=item_evidence,
+                    source_pack_root=root,
+                    created_at=created_at,
+                )
+            )
+    return results
 
 
 def write_source_pack_from_recovered_pdf(
@@ -361,6 +378,7 @@ def write_source_pack_from_recovered_pdf(
             source_path=target_source_path,
             source_hash=source_hash,
             manifest=existing_manifest,
+            source_paths=(target_source_path,),
         )
 
     _write_new_source_pack(
@@ -378,6 +396,132 @@ def write_source_pack_from_recovered_pdf(
         source_path=target_source_path,
         source_hash=source_hash,
         manifest=manifest,
+        source_paths=(target_source_path,),
+    )
+
+
+def write_source_pack_from_recovered_pdfs(
+    *,
+    evidence_records: list[RecoveredPdfEvidence],
+    source_pack_root: str | Path,
+    created_at: str | None = None,
+) -> SourcePackIntakeResult:
+    """Create one v0.2 source pack from multiple PDFs for one Zotero item."""
+    if not evidence_records:
+        raise MillefeuilleContractError(
+            "multi-PDF source-pack intake requires at least one evidence record"
+        )
+    if len(evidence_records) == 1:
+        return write_source_pack_from_recovered_pdf(
+            evidence=evidence_records[0],
+            source_pack_root=source_pack_root,
+            created_at=created_at,
+        )
+
+    root = Path(source_pack_root)
+    if not str(root).strip():
+        raise MillefeuilleContractError("source_pack_root cannot be empty")
+
+    records = sorted(evidence_records, key=lambda record: record.attachment_key)
+    item_keys = {record.item_key for record in records}
+    if len(item_keys) != 1:
+        raise MillefeuilleContractError(
+            "multi-PDF source-pack evidence must belong to one Zotero item"
+        )
+    attachment_keys = [record.attachment_key for record in records]
+    if len(set(attachment_keys)) != len(attachment_keys):
+        raise MillefeuilleContractError(
+            "multi-PDF source-pack evidence contains duplicate attachment keys"
+        )
+    if {record.source_type for record in records} != {"zotero"}:
+        raise MillefeuilleContractError(
+            "multi-PDF source-pack evidence must use source_type 'zotero'"
+        )
+
+    supplied_paper_ids = {
+        record.paper_id for record in records if record.paper_id is not None
+    }
+    if len(supplied_paper_ids) > 1:
+        raise MillefeuilleContractError(
+            "multi-PDF source-pack evidence contains conflicting paper_id values"
+        )
+    item_key = records[0].item_key
+    paper_id = (
+        next(iter(supplied_paper_ids))
+        if supplied_paper_ids
+        else paper_id_for_zotero_item_key(item_key)
+    )
+    _shared_optional_evidence_value(records, "item_title")
+    _shared_optional_evidence_value(records, "citation_key")
+
+    verified: list[tuple[RecoveredPdfEvidence, str, int, str]] = []
+    refs: set[str] = set()
+    for evidence in records:
+        source_hash = verify_recovered_pdf_evidence(evidence)
+        source_ref = source_ref_for_attachment_key(evidence.attachment_key)
+        if source_ref in refs:
+            raise MillefeuilleContractError(
+                "multi-PDF source-pack attachment refs collide after normalization"
+            )
+        refs.add(source_ref)
+        verified.append(
+            (
+                evidence,
+                source_hash,
+                evidence.recovered_pdf_path.stat().st_size,
+                source_ref,
+            )
+        )
+
+    source_hash = aggregate_source_hash(entry[1] for entry in verified)
+    timestamp = created_at or datetime.now(UTC).isoformat()
+    manifest = build_multi_source_pack_manifest(
+        verified=verified,
+        paper_id=paper_id,
+        source_hash=source_hash,
+        created_at=timestamp,
+    )
+    source_pack_dir = root / "zotero" / paper_id
+    manifest_path = source_pack_dir / "manifest.json"
+    target_sources = tuple(
+        (source_pack_dir / source_ref, evidence.recovered_pdf_path, entry_hash)
+        for evidence, entry_hash, _, source_ref in verified
+    )
+
+    existing_status = _existing_multi_source_pack_status(
+        source_pack_dir=source_pack_dir,
+        manifest_path=manifest_path,
+        target_sources=target_sources,
+        expected_manifest=manifest,
+    )
+    target_paths = tuple(target for target, _, _ in target_sources)
+    if existing_status is not None:
+        return SourcePackIntakeResult(
+            paper_id=paper_id,
+            status=existing_status,
+            source_pack_dir=source_pack_dir,
+            manifest_path=manifest_path,
+            source_path=target_paths[0],
+            source_hash=source_hash,
+            manifest=load_source_pack_manifest(manifest_path),
+            source_paths=target_paths,
+        )
+
+    _write_new_multi_source_pack(
+        source_pack_dir=source_pack_dir,
+        manifest_path=manifest_path,
+        target_sources=target_sources,
+        manifest=manifest,
+    )
+    return SourcePackIntakeResult(
+        paper_id=paper_id,
+        status="created",
+        source_pack_dir=source_pack_dir,
+        manifest_path=manifest_path,
+        source_path=target_paths[0],
+        source_hash=source_hash,
+        manifest=manifest,
+        source_paths=target_paths,
     )
 
 
@@ -442,6 +586,92 @@ def build_source_pack_manifest(
     return manifest
 
 
+def build_multi_source_pack_manifest(
+    *,
+    verified: list[tuple[RecoveredPdfEvidence, str, int, str]],
+    paper_id: str,
+    source_hash: str,
+    created_at: str,
+) -> dict[str, Any]:
+    records = [entry[0] for entry in verified]
+    item_title = _shared_optional_evidence_value(records, "item_title")
+    citation_key = _shared_optional_evidence_value(records, "citation_key")
+    identity: dict[str, Any] = {
+        "zotero_item_key": records[0].item_key,
+        "pdf_count": len(records),
+    }
+    if item_title is not None:
+        identity["item_title"] = item_title
+    if citation_key is not None:
+        identity["citation_key"] = citation_key
+
+    sources: list[dict[str, Any]] = []
+    for evidence, entry_source_hash, byte_size, source_ref in verified:
+        source_sha256 = entry_source_hash.split(":", 1)[1]
+        source_identity: dict[str, Any] = {
+            "zotero_attachment_key": evidence.attachment_key,
+            "canonical_filename": evidence.canonical_filename,
+        }
+        if evidence.file_size_bytes is not None:
+            source_identity["file_size_bytes"] = evidence.file_size_bytes
+        if evidence.zotero_version is not None:
+            source_identity["zotero_version"] = evidence.zotero_version
+
+        source: dict[str, Any] = {
+            "kind": "recovered-pdf",
+            "ref": source_ref,
+            "format": "pdf",
+            "byte_size": byte_size,
+            "sha256": source_sha256,
+            "identity": source_identity,
+            "verification": {
+                "status": "verified",
+                "method": "sha256",
+                "expected_sha256": evidence.expected_sha256,
+                "actual_sha256": source_sha256,
+            },
+            "provenance": {
+                "intake_method": "fixture-recovered-pdf",
+                "evidence_schema_version": evidence.schema_version,
+            },
+        }
+        if evidence.content_type is not None:
+            source["content_type"] = evidence.content_type
+        if evidence.discovered_at is not None:
+            source["provenance"]["discovered_at"] = evidence.discovered_at
+        if evidence.verification_strength is not None:
+            source["provenance"]["verification_strength"] = (
+                evidence.verification_strength
+            )
+        if evidence.recovery:
+            source["provenance"]["recovery"] = dict(evidence.recovery)
+        if evidence.openkb_policy_hints:
+            source["provenance"]["openkb_policy_hints"] = dict(
+                evidence.openkb_policy_hints
+            )
+        sources.append(source)
+
+    return {
+        "schema_version": SOURCE_PACK_MULTI_MANIFEST_SCHEMA_VERSION,
+        "paper_id": paper_id,
+        "source_type": "zotero",
+        "source_hash": source_hash,
+        "created_at": created_at,
+        "sources": sources,
+        "identity": identity,
+        "verification": {
+            "status": "verified",
+            "method": "sha256-aggregate",
+            "source_count": len(sources),
+        },
+        "provenance": {
+            "intake_method": "fixture-recovered-pdf",
+            "evidence_schema_version": RECOVERED_PDF_EVIDENCE_SCHEMA_VERSION,
+            "evidence_count": len(sources),
+        },
+    }
+
+
 def load_source_pack_manifest(path: str | Path) -> dict[str, Any]:
     manifest_path = Path(path)
     try:
@@ -456,12 +686,15 @@ def load_source_pack_manifest(path: str | Path) -> dict[str, Any]:
         ) from exc
     if not isinstance(payload, dict):
         raise MillefeuilleContractError("source-pack manifest must be an object")
-    source_hash = _normalize_source_hash(
+    schema_version = _required_string(payload.get("schema_version"), "schema_version")
+    source_hash = normalize_source_hash(
         _required_string(payload.get("source_hash"), "source_hash")
     )
     payload["source_hash"] = source_hash
-    source = payload.get("source")
-    if isinstance(source, dict) and source.get("sha256") is not None:
+    if schema_version == SOURCE_PACK_MANIFEST_SCHEMA_VERSION:
+        source = payload.get("source")
+        if not isinstance(source, dict) or source.get("sha256") is None:
+            return payload
         source_sha256 = _normalize_sha256(
             _required_string(source.get("sha256"), "source.sha256")
         )
@@ -469,6 +702,84 @@ def load_source_pack_manifest(path: str | Path) -> dict[str, Any]:
             raise MillefeuilleContractError(
                 "source-pack manifest source_hash does not match source.sha256"
             )
+        return payload
+
+    if schema_version != SOURCE_PACK_MULTI_MANIFEST_SCHEMA_VERSION:
+        return payload
+
+    sources = payload.get("sources")
+    if not isinstance(sources, list) or len(sources) < 2:
+        raise MillefeuilleContractError(
+            "multi-source source-pack manifest sources must contain at least "
+            "two entries"
+        )
+    entry_hashes: list[str] = []
+    attachment_keys: set[str] = set()
+    refs: set[str] = set()
+    for index, source in enumerate(sources):
+        if not isinstance(source, dict):
+            raise MillefeuilleContractError(
+                f"source-pack manifest sources[{index}] must be an object"
+            )
+        source_sha256 = _normalize_sha256(
+            _required_string(source.get("sha256"), f"sources[{index}].sha256")
+        )
+        entry_hashes.append(source_sha256)
+        source_ref = _required_string(source.get("ref"), f"sources[{index}].ref")
+        _validate_multi_source_ref(source_ref)
+        if source_ref in refs:
+            raise MillefeuilleContractError(
+                "source-pack manifest contains duplicate source refs"
+            )
+        refs.add(source_ref)
+        source_identity = source.get("identity")
+        if not isinstance(source_identity, dict):
+            raise MillefeuilleContractError(
+                f"sources[{index}].identity must be an object"
+            )
+        attachment_key = _required_string(
+            source_identity.get("zotero_attachment_key"),
+            f"sources[{index}].identity.zotero_attachment_key",
+        )
+        if attachment_key in attachment_keys:
+            raise MillefeuilleContractError(
+                "source-pack manifest contains duplicate attachment keys"
+            )
+        attachment_keys.add(attachment_key)
+        _required_string(
+            source_identity.get("canonical_filename"),
+            f"sources[{index}].identity.canonical_filename",
+        )
+        verification = source.get("verification")
+        if not isinstance(verification, dict):
+            raise MillefeuilleContractError(
+                f"sources[{index}].verification must be an object"
+            )
+        actual_sha256 = _normalize_sha256(
+            _required_string(
+                verification.get("actual_sha256"),
+                f"sources[{index}].verification.actual_sha256",
+            )
+        )
+        expected_sha256 = _normalize_sha256(
+            _required_string(
+                verification.get("expected_sha256"),
+                f"sources[{index}].verification.expected_sha256",
+            )
+        )
+        if not source_sha256 == actual_sha256 == expected_sha256:
+            raise MillefeuilleContractError(
+                f"sources[{index}] verification hash does not match source.sha256"
+            )
+    if source_hash != aggregate_source_hash(entry_hashes):
+        raise MillefeuilleContractError(
+            "source-pack manifest source_hash does not match sources aggregate"
+        )
+    identity = payload.get("identity")
+    if not isinstance(identity, dict) or identity.get("pdf_count") != len(sources):
+        raise MillefeuilleContractError(
+            "source-pack manifest identity.pdf_count does not match sources"
+        )
     return payload
 
 
@@ -483,6 +794,37 @@ def paper_id_for_zotero_item_key(item_key: str) -> str:
     return slug or "zotero-item"
 
 
+def source_ref_for_attachment_key(attachment_key: str) -> str:
+    """Return a deterministic, traversal-safe source ref for one attachment."""
+    normalized_key = _required_string(attachment_key, "attachment_key")
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", normalized_key).strip("-._")
+    slug = (slug[:80].rstrip("-._") or "attachment")
+    digest = hashlib.sha256(normalized_key.encode("utf-8")).hexdigest()[:12]
+    return f"sources/{slug}-{digest}.pdf"
+
+
+def aggregate_source_hash(source_hashes: Iterable[str]) -> str:
+    """Build the canonical pack hash from one or more source SHA-256 values."""
+    hashes = sorted(_normalize_sha256(str(value)) for value in source_hashes)
+    if not hashes:
+        raise MillefeuilleContractError(
+            "source-pack aggregate hash requires at least one source hash"
+        )
+    if len(hashes) == 1:
+        return f"sha256:{hashes[0]}"
+    digest = hashlib.sha256("\n".join(hashes).encode("utf-8")).hexdigest()
+    return f"sha256-aggregate:{digest}"
+
+
+def normalize_source_hash(value: str) -> str:
+    stripped = value.strip().lower()
+    if re.fullmatch(r"(sha256|sha256-aggregate):[0-9a-f]{64}", stripped) is None:
+        raise MillefeuilleContractError(
+            "source_hash must use sha256:<hex> or sha256-aggregate:<hex> form"
+        )
+    return stripped
+
+
 def _evidence_by_handoff_key(
     evidence_records: list[RecoveredPdfEvidence],
 ) -> dict[str, RecoveredPdfEvidence]:
@@ -495,27 +837,6 @@ def _evidence_by_handoff_key(
             )
         evidence_by_key[key] = evidence
     return evidence_by_key
-
-
-def _reject_multi_pdf_handoff_groups(rows: list[OpenKBHandoffRow]) -> None:
-    grouped_rows: dict[str, list[OpenKBHandoffRow]] = {}
-    for row in rows:
-        grouped_rows.setdefault(row.item_key, []).append(row)
-
-    conflicts: list[str] = []
-    for item_key, item_rows in grouped_rows.items():
-        if len(item_rows) <= 1:
-            continue
-        paper_id = paper_id_for_zotero_item_key(item_key)
-        attachment_keys = ", ".join(sorted(row.attachment_key for row in item_rows))
-        conflicts.append(f"{item_key} -> {paper_id} [{attachment_keys}]")
-
-    if conflicts:
-        raise MillefeuilleContractError(
-            "source-pack intake currently supports exactly one PDF handoff row "
-            "per Zotero item/source pack; refusing multi-PDF groups: "
-            + "; ".join(sorted(conflicts))
-        )
 
 
 def _handoff_key(item_key: str, attachment_key: str) -> str:
@@ -615,6 +936,29 @@ def _write_new_source_pack(
     _write_json(manifest_path, manifest)
 
 
+def _write_new_multi_source_pack(
+    *,
+    source_pack_dir: Path,
+    manifest_path: Path,
+    target_sources: tuple[tuple[Path, Path, str], ...],
+    manifest: dict[str, Any],
+) -> None:
+    source_pack_dir.mkdir(parents=True, exist_ok=True)
+    for dirname in (
+        "pages",
+        "extractions/native",
+        "extractions/mistral-ocr",
+        "selected",
+        "structure",
+        "analyses/millefeuille",
+        "sources",
+    ):
+        (source_pack_dir / dirname).mkdir(parents=True, exist_ok=True)
+    for target_path, source_path, _ in target_sources:
+        shutil.copyfile(source_path, target_path)
+    _write_json(manifest_path, manifest)
+
+
 def _existing_source_pack_status(
     *,
     source_pack_dir: Path,
@@ -658,6 +1002,75 @@ def _existing_source_pack_status(
             f"existing source pack manifest does not match evidence: {manifest_path}"
         )
     return "existing"
+
+
+def _existing_multi_source_pack_status(
+    *,
+    source_pack_dir: Path,
+    manifest_path: Path,
+    target_sources: tuple[tuple[Path, Path, str], ...],
+    expected_manifest: dict[str, Any],
+) -> str | None:
+    if not source_pack_dir.exists():
+        return None
+    if not source_pack_dir.is_dir():
+        raise MillefeuilleContractError(
+            f"source-pack path exists but is not a directory: {source_pack_dir}"
+        )
+    target_paths = [target for target, _, _ in target_sources]
+    if not manifest_path.exists() and not any(path.exists() for path in target_paths):
+        if any(source_pack_dir.iterdir()):
+            raise MillefeuilleContractError(
+                "source pack already exists without manifest/source evidence: "
+                f"{source_pack_dir}"
+            )
+        return None
+    if not manifest_path.is_file() or not all(path.is_file() for path in target_paths):
+        raise MillefeuilleContractError(
+            f"source pack already exists in an incomplete state: {source_pack_dir}"
+        )
+
+    for target_path, _, expected_source_hash in target_sources:
+        actual_source_hash = f"sha256:{sha256_file(target_path)}"
+        if actual_source_hash != expected_source_hash:
+            raise MillefeuilleContractError(
+                "existing source pack source hash drift: "
+                f"expected {expected_source_hash}, got {actual_source_hash}"
+            )
+
+    existing_manifest = load_source_pack_manifest(manifest_path)
+    comparable_existing = dict(existing_manifest)
+    comparable_expected = dict(expected_manifest)
+    comparable_existing.pop("created_at", None)
+    comparable_expected.pop("created_at", None)
+    if comparable_existing != comparable_expected:
+        raise MillefeuilleContractError(
+            f"existing source pack manifest does not match evidence: {manifest_path}"
+        )
+    return "existing"
+
+
+def _shared_optional_evidence_value(
+    records: list[RecoveredPdfEvidence],
+    field_name: str,
+) -> Any:
+    values = {
+        getattr(record, field_name)
+        for record in records
+        if getattr(record, field_name) is not None
+    }
+    if len(values) > 1:
+        raise MillefeuilleContractError(
+            f"multi-PDF source-pack evidence contains conflicting {field_name} values"
+        )
+    return next(iter(values)) if values else None
+
+
+def _validate_multi_source_ref(source_ref: str) -> None:
+    if re.fullmatch(r"sources/[A-Za-z0-9._-]+\.pdf", source_ref) is None:
+        raise MillefeuilleContractError(
+            "multi-source refs must be traversal-safe paths below sources/"
+        )
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -711,12 +1124,4 @@ def _normalize_sha256(value: str) -> str:
         stripped = stripped.split(":", 1)[1]
     if not re.fullmatch(r"[0-9a-fA-F]{64}", stripped):
         raise MillefeuilleContractError("expected_sha256 must be a SHA-256 hex digest")
-    return stripped.lower()
-
-
-def _normalize_source_hash(value: str) -> str:
-    stripped = value.strip()
-    if not stripped.startswith("sha256:"):
-        raise MillefeuilleContractError("source_hash must use the sha256:<hex> form")
-    _normalize_sha256(stripped)
     return stripped.lower()
