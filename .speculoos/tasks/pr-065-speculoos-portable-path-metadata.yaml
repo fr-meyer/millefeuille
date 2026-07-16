@@ -1,6 +1,6 @@
 id: pr-065-speculoos-portable-path-metadata
 title: Remove transient worktree path from Speculoos metadata
-status: implementation
+status: merged
 branch: chore/pr-065-speculoos-portable-path-metadata
 base_branch: dev
 github:
@@ -8,10 +8,13 @@ github:
   pull_request: 65
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/65
-  head_sha: 995468af5e12853e61c59fb61e672e07a96530cb
+  head_sha: 725e122cbe147ddd4cd84bb314d942fd243e119e
+  merge_commit: b1733e3f0687bfd41b6abcd33a2fc270abb38f58
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/65#pullrequestreview-4710582033
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87539567629
 post_merge_expected:
   pull_request: 65
   base_branch: dev
@@ -55,3 +58,11 @@ evidence:
   - "PR #65 opened as a user-authored pull request targeting dev."
   - "Live PR title, body, base, head, author, commit list, and hosted patch matched the sanitized publication packet."
   - "Project item unavailable; no ProjectV2 mutation was attempted."
+  - "Final publication-metadata continuation published at 725e122cbe147ddd4cd84bb314d942fd243e119e."
+  - "Mergeguez approved exact head 725e122cbe147ddd4cd84bb314d942fd243e119e with five informational non-blocking findings and zero blocking findings: https://github.com/fr-meyer/millefeuille/pull/65#pullrequestreview-4710582033."
+  - "All five informational findings were dispositioned as affirmations of the intended metadata-only scope; no remediation was requested or required."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87539567629."
+  - "PR #65 squash-merged to dev as b1733e3f0687bfd41b6abcd33a2fc270abb38f58 by mergeguez[bot]."
+  - "Remote feature branch chore/pr-065-speculoos-portable-path-metadata deleted after exact-SHA branch-cleanup verification."
+  - "Local feature branch deleted after dev synchronized to b1733e3f0687bfd41b6abcd33a2fc270abb38f58."
+  - "Project item unavailable moved to Done; repo-local active task metadata cleared."
