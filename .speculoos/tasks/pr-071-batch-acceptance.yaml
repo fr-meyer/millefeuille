@@ -1,17 +1,17 @@
 id: pr-071-batch-acceptance
 title: Add deterministic offline batch acceptance
-status: implementation
+status: review
 branch: feat/pr-071-batch-acceptance
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 71
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
-  url: null
-  head_sha: pending-publication
+  url: https://github.com/fr-meyer/millefeuille/pull/71
+  head_sha: 451a15544f7853104bd3603eefa2d7084f813b1a
   merge_commit: null
   mergeguez_review: null
   mergeguez_check_run: null
@@ -58,8 +58,8 @@ validation:
 publication_boundary:
   statement: "Offline fixture-only batch acceptance over existing temporary source-pack runs. No live Zotero read or write, PDF recovery, source-pack mutation against real documents, OCR/model/provider call, worker-agent execution, OpenKB/index write, credential or permission change, main-branch merge, release, package publication, production deployment, or approval bypass."
 documentation_impact:
-  status: updated
-  rationale: Root and pipeline READMEs plus CLI, artifact-storage, and remaining-work contracts now describe deterministic offline batch acceptance and its schemas.
+  status: none
+  rationale: This metadata-only continuation records the live PR identity; the user-facing documentation updates are already present in the published implementation commit.
 notes:
   - "Started from synchronized dev commit 49c5c23690a5bb2fba5832ae77053ffb830837eb."
   - "The remaining-work pipeline explicitly listed batch acceptance as the next offline acceptance task with no manual gate."
@@ -69,3 +69,4 @@ evidence:
   - "Ruff, hard-rename guard, YAML/JSON parse, and diff check passed."
   - "Regression coverage proves deterministic ordering, byte-stable reruns, aggregate needs-review behavior, strict manifest types, and preflight failure before writes for duplicate, missing, or traversal-unsafe runs."
   - "Duplicate-scan existing-match evidence now contributes an explicit review reason so single-run and batch acceptance statuses cannot incorrectly pass."
+  - "Published as user-authored PR #71 at https://github.com/fr-meyer/millefeuille/pull/71 from verified implementation head 451a15544f7853104bd3603eefa2d7084f813b1a onto dev."

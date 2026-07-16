@@ -16,21 +16,21 @@ notes:
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
   id: pr-071-batch-acceptance
-  status: implementation
+  status: review
   branch: feat/pr-071-batch-acceptance
   speculoos_task: .speculoos/tasks/pr-071-batch-acceptance.yaml
-  pull_request: null
+  pull_request: 71
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
-  head_sha: pending-publication
+  head_sha: 451a15544f7853104bd3603eefa2d7084f813b1a
 pull_request:
-  number: null
-  url: null
-  status: planned
+  number: 71
+  url: https://github.com/fr-meyer/millefeuille/pull/71
+  status: open
   base_branch: dev
   head_branch: feat/pr-071-batch-acceptance
-  head_sha: pending-publication
+  head_sha: 451a15544f7853104bd3603eefa2d7084f813b1a
   author: fr-meyer
   project_item: unavailable
   project_status: In Progress
