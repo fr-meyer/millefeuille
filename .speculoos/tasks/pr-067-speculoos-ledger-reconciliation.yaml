@@ -1,6 +1,6 @@
 id: pr-067-speculoos-ledger-reconciliation
 title: Reconcile merged Speculoos task ledgers
-status: review
+status: merged
 branch: chore/pr-067-speculoos-ledger-reconciliation
 base_branch: dev
 github:
@@ -8,10 +8,13 @@ github:
   pull_request: 67
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/67
-  head_sha: fa0cca2fa0762b724984c6bb4b183c36a5df3b09
+  head_sha: 1dd9669b51a487257a2b84db5a5830c4e43bf9ba
+  merge_commit: 1d01c8cc9079c93a7cfd0599298ab1a7b4414912
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/67#pullrequestreview-4710870157
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87547552904
 post_merge_expected:
   pull_request: 67
   base_branch: dev
@@ -66,3 +69,12 @@ evidence:
   - "Ruff, hard-rename identity guard, metadata parse, ledger audit, diff check, Speculoos validation, and publication checks passed."
   - "No ProjectV2 item is linked; no ProjectV2 mutation is attempted."
   - "Live PR readback confirms author fr-meyer, base dev, branch chore/pr-067-speculoos-ledger-reconciliation, and initial head fa0cca2fa0762b724984c6bb4b183c36a5df3b09."
+  - "Final publication-metadata continuation published at 1dd9669b51a487257a2b84db5a5830c4e43bf9ba."
+  - "Mergeguez approved exact head 1dd9669b51a487257a2b84db5a5830c4e43bf9ba with two informational non-blocking findings and zero blocking findings: https://github.com/fr-meyer/millefeuille/pull/67#pullrequestreview-4710870157."
+  - "The metadata-only finding confirms the intended scope and requires no remediation."
+  - "The truncated-patch finding is a reviewer transport limitation; the complete local diff and all 16 changed files passed full inspection, metadata parse, ledger audit, publication checks, Ruff, the hard-rename guard, and 230 tests, so no remediation is warranted."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87547552904."
+  - "PR #67 squash-merged to dev as 1d01c8cc9079c93a7cfd0599298ab1a7b4414912 by mergeguez[bot]."
+  - "Remote feature branch chore/pr-067-speculoos-ledger-reconciliation deleted after exact-SHA branch-cleanup verification."
+  - "Local feature branch deleted after dev synchronized to 1d01c8cc9079c93a7cfd0599298ab1a7b4414912."
+  - "Project item unavailable moved to Done; repo-local active task metadata cleared."
