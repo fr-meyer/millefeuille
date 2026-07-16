@@ -16,21 +16,21 @@ notes:
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
   id: pr-073-batch-classification
-  status: implementation
+  status: review
   branch: feat/pr-073-batch-classification
   speculoos_task: .speculoos/tasks/pr-073-batch-classification.yaml
-  pull_request: null
+  pull_request: 73
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
-  head_sha: pending-publication
+  head_sha: aac5489d7c392e50bf4829e8a7e7dfd8efb211ff
 pull_request:
-  number: null
-  url: null
-  status: planned
+  number: 73
+  url: https://github.com/fr-meyer/millefeuille/pull/73
+  status: open
   base_branch: dev
   head_branch: feat/pr-073-batch-classification
-  head_sha: pending-publication
+  head_sha: aac5489d7c392e50bf4829e8a7e7dfd8efb211ff
   author: fr-meyer
   project_item: unavailable
   project_status: In Progress
