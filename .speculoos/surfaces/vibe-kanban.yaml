@@ -14,7 +14,7 @@ notes:
   - No Vibe cloud or org API is configured for this repo.
   - Bootstrap should not depend on Vibe reachability.
 task:
-  status: review
-  id: pr-073-batch-classification
-  speculoos_task: .speculoos/tasks/pr-073-batch-classification.yaml
+  status: idle
+  id: null
+  speculoos_task: null
   command: null

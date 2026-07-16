@@ -1,6 +1,6 @@
 id: pr-073-batch-classification
 title: Add deterministic offline batch classification routing
-status: review
+status: merged
 branch: feat/pr-073-batch-classification
 base_branch: dev
 github:
@@ -8,13 +8,13 @@ github:
   pull_request: 73
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/73
-  head_sha: aac5489d7c392e50bf4829e8a7e7dfd8efb211ff
-  merge_commit: null
-  mergeguez_review: null
-  mergeguez_check_run: null
+  head_sha: f0999ace508c9902fd7800b143c9a0b619dc5376
+  merge_commit: 44b027c4b4e082df1747a3542909c4e070f9c6b2
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/73#pullrequestreview-4711747821
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87570745048
 post_merge_expected:
   pull_request: 73
   base_branch: dev
@@ -70,3 +70,11 @@ evidence:
   - "Regression coverage proves deterministic ordering, byte-stable reruns, locked taxonomy enforcement, aggregate classified/review/adjudication behavior, and preflight failure before writes for duplicate, taxonomy-drift, invalid-type, or traversal-unsafe inputs."
   - "Speculoos validation, private-data scan, documentation sync, and publication checks passed."
   - "Published as user-authored PR #73 at https://github.com/fr-meyer/millefeuille/pull/73 from verified implementation head aac5489d7c392e50bf4829e8a7e7dfd8efb211ff onto dev."
+  - "Final publication-metadata continuation published at f0999ace508c9902fd7800b143c9a0b619dc5376."
+  - "Mergeguez approved exact head f0999ace508c9902fd7800b143c9a0b619dc5376 with zero findings and zero blockers: https://github.com/fr-meyer/millefeuille/pull/73#pullrequestreview-4711747821."
+  - "Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/87570745048."
+  - "PR #73 squash-merged to dev as 44b027c4b4e082df1747a3542909c4e070f9c6b2 by mergeguez[bot]."
+  - "Remote feature branch feat/pr-073-batch-classification deleted after exact-SHA branch-cleanup verification."
+  - "Local feature branch deleted after dev synchronized to 44b027c4b4e082df1747a3542909c4e070f9c6b2."
+  - "Post-merge validation on synchronized dev passed: 243 tests, Ruff, metadata parse, and Speculoos status."
+  - "Project item unavailable moved to Done; repo-local active task metadata cleared."
