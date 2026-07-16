@@ -1,0 +1,10 @@
+feat: add offline batch acceptance
+
+Complete task pr-071-batch-acceptance with a versioned batch manifest,
+preflight-all run validation, deterministic aggregate reports, and regression
+coverage for pass, needs-review, duplicate, missing-run, and traversal cases.
+
+Document the offline CLI/storage contract without performing live Zotero,
+OCR, model, OpenKB, index, source-pack, release, or publication operations.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

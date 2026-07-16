@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Millefeuille acceptance batch manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "batch_id",
+    "runs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-acceptance-batch-manifest/v0.1"
+    },
+    "batch_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id"
+        ],
+        "properties": {
+          "paper_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$"
+          },
+          "item_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$"
+          },
+          "run_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "paper_id"
+            ],
+            "not": {
+              "required": [
+                "item_key"
+              ]
+            }
+          },
+          {
+            "required": [
+              "item_key"
+            ],
+            "not": {
+              "required": [
+                "paper_id"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

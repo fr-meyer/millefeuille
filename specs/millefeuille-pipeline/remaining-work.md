@@ -111,8 +111,11 @@
       paper card, index, and duplicate-scan evidence into
       `openkb-millefeuille-acceptance-summary/v0.1`, then updates the
       run-scoped stage manifest and artifact index.
-    - Remaining work: batch acceptance, live OpenKB/source-pack/index
-      reconciliation, and any approval-aware waivers.
+    - Offline batch acceptance accepts an explicit versioned batch manifest,
+      preflights all unique paper/run packages, writes deterministic per-run
+      results, and emits an aggregate pass/needs-review report.
+    - Remaining work: live OpenKB/source-pack/index reconciliation and any
+      approval-aware waivers.
     - Manual gate: none for offline fixture acceptance; live index/source-pack
       state checks require their applicable approvals.
 

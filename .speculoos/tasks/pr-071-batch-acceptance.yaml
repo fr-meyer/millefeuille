@@ -1,0 +1,71 @@
+id: pr-071-batch-acceptance
+title: Add deterministic offline batch acceptance
+status: implementation
+branch: feat/pr-071-batch-acceptance
+base_branch: dev
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  url: null
+  head_sha: pending-publication
+  merge_commit: null
+  mergeguez_review: null
+  mergeguez_check_run: null
+post_merge_expected:
+  pull_request: 71
+  base_branch: dev
+  head_branch: feat/pr-071-batch-acceptance
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - extend the existing offline acceptance command with an explicit versioned batch manifest
+  - resolve and synthesize every listed existing paper/run package before batch-owned writes begin
+  - reject traversal-unsafe batch ids, invalid locators, and duplicate resolved paper/run identities
+  - sort run results deterministically and preserve single-run acceptance outputs
+  - emit aggregate JSON and Markdown reports with portable source-root-relative refs
+  - return pass only when every run passes while still materializing valid needs-review results
+  - keep exact-input reruns byte-stable and document the batch storage and CLI contracts
+non_goals:
+  - live OpenKB, source-pack, index, Zotero, OCR, model, or provider reconciliation
+  - approval-aware acceptance waivers or live-state exception handling
+  - batch classification, larger taxonomy routing, adjudication, or worker-agent execution
+  - downstream extraction or analysis of same-item multi-PDF packs
+  - credentials, permissions, rulesets, or secret handling changes
+  - dev-to-main promotion, release tag, package publication, or production deployment
+acceptance:
+  - a batch manifest identifies a non-empty set of paper or item locators and run ids
+  - all run packages and evidence preflight before any acceptance or aggregate output is written
+  - duplicate resolved paper/run pairs and unsafe batch ids fail without partial outputs
+  - per-run summaries are written in deterministic order and aggregate counts/status are consistent
+  - one needs-review run makes the aggregate needs-review without suppressing other valid run results
+  - exact-input reruns preserve acceptance and aggregate output bytes
+  - input/output JSON schemas and user-facing CLI/storage documentation describe the offline contract
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_acceptance_batch tests.test_millefeuille_stage_cli tests.test_millefeuille_contract_artifacts tests.test_millefeuille_contract_models -v"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-071-batch-acceptance --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-071-batch-acceptance --pr-body specs/pr-071-batch-acceptance/pr-body.md --commit-message specs/pr-071-batch-acceptance/commit-message.txt --json"
+publication_boundary:
+  statement: "Offline fixture-only batch acceptance over existing temporary source-pack runs. No live Zotero read or write, PDF recovery, source-pack mutation against real documents, OCR/model/provider call, worker-agent execution, OpenKB/index write, credential or permission change, main-branch merge, release, package publication, production deployment, or approval bypass."
+documentation_impact:
+  status: updated
+  rationale: Root and pipeline READMEs plus CLI, artifact-storage, and remaining-work contracts now describe deterministic offline batch acceptance and its schemas.
+notes:
+  - "Started from synchronized dev commit 49c5c23690a5bb2fba5832ae77053ffb830837eb."
+  - "The remaining-work pipeline explicitly listed batch acceptance as the next offline acceptance task with no manual gate."
+evidence:
+  - "Focused batch-acceptance, stage-CLI, contract-artifact, and contract-model suites passed: 37 tests."
+  - "Full unittest discovery passed: 237 tests."
+  - "Ruff, hard-rename guard, YAML/JSON parse, and diff check passed."
+  - "Regression coverage proves deterministic ordering, byte-stable reruns, aggregate needs-review behavior, strict manifest types, and preflight failure before writes for duplicate, missing, or traversal-unsafe runs."
+  - "Duplicate-scan existing-match evidence now contributes an explicit review reason so single-run and batch acceptance statuses cannot incorrectly pass."

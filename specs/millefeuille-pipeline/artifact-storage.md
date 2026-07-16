@@ -31,6 +31,11 @@ Supported root modes:
 
 ```text
 source-packs/
+  batches/
+    millefeuille/<batch-id>/
+      reports/
+        acceptance-batch-summary.json
+        acceptance-batch-summary.md
   zotero/<paper-slug>/
     manifest.json
     source.pdf                  # v0.1 one-PDF pack
@@ -127,6 +132,12 @@ Every non-trivial run should emit:
 - `quality-report.md`
 - `completion-gate-result.json`
 - `zotero-writeback-plan.json` when Zotero state would change
+
+An offline acceptance batch additionally emits one run-scoped acceptance
+summary per validated locator plus
+`batches/millefeuille/<batch-id>/reports/acceptance-batch-summary.{json,md}`.
+Batch reports contain portable source-root-relative refs and aggregate status;
+they do not copy paper text, PDFs, credentials, or provider payloads.
 
 The artifact index should answer:
 

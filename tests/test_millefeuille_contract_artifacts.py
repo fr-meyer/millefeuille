@@ -29,6 +29,8 @@ REQUIRED_JSON_SCHEMAS = [
     "hierarchical-summary.schema.json",
     "paper-card.schema.json",
     "retrieval-index-status.schema.json",
+    "acceptance-batch-manifest.schema.json",
+    "acceptance-batch-summary.schema.json",
 ]
 
 REQUIRED_STAGES = {

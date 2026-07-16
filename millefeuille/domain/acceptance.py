@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Any
 
 from millefeuille.domain.card_fixtures import CARD_JSON_REF, load_paper_card
@@ -18,10 +19,13 @@ from millefeuille.domain.index_fixtures import (
     load_retrieval_index_status,
 )
 from millefeuille.domain.millefeuille import (
+    AcceptanceBatchRunRecord,
+    AcceptanceBatchSummaryRecord,
     AcceptanceCheckRecord,
     AcceptanceCheckStatus,
     AcceptanceStatus,
     AcceptanceSummaryRecord,
+    MillefeuilleContractError,
     StageName,
     StageStatus,
 )
@@ -31,6 +35,7 @@ from millefeuille.domain.route_fixtures import (
 )
 from millefeuille.domain.stage_runtime import (
     ResolvedRunArtifacts,
+    load_json_object,
     load_jsonl_records,
     persist_run_artifacts,
     relative_ref,
@@ -52,6 +57,14 @@ from millefeuille.domain.summary_fixtures import (
 
 ACCEPTANCE_SUMMARY_REF = Path("reports/acceptance-summary.json")
 ACCEPTANCE_SUMMARY_MARKDOWN_REF = Path("reports/acceptance-summary.md")
+ACCEPTANCE_BATCH_ROOT_REF = Path("batches/millefeuille")
+ACCEPTANCE_BATCH_SUMMARY_REF = Path("reports/acceptance-batch-summary.json")
+ACCEPTANCE_BATCH_SUMMARY_MARKDOWN_REF = Path(
+    "reports/acceptance-batch-summary.md"
+)
+ACCEPTANCE_BATCH_MANIFEST_SCHEMA = "millefeuille-acceptance-batch-manifest/v0.1"
+_SAFE_BATCH_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+_SAFE_BATCH_LOCATOR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,255}\Z")
 
 
 @dataclass(frozen=True)
@@ -67,6 +80,26 @@ class AcceptanceWriteResult:
             "paper_id": self.paper_id,
             "run_id": self.run_id,
             "status": self.status,
+            "summary_path": str(self.summary_path),
+            "markdown_path": str(self.markdown_path),
+        }
+
+
+@dataclass(frozen=True)
+class AcceptanceBatchWriteResult:
+    batch_id: str
+    status: str
+    counts: dict[str, int]
+    runs: list[dict[str, Any]]
+    summary_path: Path
+    markdown_path: Path
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "batch_id": self.batch_id,
+            "status": self.status,
+            "counts": dict(self.counts),
+            "runs": [dict(run) for run in self.runs],
             "summary_path": str(self.summary_path),
             "markdown_path": str(self.markdown_path),
         }
@@ -92,6 +125,99 @@ def write_acceptance_summary(
         handoff_path=handoff_path,
         duplicate_scan_path=duplicate_scan_path,
     )
+    return _persist_acceptance_summary(resolved=resolved, summary=summary)
+
+
+def write_acceptance_batch_summary(
+    *,
+    source_pack_root: str | Path,
+    batch_manifest_path: str | Path,
+    handoff_path: str | Path,
+    duplicate_scan_path: str | Path | None = None,
+) -> AcceptanceBatchWriteResult:
+    """Synthesize acceptance for a validated set of existing offline runs.
+
+    Every run is resolved and its acceptance summary is built before any output
+    is persisted. Invalid manifests, duplicate run identities, missing run
+    packages, or evidence drift therefore fail before batch-owned writes begin.
+    """
+
+    batch_id, run_locators = _load_acceptance_batch_manifest(batch_manifest_path)
+    prepared: list[tuple[ResolvedRunArtifacts, AcceptanceSummaryRecord]] = []
+    for locator in run_locators:
+        resolved = resolve_run_artifacts(
+            source_pack_root=source_pack_root,
+            run_id=locator["run_id"],
+            paper_id=locator.get("paper_id"),
+            item_key=locator.get("item_key"),
+        )
+        summary = _build_acceptance_summary(
+            resolved=resolved,
+            handoff_path=handoff_path,
+            duplicate_scan_path=duplicate_scan_path,
+        )
+        prepared.append((resolved, summary))
+
+    prepared.sort(key=lambda item: (item[0].paper_id, item[0].run_id))
+    identities = [(resolved.paper_id, resolved.run_id) for resolved, _ in prepared]
+    if len(identities) != len(set(identities)):
+        raise MillefeuilleContractError(
+            "acceptance batch runs must have unique paper_id/run_id pairs"
+        )
+
+    root = Path(source_pack_root)
+    run_records: list[AcceptanceBatchRunRecord] = []
+    for resolved, summary in prepared:
+        result = _persist_acceptance_summary(resolved=resolved, summary=summary)
+        run_records.append(
+            AcceptanceBatchRunRecord(
+                paper_id=resolved.paper_id,
+                run_id=resolved.run_id,
+                source_hash=resolved.source_hash,
+                status=summary.status,
+                summary_ref=relative_ref(result.summary_path, root),
+                review_reasons=list(summary.review_reasons),
+            )
+        )
+
+    counts = {
+        "runs": len(run_records),
+        "passed": sum(run.status == AcceptanceStatus.PASS for run in run_records),
+        "needs_review": sum(
+            run.status == AcceptanceStatus.NEEDS_REVIEW for run in run_records
+        ),
+    }
+    status = (
+        AcceptanceStatus.PASS
+        if counts["needs_review"] == 0
+        else AcceptanceStatus.NEEDS_REVIEW
+    )
+    batch_summary = AcceptanceBatchSummaryRecord(
+        batch_id=batch_id,
+        status=status,
+        counts=counts,
+        runs=run_records,
+    )
+    batch_dir = root / ACCEPTANCE_BATCH_ROOT_REF / batch_id
+    summary_path = batch_dir / ACCEPTANCE_BATCH_SUMMARY_REF
+    markdown_path = batch_dir / ACCEPTANCE_BATCH_SUMMARY_MARKDOWN_REF
+    write_json_object(summary_path, batch_summary.to_dict())
+    write_text(markdown_path, _render_acceptance_batch_markdown(batch_summary))
+    return AcceptanceBatchWriteResult(
+        batch_id=batch_id,
+        status=batch_summary.status.value,
+        counts=dict(batch_summary.counts),
+        runs=[run.to_dict() for run in batch_summary.runs],
+        summary_path=summary_path,
+        markdown_path=markdown_path,
+    )
+
+
+def _persist_acceptance_summary(
+    *,
+    resolved: ResolvedRunArtifacts,
+    summary: AcceptanceSummaryRecord,
+) -> AcceptanceWriteResult:
     summary_path = resolved.run_dir / ACCEPTANCE_SUMMARY_REF
     markdown_path = resolved.run_dir / ACCEPTANCE_SUMMARY_MARKDOWN_REF
     write_json_object(summary_path, summary.to_dict())
@@ -146,6 +272,96 @@ def write_acceptance_summary(
         summary_path=summary_path,
         markdown_path=markdown_path,
     )
+
+
+def _load_acceptance_batch_manifest(
+    path: str | Path,
+) -> tuple[str, list[dict[str, str]]]:
+    payload = load_json_object(path, "acceptance batch manifest")
+    unexpected = sorted(set(payload) - {"schema_version", "batch_id", "runs"})
+    if unexpected:
+        raise MillefeuilleContractError(
+            "acceptance batch manifest has unsupported fields: "
+            + ", ".join(unexpected)
+        )
+    schema_version = payload.get("schema_version")
+    if not isinstance(schema_version, str):
+        raise MillefeuilleContractError(
+            "acceptance batch schema_version must be a string"
+        )
+    if schema_version != ACCEPTANCE_BATCH_MANIFEST_SCHEMA:
+        raise MillefeuilleContractError(
+            f"unsupported acceptance batch schema_version {schema_version!r}"
+        )
+    batch_id = payload.get("batch_id")
+    if not isinstance(batch_id, str):
+        raise MillefeuilleContractError("acceptance batch batch_id must be a string")
+    if batch_id in {".", ".."} or _SAFE_BATCH_ID.fullmatch(batch_id) is None:
+        raise MillefeuilleContractError(
+            "batch_id must be traversal-safe and use only letters, numbers, "
+            "'.', '_', or '-'"
+        )
+    runs = payload.get("runs")
+    if not isinstance(runs, list) or not runs:
+        raise MillefeuilleContractError(
+            "acceptance batch runs must be a non-empty array"
+        )
+
+    locators: list[dict[str, str]] = []
+    for index, entry in enumerate(runs):
+        if not isinstance(entry, dict):
+            raise MillefeuilleContractError(
+                f"acceptance batch run {index} must be an object"
+            )
+        unexpected = sorted(set(entry) - {"paper_id", "item_key", "run_id"})
+        if unexpected:
+            raise MillefeuilleContractError(
+                f"acceptance batch run {index} has unsupported fields: "
+                + ", ".join(unexpected)
+            )
+        if "run_id" not in entry:
+            raise MillefeuilleContractError(
+                f"acceptance batch run {index} requires run_id"
+            )
+        run_id = entry["run_id"]
+        has_paper_id = "paper_id" in entry
+        has_item_key = "item_key" in entry
+        if has_paper_id == has_item_key:
+            raise MillefeuilleContractError(
+                f"acceptance batch run {index} requires exactly one of "
+                "paper_id or item_key"
+            )
+        locator_field = "paper_id" if has_paper_id else "item_key"
+        locator_value = entry[locator_field]
+        non_string_fields = [
+            field_name
+            for field_name, value in (
+                ("run_id", run_id),
+                (locator_field, locator_value),
+            )
+            if not isinstance(value, str)
+        ]
+        if non_string_fields:
+            raise MillefeuilleContractError(
+                f"acceptance batch run {index} has non-string locator fields: "
+                + ", ".join(non_string_fields)
+            )
+        unsafe_fields = [
+            field_name
+            for field_name, value in (
+                ("run_id", run_id),
+                (locator_field, locator_value),
+            )
+            if _SAFE_BATCH_LOCATOR.fullmatch(value) is None
+        ]
+        if unsafe_fields:
+            raise MillefeuilleContractError(
+                f"acceptance batch run {index} has unsafe locator fields: "
+                + ", ".join(unsafe_fields)
+            )
+        locator = {"run_id": run_id, locator_field: locator_value}
+        locators.append(locator)
+    return batch_id, locators
 
 
 def _build_acceptance_summary(
@@ -249,6 +465,7 @@ def _build_acceptance_summary(
         resolved=resolved,
         duplicate_scan_path=duplicate_scan_path,
         index_payload=index_payload,
+        review_reasons=review_reasons,
     )
     checks.append(duplicate_scan["check"])
     counts["duplicate_scan"] = int(
@@ -353,6 +570,7 @@ def _build_duplicate_scan_context(
     resolved: ResolvedRunArtifacts,
     duplicate_scan_path: str | Path | None,
     index_payload: dict[str, Any],
+    review_reasons: list[str],
 ) -> dict[str, Any]:
     duplicate_scan = dict(index_payload.get("duplicate_scan") or {})
     refs: list[str] = []
@@ -370,6 +588,8 @@ def _build_duplicate_scan_context(
             duplicate_scan = dict(matches[0])
             duplicate_scan["match_count"] = len(matches)
     matched_existing = bool(duplicate_scan.get("matched_existing"))
+    if matched_existing:
+        review_reasons.append("duplicate scan flagged an existing match")
     check_status = (
         AcceptanceCheckStatus.NEEDS_REVIEW
         if matched_existing
@@ -580,4 +800,28 @@ def _render_acceptance_markdown(summary: AcceptanceSummaryRecord) -> str:
         lines.extend(["", "## Review Reasons"])
         for reason in summary.review_reasons:
             lines.append(f"- {reason}")
+    return "\n".join(lines) + "\n"
+
+
+def _render_acceptance_batch_markdown(
+    summary: AcceptanceBatchSummaryRecord,
+) -> str:
+    lines = [
+        "# Acceptance Batch Summary",
+        "",
+        f"- Batch: `{summary.batch_id}`",
+        f"- Status: `{summary.status.value}`",
+        f"- Runs: `{summary.counts['runs']}`",
+        f"- Passed: `{summary.counts['passed']}`",
+        f"- Needs review: `{summary.counts['needs_review']}`",
+        "",
+        "## Runs",
+    ]
+    for run in summary.runs:
+        lines.append(
+            f"- `{run.paper_id}` / `{run.run_id}`: `{run.status.value}` "
+            f"(`{run.summary_ref}`)"
+        )
+        for reason in run.review_reasons:
+            lines.append(f"  review: {reason}")
     return "\n".join(lines) + "\n"

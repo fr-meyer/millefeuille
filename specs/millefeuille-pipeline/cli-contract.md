@@ -41,6 +41,9 @@ derived artifact write.
     package.
   - Writes `reports/acceptance-summary.json` and updates the stage manifest and
     artifact index.
+  - `--batch-manifest` preflights a non-empty set of paper/run locators before
+    any acceptance write, emits each run summary, and writes a deterministic
+    aggregate report under `batches/millefeuille/<batch-id>/reports/`.
 
 - `classify`
   - Implemented for accepted runs from explicit local evidence.
@@ -165,6 +168,9 @@ derived artifact write.
 - `acceptance`
   - Current preview implementation joins handoff, source-pack, extraction,
     route, structure, summary, card, index, and duplicate-scan evidence.
+  - Offline batch mode sorts unique paper/run identities, aggregates pass and
+    needs-review results without skipping valid runs, and rejects invalid or
+    duplicate manifests before writes.
   - Future expansion should add broader skip/OpenKB/live-state joins and
     approval-aware waivers.
 
@@ -222,6 +228,23 @@ millefeuille run \
   --writeback preview \
   --release-preflight
 ```
+
+Batch acceptance uses the same read-only evidence inputs without live provider
+or Zotero access:
+
+```bash
+millefeuille acceptance \
+  --source-pack-root /path/to/source-packs \
+  --batch-manifest /path/to/acceptance-batch.json \
+  --handoff /path/to/handoff.jsonl \
+  --json
+```
+
+The batch manifest uses
+`millefeuille-acceptance-batch-manifest/v0.1`, supplies a traversal-safe
+`batch_id`, and lists unique `paper_id` or `item_key` plus `run_id` locators.
+Offline batch acceptance is not approval for live Zotero, OCR, OpenKB, index,
+source-pack, model, or worker-agent operations.
 
 ## Run Modes
 

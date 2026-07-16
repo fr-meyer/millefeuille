@@ -19,6 +19,9 @@ Files:
 - `hierarchical-summary.schema.json` - page/section/paper summary shape.
 - `paper-card.schema.json` - compact human/agent card shape.
 - `retrieval-index-status.schema.json` - retrieval/index lane status shape.
+- `acceptance-batch-manifest.schema.json` - deterministic offline batch input
+  locators.
+- `acceptance-batch-summary.schema.json` - aggregate pass/review result shape.
 - `retrieval-index-contract.md` - OpenKB/PageIndex and optional index lanes.
 - `classification-orchestration.md` - CLI-owned classification modes and
   multi-agent governance.
@@ -31,9 +34,9 @@ Files:
 
 Executable offline contract models live in
 `millefeuille/domain/millefeuille.py`. They cover stage manifests,
-manual gates, tag-state transitions, acceptance summaries, classification
-records, writeback plans, and release-preflight records without requiring live
-provider or Zotero mutation.
+manual gates, tag-state transitions, single-run and batch acceptance summaries,
+classification records, writeback plans, and release-preflight records without
+requiring live provider or Zotero mutation.
 
 Preview/read-only stage commands now live under `millefeuille/cli/stages.py`:
 `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
