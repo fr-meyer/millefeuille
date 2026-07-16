@@ -1,6 +1,6 @@
 id: pr-077-retrieval-corpus-locators
 title: Add corpus-aware read-only retrieval locators and filters
-status: in_progress
+status: review
 branch: feat/pr-077-retrieval-corpus-locators
 base_branch: dev
 github:
@@ -10,8 +10,8 @@ github:
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
-  url: null
-  head_sha: pending-publication
+  url: https://github.com/fr-meyer/millefeuille/pull/77
+  head_sha: 0556e8694a0bc7ca7f13d2625ba6cc1212cb8643
   merge_commit: null
   mergeguez_review: null
   mergeguez_check_run: null
@@ -56,8 +56,8 @@ validation:
 publication_boundary:
   statement: "Offline, read-only ref resolution over existing temporary fixture source-pack runs. No private paper content return, live Zotero read or write, PDF recovery, durable source-pack mutation, OCR/model/provider call, worker-agent execution, OpenKB/index write, credential or permission change, main-branch merge, release, package publication, production deployment, or approval bypass."
 documentation_impact:
-  status: user-facing
-  rationale: README and pipeline contracts document the new local locators, filters, fail-closed behavior, and remaining batch boundary.
+  status: none
+  rationale: This metadata-only continuation records the live PR identity; the user-facing README and pipeline-contract updates are already present in the published implementation commit.
 notes:
   - "Started from synchronized dev commit 50f4cdfb159096afb11d9122023a32fb7fd5841e."
   - "The retrieval/index and CLI contracts explicitly leave DOI/title and section/page corpus lookup unfinished while allowing read-only local inspection."
@@ -67,3 +67,4 @@ evidence:
   - "Ruff, hard-rename identity guard, YAML/JSON parse, and diff check passed."
   - "Regression coverage proves normalized exact DOI/title resolution, direct paper/key/slug lookup, ambiguity and missing-match rejection, item-key identity verification, traversal rejection, symlink rejection, canonical index refs, optional-preview identity, and section/page/classification filters."
   - "Speculoos validation, private-data scan, documentation sync, and publication checks passed."
+  - "Published as user-authored PR #77 at https://github.com/fr-meyer/millefeuille/pull/77 from verified implementation head 0556e8694a0bc7ca7f13d2625ba6cc1212cb8643 onto dev."

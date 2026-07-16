@@ -14,7 +14,7 @@ notes:
   - No Vibe cloud or org API is configured for this repo.
   - Bootstrap should not depend on Vibe reachability.
 task:
-  status: implementation
+  status: review
   id: pr-077-retrieval-corpus-locators
   speculoos_task: .speculoos/tasks/pr-077-retrieval-corpus-locators.yaml
   command: null

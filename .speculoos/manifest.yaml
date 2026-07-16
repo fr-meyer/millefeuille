@@ -9,7 +9,7 @@ repository:
   base_branch: dev
   working_branch: feat/pr-077-retrieval-corpus-locators
 status:
-  phase: implementation
+  phase: review
   pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: planned
-    number: null
-    url: null
+    status: open
+    number: 77
+    url: https://github.com/fr-meyer/millefeuille/pull/77
     base_branch: dev
     head_branch: feat/pr-077-retrieval-corpus-locators
-    head_sha: null
+    head_sha: 0556e8694a0bc7ca7f13d2625ba6cc1212cb8643
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
