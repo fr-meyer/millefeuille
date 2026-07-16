@@ -14,26 +14,8 @@ notes:
   - Container gh is intentionally not the GitHub write path.
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
-current_task:
-  id: pr-073-batch-classification
-  status: review
-  branch: feat/pr-073-batch-classification
-  speculoos_task: .speculoos/tasks/pr-073-batch-classification.yaml
-  pull_request: 73
-  project_item: unavailable
-  pull_request_project_item: unavailable
-  project_status: In Progress
-  head_sha: aac5489d7c392e50bf4829e8a7e7dfd8efb211ff
-pull_request:
-  number: 73
-  url: https://github.com/fr-meyer/millefeuille/pull/73
-  status: open
-  base_branch: dev
-  head_branch: feat/pr-073-batch-classification
-  head_sha: aac5489d7c392e50bf4829e8a7e7dfd8efb211ff
-  author: fr-meyer
-  project_item: unavailable
-  project_status: In Progress
+current_task: null
+pull_request: null
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
@@ -325,3 +307,13 @@ completed_pull_requests:
     merge_commit: fd61dbcac385b886d477e1a72861c3db5b9d4279
     mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/71#pullrequestreview-4711463581
     mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87563190038
+  - id: pr-073-batch-classification
+    number: 73
+    url: https://github.com/fr-meyer/millefeuille/pull/73
+    status: merged
+    base_branch: dev
+    head_branch: feat/pr-073-batch-classification
+    head_sha: f0999ace508c9902fd7800b143c9a0b619dc5376
+    merge_commit: 44b027c4b4e082df1747a3542909c4e070f9c6b2
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/73#pullrequestreview-4711747821
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87570745048
