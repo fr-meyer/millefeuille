@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-075-classification-review-adjudication
+canonical_task: null
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: feat/pr-075-classification-review-adjudication
+  working_branch: null
 status:
-  phase: review
-  pret_a_coder: in_progress
+  phase: idle
+  pret_a_coder: idle
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
-    number: 75
-    url: https://github.com/fr-meyer/millefeuille/pull/75
+    status: none-active
+    number: null
+    url: null
     base_branch: dev
-    head_branch: feat/pr-075-classification-review-adjudication
-    head_sha: 70b3257106c1201b4ef24d6c2e90bd815bea1b50
+    head_branch: null
+    head_sha: null
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
