@@ -5,12 +5,13 @@ branch: chore/pr-065-speculoos-portable-path-metadata
 base_branch: dev
 github:
   issue: null
-  pull_request: null
+  pull_request: 65
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
-  head_sha: null
+  url: https://github.com/fr-meyer/millefeuille/pull/65
+  head_sha: 995468af5e12853e61c59fb61e672e07a96530cb
 post_merge_expected:
   pull_request: 65
   base_branch: dev
@@ -51,3 +52,6 @@ evidence:
   - "Sibling Speculoos manifests demonstrate that repository.local_path accepts null for portable checkout discovery."
   - "Full unittest discovery passed: 230 tests."
   - "Ruff, metadata parse, diff check, Speculoos status, validation, and publication checks passed."
+  - "PR #65 opened as a user-authored pull request targeting dev."
+  - "Live PR title, body, base, head, author, commit list, and hosted patch matched the sanitized publication packet."
+  - "Project item unavailable; no ProjectV2 mutation was attempted."

@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: planned
-    number: null
-    url: null
+    status: open
+    number: 65
+    url: https://github.com/fr-meyer/millefeuille/pull/65
     base_branch: dev
     head_branch: chore/pr-065-speculoos-portable-path-metadata
-    head_sha: null
+    head_sha: 995468af5e12853e61c59fb61e672e07a96530cb
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
