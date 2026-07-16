@@ -68,6 +68,15 @@ source-packs/
           classification/
             classification-plan.json
             decision-records/
+            actions/
+              <action-id>/
+                action-record.json
+                action-record.md
+                final-decision.json
+                final-decision.md
+                zotero-writeback-preview.json
+                adjudication-queue.jsonl
+                taxonomy-change-requests.jsonl
             rejected-alternatives.jsonl
             adjudication-queue.jsonl
             zotero-writeback-preview.json
@@ -148,6 +157,16 @@ package and additionally emits
 plus `batch-classification-report.md`. These aggregate artifacts lock the
 taxonomy version, group portable decision refs by primary path, and retain
 review/adjudication status without copying classification evidence content.
+
+An offline classification review or adjudication action emits an immutable
+package at `classification/actions/<action-id>/`. Its
+`millefeuille-classification-action/v0.1` record links the prior decision to a
+final decision and action-scoped writeback preview. The run's classification
+plan, canonical preview, stage manifest, and artifact index are advanced to that
+final decision without overwriting the prior record. Unresolved actions also
+emit a one-row `adjudication-queue.jsonl`; taxonomy-gap actions emit a one-row
+`taxonomy-change-requests.jsonl`. Empty queue/request files remain present for
+deterministic package shape and exact-rerun verification.
 
 The artifact index should answer:
 

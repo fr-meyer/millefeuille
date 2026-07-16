@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/millefeuille/classification-action-record.schema.json",
+  "title": "Millefeuille Classification Action Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "action_id",
+    "paper_id",
+    "run_id",
+    "source_hash",
+    "taxonomy_version",
+    "mode",
+    "outcome",
+    "status",
+    "summary",
+    "prior_decision_ref",
+    "final_decision_ref",
+    "writeback_preview_ref",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-classification-action/v0.1"
+    },
+    "action_id": {"type": "string", "minLength": 1},
+    "paper_id": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "source_hash": {"type": "string", "minLength": 1},
+    "taxonomy_version": {"type": "string", "minLength": 1},
+    "mode": {"enum": ["review", "adjudicate"]},
+    "outcome": {
+      "enum": [
+        "no-change",
+        "corrected",
+        "escalated",
+        "confirmed",
+        "taxonomy-change-requested"
+      ]
+    },
+    "status": {"enum": ["classified", "adjudication-required"]},
+    "summary": {"type": "string", "minLength": 1},
+    "prior_decision_ref": {"type": "string", "minLength": 1},
+    "final_decision_ref": {"type": "string", "minLength": 1},
+    "writeback_preview_ref": {"type": "string", "minLength": 1},
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "taxonomy_change_request_ref": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"mode": {"const": "review"}}},
+      "then": {"properties": {"outcome": {"enum": ["no-change", "corrected", "escalated"]}}}
+    },
+    {
+      "if": {"properties": {"mode": {"const": "adjudicate"}}},
+      "then": {"properties": {"outcome": {"enum": ["confirmed", "corrected", "taxonomy-change-requested"]}}}
+    },
+    {
+      "if": {"properties": {"outcome": {"enum": ["escalated", "taxonomy-change-requested"]}}},
+      "then": {"properties": {"status": {"const": "adjudication-required"}}},
+      "else": {"properties": {"status": {"const": "classified"}}}
+    },
+    {
+      "if": {"properties": {"outcome": {"const": "taxonomy-change-requested"}}},
+      "then": {"required": ["taxonomy_change_request_ref"]},
+      "else": {"not": {"required": ["taxonomy_change_request_ref"]}}
+    }
+  ]
+}

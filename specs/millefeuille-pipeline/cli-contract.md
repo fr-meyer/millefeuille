@@ -181,8 +181,15 @@ derived artifact write.
   - Offline batch mode locks one taxonomy version, preflights all run/evidence
     pairs, preserves per-run decisions, and emits deterministic aggregate
     routes and review/adjudication counts.
-  - Future expansion should cover richer review/adjudicate execution and
-    optional `multi-agent` execution.
+  - Offline `review` and `adjudicate` actions consume strict local action
+    evidence, validate prior-decision lineage and locked-taxonomy identity, and
+    preserve immutable prior/final records under one traversal-safe action ID.
+  - Review outcomes are `no-change`, `corrected`, and `escalated`;
+    adjudication outcomes are `confirmed`, `corrected`, and
+    `taxonomy-change-requested`.
+  - Future expansion should cover model-backed classification, optional
+    `multi-agent` execution, and automated taxonomy governance beyond emitting
+    a reviewable change-request record.
 
 - `writeback`
   - Current implementation is preview-only and writes governed plans rather
@@ -268,6 +275,36 @@ summary follows `millefeuille-classification-batch-summary/v0.1`; review or
 adjudication outcomes materialize but return exit code `2`. This offline path
 does not authorize model/provider calls, worker execution, taxonomy mutation,
 or live writes.
+
+Offline classification actions use one accepted run and explicit local
+evidence:
+
+```bash
+millefeuille classify \
+  --source-pack-root /path/to/source-packs \
+  --paper-id zotero-ITEM1 \
+  --run-id run-fixture \
+  --action-evidence /path/to/classification-action.json \
+  --json
+```
+
+The evidence follows
+`millefeuille-classification-action-evidence/v0.1`. It supplies a safe
+`action_id`, `mode`, allowed outcome, locked taxonomy version, run-relative
+`prior_decision_ref`, final path/confidence/summary, and existing local evidence
+refs. The command rejects unknown fields, invalid types, traversal, missing
+refs, paper/run/source drift, taxonomy drift, invalid mode/outcome pairs, and
+adjudication of an already-classified prior decision before writing anything.
+
+Successful preflight creates `classification/actions/<action-id>/` with an
+immutable `millefeuille-classification-action/v0.1` record, final decision,
+Markdown views, action-scoped writeback preview, and deterministic queue or
+taxonomy-change-request JSONL. It then advances the canonical classification
+plan, stage manifest, artifact index, and writeback preview to the final action
+state. `no-change`, `corrected`, and `confirmed` return `0`; `escalated` and
+`taxonomy-change-requested` preserve their audit artifacts and return `2`.
+This offline command does not call models, run workers, mutate the taxonomy, or
+write live Zotero/OpenKB/index/source-pack state.
 
 ## Run Modes
 

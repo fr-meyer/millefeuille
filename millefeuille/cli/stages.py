@@ -14,6 +14,7 @@ from millefeuille.domain.acceptance import (
     write_acceptance_summary,
 )
 from millefeuille.domain.classification import (
+    write_classification_action_from_evidence,
     write_classification_batch_summary,
     write_classification_from_evidence,
 )
@@ -106,6 +107,15 @@ def run_stage_cli(
                 result = write_classification_batch_summary(
                     source_pack_root=args.source_pack_root,
                     batch_manifest_path=args.batch_manifest,
+                    default_profile=args.model_profile,
+                )
+            elif args.action_evidence:
+                result = write_classification_action_from_evidence(
+                    action_evidence_path=args.action_evidence,
+                    source_pack_root=args.source_pack_root,
+                    run_id=args.run_id,
+                    paper_id=args.paper_id,
+                    item_key=args.item_key,
                     default_profile=args.model_profile,
                 )
             else:
@@ -244,12 +254,20 @@ def _build_parser() -> argparse.ArgumentParser:
     classify_source.add_argument("--paper-id")
     classify_source.add_argument("--item-key")
     classify.add_argument("--run-id")
-    classify.add_argument("--evidence")
-    classify.add_argument(
+    classify_input = classify.add_mutually_exclusive_group()
+    classify_input.add_argument("--evidence")
+    classify_input.add_argument(
         "--batch-manifest",
         help=(
             "Path to a millefeuille-classification-batch-manifest/v0.1 JSON "
             "file; cannot be combined with single-run locators or --evidence."
+        ),
+    )
+    classify_input.add_argument(
+        "--action-evidence",
+        help=(
+            "Path to a millefeuille-classification-action-evidence/v0.1 JSON "
+            "file for one lineage-checked review or adjudication action."
         ),
     )
     classify.add_argument("--model-profile")
@@ -530,16 +548,20 @@ def _validate_acceptance_args(args: argparse.Namespace) -> None:
 def _validate_classify_args(args: argparse.Namespace) -> None:
     single_locator_supplied = bool(args.paper_id or args.item_key or args.run_id)
     if args.batch_manifest:
-        if single_locator_supplied or args.evidence:
+        if single_locator_supplied:
             raise MillefeuilleContractError(
                 "classify --batch-manifest cannot be combined with --paper-id, "
-                "--item-key, --run-id, or --evidence"
+                "--item-key, or --run-id"
             )
         return
-    if not args.run_id or not (args.paper_id or args.item_key) or not args.evidence:
+    if not args.run_id or not (args.paper_id or args.item_key):
         raise MillefeuilleContractError(
-            "classify requires --batch-manifest or a single-run locator and "
-            "evidence (--paper-id|--item-key plus --run-id and --evidence)"
+            "classify requires --batch-manifest or a single-run locator "
+            "(--paper-id|--item-key plus --run-id)"
+        )
+    if not (args.evidence or args.action_evidence):
+        raise MillefeuilleContractError(
+            "single-run classify requires --evidence or --action-evidence"
         )
 
 

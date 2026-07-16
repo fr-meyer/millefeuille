@@ -11,6 +11,8 @@ from millefeuille.domain.millefeuille import (
     AcceptanceStatus,
     AcceptanceSummaryRecord,
     AttachmentEvidenceIdentity,
+    ClassificationActionOutcome,
+    ClassificationActionRecord,
     ClassificationBatchRunRecord,
     ClassificationBatchSummaryRecord,
     ClassificationDecisionRecord,
@@ -499,6 +501,47 @@ class TestOCREvidenceContract(unittest.TestCase):
         self.assertEqual(plan.to_dict()["default_profile"], "research-default")
         self.assertEqual(writeback.to_dict()["status"], "previewed")
         self.assertEqual(preflight.to_dict()["readiness"], "ready-for-rc-review")
+
+    def test_classification_action_record_enforces_mode_outcome_and_status(self):
+        action = ClassificationActionRecord(
+            action_id="review-001",
+            paper_id="zotero-ITEM1",
+            run_id="run-fixture",
+            source_hash="sha256:" + ("a" * 64),
+            taxonomy_version="taxonomy-v1",
+            mode=ClassificationMode.REVIEW,
+            outcome=ClassificationActionOutcome.NO_CHANGE,
+            status=ClassificationStatus.CLASSIFIED,
+            summary="The reviewed evidence supports the prior decision.",
+            prior_decision_ref=(
+                "classification/decision-records/zotero-ITEM1.json"
+            ),
+            final_decision_ref=(
+                "classification/actions/review-001/final-decision.json"
+            ),
+            writeback_preview_ref=(
+                "classification/zotero-writeback-preview.json"
+            ),
+            evidence_refs=["summaries/hierarchical-summary.json"],
+        )
+
+        self.assertEqual(action.to_dict()["outcome"], "no-change")
+        with self.assertRaises(MillefeuilleContractError):
+            ClassificationActionRecord(
+                action_id="review-002",
+                paper_id="zotero-ITEM1",
+                run_id="run-fixture",
+                source_hash="sha256:" + ("a" * 64),
+                taxonomy_version="taxonomy-v1",
+                mode=ClassificationMode.REVIEW,
+                outcome=ClassificationActionOutcome.CONFIRMED,
+                status=ClassificationStatus.CLASSIFIED,
+                summary="Invalid cross-mode outcome.",
+                prior_decision_ref="prior.json",
+                final_decision_ref="final.json",
+                writeback_preview_ref="preview.json",
+                evidence_refs=["evidence.json"],
+            )
 
     def test_classification_batch_summary_enforces_routes_and_counts(self):
         decision_ref = (

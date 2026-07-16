@@ -33,6 +33,8 @@ REQUIRED_JSON_SCHEMAS = [
     "acceptance-batch-summary.schema.json",
     "classification-batch-manifest.schema.json",
     "classification-batch-summary.schema.json",
+    "classification-action-evidence.schema.json",
+    "classification-action-record.schema.json",
 ]
 
 REQUIRED_STAGES = {
