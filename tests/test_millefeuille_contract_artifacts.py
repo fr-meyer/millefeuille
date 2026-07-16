@@ -31,6 +31,8 @@ REQUIRED_JSON_SCHEMAS = [
     "retrieval-index-status.schema.json",
     "acceptance-batch-manifest.schema.json",
     "acceptance-batch-summary.schema.json",
+    "classification-batch-manifest.schema.json",
+    "classification-batch-summary.schema.json",
 ]
 
 REQUIRED_STAGES = {

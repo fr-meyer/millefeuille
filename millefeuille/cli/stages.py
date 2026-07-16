@@ -13,7 +13,10 @@ from millefeuille.domain.acceptance import (
     write_acceptance_batch_summary,
     write_acceptance_summary,
 )
-from millefeuille.domain.classification import write_classification_from_evidence
+from millefeuille.domain.classification import (
+    write_classification_batch_summary,
+    write_classification_from_evidence,
+)
 from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
     RunMode,
@@ -98,14 +101,22 @@ def run_stage_cli(
                 )
             payload = result.to_dict()
         elif args.command == "classify":
-            result = write_classification_from_evidence(
-                evidence_path=args.evidence,
-                source_pack_root=args.source_pack_root,
-                run_id=args.run_id,
-                paper_id=args.paper_id,
-                item_key=args.item_key,
-                default_profile=args.model_profile,
-            )
+            _validate_classify_args(args)
+            if args.batch_manifest:
+                result = write_classification_batch_summary(
+                    source_pack_root=args.source_pack_root,
+                    batch_manifest_path=args.batch_manifest,
+                    default_profile=args.model_profile,
+                )
+            else:
+                result = write_classification_from_evidence(
+                    evidence_path=args.evidence,
+                    source_pack_root=args.source_pack_root,
+                    run_id=args.run_id,
+                    paper_id=args.paper_id,
+                    item_key=args.item_key,
+                    default_profile=args.model_profile,
+                )
             payload = result.to_dict()
         elif args.command == "writeback":
             if args.writeback_mode == "none":
@@ -222,10 +233,25 @@ def _build_parser() -> argparse.ArgumentParser:
 
     classify = subparsers.add_parser(
         "classify",
-        help="Write offline classification preview artifacts from explicit evidence.",
+        help=(
+            "Write run-scoped or deterministic offline batch classification "
+            "preview artifacts."
+        ),
     )
-    _add_run_locator_args(classify)
-    classify.add_argument("--evidence", required=True)
+    _add_mode_arg(classify)
+    classify.add_argument("--source-pack-root", required=True)
+    classify_source = classify.add_mutually_exclusive_group()
+    classify_source.add_argument("--paper-id")
+    classify_source.add_argument("--item-key")
+    classify.add_argument("--run-id")
+    classify.add_argument("--evidence")
+    classify.add_argument(
+        "--batch-manifest",
+        help=(
+            "Path to a millefeuille-classification-batch-manifest/v0.1 JSON "
+            "file; cannot be combined with single-run locators or --evidence."
+        ),
+    )
     classify.add_argument("--model-profile")
     classify.add_argument("--json", action="store_true")
 
@@ -498,6 +524,22 @@ def _validate_acceptance_args(args: argparse.Namespace) -> None:
         raise MillefeuilleContractError(
             "acceptance requires --batch-manifest or a single-run locator "
             "(--paper-id|--item-key plus --run-id)"
+        )
+
+
+def _validate_classify_args(args: argparse.Namespace) -> None:
+    single_locator_supplied = bool(args.paper_id or args.item_key or args.run_id)
+    if args.batch_manifest:
+        if single_locator_supplied or args.evidence:
+            raise MillefeuilleContractError(
+                "classify --batch-manifest cannot be combined with --paper-id, "
+                "--item-key, --run-id, or --evidence"
+            )
+        return
+    if not args.run_id or not (args.paper_id or args.item_key) or not args.evidence:
+        raise MillefeuilleContractError(
+            "classify requires --batch-manifest or a single-run locator and "
+            "evidence (--paper-id|--item-key plus --run-id and --evidence)"
         )
 
 

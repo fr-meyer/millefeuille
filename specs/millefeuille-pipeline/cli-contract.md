@@ -178,7 +178,10 @@ derived artifact write.
   - Current preview implementation starts only after acceptance evidence is
     complete and emits evidence-backed decision records before any Zotero
     mutation.
-  - Future expansion should cover richer batch/review/adjudicate routing and
+  - Offline batch mode locks one taxonomy version, preflights all run/evidence
+    pairs, preserves per-run decisions, and emits deterministic aggregate
+    routes and review/adjudication counts.
+  - Future expansion should cover richer review/adjudicate execution and
     optional `multi-agent` execution.
 
 - `writeback`
@@ -246,6 +249,26 @@ The batch manifest uses
 Offline batch acceptance is not approval for live Zotero, OCR, OpenKB, index,
 source-pack, model, or worker-agent operations.
 
+Batch classification consumes already-accepted runs and one local evidence ref
+per run:
+
+```bash
+millefeuille classify \
+  --source-pack-root /path/to/source-packs \
+  --batch-manifest /path/to/classification-batch.json \
+  --json
+```
+
+The manifest uses
+`millefeuille-classification-batch-manifest/v0.1`, locks one taxonomy version,
+and resolves traversal-safe evidence refs relative to the manifest. All
+evidence must use `mode: batch`. The command preflights every package and
+evidence file before writing per-run decisions or aggregate routes. Its JSON
+summary follows `millefeuille-classification-batch-summary/v0.1`; review or
+adjudication outcomes materialize but return exit code `2`. This offline path
+does not authorize model/provider calls, worker execution, taxonomy mutation,
+or live writes.
+
 ## Run Modes
 
 - `preview`
@@ -272,5 +295,6 @@ source-pack, model, or worker-agent operations.
 
 - `0`: stage passed and emitted expected evidence.
 - `1`: operator/config error.
-- `2`: validation failed or acceptance needs review.
+- `2`: validation failed, acceptance needs review, or classification requires
+  review/adjudication.
 - `3`: manual approval required for the requested stage.

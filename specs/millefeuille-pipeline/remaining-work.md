@@ -22,6 +22,12 @@
   canonical `run` orchestration, identity/drift guards, read-only retrieval,
   model-profile listing, and local release-candidate preflight artifacts on
   top of merged PR #62.
+- PR #69 adds deterministic same-item multi-PDF source-pack intake while
+  preserving the v0.1 single-PDF contract.
+- PR #71 adds deterministic offline batch acceptance with preflight-all
+  validation and aggregate pass/review reporting.
+- PR #73 adds locked-taxonomy offline batch classification with deterministic
+  aggregate routing and review/adjudication reporting.
 - Current integration branch is `dev`; stable branch is `main`.
 - Current package version is `0.4.0`.
 
@@ -124,9 +130,12 @@
     - It starts only after acceptance passes and emits classification plans,
       decision records, rejected alternatives, adjudication queues, and Zotero
       writeback previews from explicit local evidence.
-    - Remaining work: live model-backed classification, larger batch routing,
-      worker-agent execution, and taxonomy-gap automation beyond preview
-      artifacts.
+    - Offline batch routing now accepts a versioned manifest, locks one taxonomy
+      version, preflights every accepted run and evidence ref, preserves
+      deterministic per-run decisions, and emits aggregate route/review reports.
+    - Remaining work: live model-backed classification, worker-agent execution,
+      richer review/adjudication execution, and taxonomy-gap automation beyond
+      preview artifacts.
     - Manual gate: model/provider calls and worker-agent execution when used.
 
 15. **Zotero Writeback**

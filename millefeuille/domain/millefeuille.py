@@ -1430,6 +1430,250 @@ class ClassificationDecisionRecord:
 
 
 @dataclass
+class ClassificationBatchRunRecord:
+    paper_id: str
+    run_id: str
+    source_hash: str
+    taxonomy_version: str
+    status: ClassificationStatus | str
+    primary_path: str
+    decision_ref: str
+    writeback_preview_ref: str
+    review_reasons: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "paper_id",
+            "run_id",
+            "source_hash",
+            "taxonomy_version",
+            "primary_path",
+            "decision_ref",
+            "writeback_preview_ref",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string"
+                )
+        self.status = _coerce_enum(ClassificationStatus, self.status)
+        if not isinstance(self.review_reasons, list):
+            raise MillefeuilleContractError("review_reasons must be an array")
+        for reason in self.review_reasons:
+            if not isinstance(reason, str) or not reason.strip():
+                raise MillefeuilleContractError(
+                    "review_reasons must contain non-empty strings"
+                )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ClassificationBatchRunRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError(
+                "classification batch run must be an object"
+            )
+        return cls(
+            paper_id=str(payload.get("paper_id", "")).strip(),
+            run_id=str(payload.get("run_id", "")).strip(),
+            source_hash=str(payload.get("source_hash", "")).strip(),
+            taxonomy_version=str(payload.get("taxonomy_version", "")).strip(),
+            status=str(payload.get("status", "")).strip(),
+            primary_path=str(payload.get("primary_path", "")).strip(),
+            decision_ref=str(payload.get("decision_ref", "")).strip(),
+            writeback_preview_ref=str(
+                payload.get("writeback_preview_ref", "")
+            ).strip(),
+            review_reasons=list(payload.get("review_reasons", [])),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "paper_id": self.paper_id,
+            "run_id": self.run_id,
+            "source_hash": self.source_hash,
+            "taxonomy_version": self.taxonomy_version,
+            "status": self.status.value,
+            "primary_path": self.primary_path,
+            "decision_ref": self.decision_ref,
+            "writeback_preview_ref": self.writeback_preview_ref,
+        }
+        if self.review_reasons:
+            payload["review_reasons"] = list(self.review_reasons)
+        return payload
+
+
+@dataclass
+class ClassificationBatchSummaryRecord:
+    batch_id: str
+    taxonomy_version: str
+    status: ClassificationStatus | str
+    counts: dict[str, int]
+    routes: list[dict[str, Any]]
+    runs: list[ClassificationBatchRunRecord | dict[str, Any]]
+    schema_version: str = "millefeuille-classification-batch-summary/v0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "millefeuille-classification-batch-summary/v0.1":
+            raise MillefeuilleContractError(
+                f"unsupported schema_version {self.schema_version!r}"
+            )
+        for field_name in ("batch_id", "taxonomy_version"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise MillefeuilleContractError(
+                    f"{field_name} must be a non-empty string"
+                )
+        self.status = _coerce_enum(ClassificationStatus, self.status)
+        if not isinstance(self.counts, dict):
+            raise MillefeuilleContractError("counts must be an object")
+        for key, value in self.counts.items():
+            if not isinstance(key, str) or not key.strip():
+                raise MillefeuilleContractError("counts keys must be non-empty")
+            if not isinstance(value, int) or value < 0:
+                raise MillefeuilleContractError("counts values must be non-negative")
+        if not isinstance(self.runs, list):
+            raise MillefeuilleContractError("runs must be an array")
+        self.runs = [
+            run
+            if isinstance(run, ClassificationBatchRunRecord)
+            else ClassificationBatchRunRecord.from_dict(run)
+            for run in self.runs
+        ]
+        if not self.runs:
+            raise MillefeuilleContractError("runs must not be empty")
+        identities = [(run.paper_id, run.run_id) for run in self.runs]
+        if len(identities) != len(set(identities)):
+            raise MillefeuilleContractError(
+                "classification batch runs must have unique paper_id/run_id pairs"
+            )
+        if any(run.taxonomy_version != self.taxonomy_version for run in self.runs):
+            raise MillefeuilleContractError(
+                "classification batch runs must use the locked taxonomy_version"
+            )
+        expected_counts = {
+            "runs": len(self.runs),
+            "classified": sum(
+                run.status == ClassificationStatus.CLASSIFIED for run in self.runs
+            ),
+            "needs_review": sum(
+                run.status == ClassificationStatus.NEEDS_REVIEW for run in self.runs
+            ),
+            "adjudication_required": sum(
+                run.status == ClassificationStatus.ADJUDICATION_REQUIRED
+                for run in self.runs
+            ),
+        }
+        if self.counts != expected_counts:
+            raise MillefeuilleContractError(
+                f"classification batch counts drift: expected {expected_counts!r}"
+            )
+        expected_status = (
+            ClassificationStatus.ADJUDICATION_REQUIRED
+            if expected_counts["adjudication_required"]
+            else ClassificationStatus.NEEDS_REVIEW
+            if expected_counts["needs_review"]
+            else ClassificationStatus.CLASSIFIED
+        )
+        if self.status != expected_status:
+            raise MillefeuilleContractError(
+                "classification batch status must reflect its run results"
+            )
+        self._validate_routes()
+
+    def _validate_routes(self) -> None:
+        if not isinstance(self.routes, list) or not self.routes:
+            raise MillefeuilleContractError("routes must be a non-empty array")
+        expected = {
+            (
+                run.paper_id,
+                run.run_id,
+                run.decision_ref,
+                run.primary_path,
+                run.status.value,
+            )
+            for run in self.runs
+        }
+        observed: set[tuple[str, str, str, str, str]] = set()
+        route_paths: set[str] = set()
+        for route in self.routes:
+            if not isinstance(route, dict):
+                raise MillefeuilleContractError("routes entries must be objects")
+            primary_path = route.get("primary_path")
+            count = route.get("count")
+            route_runs = route.get("runs")
+            if not isinstance(primary_path, str) or not primary_path.strip():
+                raise MillefeuilleContractError(
+                    "routes.primary_path must be a non-empty string"
+                )
+            if primary_path in route_paths:
+                raise MillefeuilleContractError(
+                    "classification batch routes must group each path once"
+                )
+            route_paths.add(primary_path)
+            if not isinstance(route_runs, list) or not route_runs:
+                raise MillefeuilleContractError(
+                    "routes.runs must be a non-empty array"
+                )
+            if count != len(route_runs):
+                raise MillefeuilleContractError(
+                    "routes.count must equal the number of routed runs"
+                )
+            for run in route_runs:
+                if not isinstance(run, dict):
+                    raise MillefeuilleContractError(
+                        "routes.runs entries must be objects"
+                    )
+                identity = (
+                    run.get("paper_id"),
+                    run.get("run_id"),
+                    run.get("decision_ref"),
+                    primary_path,
+                    run.get("status"),
+                )
+                if not all(
+                    isinstance(value, str) and value.strip() for value in identity
+                ):
+                    raise MillefeuilleContractError(
+                        "routed run fields must be non-empty strings"
+                    )
+                if identity in observed:
+                    raise MillefeuilleContractError(
+                        "classification batch routes must not duplicate runs"
+                    )
+                observed.add(identity)
+        if observed != expected:
+            raise MillefeuilleContractError(
+                "classification batch routes must cover every run exactly once"
+            )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ClassificationBatchSummaryRecord:
+        if not isinstance(payload, dict):
+            raise MillefeuilleContractError(
+                "classification batch summary must be an object"
+            )
+        return cls(
+            batch_id=str(payload.get("batch_id", "")).strip(),
+            taxonomy_version=str(payload.get("taxonomy_version", "")).strip(),
+            status=str(payload.get("status", "")).strip(),
+            counts=dict(payload.get("counts", {})),
+            routes=list(payload.get("routes", [])),
+            runs=list(payload.get("runs", [])),
+            schema_version=str(payload.get("schema_version", "")).strip(),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "batch_id": self.batch_id,
+            "taxonomy_version": self.taxonomy_version,
+            "status": self.status.value,
+            "counts": dict(self.counts),
+            "routes": [dict(route) for route in self.routes],
+            "runs": [run.to_dict() for run in self.runs],
+        }
+
+
+@dataclass
 class ClassificationPlanRecord:
     run_id: str
     taxonomy_version: str

@@ -36,6 +36,9 @@ source-packs/
       reports/
         acceptance-batch-summary.json
         acceptance-batch-summary.md
+      classification/
+        batch-classification-summary.json
+        batch-classification-report.md
   zotero/<paper-slug>/
     manifest.json
     source.pdf                  # v0.1 one-PDF pack
@@ -138,6 +141,13 @@ summary per validated locator plus
 `batches/millefeuille/<batch-id>/reports/acceptance-batch-summary.{json,md}`.
 Batch reports contain portable source-root-relative refs and aggregate status;
 they do not copy paper text, PDFs, credentials, or provider payloads.
+
+An offline classification batch preserves each run-scoped classification
+package and additionally emits
+`batches/millefeuille/<batch-id>/classification/batch-classification-summary.json`
+plus `batch-classification-report.md`. These aggregate artifacts lock the
+taxonomy version, group portable decision refs by primary path, and retain
+review/adjudication status without copying classification evidence content.
 
 The artifact index should answer:
 
