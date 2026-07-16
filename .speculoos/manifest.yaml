@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-067-speculoos-ledger-reconciliation
+canonical_task: null
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: chore/pr-067-speculoos-ledger-reconciliation
+  working_branch: null
 status:
-  phase: implementation
-  pret_a_coder: in_progress
+  phase: idle
+  pret_a_coder: idle
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,12 +57,12 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
-    number: 67
-    url: https://github.com/fr-meyer/millefeuille/pull/67
+    status: none-active
+    number: null
+    url: null
     base_branch: dev
-    head_branch: chore/pr-067-speculoos-ledger-reconciliation
-    head_sha: fa0cca2fa0762b724984c6bb4b183c36a5df3b09
+    head_branch: null
+    head_sha: null
     merge_commit: null
     project_status: In Progress
   vibe_kanban:
@@ -93,14 +93,7 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task:
-  id: pr-067-speculoos-ledger-reconciliation
-  title: Reconcile merged Speculoos task ledgers
-  status: review
-  branch: chore/pr-067-speculoos-ledger-reconciliation
-  base_branch: dev
-  task_file: .speculoos/tasks/pr-067-speculoos-ledger-reconciliation.yaml
-  started_from: 9dcbbed58863834d1c6b590a065b4450f715298e
+current_task: null
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -389,3 +382,14 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/65#pullrequestreview-4710582033
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87539567629
+    - id: pr-067-speculoos-ledger-reconciliation
+      status: merged
+      branch: chore/pr-067-speculoos-ledger-reconciliation
+      base_branch: dev
+      pull_request: 67
+      url: https://github.com/fr-meyer/millefeuille/pull/67
+      head_sha: 1dd9669b51a487257a2b84db5a5830c4e43bf9ba
+      merge_commit: 1d01c8cc9079c93a7cfd0599298ab1a7b4414912
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/67#pullrequestreview-4710870157
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87547552904
