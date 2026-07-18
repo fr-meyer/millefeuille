@@ -268,7 +268,9 @@ These commands stay offline and preview-only in the current contract slice:
 ### Offline Batch Retrieval
 
 To inspect several existing source-pack runs in one deterministic operation,
-provide a strict versioned retrieval manifest instead of a single locator:
+provide a strict versioned retrieval manifest instead of a single locator. The
+v0.1 lane is merged on `dev`; promotion to `main` or a packaged release remains
+separately gated.
 
 ```bash
 millefeuille retrieve \
