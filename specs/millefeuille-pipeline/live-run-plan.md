@@ -38,3 +38,23 @@ recover PDFs, call OCR providers, write OpenKB, or write source packs.
 - request to classify before acceptance evidence;
 - request to commit raw PDFs, authenticated URLs, provider payloads, or secrets;
 - request to write Zotero/OpenKB/source packs without explicit approval.
+
+## Post-PR79 Summary Model Profile
+
+This model-profile change is a separate post-PR79 slice. It must not be folded
+into PR79 or treated as permission for a live provider call.
+
+- Page, section, and full-paper summaries select
+  `openai/gpt-5.6-sol` with `reasoning_effort: xhigh`.
+- The intended authentication lane is OpenClaw-native Codex OAuth. LiteLLM
+  credentials are separate and must not be silently substituted.
+- The profile records `fast_mode: off`, so standard processing is explicit.
+  A live adapter must not inherit an agent-level fast default. Fast/priority
+  processing requires an explicit run-level choice and must be recorded in
+  provenance.
+- There is no silent cross-provider or cross-model fallback. Any approved
+  fallback must record the actual selected model and reasoning level.
+- The `offline-preview` profile remains fixture-only and makes no provider
+  calls.
+- Historical golden-run artifacts keep the model identity that actually
+  produced them; they are not rewritten to match the new profile.

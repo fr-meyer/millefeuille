@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: null
+canonical_task: pr-082-gpt56-summary-profiles
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: null
+  working_branch: feat/pr-082-gpt56-summary-profiles
 status:
-  phase: idle
-  pret_a_coder: idle
+  phase: in_review
+  pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,11 +57,11 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: none-active
-    number: 79
-    url: https://github.com/fr-meyer/millefeuille/pull/79
+    status: open
+    number: 82
+    url: https://github.com/fr-meyer/millefeuille/pull/82
     base_branch: dev
-    head_branch: null
+    head_branch: feat/pr-082-gpt56-summary-profiles
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -93,7 +93,16 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: null
+current_task:
+  id: pr-082-gpt56-summary-profiles
+  status: implementation
+  branch: feat/pr-082-gpt56-summary-profiles
+  speculoos_task: .speculoos/tasks/pr-082-gpt56-summary-profiles.yaml
+  pull_request: null
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  head_sha: null
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
