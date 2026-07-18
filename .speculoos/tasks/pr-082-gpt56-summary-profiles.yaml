@@ -1,6 +1,6 @@
 id: pr-082-gpt56-summary-profiles
 title: Select GPT-5.6 Sol xhigh for summary model profiles
-status: implementation
+status: merged
 branch: feat/pr-082-gpt56-summary-profiles
 base_branch: dev
 write_paths:
@@ -19,13 +19,13 @@ github:
   pull_request: 82
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/82
-  head_sha: null
-  merge_commit: null
-  mergeguez_review: null
-  mergeguez_check_run: null
+  head_sha: 5f01b378d4c8c84b14bb3e41ada2cb6e9fd59d72
+  merge_commit: ba7ce07f48732a981be5de5751fa7e34380c84d6
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/82#pullrequestreview-4728585238
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88084819154
 post_merge_expected:
   pull_request: 82
   base_branch: dev
@@ -88,3 +88,9 @@ evidence:
   - "No live provider call, paid completion smoke, credential access, private paper read, or external data write was run."
   - 'PR #82 opened for pr-082-gpt56-summary-profiles'
   - 'PR #82 linked to Project item unavailable'
+  - 'PR #82 merged with merge commit ba7ce07f48732a981be5de5751fa7e34380c84d6'
+  - 'Mergeguez approved exact head 5f01b378d4c8c84b14bb3e41ada2cb6e9fd59d72 with zero findings: https://github.com/fr-meyer/millefeuille/pull/82#pullrequestreview-4728585238'
+  - 'Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/88084819154'
+  - 'Remote feature branch feat/pr-082-gpt56-summary-profiles deleted through the approved post-merge cleanup lane'
+  - Project item unavailable moved to Done
+  - surface-sync --close-merged-task cleared repo-local active task metadata
