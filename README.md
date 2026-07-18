@@ -251,7 +251,10 @@ These commands stay offline and preview-only in the current contract slice:
   fail closed. Batch mode applies the same filters uniformly after preflighting
   every manifest locator and emits only sorted root-relative refs and status
   metadata.
-- `models` prints the bundled offline model-profile catalog.
+- `models` prints the bundled offline model-profile catalog. The
+  `research-default` page, section, and full-paper summary stages select
+  `openai/gpt-5.6-sol` with `reasoning_effort: xhigh` and `fast_mode: off`;
+  this is selection metadata only and does not authorize a live provider call.
 - `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
   and `index` expose the existing fixture writers as explicit single-paper
   stages and update the run manifest and artifact index.

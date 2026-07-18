@@ -55,6 +55,20 @@ $defs:
         type: string
       temperature:
         type: number
+      reasoning_effort:
+        enum:
+          - none
+          - minimal
+          - low
+          - medium
+          - high
+          - xhigh
+          - max
+      fast_mode:
+        enum:
+          - "off"
+          - "on"
+          - auto
       prompt_version:
         type: string
       confidence_scores_granularity:

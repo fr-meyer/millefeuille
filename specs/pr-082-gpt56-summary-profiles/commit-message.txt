@@ -1,0 +1,5 @@
+feat: select GPT-5.6 Sol for summary profiles
+
+Implement Speculoos task pr-082-gpt56-summary-profiles.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

@@ -8,6 +8,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
+import yaml
+
 from millefeuille.cli.stages import run_stage_cli
 from millefeuille.domain.acceptance import ACCEPTANCE_SUMMARY_REF
 from millefeuille.domain.artifact_writer import write_dry_run_artifacts
@@ -472,6 +474,100 @@ class TestMillefeuilleStageCli(unittest.TestCase):
             self.assertEqual(models_exit, 0)
             models_payload = json.loads(models_stdout.getvalue())
             self.assertEqual(models_payload["default_profile"], "research-default")
+            research_profile = models_payload["profiles"]["research-default"]
+            for stage_name in (
+                "summarize_page",
+                "summarize_section",
+                "summarize_full_paper",
+            ):
+                self.assertEqual(
+                    research_profile[stage_name]["model"],
+                    "openai/gpt-5.6-sol",
+                )
+                self.assertEqual(
+                    research_profile[stage_name]["reasoning_effort"],
+                    "xhigh",
+                )
+                self.assertEqual(research_profile[stage_name]["fast_mode"], "off")
+
+            self.assertEqual(
+                research_profile["paper_card"],
+                {
+                    "backend": "chat",
+                    "model": "gpt-5",
+                    "provider": "openai",
+                    "temperature": 0.1,
+                    "prompt_version": "paper-card-v1",
+                    "record_usage": True,
+                },
+            )
+            self.assertEqual(
+                research_profile["classify"],
+                {
+                    "backend": "chat",
+                    "model": "gpt-5",
+                    "provider": "openai",
+                    "temperature": 0.0,
+                    "prompt_version": "classify-v1",
+                    "require_taxonomy_version": True,
+                    "record_usage": True,
+                },
+            )
+            self.assertEqual(
+                models_payload["profiles"]["offline-preview"],
+                {
+                    "summarize_page": {
+                        "backend": "fixture",
+                        "model": "offline-preview",
+                        "provider": "none",
+                        "record_usage": False,
+                    },
+                    "summarize_section": {
+                        "backend": "fixture",
+                        "model": "offline-preview",
+                        "provider": "none",
+                        "record_usage": False,
+                    },
+                    "summarize_full_paper": {
+                        "backend": "fixture",
+                        "model": "offline-preview",
+                        "provider": "none",
+                        "record_usage": False,
+                    },
+                    "paper_card": {
+                        "backend": "fixture",
+                        "model": "offline-preview",
+                        "provider": "none",
+                        "record_usage": False,
+                    },
+                    "classify": {
+                        "backend": "fixture",
+                        "model": "offline-preview",
+                        "provider": "none",
+                        "require_taxonomy_version": True,
+                        "record_usage": False,
+                    },
+                },
+            )
+
+    def test_model_profile_schema_enumerates_reasoning_and_fast_modes(self):
+        schema_path = (
+            Path(__file__).resolve().parents[1]
+            / "specs"
+            / "millefeuille-pipeline"
+            / "model-profile.schema.yaml"
+        )
+        schema = yaml.safe_load(schema_path.read_text(encoding="utf-8"))
+        stage_properties = schema["$defs"]["model_stage"]["properties"]
+
+        self.assertEqual(
+            stage_properties["reasoning_effort"]["enum"],
+            ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
+        )
+        self.assertEqual(
+            stage_properties["fast_mode"]["enum"],
+            ["off", "on", "auto"],
+        )
 
     def test_run_executes_full_fixture_pipeline_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tempdir:
