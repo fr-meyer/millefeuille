@@ -17,7 +17,7 @@ github:
   project_status: In Progress
   project_item: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/80
-  head_sha: null
+  head_sha: dbd12ed10b95688ca8b22701c86914f7fe251f2d
   merge_commit: null
 post_merge_expected:
   pull_request: 80
@@ -43,9 +43,11 @@ acceptance:
 validation:
   - "ruby -ryaml -rjson -e 'Dir[\".github/workflows/*.yml\", \".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
   - "git diff --check"
-  - "git diff --exit-code origin/dev -- .github/workflows/coderabbit-pr-automation-comment-trigger.yml .github/workflows/coderabbit-pr-automation-manual.yml"
+  - "git diff --exit-code origin/dev -- .github/workflows/coderabbit-pr-comment-trigger.yml .github/workflows/coderabbit-pr-automation-manual.yml"
   - "speculoos status --json"
   - "speculoos validate --task pr-080-ci-retire-broken-coderabbit --validation \"git diff --check\" --json"
+  - "python3 -m json.tool specs/pr-080-ci-retire-broken-coderabbit/policy-evidence.json >/dev/null"
+  - "python3 -c 'import hashlib,json; e=json.load(open(\"specs/pr-080-ci-retire-broken-coderabbit/policy-evidence.json\")); assert hashlib.sha256(open(\".speculoos/actors.json\",\"rb\").read()).hexdigest() == e[\"replacement_review_gate\"][\"source_sha256\"]'"
   - "speculoos publish-check --task pr-080-ci-retire-broken-coderabbit --pr-body specs/pr-080-ci-retire-broken-coderabbit/pr-body.md --commit-message specs/pr-080-ci-retire-broken-coderabbit/commit-message.txt --json"
 publication_boundary:
   statement: "Repository CI metadata only: remove one broken automatic pull_request workflow while preserving manual and comment-triggered tooling. No credential or permission change, application code change, private data access, provider call, production deployment, main-branch change, release, package publication, or approval bypass."
@@ -62,6 +64,8 @@ notes:
   - "Its consumer checkout passed, then Checkout shared toolkit repository failed before all remediation steps because the automatic cross-repository lane is not configured."
   - "The manual and comment-triggered workflow files remain available for explicitly configured use."
   - "Live read-only GitHub policy checks on 2026-07-18 returned no effective rules for dev and no repository rulesets; the approved Mergeguez broker also has no protection target for millefeuille."
+  - "github.head_sha records the immediately preceding published head dbd12ed10b95688ca8b22701c86914f7fe251f2d that triggered exact-head review; the current head remains fail-closed through the live expected-head-sha review and merge gates."
+  - "The sanitized policy snapshot and the exact replacement-gate configuration are committed at specs/pr-080-ci-retire-broken-coderabbit/policy-evidence.json."
 evidence:
   - "The change is limited to one workflow deletion plus Speculoos task/publication metadata."
   - "Exact-head review and policy merge remain mandatory."

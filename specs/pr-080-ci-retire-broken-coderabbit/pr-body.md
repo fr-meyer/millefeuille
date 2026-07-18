@@ -20,7 +20,9 @@ Live read-only GitHub policy checks on 2026-07-18 established that this check is
 - `GET /repos/fr-meyer/millefeuille/rulesets` returned `[]` (no repository rulesets)
 - the approved Mergeguez broker exposes no branch-protection target/profile for `millefeuille`
 
-Speculoos still requires the current PR head's live checks and exact-head Mergeguez approval before merge; this change does not relax that policy.
+The sanitized live-policy snapshot and replacement-gate configuration are committed in `specs/pr-080-ci-retire-broken-coderabbit/policy-evidence.json`. That evidence is pinned to the SHA-256 of `.speculoos/actors.json` and records the `feature_to_dev` requirements: exact PR/base/head/SHA identity, native Mergeguez review, ready live checks, zero blocking findings, and verified `mergeguez[bot]` merge attribution.
+
+Speculoos re-reads those gates from the live PR before merge; removing the broken CodeRabbit caller cannot bypass them.
 
 ## Scope
 
@@ -35,6 +37,7 @@ Speculoos still requires the current PR head's live checks and exact-head Mergeg
 - `.speculoos/surfaces/github.yaml`
 - `.speculoos/tasks/pr-080-ci-retire-broken-coderabbit.yaml`
 - `specs/pr-080-ci-retire-broken-coderabbit/commit-message.txt`
+- `specs/pr-080-ci-retire-broken-coderabbit/policy-evidence.json`
 - `specs/pr-080-ci-retire-broken-coderabbit/pr-body.md`
 
 ## Validation
@@ -42,6 +45,7 @@ Speculoos still requires the current PR head's live checks and exact-head Mergeg
 - workflow and Speculoos YAML/JSON parse
 - `git diff --check`
 - byte-identical diff check for the manual and comment-triggered CodeRabbit workflows
+- committed policy-evidence JSON parse and actor-policy digest check
 - Speculoos status, validation, private-data scan, documentation sync, and publication checks
 
 ## Documentation Impact
