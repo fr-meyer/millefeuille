@@ -230,6 +230,7 @@ millefeuille classify --source-pack-root ./source-packs --paper-id zotero-ITEM1 
 millefeuille writeback --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --writeback preview
 millefeuille retrieve --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001
 millefeuille retrieve --source-pack-root ./source-packs --doi https://doi.org/10.1234/example --run-id run-001 --section methods --evidence-need classification --json
+millefeuille retrieve --source-pack-root ./source-packs --batch-manifest retrieval-batch.json --summary-scope classification --json
 millefeuille models
 millefeuille run --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --stages acceptance,classify,writeback --handoff handoff.jsonl --classification-evidence classification-evidence.json --release-preflight
 ```
@@ -247,7 +248,9 @@ These commands stay offline and preview-only in the current contract slice:
   references for downstream inspection. Optional scope, grain, index-lane,
   section, page, and classification-evidence filters never paste private paper
   content. Corpus ambiguity, identity drift, traversal, and invalid page queries
-  fail closed.
+  fail closed. Batch mode applies the same filters uniformly after preflighting
+  every manifest locator and emits only sorted root-relative refs and status
+  metadata.
 - `models` prints the bundled offline model-profile catalog.
 - `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
   and `index` expose the existing fixture writers as explicit single-paper
@@ -261,6 +264,87 @@ These commands stay offline and preview-only in the current contract slice:
 - `--mode approved-live` and approved-live writeback stop at exit code `3`;
   these commands never turn a preview invocation into a live provider or
   Zotero mutation.
+
+### Offline Batch Retrieval
+
+To inspect several existing source-pack runs in one deterministic operation,
+provide a strict versioned retrieval manifest instead of a single locator:
+
+```bash
+millefeuille retrieve \
+  --source-pack-root /path/to/source-packs \
+  --batch-manifest /path/to/retrieval-batch.json \
+  --evidence-need classification \
+  --json
+```
+
+The manifest uses `millefeuille-retrieval-batch-manifest/v0.1`, supplies one
+traversal-safe `batch_id`, and contains a non-empty `runs` array. Every entry
+has `run_id` and exactly one of `paper_id`, `item_key`, `slug`, `doi`, or
+`title`; unknown fields and non-string locator values are rejected. The usual
+scope, grain, index-lane, section, page, and classification-evidence filters
+apply coherently to every resolved run. `--batch-manifest` is preview-only,
+must not be empty, and cannot be combined with direct locators or `--run-id`.
+
+Millefeuille resolves and validates the complete manifest before writing. A
+missing or ambiguous identity, duplicate resolved paper/run pair, drifted
+package, unsafe artifact ref, or malformed later entry prevents all aggregate
+writes. Successful preflight emits byte-stable, sorted artifacts at:
+
+- `batches/millefeuille/<batch-id>/retrieval/batch-retrieval-result.json`
+- `batches/millefeuille/<batch-id>/retrieval/batch-retrieval-report.md`
+
+The JSON follows `millefeuille-retrieval-batch-result/v0.1`. Both views contain
+only portable refs, locator/source/acceptance status, optional
+classification/writeback refs, and aggregate counts. Summary matches are
+allowlisted to `grain`, `scope`, and portable `text_ref`; artifact-controlled
+`summary_id` values are deliberately excluded. Index lanes are allowlisted to
+`lane` and `status`. On supported POSIX local filesystems, batch preflight pins
+one no-follow source-root descriptor and opens every source-pack manifest, card,
+summary, index, optional artifact, and referenced full-text/summary path relative
+to it, without path-based reads or symlink following. Stable file identities,
+missing optional inputs, and enumerated corpus entries are snapshotted; the
+external batch manifest is read no-follow and retained byte-for-byte. Publication
+then pins the batch-directory inode, locks the batch directory, creates staging files
+exclusively by descriptor, and keeps those owned read/write descriptors open.
+While the randomized mode-`0700` staging generation is still unpublished,
+Millefeuille validates its exact entry set, rereads both expected byte streams,
+rechecks names, inode identities, file metadata, and single-link counts, then
+changes the files to mode `0444` and the generation directory to mode `0555`.
+A second held-descriptor verification follows those permission changes. The
+atomic no-replace rename of that complete generation is the publication commit
+point; the parent directory is fsynced afterward for durability, with no
+post-publication validation window before commit. If any pre-commit step fails,
+Millefeuille truncates and fsyncs only the owned staged inodes through those held
+descriptors, so a raced external hard link cannot retain aborted aggregate
+bytes. Failure cleanup deliberately does not unlink, rename, or remove namespace
+entries because an uncooperative same-UID replacement cannot be conditionally
+mutated atomically; unverified entries remain untouched. The failed temporary
+generation therefore remains in its reached mode (`0700` or `0555`) with owned
+output files reduced to zero bytes for explicit operator cleanup. Exact
+byte-identical reruns verify opened read-only regular-file descriptors and no-op,
+while incomplete, writable, drifted, symlinked, hard-linked, displaced, or
+substituted output fails closed instead of being overwritten. Immediately before
+the rerun no-op or atomic rename, while the cooperative batch lock is held,
+Millefeuille reopens and revalidates every snapshotted input and corpus entry and
+rereads the external batch manifest. Namespace, entry-set, hard-link, or
+same-inode content changes observed before that final check fail closed.
+
+The lock serializes cooperating Millefeuille writers; POSIX `flock`, mode bits,
+and descriptor checks cannot stop an uncooperative same-UID owner from changing
+source inputs or staging after the last validation and before the rename, or
+from mutating files after publication. The contract therefore requires trusted
+ownership, cooperative same-UID writers, or stronger immutable/content-addressed
+storage and does not claim protection against that adversary. The atomic rename
+is the completed-operation boundary inside this stated trust model. Platforms or
+filesystems without the
+required POSIX directory-lock, no-replace rename, and descriptor-relative
+primitives fail closed before aggregate publication; package import and legacy
+single-run retrieval use their portable legacy read fallback when POSIX
+`O_NOFOLLOW` is unavailable. This preview-only path never includes summary or
+paper-card prose, PDFs, or provider payloads, and does not read live Zotero,
+recover PDFs, call OCR/models/providers, write OpenKB or an index, or grant
+approval for publication or release operations.
 
 ### Offline Batch Acceptance
 

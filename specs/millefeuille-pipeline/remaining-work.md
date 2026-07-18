@@ -34,6 +34,9 @@
 - PR #77 adds corpus-aware read-only artifact retrieval by paper id, Zotero key,
   source-pack slug, normalized DOI, or normalized exact title, with strict
   identity, ambiguity, section, page, and classification-evidence handling.
+- The current offline slice adds strict multi-run retrieval manifests, complete
+  preflight, and deterministic JSON/Markdown aggregates containing portable
+  refs and status metadata only.
 - Current integration branch is `dev`; stable branch is `main`.
 - Current package version is `0.4.0`.
 
@@ -117,8 +120,22 @@
     - Offline read-only retrieval now resolves verified run packages through
       direct or corpus identity locators and returns filtered artifact refs
       without returning private content.
-    - Remaining work: explicit multi-run/batch retrieval manifests and approved
-      live index reconciliation.
+    - Offline batch retrieval now accepts a strict versioned manifest covering
+      every single-run locator, applies coherent filters to all runs, rejects
+      duplicate resolved identities and unsafe refs before writes, and emits
+      byte-stable aggregate JSON/Markdown after pinned-root descriptor-relative
+      preflight. Publication verifies the complete unpublished staging
+      generation through held descriptors, makes it read-only, revalidates the
+      snapshotted inputs plus external manifest under the cooperative batch lock,
+      then uses an atomic no-replace rename as the commit point. This boundary
+      requires trusted ownership or cooperative same-UID writers; it does not
+      claim protection from an uncooperative owner racing the final check.
+      Artifact-controlled summary IDs are excluded. Unsupported
+      publication primitives fail closed before aggregate output. Pre-commit
+      failure cleanup scrubs only owned staged inodes through held descriptors
+      and leaves the temporary generation in its reached mode plus unverified
+      namespace entries in place for explicit operator cleanup.
+    - Remaining work: separately approved live index reconciliation.
     - Manual gate: OpenKB write, PageIndex/ConDB/ChatIndex index writes, and
       duplicate scan against live local state.
 

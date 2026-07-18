@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: null
+canonical_task: pr-079-batch-retrieval
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: null
+  working_branch: feat/pr-079-batch-retrieval
 status:
-  phase: idle
-  pret_a_coder: idle
+  phase: implementation
+  pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 261 passed, 0 failed
+    result: 297 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .
@@ -57,11 +57,11 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: none-active
-    number: null
-    url: null
+    status: open
+    number: 79
+    url: https://github.com/fr-meyer/millefeuille/pull/79
     base_branch: dev
-    head_branch: null
+    head_branch: feat/pr-079-batch-retrieval
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -93,7 +93,16 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: null
+current_task:
+  id: pr-079-batch-retrieval
+  status: implementation
+  branch: feat/pr-079-batch-retrieval
+  speculoos_task: .speculoos/tasks/pr-079-batch-retrieval.yaml
+  pull_request: 79
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  head_sha: null
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap

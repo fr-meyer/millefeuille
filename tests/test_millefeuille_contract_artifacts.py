@@ -29,6 +29,8 @@ REQUIRED_JSON_SCHEMAS = [
     "hierarchical-summary.schema.json",
     "paper-card.schema.json",
     "retrieval-index-status.schema.json",
+    "retrieval-batch-manifest.schema.json",
+    "retrieval-batch-result.schema.json",
     "acceptance-batch-manifest.schema.json",
     "acceptance-batch-summary.schema.json",
     "classification-batch-manifest.schema.json",
@@ -102,6 +104,41 @@ class TestMillefeuilleContractArtifacts(unittest.TestCase):
         )
         self.assertEqual(schema["properties"]["source_type"]["const"], "zotero")
         self.assertTrue(REQUIRED_STAGES.issubset(stage_names))
+
+    def test_retrieval_batch_schemas_pin_v01_contracts(self):
+        manifest = json.loads(
+            (SPEC_DIR / "retrieval-batch-manifest.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        result = json.loads(
+            (SPEC_DIR / "retrieval-batch-result.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertEqual(
+            manifest["properties"]["schema_version"]["const"],
+            "millefeuille-retrieval-batch-manifest/v0.1",
+        )
+        self.assertEqual(
+            result["properties"]["schema_version"]["const"],
+            "millefeuille-retrieval-batch-result/v0.1",
+        )
+        self.assertFalse(manifest["additionalProperties"])
+        self.assertFalse(result["additionalProperties"])
+        self.assertEqual(
+            result["$defs"]["runResult"]["properties"]["source_hash"]["pattern"],
+            "^sha256(?:-aggregate)?:[0-9a-f]{64}$",
+        )
+        self.assertEqual(
+            set(result["$defs"]["summaryEntry"]["properties"]),
+            {"grain", "scope", "text_ref"},
+        )
+        self.assertEqual(
+            set(result["$defs"]["indexLane"]["properties"]),
+            {"lane", "status"},
+        )
 
     def test_model_profile_schema_names_model_using_stages(self):
         text = (SPEC_DIR / "model-profile.schema.yaml").read_text(encoding="utf-8")

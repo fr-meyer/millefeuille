@@ -12,6 +12,7 @@ from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
     PaperCardRecord,
 )
+from millefeuille.domain.secure_io import load_json_object_no_follow
 from millefeuille.domain.source_packs import (
     load_source_pack_manifest,
     paper_id_for_zotero_item_key,
@@ -469,18 +470,16 @@ def _read_text_fixture(path: Path, *, kind: str) -> str:
 def _load_json_object(path: str | Path, kind: str) -> dict[str, Any]:
     object_path = Path(path)
     try:
-        payload = json.loads(object_path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise MillefeuilleContractError(
-            f"could not read {kind} {object_path}: {exc}"
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise MillefeuilleContractError(
-            f"{kind} is not valid JSON: {object_path}"
-        ) from exc
-    if not isinstance(payload, dict):
-        raise MillefeuilleContractError(f"{kind} must be an object")
-    return payload
+        return load_json_object_no_follow(object_path, kind)
+    except MillefeuilleContractError as exc:
+        message = str(exc)
+        if f"{kind} not found:" in message or message.startswith(
+            f"could not open {kind}"
+        ):
+            raise MillefeuilleContractError(
+                f"could not read {kind} {object_path}: {message}"
+            ) from exc
+        raise
 
 
 def _resolve_optional_path(

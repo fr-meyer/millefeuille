@@ -14,8 +14,25 @@ notes:
   - Container gh is intentionally not the GitHub write path.
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
-current_task: null
-pull_request: null
+current_task:
+  id: pr-079-batch-retrieval
+  status: implementation
+  branch: feat/pr-079-batch-retrieval
+  speculoos_task: .speculoos/tasks/pr-079-batch-retrieval.yaml
+  pull_request: 79
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  head_sha: null
+pull_request:
+  number: 79
+  url: https://github.com/fr-meyer/millefeuille/pull/79
+  status: open
+  base_branch: dev
+  head_branch: feat/pr-079-batch-retrieval
+  head_sha: null
+  project_item: unavailable
+  project_status: In Progress
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36

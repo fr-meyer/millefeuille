@@ -1,0 +1,101 @@
+id: pr-079-batch-retrieval
+title: Add deterministic offline multi-run retrieval aggregates
+status: in_progress
+branch: feat/pr-079-batch-retrieval
+base_branch: dev
+write_scope:
+  allowed:
+    - .speculoos/manifest.yaml
+    - .speculoos/surfaces/github.yaml
+    - .speculoos/surfaces/vibe-kanban.yaml
+    - .speculoos/tasks/pr-079-batch-retrieval.yaml
+    - README.md
+    - millefeuille/cli/stages.py
+    - millefeuille/domain/artifacts.py
+    - millefeuille/domain/card_fixtures.py
+    - millefeuille/domain/index_fixtures.py
+    - millefeuille/domain/retrieve.py
+    - millefeuille/domain/secure_io.py
+    - millefeuille/domain/source_packs.py
+    - millefeuille/domain/stage_runtime.py
+    - millefeuille/domain/summary_fixtures.py
+    - specs/millefeuille-pipeline/README.md
+    - specs/millefeuille-pipeline/cli-contract.md
+    - specs/millefeuille-pipeline/remaining-work.md
+    - specs/millefeuille-pipeline/retrieval-batch-manifest.schema.json
+    - specs/millefeuille-pipeline/retrieval-batch-result.schema.json
+    - specs/millefeuille-pipeline/retrieval-index-contract.md
+    - specs/pr-079-batch-retrieval/
+    - tests/test_millefeuille_contract_artifacts.py
+    - tests/test_millefeuille_retrieval_batch.py
+    - tests/test_millefeuille_retrieve.py
+executor: openclaw-agent
+branch_plan: preserve and complete the existing isolated PR79 feature branch from exact dev base
+private_data_scan: required before publication; reject secrets, raw PDFs, private paper content, provider payloads, and authenticated URLs
+publish_authority: approved dev-only branch, PR, exact-head Mergeguez review, and policy auto-merge lane from Franck on 2026-07-18
+github:
+  issue: null
+  pull_request: 79
+  issue_project_item: null
+  pull_request_project_item: unavailable
+  project_status: In Progress
+  project_item: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/79
+  head_sha: null
+  merge_commit: null
+  mergeguez_review: null
+  mergeguez_check_run: null
+scope:
+  - add a strict versioned retrieval batch manifest covering paper-id, Zotero-key, source-pack-slug, DOI, and title locators
+  - preflight every locator and verified artifact package through one pinned source-root descriptor before any aggregate write
+  - snapshot every inspected file, missing optional input, and enumerated corpus entry, retain the external batch manifest bytes, and revalidate that input set under the cooperative batch lock immediately before commit
+  - reject malformed or non-string fields, unsafe refs, missing or ambiguous identities, and duplicate resolved paper/run identities
+  - apply existing summary, location, classification-evidence, and index-lane filters uniformly across a batch
+  - emit sorted portable allowlisted ref/status JSON and Markdown aggregates beneath the batch root without artifact-controlled summary IDs
+  - publish aggregates from pinned source-root and batch-directory descriptors by verifying a complete unpublished staging generation through held descriptors, making it read-only, and using an atomic no-replace rename as the commit point within a trusted-ownership or cooperative same-UID writer boundary
+  - on pre-commit failure, scrub only owned staged inodes through held descriptors and leave the temporary generation in its reached mode plus unverified namespace entries in place for explicit operator cleanup
+  - fail closed before aggregate publication when required POSIX no-follow, descriptor-relative, directory-lock, or no-replace-rename primitives are unavailable
+  - keep exact reruns byte-stable and avoid loading or returning private paper content
+non_goals:
+  - live Zotero reads or writes, PDF recovery, OCR, provider/model calls, or worker-agent execution
+  - OpenKB, PageIndex, ConDB, ChatIndex, source-pack, or live index writes
+  - returning paper, summary, card, PDF, or provider payload content
+  - credentials, permissions, rulesets, schedulers, or secret handling changes
+  - stable-branch changes, release, or package publication; the approved dev-only PR/review/merge lane is in scope
+acceptance:
+  - the CLI accepts either one existing single-run locator or one strict v0.1 batch manifest, never both
+  - all five existing locator forms resolve in batch mode and preserve their locator type
+  - complete preflight prevents aggregate writes when any later locator, package, identity, or ref is invalid
+  - duplicate resolved paper/run identities and traversal, descendant symlink substitution, linked, displaced, substituted, same-inode mutation, hard-link-injection, unexpected-entry, or late-destination hazards detected in unpublished staging fail closed before the atomic rename commit, and external hard links retain no aborted aggregate bytes
+  - source artifact, optional-input, corpus-enumeration, or external-manifest changes observed by the final under-lock snapshot revalidation fail closed before commit
+  - the documented trust boundary states that POSIX locks and mode bits serialize cooperative writers but do not protect against an uncooperative same-UID owner racing after the final check
+  - batch mode fails closed without POSIX no-follow primitives while legacy single-run retrieval and public loader error prefixes remain compatible
+  - aggregate JSON follows the v0.1 result schema, accepts both single-PDF and aggregate source hashes, and Markdown contains only allowlisted metadata
+  - runs, matched summaries, lanes, and source-pack-root-relative slash-normalized refs are deterministic
+  - coherent retrieval filters apply uniformly and identical reruns are byte-stable no-ops while changed existing output fails closed as drift
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, and Speculoos validation pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_retrieval_batch tests.test_millefeuille_retrieve tests.test_millefeuille_stage_cli tests.test_millefeuille_contract_artifacts -v"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos status --json"
+  - "speculoos validate --task pr-079-batch-retrieval --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-079-batch-retrieval --pr-body specs/pr-079-batch-retrieval/pr-body.md --commit-message specs/pr-079-batch-retrieval/commit-message.txt --json"
+publication_boundary:
+  statement: "Offline aggregate ref/status reporting over existing temporary fixture or synthetic source-pack runs only. GitHub writes are limited to the approved dev-target PR #79 review and policy-merge lane. No private paper content return, live Zotero access, PDF recovery, durable source-pack mutation, OCR/model/provider call, worker-agent execution, OpenKB/index write, credential or permission change, main-branch change, release, package publication, production deployment, or approval bypass."
+documentation_impact:
+  status: user-facing
+  rationale: README and pipeline contracts document the strict manifest, full-preflight semantics, aggregate paths, filters, portable refs, and privacy boundary.
+notes:
+  - "Started from exact origin/dev commit 1cbe0cfc5b428d5b684117e4c3718a38004c4b95 on feat/pr-079-batch-retrieval."
+  - "Published as dev-target PR #79 at https://github.com/fr-meyer/millefeuille/pull/79; no GitHub Project item is linked."
+  - "Exact final head, approved review/check, and merge identifiers are recorded by post-merge Speculoos closeout because a commit cannot self-record its own SHA."
+  - "Expanded full-diff Mergeguez review identified input-snapshot and same-UID trust-boundary concerns; the implementation now performs final under-lock input/manifest revalidation and documents the enforceable cooperative-writer boundary."
+evidence:
+  - "Focused batch-retrieval, single-retrieval, stage-CLI, and contract tests passed: 66 tests."
+  - "Full unittest discovery passed: 306 tests."
+  - "Ruff, YAML/JSON metadata parse, and git diff check passed."
+  - "Speculoos status, task validation, private-data scan, documentation sync, and publication checks passed."
+  - "Regression coverage includes all locators, strict metadata allowlists with artifact-controlled summary-ID exclusion, aggregate-source-hash schema/runtime coverage, pinned-root descriptor-relative reads, final source-artifact and external-manifest snapshot revalidation, manifest/stage/index and descendant-directory symlink rejection, Unicode-and-space single-run refs, single-run no-O_NOFOLLOW portability, loader error compatibility, source-root and pre-commit batch-directory substitution, same-inode staging mutation, legacy lock replacement, inbound staging hard-link preservation, outbound hard-link scrubbing, staging-generation substitution with descriptor-only cleanup, read-only atomic-rename commit, approved-live gating, late-destination no-overwrite, unexpected-entry preservation, no-unscrubbed-partial-output behavior, coherent concurrency, drift detection, content exclusion, and byte-stable reruns."

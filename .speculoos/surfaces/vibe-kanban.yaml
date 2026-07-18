@@ -14,7 +14,7 @@ notes:
   - No Vibe cloud or org API is configured for this repo.
   - Bootstrap should not depend on Vibe reachability.
 task:
-  status: idle
-  id: null
-  speculoos_task: null
+  status: implementation
+  id: pr-079-batch-retrieval
+  speculoos_task: .speculoos/tasks/pr-079-batch-retrieval.yaml
   command: null

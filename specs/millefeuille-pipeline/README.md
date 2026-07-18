@@ -19,6 +19,9 @@ Files:
 - `hierarchical-summary.schema.json` - page/section/paper summary shape.
 - `paper-card.schema.json` - compact human/agent card shape.
 - `retrieval-index-status.schema.json` - retrieval/index lane status shape.
+- `retrieval-batch-manifest.schema.json` - strict multi-run retrieval locators.
+- `retrieval-batch-result.schema.json` - deterministic aggregate ref/status
+  results.
 - `acceptance-batch-manifest.schema.json` - deterministic offline batch input
   locators.
 - `acceptance-batch-summary.schema.json` - aggregate pass/review result shape.
@@ -45,7 +48,25 @@ Executable offline contract models live in
 manual gates, tag-state transitions, single-run and batch acceptance summaries,
 single-run and batch classification records, offline classification review and
 adjudication actions, writeback plans, and release-preflight records without
-requiring live provider or Zotero mutation.
+requiring live provider or Zotero mutation. Batch retrieval orchestration lives
+in `millefeuille/domain/retrieve.py`; it validates strict versioned locators,
+preflights every package through one pinned source-root descriptor, and emits
+only portable allowlisted refs/status metadata without artifact-controlled
+summary IDs. Descendant reads and corpus enumeration use descriptor-relative
+no-follow operations. Safe aggregate publication uses pinned descriptors, a
+batch-directory inode lock, and an atomic no-replace generation rename on
+supported POSIX local filesystems. While staging remains unpublished, validation
+rereads expected bytes, rechecks held descriptors, metadata, entry names, and
+single-link counts, then makes files and the generation directory read-only; the
+atomic rename is the commit point. Immediately before that point, the cooperative
+batch lock remains held while all snapshotted inputs and corpus entries are
+reopened and revalidated and the external manifest is reread byte-for-byte. On
+pre-commit failure, descriptor-only cleanup scrubs owned output bytes but
+intentionally leaves the temporary generation in its reached mode and any
+unverified namespace entries in place for explicit operator cleanup; unavailable
+primitives fail closed before publication. This boundary assumes trusted
+ownership or cooperative same-UID writers: POSIX locks and mode bits do not
+prevent an uncooperative owner from mutating staging after the last check.
 
 Preview/read-only stage commands now live under `millefeuille/cli/stages.py`:
 `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
