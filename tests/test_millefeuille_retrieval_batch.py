@@ -631,6 +631,86 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertIn("appeared after batch preflight", stderr.getvalue())
             self.assertIn(optional_path.as_posix(), stderr.getvalue())
 
+    def test_non_regular_optional_input_fails_during_preflight(self):
+        cases = ["directory"]
+        if hasattr(os, "mkfifo"):
+            cases.append("fifo")
+
+        for kind in cases:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tempdir:
+                root, run_dir = _prepare_fixture_run(tempdir)
+                manifest_path = Path(tempdir) / "retrieval-batch.json"
+                _write_batch_manifest(
+                    manifest_path,
+                    runs=[{"paper_id": PAPER_ID, "run_id": RUN_ID}],
+                )
+                optional_path = run_dir / retrieve_domain.ACCEPTANCE_SUMMARY_REF
+                optional_path.parent.mkdir(parents=True, exist_ok=True)
+                if kind == "directory":
+                    optional_path.mkdir()
+                else:
+                    os.mkfifo(optional_path)
+
+                stderr = StringIO()
+                exit_code = run_stage_cli(
+                    _batch_args(source_pack_root=root, manifest_path=manifest_path),
+                    stderr=stderr,
+                )
+
+                self.assertEqual(exit_code, 2)
+                self.assertIn("is not a regular file", stderr.getvalue())
+                self.assertIn(optional_path.as_posix(), stderr.getvalue())
+                self.assertFalse((root / RETRIEVAL_BATCH_ROOT_REF).exists())
+
+    def test_missing_optional_input_becoming_non_regular_fails_revalidation(self):
+        cases = ["directory"]
+        if hasattr(os, "mkfifo"):
+            cases.append("fifo")
+
+        for kind in cases:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tempdir:
+                root, run_dir = _prepare_fixture_run(tempdir)
+                manifest_path = Path(tempdir) / "retrieval-batch.json"
+                _write_batch_manifest(
+                    manifest_path,
+                    runs=[{"paper_id": PAPER_ID, "run_id": RUN_ID}],
+                )
+                optional_path = run_dir / retrieve_domain.ACCEPTANCE_SUMMARY_REF
+                self.assertFalse(optional_path.exists())
+                real_render = retrieve_domain._render_retrieval_batch_markdown
+
+                def _replace_optional_after_preflight(
+                    payload: dict[str, object],
+                    *,
+                    _real_render=real_render,
+                    _optional_path=optional_path,
+                    _kind=kind,
+                ) -> str:
+                    report = _real_render(payload)
+                    _optional_path.parent.mkdir(parents=True, exist_ok=True)
+                    if _kind == "directory":
+                        _optional_path.mkdir()
+                    else:
+                        os.mkfifo(_optional_path)
+                    return report
+
+                stderr = StringIO()
+                with mock.patch(
+                    "millefeuille.domain.retrieve._render_retrieval_batch_markdown",
+                    side_effect=_replace_optional_after_preflight,
+                ):
+                    exit_code = run_stage_cli(
+                        _batch_args(
+                            source_pack_root=root,
+                            manifest_path=manifest_path,
+                        ),
+                        stderr=stderr,
+                    )
+
+                self.assertEqual(exit_code, 2)
+                self.assertIn("changed after batch preflight", stderr.getvalue())
+                self.assertIn(optional_path.as_posix(), stderr.getvalue())
+
     def test_corpus_enumeration_mutation_after_preflight_fails_closed(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, run_dir = _prepare_fixture_run(tempdir)

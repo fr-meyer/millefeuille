@@ -158,7 +158,9 @@ def _open_regular_file_fd(
         if not stat.S_ISREG(opened_stat.st_mode) or not stat.S_ISREG(
             named_stat.st_mode
         ):
-            raise MillefeuilleContractError(f"{label} not found: {path}")
+            raise MillefeuilleContractError(
+                f"{label} is not a regular file: {path}"
+            )
         if (opened_stat.st_dev, opened_stat.st_ino) != (
             named_stat.st_dev,
             named_stat.st_ino,
@@ -591,7 +593,9 @@ class RootArtifactReader:
         try:
             opened_stat = os.fstat(fd)
             if not stat.S_ISREG(opened_stat.st_mode):
-                raise MillefeuilleContractError(f"{label} not found: {target}")
+                raise MillefeuilleContractError(
+                    f"{label} is not a regular file: {target}"
+                )
             self._require_unchanged_regular_file(
                 parent_fd=parent_fd,
                 fd=fd,

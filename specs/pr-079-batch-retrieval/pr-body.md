@@ -8,7 +8,7 @@ Implements Speculoos task `pr-079-batch-retrieval`: deterministic offline multi-
 - rejects unknown or non-string fields, unsafe locators/refs, missing or ambiguous identities, and duplicate resolved runs
 - applies existing scope, grain, index-lane, section, page, and classification-evidence filters uniformly
 - emits sorted source-pack-root-relative allowlisted refs/status metadata as strict v0.1 JSON plus Markdown, excluding artifact-controlled summary IDs
-- pins one source-root descriptor across preflight, performs descendant and corpus reads through descriptor-relative no-follow operations, and snapshots every inspected file, missing optional input, and enumerated corpus entry
+- pins one source-root descriptor across preflight, performs descendant and corpus reads through descriptor-relative no-follow operations, snapshots every inspected file, truly absent optional input, and enumerated corpus entry, and rejects optional paths that exist as directories, FIFOs, or other non-regular entries
 - rereads the external batch manifest and reopens/revalidates every snapshotted source input under the cooperative batch lock immediately before an exact-rerun no-op or atomic commit
 - pins and revalidates the batch-directory inode, locks its descriptor, verifies the complete unpublished staging generation through held read/write descriptors, makes it read-only, and uses the atomic no-replace rename as the commit point
 - retains separate read-only verification and private read/write cleanup descriptors for each staged inode; on pre-commit failure it truncates/fsyncs the owned inode directly even if its staged name was displaced or replaced, so raced external hard links retain no aborted bytes while unverified namespace entries remain untouched
@@ -47,8 +47,8 @@ Implements Speculoos task `pr-079-batch-retrieval`: deterministic offline multi-
 
 ## Validation
 
-- focused batch/retrieval/stage-CLI/contract suite — 68 passed
-- full unittest discovery — 308 passed
+- focused batch/retrieval/stage-CLI/contract suite — 70 passed
+- full unittest discovery — 310 passed
 - Ruff — passed
 - YAML/JSON metadata parse — passed
 - `git diff --check` — passed

@@ -304,8 +304,10 @@ allowlisted to `grain`, `scope`, and portable `text_ref`; artifact-controlled
 one no-follow source-root descriptor and opens every source-pack manifest, card,
 summary, index, optional artifact, and referenced full-text/summary path relative
 to it, without path-based reads or symlink following. Stable file identities,
-missing optional inputs, and enumerated corpus entries are snapshotted; the
-external batch manifest is read no-follow and retained byte-for-byte. Publication
+missing optional inputs, and enumerated corpus entries are snapshotted. Only an
+actual absent path is optional; an optional path that exists as a directory,
+FIFO, or other non-regular entry fails closed. The external batch manifest is
+read no-follow and retained byte-for-byte. Publication
 then pins the batch-directory inode, locks the batch directory, creates staging files
 exclusively by descriptor, and keeps independently opened read-only verification
 and private read/write cleanup descriptors for each owned inode. While the

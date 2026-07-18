@@ -288,8 +288,10 @@ Markdown report are written beneath
 filesystems, batch preflight pins one source-root descriptor, traverses every
 input component through descriptor-relative no-follow operations, parses JSON
 from held regular-file descriptors, and snapshots stable input identities,
-missing optional inputs, and enumerated corpus entries. The external batch
-manifest is retained byte-for-byte for a no-follow precommit reread. Publication
+missing optional inputs, and enumerated corpus entries. Only an actually absent
+optional path is recorded as missing; directories, FIFOs, and other non-regular
+entries fail closed. The external batch manifest is retained byte-for-byte for a
+no-follow precommit reread. Publication
 pins the batch-directory inode, locks its descriptor, and stages
 exclusively created files by descriptor while retaining independently opened
 read-only verification and private read/write cleanup descriptors for each owned

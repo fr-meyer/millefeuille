@@ -89,8 +89,10 @@ preflight opens one pinned source-root descriptor, traverses every descendant
 component through descriptor-relative no-follow operations, and parses JSON
 from held regular-file descriptors. Corpus enumeration and referenced artifact
 verification use that same pinned root. It snapshots stable input identities,
-missing optional inputs, and corpus entries; the external batch manifest is read
-no-follow and retained byte-for-byte. Publication creates the batch hierarchy
+missing optional inputs, and corpus entries. Only an actually absent optional
+path is recorded as missing; directories, FIFOs, and other non-regular entries
+fail closed. The external batch manifest is read no-follow and retained
+byte-for-byte. Publication creates the batch hierarchy
 relative to a pinned descriptor and locks the
 pinned batch-directory inode. Both files are created exclusively inside a
 descriptor-relative mode-`0700` temporary generation and kept open through
