@@ -16,7 +16,7 @@ from typing import Any
 import unicodedata
 
 from millefeuille.domain.acceptance import ACCEPTANCE_SUMMARY_REF
-from millefeuille.domain.card_fixtures import CARD_JSON_REF, load_paper_card
+from millefeuille.domain.card_fixtures import CARD_JSON_REF
 from millefeuille.domain.classification import (
     CLASSIFICATION_PLAN_REF,
     WRITEBACK_PREVIEW_REF,
@@ -73,6 +73,12 @@ _RETRIEVAL_BATCH_TEMP_PREFIX = ".retrieval.tmp-"
 class _PreparedRetrieval:
     resolved: ResolvedRunArtifacts
     payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class _StagedFileDescriptors:
+    read_fd: int
+    scrub_fd: int
 
 
 def retrieve_artifact_refs(
@@ -1044,7 +1050,7 @@ def _publish_retrieval_batch_outputs(
                         prefix=_RETRIEVAL_BATCH_TEMP_PREFIX,
                     )
                     committed = False
-                    staged_file_fds: dict[str, int] = {}
+                    staged_files: dict[str, _StagedFileDescriptors] = {}
                     temp_dir_fd = _open_relative_directory_fd(batch_dir_fd, temp_name)
                     try:
                         _require_relative_fd_entry_matches(
@@ -1055,14 +1061,14 @@ def _publish_retrieval_batch_outputs(
                             label="retrieval batch staging directory",
                             directory=True,
                         )
-                        staged_file_fds[RETRIEVAL_BATCH_RESULT_REF.name] = (
+                        staged_files[RETRIEVAL_BATCH_RESULT_REF.name] = (
                             _write_staged_bytes(
                                 Path(RETRIEVAL_BATCH_RESULT_REF.name),
                                 result_bytes,
                                 dir_fd=temp_dir_fd,
                             )
                         )
-                        staged_file_fds[RETRIEVAL_BATCH_REPORT_REF.name] = (
+                        staged_files[RETRIEVAL_BATCH_REPORT_REF.name] = (
                             _write_staged_bytes(
                                 Path(RETRIEVAL_BATCH_REPORT_REF.name),
                                 report_bytes,
@@ -1080,19 +1086,19 @@ def _publish_retrieval_batch_outputs(
                                 "retrieval batch staging output drift detected at "
                                 f"{batch_dir / temp_name}"
                             )
-                        for name, fd in staged_file_fds.items():
+                        for name, descriptors in staged_files.items():
                             staged_path = batch_dir / temp_name / name
                             _require_relative_fd_entry_matches(
                                 parent_fd=temp_dir_fd,
                                 name=name,
-                                fd=fd,
+                                fd=descriptors.read_fd,
                                 path=staged_path,
                                 label="retrieval batch staged output",
                                 directory=False,
                                 require_single_link=True,
                             )
                             _verify_open_fd_bytes(
-                                fd=fd,
+                                fd=descriptors.read_fd,
                                 expected_bytes=expected_staged_bytes[name],
                                 path=staged_path,
                                 label="retrieval batch staged output",
@@ -1106,19 +1112,19 @@ def _publish_retrieval_batch_outputs(
                                 "retrieval batch staging output drift detected at "
                                 f"{batch_dir / temp_name}"
                             )
-                        for name, fd in staged_file_fds.items():
+                        for name, descriptors in staged_files.items():
                             staged_path = batch_dir / temp_name / name
                             _require_relative_fd_entry_matches(
                                 parent_fd=temp_dir_fd,
                                 name=name,
-                                fd=fd,
+                                fd=descriptors.read_fd,
                                 path=staged_path,
                                 label="retrieval batch staged output",
                                 directory=False,
                                 require_single_link=True,
                             )
                             _verify_open_fd_bytes(
-                                fd=fd,
+                                fd=descriptors.read_fd,
                                 expected_bytes=expected_staged_bytes[name],
                                 path=staged_path,
                                 label="retrieval batch staged output",
@@ -1166,14 +1172,15 @@ def _publish_retrieval_batch_outputs(
                             if not committed:
                                 _scrub_staged_files(
                                     generation_dir_fd=temp_dir_fd,
-                                    staged_file_fds=staged_file_fds,
+                                    staged_files=staged_files,
                                 )
                                 with suppress(OSError):
                                     _fsync_directory_fd(batch_dir_fd)
                         finally:
-                            for fd in staged_file_fds.values():
-                                with suppress(OSError):
-                                    os.close(fd)
+                            for descriptors in staged_files.values():
+                                for fd in (descriptors.read_fd, descriptors.scrub_fd):
+                                    with suppress(OSError):
+                                        os.close(fd)
                             os.close(temp_dir_fd)
             finally:
                 os.close(batch_dir_fd)
@@ -1192,28 +1199,28 @@ def _write_staged_bytes(
     payload: bytes,
     *,
     dir_fd: int,
-) -> int:
+) -> _StagedFileDescriptors:
     flags = os.O_RDWR | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_CLOEXEC"):
         flags |= os.O_CLOEXEC
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
-    write_fd = os.open(path.name, flags, 0o600, dir_fd=dir_fd)
+    scrub_fd: int | None = os.open(path.name, flags, 0o600, dir_fd=dir_fd)
     read_fd: int | None = None
     try:
-        with os.fdopen(write_fd, "wb", closefd=False) as handle:
+        with os.fdopen(scrub_fd, "wb", closefd=False) as handle:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        os.fchmod(write_fd, 0o444)
-        os.fsync(write_fd)
+        os.fchmod(scrub_fd, 0o444)
+        os.fsync(scrub_fd)
         read_fd = _open_verified_relative_regular_file(
             stable_dir_fd=dir_fd,
             name=path.name,
             path=path,
             label="retrieval batch staged output",
         )
-        write_stat = os.fstat(write_fd)
+        write_stat = os.fstat(scrub_fd)
         read_stat = os.fstat(read_fd)
         if (write_stat.st_dev, write_stat.st_ino) != (
             read_stat.st_dev,
@@ -1228,18 +1235,24 @@ def _write_staged_bytes(
             path=path,
             label="retrieval batch staged output",
         )
-        result_fd = read_fd
+        descriptors = _StagedFileDescriptors(
+            read_fd=read_fd,
+            scrub_fd=scrub_fd,
+        )
         read_fd = None
-        return result_fd
+        scrub_fd = None
+        return descriptors
     except BaseException:
+        if scrub_fd is not None:
+            with suppress(OSError):
+                _scrub_staged_file_fd(scrub_fd)
+        raise
+    finally:
         if read_fd is not None:
             with suppress(OSError):
                 os.close(read_fd)
-        with suppress(OSError):
-            _scrub_staged_file_fd(write_fd)
-        raise
-    finally:
-        os.close(write_fd)
+        if scrub_fd is not None:
+            os.close(scrub_fd)
 
 
 def _fsync_directory_fd(fd: int) -> None:
@@ -1865,69 +1878,24 @@ def _scrub_staged_file_fd(fd: int) -> None:
     os.fsync(fd)
 
 
-def _open_owned_staged_file_for_scrub(
-    *,
-    generation_dir_fd: int,
-    name: str,
-    read_fd: int,
-) -> int:
-    """Reopen one pinned staged inode for failure-only scrubbing."""
-
-    os.fchmod(read_fd, 0o600)
-    flags = os.O_RDWR
-    if hasattr(os, "O_CLOEXEC"):
-        flags |= os.O_CLOEXEC
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    if hasattr(os, "O_NONBLOCK"):
-        flags |= os.O_NONBLOCK
-    write_fd = os.open(name, flags, dir_fd=generation_dir_fd)
-    try:
-        read_stat = os.fstat(read_fd)
-        write_stat = os.fstat(write_fd)
-        named_stat = os.stat(name, dir_fd=generation_dir_fd, follow_symlinks=False)
-        expected_identity = (read_stat.st_dev, read_stat.st_ino)
-        if not stat.S_ISREG(write_stat.st_mode) or not stat.S_ISREG(
-            named_stat.st_mode
-        ):
-            raise OSError(errno.EIO, "staged output is no longer a regular file")
-        if (write_stat.st_dev, write_stat.st_ino) != expected_identity:
-            raise OSError(errno.EIO, "staged output inode changed before scrub")
-        if (named_stat.st_dev, named_stat.st_ino) != expected_identity:
-            raise OSError(errno.EIO, "staged output name changed before scrub")
-        return write_fd
-    except BaseException:
-        os.close(write_fd)
-        raise
-
-
 def _scrub_staged_files(
     *,
     generation_dir_fd: int,
-    staged_file_fds: dict[str, int],
+    staged_files: dict[str, _StagedFileDescriptors],
 ) -> None:
-    """Erase owned output bytes through a verified failure-only reopen."""
+    """Erase owned staged inodes through retained failure-only descriptors."""
 
     first_error: OSError | None = None
-    for name, read_fd in staged_file_fds.items():
-        write_fd: int | None = None
+    for descriptors in staged_files.values():
         try:
-            write_fd = _open_owned_staged_file_for_scrub(
-                generation_dir_fd=generation_dir_fd,
-                name=name,
-                read_fd=read_fd,
-            )
-            _scrub_staged_file_fd(write_fd)
+            _scrub_staged_file_fd(descriptors.scrub_fd)
         except OSError as exc:
             if first_error is None:
                 first_error = exc
         finally:
-            if write_fd is not None:
-                with suppress(OSError):
-                    os.close(write_fd)
             with suppress(OSError):
-                os.fchmod(read_fd, 0o444)
-                os.fsync(read_fd)
+                os.fchmod(descriptors.scrub_fd, 0o444)
+                os.fsync(descriptors.scrub_fd)
     try:
         _fsync_directory_fd(generation_dir_fd)
     except OSError as exc:
@@ -2128,13 +2096,13 @@ def _load_verified_paper_card(
     artifact_reader: RootArtifactReader | None = None,
 ) -> dict[str, Any]:
     card_path = resolved.run_dir / CARD_JSON_REF
-    if artifact_reader is not None:
-        card_payload = PaperCardRecord.from_dict(
-            artifact_reader.load_json_object(card_path, "paper card")
-        ).to_dict()
-    else:
-        _require_regular_artifact(card_path, "paper card")
-        card_payload = load_paper_card(card_path)
+    card_payload = PaperCardRecord.from_dict(
+        _load_retrieval_json(
+            card_path,
+            "paper card",
+            artifact_reader=artifact_reader,
+        )
+    ).to_dict()
     _require_identity(
         payload=card_payload,
         label="paper card",

@@ -63,10 +63,10 @@ non_goals:
   - credentials, permissions, rulesets, schedulers, or secret handling changes
   - stable-branch changes, release, or package publication; the approved dev-only PR/review/merge lane is in scope
 acceptance:
-  - the CLI accepts either one existing single-run locator or one strict v0.1 batch manifest, never both
+  - the CLI accepts either one existing single-run locator or one strict v0.1 batch manifest, never both, and every non-preview batch mode is rejected even after the generic mode gate
   - all five existing locator forms resolve in batch mode and preserve their locator type
   - complete preflight prevents aggregate writes when any later locator, package, identity, or ref is invalid
-  - duplicate resolved paper/run identities and traversal, descendant symlink substitution, linked, displaced, substituted, same-inode mutation, hard-link-injection, unexpected-entry, or late-destination hazards detected in unpublished staging fail closed before the atomic rename commit, and external hard links retain no aborted aggregate bytes
+  - duplicate resolved paper/run identities and traversal, descendant symlink substitution, linked, displaced, substituted, same-inode mutation, hard-link-injection, unexpected-entry, or late-destination hazards detected in unpublished staging fail closed before the atomic rename commit, and retained cleanup descriptors scrub owned staged inodes even after staged-name displacement so external hard links retain no aborted aggregate bytes
   - source artifact, optional-input, corpus-enumeration, or external-manifest changes observed by the final under-lock snapshot revalidation fail closed before commit
   - the documented trust boundary states that POSIX locks and mode bits serialize cooperative writers but do not protect against an uncooperative same-UID owner racing after the final check
   - batch mode fails closed without POSIX no-follow primitives while legacy single-run retrieval and public loader error prefixes remain compatible
@@ -94,8 +94,8 @@ notes:
   - "Exact final head, approved review/check, and merge identifiers are recorded by post-merge Speculoos closeout because a commit cannot self-record its own SHA."
   - "Expanded full-diff Mergeguez review identified input-snapshot and same-UID trust-boundary concerns; the implementation now performs final under-lock input/manifest revalidation and documents the enforceable cooperative-writer boundary."
 evidence:
-  - "Focused batch-retrieval, single-retrieval, stage-CLI, and contract tests passed: 66 tests."
-  - "Full unittest discovery passed: 306 tests."
+  - "Focused batch-retrieval, single-retrieval, stage-CLI, and contract tests passed: 68 tests."
+  - "Full unittest discovery passed: 308 tests."
   - "Ruff, YAML/JSON metadata parse, and git diff check passed."
   - "Speculoos status, task validation, private-data scan, documentation sync, and publication checks passed."
-  - "Regression coverage includes all locators, strict metadata allowlists with artifact-controlled summary-ID exclusion, aggregate-source-hash schema/runtime coverage, pinned-root descriptor-relative reads, final source-artifact and external-manifest snapshot revalidation, manifest/stage/index and descendant-directory symlink rejection, Unicode-and-space single-run refs, single-run no-O_NOFOLLOW portability, loader error compatibility, source-root and pre-commit batch-directory substitution, same-inode staging mutation, legacy lock replacement, inbound staging hard-link preservation, outbound hard-link scrubbing, staging-generation substitution with descriptor-only cleanup, read-only atomic-rename commit, approved-live gating, late-destination no-overwrite, unexpected-entry preservation, no-unscrubbed-partial-output behavior, coherent concurrency, drift detection, content exclusion, and byte-stable reruns."
+  - "Regression coverage includes all locators, strict metadata allowlists with artifact-controlled summary-ID exclusion, aggregate-source-hash schema/runtime coverage, pinned-root descriptor-relative reads, final source-artifact and external-manifest snapshot revalidation, manifest/stage/index and descendant-directory symlink rejection, Unicode-and-space single-run refs, single-run no-O_NOFOLLOW portability, loader error compatibility, source-root and pre-commit batch-directory substitution, same-inode staging mutation, legacy lock replacement, inbound staging hard-link preservation, outbound hard-link scrubbing after staged-name displacement/replacement, staging-generation substitution with descriptor-only cleanup, read-only atomic-rename commit, approved-live gating, late-destination no-overwrite, unexpected-entry preservation, no-unscrubbed-partial-output behavior, coherent concurrency, drift detection, content exclusion, and byte-stable reruns."

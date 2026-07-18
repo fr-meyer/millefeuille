@@ -291,17 +291,19 @@ from held regular-file descriptors, and snapshots stable input identities,
 missing optional inputs, and enumerated corpus entries. The external batch
 manifest is retained byte-for-byte for a no-follow precommit reread. Publication
 pins the batch-directory inode, locks its descriptor, and stages
-exclusively created files by descriptor while retaining owned read/write
-descriptors. Before publication it validates the exact staging entry set,
+exclusively created files by descriptor while retaining independently opened
+read-only verification and private read/write cleanup descriptors for each owned
+inode. Before publication it validates the exact staging entry set,
 rereads both expected byte streams, rechecks names, inode identities, metadata,
 and single-link counts, changes files to mode `0444` and the generation
 directory to mode `0555`, then repeats the held-descriptor verification. The
 atomic no-replace rename of that complete read-only generation is the
 publication commit point; parent-directory fsync follows for durability, not as
 a post-publication validation gate. Pre-commit failure cleanup truncates and
-fsyncs only the owned staged inodes through those held descriptors, preventing a
-raced external hard link from retaining aborted aggregate bytes. It deliberately
-performs no namespace unlink, rename, or remove operation because an
+fsyncs only the owned staged inodes through their retained cleanup descriptors,
+even if a staged name was displaced or replaced, preventing a raced external
+hard link from retaining aborted aggregate bytes. It deliberately performs no
+namespace unlink, rename, or remove operation because an
 uncooperative same-UID replacement cannot be conditionally mutated atomically;
 unverified entries stay untouched. The failed temporary generation remains in
 its reached mode (`0700` or `0555`) with owned output files at zero bytes for

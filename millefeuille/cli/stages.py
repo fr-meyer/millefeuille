@@ -629,7 +629,7 @@ def _validate_retrieve_args(args: argparse.Namespace) -> None:
                 "retrieve --batch-manifest cannot be combined with --paper-id, "
                 "--item-key, --slug, --doi, --title, or --run-id"
             )
-        if args.mode == RunMode.READ_ONLY_LIVE.value:
+        if args.mode != RunMode.PREVIEW.value:
             raise MillefeuilleContractError(
                 "retrieve --batch-manifest is preview-only because it writes "
                 "local aggregate artifacts"

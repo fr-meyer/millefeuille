@@ -93,16 +93,18 @@ missing optional inputs, and corpus entries; the external batch manifest is read
 no-follow and retained byte-for-byte. Publication creates the batch hierarchy
 relative to a pinned descriptor and locks the
 pinned batch-directory inode. Both files are created exclusively inside a
-descriptor-relative mode-`0700` temporary generation and kept open through owned
-read/write descriptors. Before publication, Millefeuille validates the exact
-entry set, rereads both expected byte streams, rechecks names, inode identities,
+descriptor-relative mode-`0700` temporary generation and kept open through
+independently opened read-only verification and private read/write cleanup
+descriptors for each owned inode. Before publication, Millefeuille validates the
+exact entry set, rereads both expected byte streams, rechecks names, inode identities,
 metadata, and single-link counts, changes files to mode `0444` and the directory
 to mode `0555`, then repeats the held-descriptor verification. The atomic
 no-replace rename into the stable `retrieval/` path is the publication commit
 point; parent-directory fsync follows for durability. Pre-commit failure cleanup
-truncates and fsyncs only the owned staged inodes through those held descriptors,
-so a raced external hard link cannot retain aborted aggregate bytes. It does not
-unlink, rename, or remove namespace entries because an uncooperative same-UID
+truncates and fsyncs only the owned staged inodes through their retained cleanup
+descriptors, even if a staged name was displaced or replaced, so a raced external
+hard link cannot retain aborted aggregate bytes. It does not unlink, rename, or
+remove namespace entries because an uncooperative same-UID
 replacement cannot be conditionally mutated atomically; unverified entries stay
 untouched. The failed temporary generation remains in its reached mode (`0700`
 or `0555`) with owned outputs at zero bytes for explicit operator cleanup.

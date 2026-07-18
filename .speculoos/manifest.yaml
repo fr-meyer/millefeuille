@@ -22,7 +22,7 @@ validation:
   unit_tests:
     status: passed
     command: .venv/bin/python -m unittest discover -v
-    result: 297 passed, 0 failed
+    result: 308 passed, 0 failed
   lint:
     status: passed
     command: .venv/bin/ruff check .

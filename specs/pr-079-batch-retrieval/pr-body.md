@@ -11,7 +11,7 @@ Implements Speculoos task `pr-079-batch-retrieval`: deterministic offline multi-
 - pins one source-root descriptor across preflight, performs descendant and corpus reads through descriptor-relative no-follow operations, and snapshots every inspected file, missing optional input, and enumerated corpus entry
 - rereads the external batch manifest and reopens/revalidates every snapshotted source input under the cooperative batch lock immediately before an exact-rerun no-op or atomic commit
 - pins and revalidates the batch-directory inode, locks its descriptor, verifies the complete unpublished staging generation through held read/write descriptors, makes it read-only, and uses the atomic no-replace rename as the commit point
-- on pre-commit failure, truncates and fsyncs only owned staged inodes through held descriptors so raced external hard links retain no aborted bytes; performs no namespace unlink/rename/remove and leaves anomalies in place for explicit operator cleanup
+- retains separate read-only verification and private read/write cleanup descriptors for each staged inode; on pre-commit failure it truncates/fsyncs the owned inode directly even if its staged name was displaced or replaced, so raced external hard links retain no aborted bytes while unverified namespace entries remain untouched
 - treats exact reruns as verified read-only byte-stable no-ops and fails closed on incomplete, writable, drifted, linked, displaced, or substituted output; mutations observed before the final precommit check fail closed
 - states the enforceable trust boundary explicitly: POSIX locks and mode bits serialize cooperative writers but cannot prevent an uncooperative same-UID owner from racing after the last check, so trusted ownership, cooperation, or stronger immutable storage is required
 - fails closed before aggregate publication when required POSIX no-follow, descriptor-relative, directory-lock, or no-replace-rename primitives are unavailable, while preserving legacy single-run fallback reads and public loader error prefixes
@@ -47,8 +47,8 @@ Implements Speculoos task `pr-079-batch-retrieval`: deterministic offline multi-
 
 ## Validation
 
-- focused batch/retrieval/stage-CLI/contract suite — 66 passed
-- full unittest discovery — 306 passed
+- focused batch/retrieval/stage-CLI/contract suite — 68 passed
+- full unittest discovery — 308 passed
 - Ruff — passed
 - YAML/JSON metadata parse — passed
 - `git diff --check` — passed

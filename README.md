@@ -283,8 +283,9 @@ traversal-safe `batch_id`, and contains a non-empty `runs` array. Every entry
 has `run_id` and exactly one of `paper_id`, `item_key`, `slug`, `doi`, or
 `title`; unknown fields and non-string locator values are rejected. The usual
 scope, grain, index-lane, section, page, and classification-evidence filters
-apply coherently to every resolved run. `--batch-manifest` is preview-only,
-must not be empty, and cannot be combined with direct locators or `--run-id`.
+apply coherently to every resolved run. `--batch-manifest` is preview-only:
+every non-preview mode is rejected independently of the generic live-mode gate.
+It must not be empty and cannot be combined with direct locators or `--run-id`.
 
 Millefeuille resolves and validates the complete manifest before writing. A
 missing or ambiguous identity, duplicate resolved paper/run pair, drifted
@@ -306,8 +307,9 @@ to it, without path-based reads or symlink following. Stable file identities,
 missing optional inputs, and enumerated corpus entries are snapshotted; the
 external batch manifest is read no-follow and retained byte-for-byte. Publication
 then pins the batch-directory inode, locks the batch directory, creates staging files
-exclusively by descriptor, and keeps those owned read/write descriptors open.
-While the randomized mode-`0700` staging generation is still unpublished,
+exclusively by descriptor, and keeps independently opened read-only verification
+and private read/write cleanup descriptors for each owned inode. While the
+randomized mode-`0700` staging generation is still unpublished,
 Millefeuille validates its exact entry set, rereads both expected byte streams,
 rechecks names, inode identities, file metadata, and single-link counts, then
 changes the files to mode `0444` and the generation directory to mode `0555`.
@@ -315,9 +317,10 @@ A second held-descriptor verification follows those permission changes. The
 atomic no-replace rename of that complete generation is the publication commit
 point; the parent directory is fsynced afterward for durability, with no
 post-publication validation window before commit. If any pre-commit step fails,
-Millefeuille truncates and fsyncs only the owned staged inodes through those held
-descriptors, so a raced external hard link cannot retain aborted aggregate
-bytes. Failure cleanup deliberately does not unlink, rename, or remove namespace
+Millefeuille truncates and fsyncs only the owned staged inodes through their
+retained cleanup descriptors, even if a staged name was displaced or replaced,
+so a raced external hard link cannot retain aborted aggregate bytes. Failure
+cleanup deliberately does not unlink, rename, or remove namespace
 entries because an uncooperative same-UID replacement cannot be conditionally
 mutated atomically; unverified entries remain untouched. The failed temporary
 generation therefore remains in its reached mode (`0700` or `0555`) with owned

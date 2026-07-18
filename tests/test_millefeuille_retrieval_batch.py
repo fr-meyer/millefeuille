@@ -1614,6 +1614,96 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertEqual(external.stat().st_size, 0)
             self.assertFalse((batch_dir / RETRIEVAL_BATCH_RESULT_REF.parent).exists())
 
+    def test_displaced_staged_inode_is_scrubbed_through_retained_descriptor(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root, _run_dir = _prepare_fixture_run(tempdir)
+            manifest_path = Path(tempdir) / "retrieval-batch.json"
+            _write_batch_manifest(
+                manifest_path,
+                runs=[{"paper_id": PAPER_ID, "run_id": RUN_ID}],
+            )
+            batch_dir = root / RETRIEVAL_BATCH_ROOT_REF / "retrieval-fixture"
+            external = Path(tempdir) / "displaced-report-link.md"
+            displaced_name = "displaced-report.md"
+            replacement_bytes = b"attacker-owned replacement\n"
+            stderr = StringIO()
+            real_write = retrieve_domain._write_staged_bytes
+            real_read = retrieve_domain._read_bytes_from_open_fd
+            staging_dir_fd: int | None = None
+            read_count = 0
+
+            def _capture_staging_fd(
+                path: Path,
+                payload: bytes,
+                *,
+                dir_fd: int,
+            ) -> retrieve_domain._StagedFileDescriptors:
+                nonlocal staging_dir_fd
+                staging_dir_fd = dir_fd
+                return real_write(path, payload, dir_fd=dir_fd)
+
+            def _displace_report_after_initial_verification(fd: int) -> bytes:
+                nonlocal read_count
+                payload = real_read(fd)
+                read_count += 1
+                if read_count == 4:
+                    assert staging_dir_fd is not None
+                    os.link(
+                        RETRIEVAL_BATCH_REPORT_REF.name,
+                        external,
+                        src_dir_fd=staging_dir_fd,
+                        follow_symlinks=False,
+                    )
+                    os.rename(
+                        RETRIEVAL_BATCH_REPORT_REF.name,
+                        displaced_name,
+                        src_dir_fd=staging_dir_fd,
+                        dst_dir_fd=staging_dir_fd,
+                    )
+                    replacement_fd = os.open(
+                        RETRIEVAL_BATCH_REPORT_REF.name,
+                        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                        0o600,
+                        dir_fd=staging_dir_fd,
+                    )
+                    try:
+                        os.write(replacement_fd, replacement_bytes)
+                    finally:
+                        os.close(replacement_fd)
+                return payload
+
+            with (
+                mock.patch(
+                    "millefeuille.domain.retrieve._write_staged_bytes",
+                    side_effect=_capture_staging_fd,
+                ),
+                mock.patch(
+                    "millefeuille.domain.retrieve._read_bytes_from_open_fd",
+                    side_effect=_displace_report_after_initial_verification,
+                ),
+            ):
+                exit_code = run_stage_cli(
+                    _batch_args(source_pack_root=root, manifest_path=manifest_path),
+                    stderr=stderr,
+                )
+
+            self.assertEqual(exit_code, 2)
+            self.assertIn("changed while read", stderr.getvalue())
+            self.assertFalse((batch_dir / RETRIEVAL_BATCH_RESULT_REF.parent).exists())
+            self.assertTrue(external.exists())
+            self.assertEqual(external.stat().st_size, 0)
+            staging_dirs = list(batch_dir.glob(f"{_RETRIEVAL_BATCH_TEMP_PREFIX}*"))
+            self.assertEqual(len(staging_dirs), 1)
+            self.assertEqual((staging_dirs[0] / displaced_name).stat().st_size, 0)
+            self.assertEqual(
+                (staging_dirs[0] / RETRIEVAL_BATCH_REPORT_REF.name).read_bytes(),
+                replacement_bytes,
+            )
+            self.assertEqual(
+                (staging_dirs[0] / RETRIEVAL_BATCH_RESULT_REF.name).stat().st_size,
+                0,
+            )
+
     def test_staged_descriptors_are_read_only_before_final_verification(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -1638,13 +1728,13 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 payload: bytes,
                 *,
                 dir_fd: int,
-            ) -> int:
+            ) -> retrieve_domain._StagedFileDescriptors:
                 nonlocal result_fd, result_size
-                fd = real_write(path, payload, dir_fd=dir_fd)
+                descriptors = real_write(path, payload, dir_fd=dir_fd)
                 if path.name == RETRIEVAL_BATCH_RESULT_REF.name:
-                    result_fd = fd
+                    result_fd = descriptors.read_fd
                     result_size = len(payload)
-                return fd
+                return descriptors
 
             def _attempt_retained_fd_mutation(fd: int) -> bytes:
                 nonlocal read_count, rejected_errno
@@ -2132,6 +2222,33 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
 
             self.assertEqual(exit_code, 3)
             self.assertIn("separate manual approval", stderr.getvalue())
+            self.assertFalse((root / RETRIEVAL_BATCH_ROOT_REF).exists())
+
+    def test_batch_approved_live_is_rejected_after_generic_gate(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root, _run_dir = _prepare_fixture_run(tempdir)
+            manifest_path = Path(tempdir) / "retrieval-batch.json"
+            _write_batch_manifest(
+                manifest_path,
+                runs=[{"paper_id": PAPER_ID, "run_id": RUN_ID}],
+            )
+            stderr = StringIO()
+
+            with mock.patch(
+                "millefeuille.cli.stages._mode_gate",
+                return_value=None,
+            ):
+                exit_code = run_stage_cli(
+                    _batch_args(
+                        source_pack_root=root,
+                        manifest_path=manifest_path,
+                        extra=["--mode", "approved-live"],
+                    ),
+                    stderr=stderr,
+                )
+
+            self.assertEqual(exit_code, 2)
+            self.assertIn("preview-only", stderr.getvalue())
             self.assertFalse((root / RETRIEVAL_BATCH_ROOT_REF).exists())
 
     def test_batch_manifest_argument_rejects_empty_whitespace_and_direct_locators(self):
