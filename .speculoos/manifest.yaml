@@ -58,8 +58,8 @@ surfaces:
   github_pull_request:
     enabled: true
     status: open
-    number: null
-    url: null
+    number: 82
+    url: https://github.com/fr-meyer/millefeuille/pull/82
     base_branch: dev
     head_branch: feat/pr-082-gpt56-summary-profiles
     head_sha: null

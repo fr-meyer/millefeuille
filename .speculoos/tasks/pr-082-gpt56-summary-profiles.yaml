@@ -21,8 +21,8 @@ github:
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
-  url: null
-  head_sha: fa029b653a6cbf661deaf43349cf4c2466405e0f
+  url: https://github.com/fr-meyer/millefeuille/pull/82
+  head_sha: null
   merge_commit: null
   mergeguez_review: null
   mergeguez_check_run: null
@@ -78,6 +78,7 @@ notes:
   - "Reconstructed from exact transcript-backed edit payloads onto current origin/dev commit 9eb389ed4403636cdd3ea480f304b1a718ac1bfd."
   - "The prior pr-081 identity was retired because GitHub PR #81 is the merged PR79/PR80 metadata closeout; this reconstruction uses pr-082."
   - "The model profile is selection metadata; a future live adapter must map xhigh and fast_mode through the approved route and record the actual selection."
+  - "While PR #82 is open, committed metadata leaves github.head_sha null: the exact live head is verified by broker-backed review evidence and finalized after merge, rather than storing a stale self-referential commit SHA."
 evidence:
   - "Reconstructed from preserved execution-transcript edit payloads on synchronized dev; the damaged deletion-state patch was not applied."
   - "Focused stage-CLI suite passed: 10 tests."
