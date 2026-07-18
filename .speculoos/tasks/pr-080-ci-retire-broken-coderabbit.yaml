@@ -24,7 +24,7 @@ post_merge_expected:
   base_branch: dev
   head_branch: fix/pr-080-ci-retire-broken-coderabbit
   head_sha: merge-plan-exact-head
-  merge_actor: user_api
+  merge_actor: mergeguez_dev_merge
   delete_branch_after_merge: true
 scope:
   - remove the obsolete automatic pull_request CodeRabbit remediation workflow
