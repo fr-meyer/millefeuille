@@ -45,6 +45,13 @@ github:
   merge_commit: null
   mergeguez_review: null
   mergeguez_check_run: null
+post_merge_expected:
+  pull_request: 79
+  base_branch: dev
+  head_branch: feat/pr-079-batch-retrieval
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
 scope:
   - add a strict versioned retrieval batch manifest covering paper-id, Zotero-key, source-pack-slug, DOI, and title locators
   - preflight every locator and verified artifact package through one pinned source-root descriptor before any aggregate write
