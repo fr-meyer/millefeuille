@@ -16,13 +16,13 @@ write_paths:
   - tests/test_millefeuille_stage_cli.py
 github:
   issue: null
-  pull_request: null
+  pull_request: 82
   issue_project_item: null
   pull_request_project_item: unavailable
   project_status: In Progress
   project_item: unavailable
   url: null
-  head_sha: null
+  head_sha: fa029b653a6cbf661deaf43349cf4c2466405e0f
   merge_commit: null
   mergeguez_review: null
   mergeguez_check_run: null
@@ -85,3 +85,5 @@ evidence:
   - "Ruff, YAML/JSON metadata parse, git diff check, private-data scan, Speculoos validation, and publication checks passed."
   - "Regression assertions preserve paper-card, classification, and offline-preview profiles and validate reasoning_effort plus fast_mode schema enums."
   - "No live provider call, paid completion smoke, credential access, private paper read, or external data write was run."
+  - 'PR #82 opened for pr-082-gpt56-summary-profiles'
+  - 'PR #82 linked to Project item unavailable'

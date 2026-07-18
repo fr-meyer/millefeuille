@@ -9,7 +9,7 @@ repository:
   base_branch: dev
   working_branch: feat/pr-082-gpt56-summary-profiles
 status:
-  phase: implementation
+  phase: in_review
   pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
@@ -57,7 +57,7 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: planned
+    status: open
     number: null
     url: null
     base_branch: dev

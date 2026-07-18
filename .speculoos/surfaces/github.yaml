@@ -19,21 +19,12 @@ current_task:
   status: implementation
   branch: feat/pr-082-gpt56-summary-profiles
   speculoos_task: .speculoos/tasks/pr-082-gpt56-summary-profiles.yaml
-  pull_request: null
+  pull_request: 82
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
-  head_sha: null
-pull_request:
-  number: null
-  url: null
-  status: planned
-  base_branch: dev
-  head_branch: feat/pr-082-gpt56-summary-profiles
-  head_sha: null
-  author: fr-meyer
-  project_item: unavailable
-  project_status: In Progress
+  head_sha: fa029b653a6cbf661deaf43349cf4c2466405e0f
+pull_request: 82
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
