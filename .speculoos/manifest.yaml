@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: null
+canonical_task: pr-080-ci-retire-broken-coderabbit
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: null
+  working_branch: fix/pr-080-ci-retire-broken-coderabbit
 status:
-  phase: idle
-  pret_a_coder: idle
+  phase: implementation
+  pret_a_coder: in_progress
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,11 +57,11 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: none-active
-    number: null
-    url: null
+    status: open
+    number: 80
+    url: https://github.com/fr-meyer/millefeuille/pull/80
     base_branch: dev
-    head_branch: null
+    head_branch: fix/pr-080-ci-retire-broken-coderabbit
     head_sha: null
     merge_commit: null
     project_status: In Progress

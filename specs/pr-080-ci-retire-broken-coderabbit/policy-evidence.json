@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "repository": "fr-meyer/millefeuille",
+  "captured_at": "2026-07-18T09:13:26Z",
+  "base_branch": "dev",
+  "github_policy_readback": {
+    "effective_branch_rules": {
+      "endpoint": "GET /repos/fr-meyer/millefeuille/rules/branches/dev",
+      "http_status": 200,
+      "response": []
+    },
+    "repository_rulesets": {
+      "endpoint": "GET /repos/fr-meyer/millefeuille/rulesets",
+      "http_status": 200,
+      "response": []
+    }
+  },
+  "replacement_review_gate": {
+    "source": ".speculoos/actors.json",
+    "source_sha256": "dd2e61e8737eab57567435e85a2d306e40f84556d01eb5ff05d462cb1aa40f78",
+    "branch_policy": {
+      "name": "feature_to_dev",
+      "base_refs": [
+        "dev"
+      ],
+      "head_patterns": [
+        "chore/pr-*",
+        "docs/pr-*",
+        "feat/pr-*",
+        "fix/pr-*",
+        "test/pr-*"
+      ],
+      "review_actor": "mergeguez_review",
+      "merge_actor": "mergeguez_dev_merge",
+      "native_review_requires_distinct_author": true,
+      "exact_pr_base_head_sha_required": true,
+      "auto_merge": {
+        "enabled": true,
+        "delete_branch_after_merge": true
+      }
+    },
+    "merge_actor_profile": {
+      "bot_login": "mergeguez[bot]",
+      "allowed_base_refs": [
+        "dev"
+      ],
+      "requires_explicit_approval": false,
+      "exact_pr_base_head_sha_required": true,
+      "required_live_checks": [
+        "exact_pr_number",
+        "exact_base_branch",
+        "exact_head_branch",
+        "exact_head_sha",
+        "required_mergeguez_review_and_checks",
+        "zero_blocking_mergeguez_findings",
+        "merged_by_verification"
+      ]
+    }
+  },
+  "interpretation": "GitHub does not currently require the removed CodeRabbit check. The repository's separate Speculoos policy still requires an exact-head native Mergeguez review, ready live checks, zero blocking findings, and verified Mergeguez merge attribution before a dev-target feature PR can merge."
+}
