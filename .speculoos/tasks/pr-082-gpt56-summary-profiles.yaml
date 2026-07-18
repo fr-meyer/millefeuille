@@ -27,7 +27,7 @@ github:
   mergeguez_review: null
   mergeguez_check_run: null
 post_merge_expected:
-  pull_request: next-available
+  pull_request: 82
   base_branch: dev
   head_branch: feat/pr-082-gpt56-summary-profiles
   head_sha: merge-plan-exact-head
@@ -66,10 +66,10 @@ publication_boundary:
 documentation_impact:
   status: updated
   rationale: The live-run plan records the GPT-5.6 Sol xhigh summary profile, explicit standard processing, authentication lane, fallback rule, and provenance boundary.
-branch_plan: Reconstruct the transcript-backed change on a fresh workspace-safe worktree from synchronized dev, publish one isolated user-authored PR to dev, obtain exact-head Mergeguez review, and stop before merge.
+branch_plan: Reconstruct the transcript-backed change on a fresh workspace-safe worktree from synchronized dev, publish one isolated user-authored PR to dev, obtain exact-head Mergeguez review, merge the approved feature PR into dev, complete the Speculoos closeout, and stop before any dev-to-main promotion.
 executor: OpenClaw main session
 private_data_scan: required; source, schema, tests, and public planning metadata only, with no credentials, private papers, provider payloads, or host-specific paths
-publish_authority: explicitly approved by Franck on 2026-07-18 for reconstruction, validation, user-authored PR publication, and exact-head review; merge and cleanup remain excluded
+publish_authority: explicitly approved by Franck on 2026-07-18 for reconstruction, validation, user-authored PR publication, exact-head review, policy-gated merge into dev, and PR-specific branch/worktree closeout; dev-to-main promotion, release, deployment, and legacy cleanup remain excluded
 audit:
   damaged_worktree: retained out of tree and left unchanged
   recovery_source: preserved execution-transcript edit payloads
