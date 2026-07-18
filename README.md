@@ -253,8 +253,9 @@ These commands stay offline and preview-only in the current contract slice:
   metadata.
 - `models` prints the bundled offline model-profile catalog. The
   `research-default` page, section, and full-paper summary stages select
-  `openai/gpt-5.6-sol` with `reasoning_effort: xhigh` and `fast_mode: off`;
-  this is selection metadata only and does not authorize a live provider call.
+  `openai/gpt-5.6-sol` with `reasoning_effort: xhigh` and `fast_mode: off`.
+  This profile is merged on `dev`; it remains selection metadata only and does
+  not authorize a live provider call or a promotion to `main`.
 - `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
   and `index` expose the existing fixture writers as explicit single-paper
   stages and update the run manifest and artifact index.

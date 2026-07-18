@@ -14,7 +14,7 @@ notes:
   - No Vibe cloud or org API is configured for this repo.
   - Bootstrap should not depend on Vibe reachability.
 task:
-  status: implementation
-  id: pr-082-gpt56-summary-profiles
-  speculoos_task: .speculoos/tasks/pr-082-gpt56-summary-profiles.yaml
+  status: idle
+  id: null
+  speculoos_task: null
   command: null

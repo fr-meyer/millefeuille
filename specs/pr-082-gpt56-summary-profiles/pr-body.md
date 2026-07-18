@@ -1,15 +1,14 @@
 ## Summary
 
-Implements Speculoos task `pr-082-gpt56-summary-profiles`: reconstruct the
-transcript-backed post-PR79 model-profile slice on current `dev` and select the
-exact GPT-5.6 Sol route for hierarchical summaries.
+Closes the repo-local Speculoos delivery metadata for merged PR #82, which
+selected the exact GPT-5.6 Sol route for hierarchical summaries.
 
-- page, section, and full-paper summaries select `openai/gpt-5.6-sol`
-- all three record `reasoning_effort: xhigh` and `fast_mode: off`
-- the profile schema accepts explicit reasoning and processing-tier metadata
-- the live-run contract records the OAuth, no-silent-fallback,
-  standard-processing, and historical-provenance boundaries
-- paper-card, classification, and fixture-only offline profiles remain unchanged
+- records exact reviewed head, zero-finding Mergeguez evidence, and `dev` merge
+- records approved remote feature-branch cleanup
+- marks task `pr-082-gpt56-summary-profiles` merged and Project status Done
+- returns canonical Speculoos and local Vibe mirror state to idle
+- records that the delivered profile is merged on `dev`, while promotion to
+  `main` and live provider execution remain separately gated
 
 ## Recovery Provenance
 
@@ -26,12 +25,7 @@ modify the damaged worktree/backups.
 - `.speculoos/surfaces/vibe-kanban.yaml`
 - `.speculoos/tasks/pr-082-gpt56-summary-profiles.yaml`
 - `README.md`
-- `millefeuille/domain/model_profiles.py`
-- `specs/millefeuille-pipeline/live-run-plan.md`
-- `specs/millefeuille-pipeline/model-profile.schema.yaml`
-- `specs/pr-082-gpt56-summary-profiles/commit-message.txt`
 - `specs/pr-082-gpt56-summary-profiles/pr-body.md`
-- `tests/test_millefeuille_stage_cli.py`
 
 ## Validation
 
@@ -56,16 +50,26 @@ adds the matching machine-readable fields.
 ## Release Flow
 
 Feature PRs target `dev`; release/promotion PRs target `main` and remain
-separately gated. This PR stops before merge. No stable-branch change, release
-tag, package publication, or production deployment is part of this slice.
+separately gated. PR #82 received exact-head Mergeguez approval and was
+squash-merged into `dev`; its remote feature branch was deleted. No
+stable-branch change, release tag, package publication, or production deployment
+is part of this slice.
+
+## Delivery Closeout
+
+- exact reviewed head: `5f01b378d4c8c84b14bb3e41ada2cb6e9fd59d72`
+- zero-finding Mergeguez review: https://github.com/fr-meyer/millefeuille/pull/82#pullrequestreview-4728585238
+- successful Mergeguez check: https://github.com/fr-meyer/millefeuille/runs/88084819154
+- `dev` squash-merge commit: `ba7ce07f48732a981be5de5751fa7e34380c84d6`
+- remote feature branch deleted through the approved post-merge cleanup lane
 
 ## Publication Boundary
 
 Offline model-profile metadata, schema, tests, and documentation only. GitHub
-publication is limited to a user-authored feature PR targeting `dev` plus
-exact-head Mergeguez review. No private paper content, live Zotero access, PDF
-recovery, OCR/model/provider call, paid completion smoke, worker-agent
-execution, source-pack mutation, OpenKB/index write, classification/writeback,
-credential or permission change, OpenClaw routing/configuration change,
-main-branch change, release, package publication, production deployment,
-cleanup, or approval bypass.
+publication was limited to the completed PR #82 review, `dev` merge, remote
+feature-branch cleanup, and repo-local Speculoos closeout. No private paper
+content, live Zotero access, PDF recovery, OCR/model/provider call, paid
+completion smoke, worker-agent execution, source-pack mutation, OpenKB/index
+write, classification/writeback, credential or permission change, OpenClaw
+routing/configuration change, main-branch change, release, package publication,
+production deployment, legacy branch/worktree cleanup, or approval bypass.
