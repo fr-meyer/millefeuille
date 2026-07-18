@@ -1,6 +1,6 @@
 id: pr-080-ci-retire-broken-coderabbit
 title: Retire broken automatic CodeRabbit PR trigger
-status: implementation
+status: merged
 branch: fix/pr-080-ci-retire-broken-coderabbit
 base_branch: dev
 write_paths:
@@ -14,11 +14,13 @@ github:
   pull_request: 80
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/80
-  head_sha: dbd12ed10b95688ca8b22701c86914f7fe251f2d
-  merge_commit: null
+  head_sha: 0538e0a4574b24d193d5fa720cd08ca0ecd15484
+  merge_commit: 0e428db047a9bf81d087f5bafca03a9295527b98
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/80#pullrequestreview-4728221677
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88065960480
 post_merge_expected:
   pull_request: 80
   base_branch: dev
@@ -71,3 +73,8 @@ evidence:
   - "Exact-head review and policy merge remain mandatory."
   - "GET /repos/fr-meyer/millefeuille/rules/branches/dev returned an empty rule list."
   - "GET /repos/fr-meyer/millefeuille/rulesets returned an empty ruleset list."
+  - 'PR #80 merged with merge commit 0e428db047a9bf81d087f5bafca03a9295527b98'
+  - 'Mergeguez approved exact head 0538e0a4574b24d193d5fa720cd08ca0ecd15484 with zero findings: https://github.com/fr-meyer/millefeuille/pull/80#pullrequestreview-4728221677'
+  - 'Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/88065960480'
+  - Project item unavailable moved to Done
+  - surface-sync --close-merged-task cleared repo-local active task metadata

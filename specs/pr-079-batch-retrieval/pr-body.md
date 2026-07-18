@@ -71,8 +71,25 @@ boundary.
 
 ## Release Flow
 
-Feature PRs target `dev`; release/promotion PRs target `main` and remain separately gated. This approved feature PR's exact-head review and policy merge are still gated. No stable-branch change, release tag, package publication, or production deployment is part of this slice.
+Feature PRs target `dev`; release/promotion PRs target `main` and remain separately
+gated. PR #79 received exact-head Mergeguez approval and merged to `dev`; its
+remote feature branch was deleted. No stable-branch change, release tag, package
+publication, or production deployment is part of this slice.
+
+## Delivery Closeout
+
+- exact reviewed head: `c950bb07e6abadfd4d41426ecd0404e99eae49c3`
+- zero-finding Mergeguez review: https://github.com/fr-meyer/millefeuille/pull/79#pullrequestreview-4728318466
+- successful Mergeguez check: https://github.com/fr-meyer/millefeuille/runs/88071003328
+- `dev` merge commit: `18c452bcd070d43ccd1e167164613e9262054f22`
+- remote feature branch deleted by the approved merge lane
 
 ## Publication Boundary
 
-Offline aggregate ref/status reporting over existing temporary fixture or synthetic source-pack runs only. No private paper content return, live Zotero access, PDF recovery, durable source-pack mutation, OCR/model/provider call, worker-agent execution, OpenKB/index write, credential or permission change, GitHub publication, main-branch change, release, package publication, production deployment, or approval bypass.
+Offline aggregate ref/status reporting over existing temporary fixture or
+synthetic source-pack runs only. GitHub publication was limited to the completed
+PR #79 review and `dev` merge lane. No private paper content return, live Zotero
+access, PDF recovery, durable source-pack mutation, OCR/model/provider call,
+worker-agent execution, OpenKB/index write, credential or permission change,
+main-branch change, release, package publication, production deployment, or
+approval bypass.

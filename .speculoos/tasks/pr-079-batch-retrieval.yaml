@@ -1,6 +1,6 @@
 id: pr-079-batch-retrieval
 title: Add deterministic offline multi-run retrieval aggregates
-status: in_progress
+status: merged
 branch: feat/pr-079-batch-retrieval
 base_branch: dev
 write_scope:
@@ -38,13 +38,13 @@ github:
   pull_request: 79
   issue_project_item: null
   pull_request_project_item: unavailable
-  project_status: In Progress
+  project_status: Done
   project_item: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/79
-  head_sha: null
-  merge_commit: null
-  mergeguez_review: null
-  mergeguez_check_run: null
+  head_sha: c950bb07e6abadfd4d41426ecd0404e99eae49c3
+  merge_commit: 18c452bcd070d43ccd1e167164613e9262054f22
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/79#pullrequestreview-4728318466
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88071003328
 post_merge_expected:
   pull_request: 79
   base_branch: dev
@@ -106,3 +106,8 @@ evidence:
   - "Ruff, YAML/JSON metadata parse, and git diff check passed."
   - "Speculoos status, task validation, private-data scan, documentation sync, and publication checks passed."
   - "Regression coverage includes all locators, strict metadata allowlists with artifact-controlled summary-ID exclusion, aggregate-source-hash schema/runtime coverage, pinned-root descriptor-relative reads, non-regular optional artifact rejection during preflight and final revalidation, final source-artifact and external-manifest snapshot revalidation, manifest/stage/index and descendant-directory symlink rejection, Unicode-and-space single-run refs, single-run no-O_NOFOLLOW portability with direct/parent-path symlink and non-regular rejection plus pre-read lstat/open swap detection and descriptor cleanup, loader error compatibility, source-root and pre-commit batch-directory substitution, same-inode staging mutation, legacy lock replacement, inbound staging hard-link preservation, outbound hard-link scrubbing after staged-name displacement/replacement, staging-generation substitution with descriptor-only cleanup, read-only atomic-rename commit, approved-live gating, late-destination no-overwrite, unexpected-entry preservation, no-unscrubbed-partial-output behavior, coherent concurrency, drift detection, content exclusion, and byte-stable reruns."
+  - 'PR #79 merged with merge commit 18c452bcd070d43ccd1e167164613e9262054f22'
+  - 'Mergeguez approved exact head c950bb07e6abadfd4d41426ecd0404e99eae49c3 with zero findings: https://github.com/fr-meyer/millefeuille/pull/79#pullrequestreview-4728318466'
+  - 'Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/88071003328'
+  - Project item unavailable moved to Done
+  - surface-sync --close-merged-task cleared repo-local active task metadata
