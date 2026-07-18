@@ -1,0 +1,7 @@
+ci: retire broken automatic CodeRabbit trigger
+
+Remove the obsolete automatic pull_request CodeRabbit remediation workflow whose unconfigured private cross-repository checkout creates a red check on every PR.
+
+Preserve the manual and comment-triggered CodeRabbit workflows and keep exact-head Mergeguez review plus Speculoos policy merge unchanged.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>
