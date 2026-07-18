@@ -185,6 +185,97 @@ def _stable_stat_identity(value: os.stat_result) -> tuple[int, ...]:
     )
 
 
+def _portable_lstat_regular_file(path: Path, *, label: str) -> os.stat_result:
+    """Reject symlinks/non-directories before a portable regular-file open."""
+
+    target = Path(path)
+    anchor = Path(target.anchor) if target.is_absolute() else Path(".")
+    parts = target.parts[1:] if target.is_absolute() else target.parts
+    if not parts or parts[-1] in {"", ".", ".."}:
+        raise MillefeuilleContractError(f"{label} is not a regular file: {target}")
+
+    current = anchor
+    for part in parts[:-1]:
+        if part in {"", "."}:
+            continue
+        if part == "..":
+            raise MillefeuilleContractError(
+                f"{label} path must not contain parent traversal: {target}"
+            )
+        current /= part
+        try:
+            parent_stat = os.lstat(current)
+        except FileNotFoundError as exc:
+            raise MillefeuilleContractError(f"{label} not found: {target}") from exc
+        except OSError as exc:
+            raise MillefeuilleContractError(
+                f"could not inspect {label} path {target}: {exc}"
+            ) from exc
+        if stat.S_ISLNK(parent_stat.st_mode) or not stat.S_ISDIR(
+            parent_stat.st_mode
+        ):
+            raise MillefeuilleContractError(
+                f"{label} path must not contain symbolic links or non-directories: "
+                f"{target}"
+            )
+
+    try:
+        named_stat = os.lstat(target)
+    except FileNotFoundError as exc:
+        raise MillefeuilleContractError(f"{label} not found: {target}") from exc
+    except OSError as exc:
+        raise MillefeuilleContractError(
+            f"could not inspect {label} {target}: {exc}"
+        ) from exc
+    if stat.S_ISLNK(named_stat.st_mode):
+        raise MillefeuilleContractError(
+            f"{label} must not be a symbolic link: {target}"
+        )
+    if not stat.S_ISREG(named_stat.st_mode):
+        raise MillefeuilleContractError(f"{label} is not a regular file: {target}")
+    return named_stat
+
+
+def _open_portable_regular_file_fd(
+    path: Path,
+    *,
+    label: str,
+) -> tuple[int, os.stat_result]:
+    """Open a portable regular file after lstat checks, then bind its identity."""
+
+    target = Path(path)
+    expected_stat = _portable_lstat_regular_file(target, label=label)
+    flags = os.O_RDONLY
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NONBLOCK"):
+        flags |= os.O_NONBLOCK
+    try:
+        fd = os.open(target, flags)
+    except FileNotFoundError as exc:
+        raise MillefeuilleContractError(f"{label} not found: {target}") from exc
+    except OSError as exc:
+        raise MillefeuilleContractError(
+            f"could not open {label} {target}: {exc}"
+        ) from exc
+
+    try:
+        opened_stat = os.fstat(fd)
+        if not stat.S_ISREG(opened_stat.st_mode):
+            raise MillefeuilleContractError(
+                f"{label} is not a regular file: {target}"
+            )
+        if _stable_stat_identity(opened_stat) != _stable_stat_identity(expected_stat):
+            raise MillefeuilleContractError(f"{label} changed while opening: {target}")
+        named_stat = _portable_lstat_regular_file(target, label=label)
+        if _stable_stat_identity(named_stat) != _stable_stat_identity(expected_stat):
+            raise MillefeuilleContractError(f"{label} changed while opening: {target}")
+        return fd, opened_stat
+    except Exception:
+        os.close(fd)
+        raise
+
+
 class RootArtifactReader:
     """Pinned-root reader for descriptor-relative batch artifact inspection."""
 
@@ -639,11 +730,12 @@ def verify_regular_file_no_follow(path: str | Path, label: str) -> None:
 
     target = Path(path)
     if not _supports_no_follow():
-        # Preserve the legacy portable single-run path on platforms that cannot
-        # provide the stronger POSIX descriptor contract. Batch retrieval never
-        # reaches this fallback: RootArtifactReader fails closed at its boundary.
-        if not target.is_file():
-            raise MillefeuilleContractError(f"{label} not found: {target}")
+        # Preserve the portable single-run path while retaining explicit
+        # symlink rejection and binding the opened descriptor to the lstat
+        # identity. Batch retrieval never reaches this fallback:
+        # RootArtifactReader fails closed at its boundary.
+        fd, _opened_stat = _open_portable_regular_file_fd(target, label=label)
+        os.close(fd)
         return
 
     parent_fd, fd, name, opened_stat = _open_regular_file_fd(target, label=label)
@@ -670,11 +762,44 @@ def read_bytes_no_follow(path: str | Path, label: str) -> bytes:
     target = Path(path)
     if not _supports_no_follow():
         try:
-            return target.read_bytes()
+            fd, opened_stat = _open_portable_regular_file_fd(
+                target,
+                label=label,
+            )
+        except MillefeuilleContractError as exc:
+            raise MillefeuilleContractError(
+                f"could not read {label} {target}: {exc}"
+            ) from exc
+        try:
+            chunks: list[bytes] = []
+            while True:
+                chunk = os.read(fd, 65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            payload = b"".join(chunks)
+            final_fd_stat = os.fstat(fd)
+            final_named_stat = _portable_lstat_regular_file(target, label=label)
+            expected = _stable_stat_identity(opened_stat)
+            if _stable_stat_identity(final_fd_stat) != expected:
+                raise MillefeuilleContractError(
+                    f"{label} changed while read: {target}"
+                )
+            if _stable_stat_identity(final_named_stat) != expected:
+                raise MillefeuilleContractError(
+                    f"{label} changed while read: {target}"
+                )
+            if len(payload) != opened_stat.st_size:
+                raise MillefeuilleContractError(
+                    f"{label} changed while read: {target}"
+                )
+            return payload
         except OSError as exc:
             raise MillefeuilleContractError(
                 f"could not read {label} {target}: {exc}"
             ) from exc
+        finally:
+            os.close(fd)
 
     try:
         parent_fd, fd, name, opened_stat = _open_regular_file_fd(

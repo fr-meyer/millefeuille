@@ -327,8 +327,11 @@ completed-operation boundary inside this stated trust model. Platforms or
 filesystems lacking the required POSIX no-follow, descriptor-relative,
 directory-lock, or no-replace-rename primitives fail closed before aggregate
 publication, while package import and legacy single-run retrieval use their
-portable legacy read fallback when POSIX `O_NOFOLLOW` is unavailable. The result contains only deterministic
-refs, allowlisted summary/index status metadata, and counts. Artifact-controlled
+portable legacy read fallback when POSIX `O_NOFOLLOW` is unavailable. That
+fallback rejects parent traversal, lstat-checks every parent and target, rejects
+symbolic links and non-regular entries, and binds the opened descriptor to the
+checked identity before reading. The result contains only deterministic refs, allowlisted
+summary/index status metadata, and counts. Artifact-controlled
 `summary_id` values are excluded from batch output. This is not approval for live Zotero,
 PDF recovery, OCR/model/provider calls, OpenKB/index writes, source-pack intake,
 or publication.

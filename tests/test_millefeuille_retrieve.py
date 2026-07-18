@@ -12,6 +12,9 @@ import unittest
 from unittest import mock
 
 from millefeuille.cli.stages import run_stage_cli
+from millefeuille.domain import secure_io
+from millefeuille.domain.millefeuille import MillefeuilleContractError
+from millefeuille.domain.secure_io import read_bytes_no_follow
 from tests.test_millefeuille_stage_cli import (
     PAPER_ID,
     RUN_ID,
@@ -55,6 +58,147 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
 
             self.assertEqual(payload["paper_id"], PAPER_ID)
             self.assertEqual(payload["run_id"], RUN_ID)
+
+    def test_portable_single_run_rejects_symlinked_artifact_paths(self):
+        cases = (
+            ("file", "paper card must not be a symbolic link"),
+            ("parent", "path must not contain symbolic links"),
+        )
+        for kind, expected_error in cases:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tempdir:
+                source_pack_root, run_dir = _prepare_fixture_run(tempdir)
+                cards_dir = run_dir / "cards"
+                card_path = cards_dir / "paper-card.json"
+                if kind == "file":
+                    real_card_path = cards_dir / "paper-card-real.json"
+                    card_path.rename(real_card_path)
+                    card_path.symlink_to(real_card_path.name)
+                else:
+                    real_cards_dir = run_dir / "cards-real"
+                    cards_dir.rename(real_cards_dir)
+                    cards_dir.symlink_to(real_cards_dir.name, target_is_directory=True)
+
+                stderr = StringIO()
+                with mock.patch(
+                    "millefeuille.domain.secure_io._supports_no_follow",
+                    return_value=False,
+                ):
+                    exit_code = run_stage_cli(
+                        [
+                            "retrieve",
+                            "--source-pack-root",
+                            str(source_pack_root),
+                            "--paper-id",
+                            PAPER_ID,
+                            "--run-id",
+                            RUN_ID,
+                        ],
+                        stderr=stderr,
+                    )
+
+                self.assertEqual(exit_code, 2)
+                self.assertIn(expected_error, stderr.getvalue())
+
+    def test_portable_reader_rejects_symlinked_and_non_regular_paths(self):
+        cases = ["file", "parent", "directory"]
+        if hasattr(os, "mkfifo"):
+            cases.append("fifo")
+        for kind in cases:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tempdir:
+                root = Path(tempdir)
+                real_dir = root / "real"
+                real_dir.mkdir()
+                real_path = real_dir / "artifact.json"
+                real_path.write_text('{"safe": true}\n', encoding="utf-8")
+                candidate = root / "artifact.json"
+                if kind == "file":
+                    candidate.symlink_to(real_path)
+                    expected_error = "must not be a symbolic link"
+                elif kind == "parent":
+                    linked_parent = root / "linked"
+                    linked_parent.symlink_to(real_dir, target_is_directory=True)
+                    candidate = linked_parent / real_path.name
+                    expected_error = "path must not contain symbolic links"
+                elif kind == "directory":
+                    candidate.mkdir()
+                    expected_error = "is not a regular file"
+                else:
+                    os.mkfifo(candidate)
+                    expected_error = "is not a regular file"
+
+                with (
+                    mock.patch(
+                        "millefeuille.domain.secure_io._supports_no_follow",
+                        return_value=False,
+                    ),
+                    self.assertRaisesRegex(
+                        MillefeuilleContractError,
+                        expected_error,
+                    ),
+                ):
+                    read_bytes_no_follow(candidate, "portable artifact")
+
+    def test_portable_reader_rejects_lstat_open_swap_before_read_and_closes_fd(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            candidate = root / "artifact.json"
+            candidate.write_text('{"safe": true}\n', encoding="utf-8")
+            outside = root / "outside.json"
+            outside.write_text("PRIVATE OUTSIDE BYTES\n", encoding="utf-8")
+
+            real_lstat = secure_io._portable_lstat_regular_file
+            real_open = os.open
+            real_read = os.read
+            opened_fds: list[int] = []
+            read_calls: list[int] = []
+
+            def swap_after_lstat(path: Path, *, label: str) -> os.stat_result:
+                expected = real_lstat(path, label=label)
+                candidate.unlink()
+                candidate.symlink_to(outside)
+                return expected
+
+            def recording_open(*args: object, **kwargs: object) -> int:
+                fd = real_open(*args, **kwargs)
+                opened_fds.append(fd)
+                return fd
+
+            def recording_read(fd: int, size: int) -> bytes:
+                read_calls.append(fd)
+                return real_read(fd, size)
+
+            with (
+                mock.patch.object(
+                    secure_io,
+                    "_supports_no_follow",
+                    return_value=False,
+                ),
+                mock.patch.object(
+                    secure_io,
+                    "_portable_lstat_regular_file",
+                    side_effect=swap_after_lstat,
+                ),
+                mock.patch.object(
+                    secure_io.os,
+                    "open",
+                    side_effect=recording_open,
+                ),
+                mock.patch.object(
+                    secure_io.os,
+                    "read",
+                    side_effect=recording_read,
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "changed while opening",
+                ),
+            ):
+                read_bytes_no_follow(candidate, "portable artifact")
+
+            self.assertEqual(read_calls, [])
+            self.assertEqual(len(opened_fds), 1)
+            with self.assertRaises(OSError):
+                os.fstat(opened_fds[0])
 
     def test_doi_and_normalized_title_resolve_verified_corpus_package(self):
         with tempfile.TemporaryDirectory() as tempdir:

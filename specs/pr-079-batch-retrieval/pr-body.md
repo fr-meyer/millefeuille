@@ -14,7 +14,7 @@ Implements Speculoos task `pr-079-batch-retrieval`: deterministic offline multi-
 - retains separate read-only verification and private read/write cleanup descriptors for each staged inode; on pre-commit failure it truncates/fsyncs the owned inode directly even if its staged name was displaced or replaced, so raced external hard links retain no aborted bytes while unverified namespace entries remain untouched
 - treats exact reruns as verified read-only byte-stable no-ops and fails closed on incomplete, writable, drifted, linked, displaced, or substituted output; mutations observed before the final precommit check fail closed
 - states the enforceable trust boundary explicitly: POSIX locks and mode bits serialize cooperative writers but cannot prevent an uncooperative same-UID owner from racing after the last check, so trusted ownership, cooperation, or stronger immutable storage is required
-- fails closed before aggregate publication when required POSIX no-follow, descriptor-relative, directory-lock, or no-replace-rename primitives are unavailable, while preserving legacy single-run fallback reads and public loader error prefixes
+- fails closed before aggregate publication when required POSIX no-follow, descriptor-relative, directory-lock, or no-replace-rename primitives are unavailable, while preserving portable legacy single-run fallback reads that reject parent traversal, target/parent-path symlinks, non-regular entries, and pre-read lstat/open identity swaps
 - never includes private paper, summary, card, PDF, or provider payload content
 
 ## Changed Files
@@ -47,8 +47,8 @@ Implements Speculoos task `pr-079-batch-retrieval`: deterministic offline multi-
 
 ## Validation
 
-- focused batch/retrieval/stage-CLI/contract suite — 70 passed
-- full unittest discovery — 310 passed
+- focused batch/retrieval/stage-CLI/contract suite — 73 passed
+- full unittest discovery — 313 passed
 - Ruff — passed
 - YAML/JSON metadata parse — passed
 - `git diff --check` — passed
@@ -65,7 +65,9 @@ modes, final under-lock input snapshot revalidation, the atomic rename commit
 boundary, the cooperative same-UID/trusted-ownership limitation, legacy
 single-run fallback reads, descriptor-only failure scrubbing,
 explicit cleanup of retained failed generations, root-relative portable refs,
-deterministic reruns, and the ref/status-only privacy boundary.
+portable single-run traversal/symlink/non-regular rejection plus pre-read
+lstat/open swap detection, deterministic reruns, and the ref/status-only privacy
+boundary.
 
 ## Release Flow
 

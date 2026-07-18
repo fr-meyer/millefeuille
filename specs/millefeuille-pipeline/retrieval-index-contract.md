@@ -129,7 +129,10 @@ completed-operation boundary inside this stated trust model. Platforms or
 filesystems without the required POSIX no-follow, descriptor-relative,
 directory-lock, and no-replace-rename primitives fail closed before aggregate
 publication; package import and legacy single-run retrieval use their portable
-legacy read fallback when POSIX `O_NOFOLLOW` is unavailable.
+legacy read fallback when POSIX `O_NOFOLLOW` is unavailable. That fallback
+rejects parent traversal, lstat-checks every parent and target, rejects symbolic
+links and non-regular entries, and binds the opened descriptor to the checked
+identity before reading.
 
 ## Acceptance
 
