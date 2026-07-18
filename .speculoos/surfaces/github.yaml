@@ -15,21 +15,21 @@ notes:
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
-  id: pr-080-ci-retire-broken-coderabbit
+  id: pr-079-batch-retrieval
   status: implementation
-  branch: fix/pr-080-ci-retire-broken-coderabbit
-  speculoos_task: .speculoos/tasks/pr-080-ci-retire-broken-coderabbit.yaml
-  pull_request: 80
+  branch: feat/pr-079-batch-retrieval
+  speculoos_task: .speculoos/tasks/pr-079-batch-retrieval.yaml
+  pull_request: 79
   project_item: unavailable
   pull_request_project_item: unavailable
   project_status: In Progress
   head_sha: null
 pull_request:
-  number: 80
-  url: https://github.com/fr-meyer/millefeuille/pull/80
+  number: 79
+  url: https://github.com/fr-meyer/millefeuille/pull/79
   status: open
   base_branch: dev
-  head_branch: fix/pr-080-ci-retire-broken-coderabbit
+  head_branch: feat/pr-079-batch-retrieval
   head_sha: null
   project_item: unavailable
   project_status: In Progress

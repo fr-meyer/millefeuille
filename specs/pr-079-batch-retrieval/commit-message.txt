@@ -1,0 +1,12 @@
+feat: add deterministic batch retrieval
+
+Complete task pr-079-batch-retrieval with strict versioned multi-run
+manifests, full preflight, coherent filters, and byte-stable JSON/Markdown
+aggregates containing sorted portable refs and status metadata only.
+
+Fail closed on malformed or unsafe locators and refs, missing or ambiguous
+identities, duplicate resolved runs, package drift, and mixed invalid batches
+without returning private paper content or performing live Zotero, provider,
+source-pack, OpenKB, index, release, or publication operations.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

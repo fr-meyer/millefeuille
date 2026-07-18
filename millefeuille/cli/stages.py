@@ -30,7 +30,10 @@ from millefeuille.domain.offline_stages import (
     write_offline_fixture_stage,
 )
 from millefeuille.domain.release_preflight import write_release_candidate_preflight
-from millefeuille.domain.retrieve import retrieve_artifact_refs
+from millefeuille.domain.retrieve import (
+    retrieve_artifact_refs,
+    write_retrieval_batch_result,
+)
 from millefeuille.domain.stage_runtime import resolve_run_artifacts
 from millefeuille.domain.writeback import write_writeback_plan
 
@@ -142,21 +145,34 @@ def run_stage_cli(
             )
             payload = result.to_dict()
         elif args.command == "retrieve":
-            payload = retrieve_artifact_refs(
-                source_pack_root=args.source_pack_root,
-                run_id=args.run_id,
-                paper_id=args.paper_id,
-                item_key=args.item_key,
-                slug=args.slug,
-                doi=args.doi,
-                title=args.title,
-                summary_scope=args.summary_scope,
-                grain=args.grain,
-                index_lane=args.index_lane,
-                section=args.section,
-                page=args.page,
-                evidence_need=args.evidence_need,
-            )
+            _validate_retrieve_args(args)
+            if args.batch_manifest is not None:
+                payload = write_retrieval_batch_result(
+                    source_pack_root=args.source_pack_root,
+                    batch_manifest_path=args.batch_manifest,
+                    summary_scope=args.summary_scope,
+                    grain=args.grain,
+                    index_lane=args.index_lane,
+                    section=args.section,
+                    page=args.page,
+                    evidence_need=args.evidence_need,
+                )
+            else:
+                payload = retrieve_artifact_refs(
+                    source_pack_root=args.source_pack_root,
+                    run_id=args.run_id,
+                    paper_id=args.paper_id,
+                    item_key=args.item_key,
+                    slug=args.slug,
+                    doi=args.doi,
+                    title=args.title,
+                    summary_scope=args.summary_scope,
+                    grain=args.grain,
+                    index_lane=args.index_lane,
+                    section=args.section,
+                    page=args.page,
+                    evidence_need=args.evidence_need,
+                )
         elif args.command == "models":
             payload = DEFAULT_MODEL_PROFILE_BUNDLE
         elif args.command == "run":
@@ -299,13 +315,20 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_mode_arg(retrieve)
     retrieve.add_argument("--source-pack-root", required=True)
-    retrieve_source = retrieve.add_mutually_exclusive_group(required=True)
+    retrieve_source = retrieve.add_mutually_exclusive_group()
     retrieve_source.add_argument("--paper-id")
     retrieve_source.add_argument("--item-key")
     retrieve_source.add_argument("--slug")
     retrieve_source.add_argument("--doi")
     retrieve_source.add_argument("--title")
-    retrieve.add_argument("--run-id", required=True)
+    retrieve.add_argument("--run-id")
+    retrieve.add_argument(
+        "--batch-manifest",
+        help=(
+            "Path to a millefeuille-retrieval-batch-manifest/v0.1 JSON file; "
+            "cannot be combined with single-run locators or --run-id."
+        ),
+    )
     retrieve.add_argument("--summary-scope")
     retrieve.add_argument("--grain")
     retrieve.add_argument("--index-lane")
@@ -582,6 +605,40 @@ def _validate_classify_args(args: argparse.Namespace) -> None:
     if not (args.evidence or args.action_evidence):
         raise MillefeuilleContractError(
             "single-run classify requires --evidence or --action-evidence"
+        )
+
+
+def _validate_retrieve_args(args: argparse.Namespace) -> None:
+    locator_values = (
+        args.paper_id,
+        args.item_key,
+        args.slug,
+        args.doi,
+        args.title,
+    )
+    single_locator_supplied = any(value is not None for value in locator_values)
+    batch_manifest_supplied = args.batch_manifest is not None
+    if batch_manifest_supplied:
+        if not isinstance(args.batch_manifest, str) or not args.batch_manifest.strip():
+            raise MillefeuilleContractError(
+                "retrieve --batch-manifest must not be empty"
+            )
+        args.batch_manifest = args.batch_manifest.strip()
+        if single_locator_supplied or args.run_id is not None:
+            raise MillefeuilleContractError(
+                "retrieve --batch-manifest cannot be combined with --paper-id, "
+                "--item-key, --slug, --doi, --title, or --run-id"
+            )
+        if args.mode != RunMode.PREVIEW.value:
+            raise MillefeuilleContractError(
+                "retrieve --batch-manifest is preview-only because it writes "
+                "local aggregate artifacts"
+            )
+        return
+    if not single_locator_supplied or args.run_id is None:
+        raise MillefeuilleContractError(
+            "retrieve requires --batch-manifest or a single-run locator "
+            "(--paper-id|--item-key|--slug|--doi|--title plus --run-id)"
         )
 
 

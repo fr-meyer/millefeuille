@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 from typing import Any
 
 from millefeuille.domain.artifacts import (
@@ -20,9 +21,16 @@ from millefeuille.domain.millefeuille import (
     StageName,
     StageRecord,
 )
+from millefeuille.domain.secure_io import (
+    RootArtifactReader,
+    load_json_object_no_follow,
+    read_text_no_follow,
+    verify_regular_file_no_follow,
+)
 from millefeuille.domain.source_packs import (
     load_source_pack_manifest,
     paper_id_for_zotero_item_key,
+    parse_source_pack_manifest,
 )
 
 _SAFE_PACKAGE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
@@ -49,6 +57,7 @@ def resolve_run_artifacts(
     run_id: str,
     paper_id: str | None = None,
     item_key: str | None = None,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> ResolvedRunArtifacts:
     requested_item_key: str | None = None
     if item_key is not None:
@@ -71,6 +80,7 @@ def resolve_run_artifacts(
     require_safe_package_id(resolved_run_id, "run_id")
 
     root = Path(source_pack_root)
+    ensure_no_follow_directory(root, "source-pack root")
     source_pack_dir = root / "zotero" / resolved_paper_id
     manifest_path = source_pack_dir / "manifest.json"
     stage_manifest_path = (
@@ -87,16 +97,39 @@ def resolve_run_artifacts(
         / resolved_run_id
         / "artifact-index.json"
     )
-    if not stage_manifest_path.is_file():
-        raise MillefeuilleContractError(
-            f"stage manifest not found: {stage_manifest_path}"
-        )
-    if not artifact_index_path.is_file():
-        raise MillefeuilleContractError(
-            f"artifact index not found: {artifact_index_path}"
-        )
 
-    source_pack_manifest = load_source_pack_manifest(manifest_path)
+    if artifact_reader is None:
+        ensure_no_follow_regular_file(
+            manifest_path,
+            "source-pack manifest",
+            root=root,
+        )
+        ensure_no_follow_regular_file(
+            stage_manifest_path,
+            "stage manifest",
+            root=root,
+        )
+        ensure_no_follow_regular_file(
+            artifact_index_path,
+            "artifact index",
+            root=root,
+        )
+        source_pack_manifest = load_source_pack_manifest(manifest_path)
+        stage_manifest = load_stage_manifest(stage_manifest_path)
+        artifact_index = load_artifact_index(artifact_index_path)
+    else:
+        source_pack_manifest = parse_source_pack_manifest(
+            artifact_reader.load_json_object(
+                manifest_path,
+                "source-pack manifest",
+            )
+        )
+        stage_manifest = StageManifest.from_dict(
+            artifact_reader.load_json_object(stage_manifest_path, "stage manifest")
+        )
+        artifact_index = ArtifactIndex.from_dict(
+            artifact_reader.load_json_object(artifact_index_path, "artifact index")
+        )
     if requested_item_key is not None:
         manifest_identity = source_pack_manifest.get("identity")
         actual_item_key = (
@@ -109,8 +142,6 @@ def resolve_run_artifacts(
                 "source-pack item_key drift: "
                 f"expected {requested_item_key!r}, got {actual_item_key!r}"
             )
-    stage_manifest = load_stage_manifest(stage_manifest_path)
-    artifact_index = load_artifact_index(artifact_index_path)
     _validate_run_identity(
         paper_id=resolved_paper_id,
         run_id=resolved_run_id,
@@ -140,6 +171,127 @@ def require_safe_package_id(value: str, field_name: str) -> None:
             f"{field_name} must be traversal-safe and use only letters, numbers, "
             "dots, underscores, and hyphens"
         )
+
+
+def _lstat_path(path: Path, label: str) -> os.stat_result:
+    try:
+        return os.lstat(path)
+    except FileNotFoundError as exc:
+        raise MillefeuilleContractError(f"{label} not found: {path}") from exc
+    except OSError as exc:
+        raise MillefeuilleContractError(
+            f"could not inspect {label} {path}: {exc}"
+        ) from exc
+
+
+def _walk_no_follow(
+    path: Path,
+    *,
+    label: str,
+    root: Path | None = None,
+    allow_missing: bool = False,
+) -> os.stat_result | None:
+    target = Path(path)
+    if root is not None:
+        boundary = Path(root)
+        try:
+            relative = target.relative_to(boundary)
+        except ValueError as exc:
+            raise MillefeuilleContractError(
+                f"{label} escapes the source-pack root: {target}"
+            ) from exc
+        current = boundary
+        boundary_stat = _lstat_path(boundary, "source-pack root")
+        if stat.S_ISLNK(boundary_stat.st_mode):
+            raise MillefeuilleContractError(
+                f"source-pack root must not be a symbolic link: {boundary}"
+            )
+        if not stat.S_ISDIR(boundary_stat.st_mode):
+            raise MillefeuilleContractError(
+                f"source-pack root is not a directory: {boundary}"
+            )
+        parts = relative.parts
+        final_stat: os.stat_result | None = boundary_stat if not parts else None
+    else:
+        current = Path(target.anchor) if target.is_absolute() else Path(".")
+        parts = target.parts[1:] if target.is_absolute() else target.parts
+        final_stat = _lstat_path(current, label) if not parts else None
+    for index, part in enumerate(parts):
+        current = current / part
+        try:
+            current_stat = os.lstat(current)
+        except FileNotFoundError:
+            if allow_missing:
+                return None
+            raise MillefeuilleContractError(f"{label} not found: {current}") from None
+        except OSError as exc:
+            raise MillefeuilleContractError(
+                f"could not inspect {label} {current}: {exc}"
+            ) from exc
+        if stat.S_ISLNK(current_stat.st_mode):
+            if index == len(parts) - 1:
+                raise MillefeuilleContractError(
+                    f"{label} must not be a symbolic link"
+                )
+            raise MillefeuilleContractError(
+                f"{label} path must not contain symbolic links"
+            )
+        if index != len(parts) - 1 and not stat.S_ISDIR(current_stat.st_mode):
+            raise MillefeuilleContractError(
+                f"{label} path parent is not a directory: {current}"
+            )
+        final_stat = current_stat
+    return final_stat
+
+
+def ensure_no_follow_regular_file(
+    path: str | Path,
+    label: str,
+    *,
+    root: str | Path | None = None,
+) -> None:
+    target = Path(path)
+    if root is not None:
+        boundary = Path(root)
+        try:
+            target.relative_to(boundary)
+        except ValueError as exc:
+            raise MillefeuilleContractError(
+                f"{label} escapes the source-pack root: {target}"
+            ) from exc
+    verify_regular_file_no_follow(target, label)
+
+
+def ensure_no_follow_directory(
+    path: str | Path,
+    label: str,
+    *,
+    root: str | Path | None = None,
+) -> None:
+    target = Path(path)
+    final_stat = _walk_no_follow(
+        target,
+        label=label,
+        root=Path(root) if root is not None else None,
+    )
+    if final_stat is None or not stat.S_ISDIR(final_stat.st_mode):
+        raise MillefeuilleContractError(f"{label} is not a directory: {target}")
+
+
+def probe_no_follow_regular_file(
+    path: str | Path,
+    label: str,
+    *,
+    root: str | Path | None = None,
+) -> bool:
+    target = Path(path)
+    final_stat = _walk_no_follow(
+        target,
+        label=label,
+        root=Path(root) if root is not None else None,
+        allow_missing=True,
+    )
+    return final_stat is not None and stat.S_ISREG(final_stat.st_mode)
 
 
 def _validate_run_identity(
@@ -244,28 +396,12 @@ def write_stage_manifest(manifest: StageManifest, path: str | Path) -> None:
 
 
 def load_json_object(path: str | Path, label: str) -> dict[str, Any]:
-    target = Path(path)
-    try:
-        payload = json.loads(target.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise MillefeuilleContractError(
-            f"could not read {label} {target}: {exc}"
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise MillefeuilleContractError(f"{label} is not valid JSON: {target}") from exc
-    if not isinstance(payload, dict):
-        raise MillefeuilleContractError(f"{label} must be an object")
-    return payload
+    return load_json_object_no_follow(path, label)
 
 
 def load_jsonl_records(path: str | Path, label: str) -> list[dict[str, Any]]:
     target = Path(path)
-    try:
-        text = target.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise MillefeuilleContractError(
-            f"could not read {label} {target}: {exc}"
-        ) from exc
+    text = read_text_no_follow(target, label)
 
     records: list[dict[str, Any]] = []
     for line_number, line in enumerate(text.splitlines(), start=1):

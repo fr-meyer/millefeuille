@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/retrieval-batch-result.schema.json",
+  "title": "Millefeuille Retrieval Batch Result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "batch_id",
+    "status",
+    "counts",
+    "runs"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-retrieval-batch-result/v0.1"
+    },
+    "batch_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "not": {"enum": [".", ".."]}
+    },
+    "status": {"const": "retrieved"},
+    "counts": {"$ref": "#/$defs/counts"},
+    "filters": {"$ref": "#/$defs/filters"},
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/runResult"}
+    }
+  },
+  "$defs": {
+    "safePackageId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "not": {"enum": [".", ".."]}
+    },
+    "portableRef": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,255}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,255})*$"
+    },
+    "counts": {
+      "type": "object",
+      "required": [
+        "runs",
+        "summary_matches",
+        "index_lane_matches",
+        "acceptance_pass",
+        "acceptance_needs_review",
+        "acceptance_unavailable",
+        "classification_plans",
+        "writeback_previews"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "runs": {"type": "integer", "minimum": 1},
+        "summary_matches": {"type": "integer", "minimum": 0},
+        "index_lane_matches": {"type": "integer", "minimum": 0},
+        "acceptance_pass": {"type": "integer", "minimum": 0},
+        "acceptance_needs_review": {"type": "integer", "minimum": 0},
+        "acceptance_unavailable": {"type": "integer", "minimum": 0},
+        "classification_plans": {"type": "integer", "minimum": 0},
+        "writeback_previews": {"type": "integer", "minimum": 0}
+      }
+    },
+    "filters": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "summary_scope": {
+          "enum": [
+            "classification",
+            "literature-review",
+            "technical",
+            "domain",
+            "quick-read",
+            "general"
+          ]
+        },
+        "grain": {
+          "enum": [
+            "page",
+            "section",
+            "figure-table",
+            "full-paper",
+            "scope-specific"
+          ]
+        },
+        "index_lane": {
+          "enum": ["openkb", "pageindex", "condb", "chatindex", "other"]
+        },
+        "section": {"type": "string", "minLength": 1},
+        "page": {"type": "integer", "minimum": 1},
+        "evidence_need": {"const": "classification"}
+      }
+    },
+    "summaryEntry": {
+      "type": "object",
+      "required": [
+        "grain",
+        "scope",
+        "text_ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "grain": {
+          "enum": [
+            "page",
+            "section",
+            "figure-table",
+            "full-paper",
+            "scope-specific"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "classification",
+            "literature-review",
+            "technical",
+            "domain",
+            "quick-read",
+            "general"
+          ]
+        },
+        "text_ref": {"$ref": "#/$defs/portableRef"}
+      }
+    },
+    "indexLane": {
+      "type": "object",
+      "required": ["lane", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "lane": {
+          "enum": ["openkb", "pageindex", "condb", "chatindex", "other"]
+        },
+        "status": {
+          "enum": ["skipped", "previewed", "written", "failed", "needs-review"]
+        }
+      }
+    },
+    "runResult": {
+      "type": "object",
+      "required": [
+        "paper_id",
+        "run_id",
+        "locator_type",
+        "status",
+        "source_hash",
+        "source_pack_ref",
+        "selected_fulltext_ref",
+        "summary_ref",
+        "summary_entries",
+        "summary_match_count",
+        "paper_card_ref",
+        "index_status_ref",
+        "index_lanes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "paper_id": {"$ref": "#/$defs/safePackageId"},
+        "run_id": {"$ref": "#/$defs/safePackageId"},
+        "locator_type": {
+          "enum": ["paper_id", "item_key", "slug", "doi", "title"]
+        },
+        "status": {"const": "retrieved"},
+        "source_hash": {
+          "type": "string",
+          "pattern": "^sha256(?:-aggregate)?:[0-9a-f]{64}$"
+        },
+        "source_pack_ref": {"$ref": "#/$defs/portableRef"},
+        "selected_fulltext_ref": {"$ref": "#/$defs/portableRef"},
+        "summary_ref": {"$ref": "#/$defs/portableRef"},
+        "summary_entries": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/summaryEntry"}
+        },
+        "summary_match_count": {"type": "integer", "minimum": 0},
+        "paper_card_ref": {"$ref": "#/$defs/portableRef"},
+        "index_status_ref": {"$ref": "#/$defs/portableRef"},
+        "index_lanes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/indexLane"}
+        },
+        "acceptance_summary_ref": {"$ref": "#/$defs/portableRef"},
+        "acceptance_status": {"enum": ["pass", "needs-review"]},
+        "classification_plan_ref": {"$ref": "#/$defs/portableRef"},
+        "writeback_preview_ref": {"$ref": "#/$defs/portableRef"}
+      },
+      "dependentRequired": {
+        "acceptance_summary_ref": ["acceptance_status"],
+        "acceptance_status": ["acceptance_summary_ref"]
+      }
+    }
+  }
+}

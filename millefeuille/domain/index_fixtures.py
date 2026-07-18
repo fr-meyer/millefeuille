@@ -19,6 +19,7 @@ from millefeuille.domain.route_fixtures import (
     ROUTE_MARKDOWN_REF,
     load_route_selection_sidecar,
 )
+from millefeuille.domain.secure_io import load_json_object_no_follow
 from millefeuille.domain.source_packs import (
     load_source_pack_manifest,
     paper_id_for_zotero_item_key,
@@ -452,20 +453,7 @@ def _relative_ref(path: Path, start: Path) -> str:
 
 
 def _load_json_object(path: str | Path, kind: str) -> dict[str, Any]:
-    object_path = Path(path)
-    try:
-        payload = json.loads(object_path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise MillefeuilleContractError(
-            f"could not read {kind} {object_path}: {exc}"
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise MillefeuilleContractError(
-            f"{kind} is not valid JSON: {object_path}"
-        ) from exc
-    if not isinstance(payload, dict):
-        raise MillefeuilleContractError(f"{kind} must be an object")
-    return payload
+    return load_json_object_no_follow(path, kind)
 
 
 def _required_string(value: Any, field_name: str) -> str:

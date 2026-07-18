@@ -11,6 +11,7 @@ from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
     StageStatus,
 )
+from millefeuille.domain.secure_io import load_json_object_no_follow
 
 ARTIFACT_INDEX_SCHEMA_VERSION = "millefeuille-artifact-index/v0.1"
 
@@ -161,17 +162,7 @@ class ArtifactIndex:
 
 
 def load_artifact_index(path: str | Path) -> ArtifactIndex:
-    index_path = Path(path)
-    try:
-        payload = json.loads(index_path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise MillefeuilleContractError(
-            f"could not read artifact index {index_path}: {exc}"
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise MillefeuilleContractError(
-            f"artifact index is not valid JSON: {index_path}"
-        ) from exc
+    payload = load_json_object_no_follow(path, "artifact index")
     return ArtifactIndex.from_dict(payload)
 
 

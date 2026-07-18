@@ -19,6 +19,7 @@ from typing import Any
 
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.models import OpenKBHandoffRow
+from millefeuille.domain.secure_io import load_json_object_no_follow
 
 SOURCE_PACK_ARTIFACT_ROOT = "source-pack"
 DEFAULT_SOURCE_PACK_ROOT = "/srv/openkb/source-packs"
@@ -675,17 +676,23 @@ def build_multi_source_pack_manifest(
 def load_source_pack_manifest(path: str | Path) -> dict[str, Any]:
     manifest_path = Path(path)
     try:
-        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise MillefeuilleContractError(
-            f"could not read source-pack manifest {manifest_path}: {exc}"
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise MillefeuilleContractError(
-            f"source-pack manifest is not valid JSON: {manifest_path}"
-        ) from exc
-    if not isinstance(payload, dict):
-        raise MillefeuilleContractError("source-pack manifest must be an object")
+        payload = load_json_object_no_follow(manifest_path, "source-pack manifest")
+    except MillefeuilleContractError as exc:
+        message = str(exc)
+        if "source-pack manifest not found:" in message or message.startswith(
+            "could not open source-pack manifest"
+        ):
+            raise MillefeuilleContractError(
+                f"could not read source-pack manifest {manifest_path}: {message}"
+            ) from exc
+        raise
+    return parse_source_pack_manifest(payload)
+
+
+def parse_source_pack_manifest(payload: dict[str, Any]) -> dict[str, Any]:
+    """Normalize and validate an already decoded source-pack manifest."""
+
+    payload = dict(payload)
     schema_version = _required_string(payload.get("schema_version"), "schema_version")
     source_hash = normalize_source_hash(
         _required_string(payload.get("source_hash"), "source_hash")
