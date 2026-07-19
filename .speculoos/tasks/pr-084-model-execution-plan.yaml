@@ -1,6 +1,6 @@
 id: pr-084-model-execution-plan
 title: Add deterministic no-call summary execution plans
-status: in_progress
+status: merged
 branch: feat/pr-084-model-execution-plan
 base_branch: dev
 write_paths:
@@ -22,10 +22,14 @@ github:
   issue: null
   pull_request: 84
   issue_project_item: null
-  pull_request_project_item: null
-  project_status: In Progress
-  project_item: null
+  pull_request_project_item: unavailable
+  project_status: Done
+  project_item: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/84
+  head_sha: 71273cfc48f4a8106592ee6feea89e842351a6e2
+  merge_commit: 969acda50aeba56e1a15106b8b1e49513e1f3570
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/84#pullrequestreview-4730250837
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88164488944
 post_merge_expected:
   pull_request: 84
   base_branch: dev
@@ -83,3 +87,9 @@ evidence:
   - Initial exact-head Mergeguez review requested changes for schema strictness and provider/backend consistency; the remediation strengthens requested-parameter and conditional schema constraints, tests generated/malformed required shape, and rejects partial fixture markers before planning.
   - Second exact-head review caught a conflicting global blockers minimum; the remediation scopes the minimum to non-fixture plans and validates both generated plan types with the Draft 2020-12 validator.
   - Third exact-head review required the schema to enforce the full provenance field set; the remediation pins the exact mandatory array and adds negative validation coverage for an omitted field.
+  - 'PR #84 merged with merge commit 969acda50aeba56e1a15106b8b1e49513e1f3570'
+  - 'Mergeguez approved exact head 71273cfc48f4a8106592ee6feea89e842351a6e2 with zero findings: https://github.com/fr-meyer/millefeuille/pull/84#pullrequestreview-4730250837'
+  - 'Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/88164488944'
+  - 'Remote feature branch feat/pr-084-model-execution-plan deleted through the approved post-merge cleanup lane'
+  - Project item unavailable; closeout recorded without ProjectV2 mutation
+  - surface-sync --close-merged-task cleared repo-local active task metadata

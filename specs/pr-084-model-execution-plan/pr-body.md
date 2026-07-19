@@ -1,8 +1,12 @@
 ## Summary
 
-- add deterministic no-call execution plans for page, section, and full-paper summary profiles
-- expose requested model controls, authentication lane, fallback policy, live blockers, and future provenance requirements
-- add a strict v0.1 plan schema, CLI contract, documentation, and regression coverage
+Closes the repo-local Speculoos delivery metadata for merged PR #84, which added deterministic no-call summary execution plans.
+
+- records exact reviewed head, zero-finding Mergeguez evidence, and `dev` merge
+- records approved remote feature-branch cleanup
+- marks task `pr-084-model-execution-plan` merged and Project status Done/unavailable
+- returns canonical Speculoos and local Vibe mirror state to idle
+- records that the delivered no-call plan contract is merged on `dev`, while promotion to `main` and live model execution remain separately gated
 
 ## Changed Files
 
@@ -11,22 +15,7 @@
 - `.speculoos/surfaces/vibe-kanban.yaml`
 - `.speculoos/tasks/pr-084-model-execution-plan.yaml`
 - `README.md`
-- `millefeuille/cli/stages.py`
-- `millefeuille/domain/model_execution.py`
-- `millefeuille/domain/model_profiles.py`
-- `pyproject.toml`
-- `specs/millefeuille-pipeline/README.md`
-- `specs/millefeuille-pipeline/artifact-storage.md`
-- `specs/millefeuille-pipeline/cli-contract.md`
-- `specs/millefeuille-pipeline/live-run-plan.md`
-- `specs/millefeuille-pipeline/model-execution-plan.schema.json`
-- `specs/millefeuille-pipeline/model-profile.schema.yaml`
-- `specs/millefeuille-pipeline/remaining-work.md`
-- `specs/pr-084-model-execution-plan/commit-message.txt`
 - `specs/pr-084-model-execution-plan/pr-body.md`
-- `tests/test_millefeuille_contract_artifacts.py`
-- `tests/test_millefeuille_model_execution.py`
-- `tests/test_millefeuille_stage_cli.py`
 
 ## Validation
 
@@ -34,33 +23,26 @@
 - full unittest discovery
 - Ruff
 - YAML/JSON metadata parse
-- changed-file private-data scan
 - `git diff --check`
+- changed-file private-data scan
 - Speculoos task validation and publication checks
 
 ## Documentation Impact
 
-`README.md` and the pipeline contract now explain the no-call planning command,
-authentication and fallback selection, live blockers, and future provenance
-requirements. The model-profile schema and new execution-plan schema provide
-the matching machine-readable boundaries.
+`README.md` now records that the GPT-5.6 Sol summary profile and deterministic no-call execution-plan contract are merged on `dev`. Live provider execution and stable promotion remain separately gated.
 
 ## Release Flow
 
-Feature PRs target `dev`; release/promotion PRs target `main` and remain
-separately gated. This slice may proceed through exact-head review and merge to
-`dev` under the configured branch policy. No stable-branch change, release tag,
-package publication, or production deployment is included.
+Feature PRs target `dev`; release/promotion PRs target `main` and remain separately gated. PR #84 received exact-head Mergeguez approval and was merged into `dev`; its remote feature branch was deleted. No stable-branch change, release tag, package publication, or production deployment is part of this closeout.
+
+## Delivery Closeout
+
+- exact reviewed head: `71273cfc48f4a8106592ee6feea89e842351a6e2`
+- zero-finding Mergeguez review: https://github.com/fr-meyer/millefeuille/pull/84#pullrequestreview-4730250837
+- successful Mergeguez check: https://github.com/fr-meyer/millefeuille/runs/88164488944
+- `dev` merge commit: `969acda50aeba56e1a15106b8b1e49513e1f3570`
+- remote feature branch deleted through the approved post-merge cleanup lane
 
 ## Publication Boundary
 
-Offline model execution planning, schema, tests, and documentation only. No
-private paper content, live Zotero access, PDF recovery, OCR/model/provider
-call, paid completion smoke, worker-agent execution, source-pack mutation,
-OpenKB/index write, classification/writeback, credential lookup or permission
-change, OpenClaw routing/configuration change, main-branch change, release,
-package publication, production deployment, or approval bypass.
-
-## Speculoos
-
-Task: `pr-084-model-execution-plan`
+Offline plan-contract documentation and repo-local delivery metadata only. GitHub publication is limited to the completed PR #84 review, `dev` merge, remote feature-branch cleanup, and this closeout PR. No private paper content, live Zotero access, PDF recovery, OCR/model/provider call, paid completion smoke, worker-agent execution, source-pack mutation, OpenKB/index write, classification/writeback, credential or permission change, OpenClaw routing/configuration change, main-branch change, release, package publication, production deployment, or approval bypass.
