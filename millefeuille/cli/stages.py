@@ -23,6 +23,10 @@ from millefeuille.domain.millefeuille import (
     RunMode,
     StageName,
 )
+from millefeuille.domain.model_execution import (
+    SUMMARY_MODEL_STAGES,
+    build_summary_execution_plan,
+)
 from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
 from millefeuille.domain.offline_stages import (
     OFFLINE_FIXTURE_STAGES,
@@ -174,7 +178,21 @@ def run_stage_cli(
                     evidence_need=args.evidence_need,
                 )
         elif args.command == "models":
-            payload = DEFAULT_MODEL_PROFILE_BUNDLE
+            if args.plan:
+                if not args.profile or not args.stage:
+                    raise MillefeuilleContractError(
+                        "models --plan requires --profile and --stage"
+                    )
+                payload = build_summary_execution_plan(
+                    profile=args.profile,
+                    stage=args.stage,
+                )
+            else:
+                if args.profile or args.stage:
+                    raise MillefeuilleContractError(
+                        "models --profile/--stage require --plan"
+                    )
+                payload = DEFAULT_MODEL_PROFILE_BUNDLE
         elif args.command == "run":
             payload = _run_pipeline(args)
         else:
@@ -342,9 +360,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
     models = subparsers.add_parser(
         "models",
-        help="List bundled preview model profiles.",
+        help="List profiles or build a deterministic no-call summary plan.",
     )
     _add_mode_arg(models)
+    models.add_argument(
+        "--plan",
+        action="store_true",
+        help="Resolve one summary-stage execution plan without a provider call.",
+    )
+    models.add_argument("--profile")
+    models.add_argument("--stage", choices=SUMMARY_MODEL_STAGES)
     models.add_argument("--json", action="store_true")
 
     run = subparsers.add_parser(

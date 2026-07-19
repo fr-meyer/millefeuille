@@ -232,6 +232,7 @@ millefeuille retrieve --source-pack-root ./source-packs --paper-id zotero-ITEM1 
 millefeuille retrieve --source-pack-root ./source-packs --doi https://doi.org/10.1234/example --run-id run-001 --section methods --evidence-need classification --json
 millefeuille retrieve --source-pack-root ./source-packs --batch-manifest retrieval-batch.json --summary-scope classification --json
 millefeuille models
+millefeuille models --plan --profile research-default --stage summarize_full_paper --json
 millefeuille run --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --stages acceptance,classify,writeback --handoff handoff.jsonl --classification-evidence classification-evidence.json --release-preflight
 ```
 
@@ -251,7 +252,12 @@ These commands stay offline and preview-only in the current contract slice:
   fail closed. Batch mode applies the same filters uniformly after preflighting
   every manifest locator and emits only sorted root-relative refs and status
   metadata.
-- `models` prints the bundled offline model-profile catalog. The
+- `models` prints the bundled offline model-profile catalog and
+  `models --plan --profile <id> --stage <summary-stage>` resolves a deterministic
+  no-call execution plan. The plan exposes the requested model, reasoning and
+  fast-mode controls, authentication lane, fallback policy, live blockers, and
+  required provenance fields while proving that no credential lookup or
+  provider call occurred. The
   `research-default` page, section, and full-paper summary stages select
   `openai/gpt-5.6-sol` with `reasoning_effort: xhigh` and `fast_mode: off`.
   This profile is merged on `dev`; it remains selection metadata only and does

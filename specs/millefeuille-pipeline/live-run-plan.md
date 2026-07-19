@@ -58,3 +58,7 @@ into PR79 or treated as permission for a live provider call.
   calls.
 - Historical golden-run artifacts keep the model identity that actually
   produced them; they are not rewritten to match the new profile.
+- `millefeuille models --plan --profile research-default --stage <summary-stage>`
+  may be used offline to inspect the requested model, authentication lane,
+  fallback policy, execution blockers, and future provenance requirements. It
+  performs no credential lookup or provider call and does not authorize one.

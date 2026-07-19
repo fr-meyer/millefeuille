@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/model-execution-plan.schema.json",
+  "title": "Millefeuille Model Execution Plan",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "profile",
+    "stage",
+    "backend",
+    "provider",
+    "requested_model",
+    "requested_parameters",
+    "authentication",
+    "fallback",
+    "execution",
+    "provenance_contract"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "millefeuille-model-execution-plan/v0.1"},
+    "status": {"const": "planned-offline"},
+    "profile": {"type": "string", "minLength": 1},
+    "stage": {
+      "enum": [
+        "summarize_page",
+        "summarize_section",
+        "summarize_full_paper"
+      ]
+    },
+    "backend": {"type": "string", "minLength": 1},
+    "provider": {"type": "string", "minLength": 1},
+    "requested_model": {"type": "string", "minLength": 1},
+    "requested_parameters": {"type": "object"},
+    "authentication": {
+      "type": "object",
+      "required": ["lane", "credential_lookup_performed"],
+      "additionalProperties": false,
+      "properties": {
+        "lane": {"type": "string", "minLength": 1},
+        "credential_lookup_performed": {"const": false}
+      }
+    },
+    "fallback": {
+      "type": "object",
+      "required": ["policy", "model"],
+      "additionalProperties": false,
+      "properties": {
+        "policy": {"enum": ["none", "explicit"]},
+        "model": {"type": ["string", "null"]}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": [
+        "provider_call_permitted",
+        "provider_call_performed",
+        "fixture_only",
+        "ready_for_approved_live_execution",
+        "blockers"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "provider_call_permitted": {"const": false},
+        "provider_call_performed": {"const": false},
+        "fixture_only": {"type": "boolean"},
+        "ready_for_approved_live_execution": {"const": false},
+        "blockers": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      }
+    },
+    "provenance_contract": {
+      "type": "object",
+      "required": ["schema_version", "required_fields", "actual_values_recorded"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"const": "millefeuille-model-provenance/v0.1"},
+        "required_fields": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "actual_values_recorded": {"const": false}
+      }
+    }
+  }
+}

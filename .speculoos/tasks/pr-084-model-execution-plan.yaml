@@ -1,0 +1,78 @@
+id: pr-084-model-execution-plan
+title: Add deterministic no-call summary execution plans
+status: in_progress
+branch: feat/pr-084-model-execution-plan
+base_branch: dev
+write_paths:
+  - .speculoos/manifest.yaml
+  - .speculoos/surfaces/github.yaml
+  - .speculoos/surfaces/vibe-kanban.yaml
+  - .speculoos/tasks/pr-084-model-execution-plan.yaml
+  - README.md
+  - millefeuille/cli/stages.py
+  - millefeuille/domain/model_execution.py
+  - millefeuille/domain/model_profiles.py
+  - specs/millefeuille-pipeline/**
+  - specs/pr-084-model-execution-plan/**
+  - tests/test_millefeuille_contract_artifacts.py
+  - tests/test_millefeuille_model_execution.py
+  - tests/test_millefeuille_stage_cli.py
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  pull_request_project_item: null
+  project_status: In Progress
+  project_item: null
+post_merge_expected:
+  pull_request: pr-number-assigned-after-publication
+  base_branch: dev
+  head_branch: feat/pr-084-model-execution-plan
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+scope:
+  - add a deterministic no-call execution plan for page, section, and full-paper summary profiles
+  - expose requested model and parameters, authentication lane, fallback policy, live blockers, and future provenance requirements
+  - preserve the existing profile catalog and offline-preview behavior
+  - add a strict v0.1 execution-plan schema, CLI surface, documentation, and regression coverage
+non_goals:
+  - provider/model calls, paid smoke tests, or credential lookup
+  - actual resolved-model, usage, input, output, or quality-evidence claims
+  - OpenClaw routing, authentication, fallback, or fast-mode configuration changes
+  - live Zotero read/write, PDF recovery, OCR, source-pack mutation, OpenKB/index writes, classification, or writeback
+  - dev-to-main promotion, release tag, package publication, or production deployment
+acceptance:
+  - models --plan resolves only supported summary stages from an explicit bundled profile
+  - research-default plans select openai/gpt-5.6-sol, xhigh reasoning, fast_mode off, OpenClaw-native Codex OAuth, and no fallback
+  - offline-preview plans remain fixture-only with no provider blockers
+  - plans state that credential lookup and provider execution were not performed and approved-live execution is not ready
+  - provenance requirements include requested and resolved model, profile/stage, source/output refs, usage, and quality warnings without claiming actual values
+  - malformed profiles, unknown profiles, unsupported stages, and invalid fallback combinations fail closed
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check, private-data scan, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_model_execution tests.test_millefeuille_stage_cli tests.test_millefeuille_contract_artifacts -v"
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos validate --task pr-084-model-execution-plan --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-084-model-execution-plan --pr-body specs/pr-084-model-execution-plan/pr-body.md --commit-message specs/pr-084-model-execution-plan/commit-message.txt --json"
+publication_boundary:
+  statement: "Offline model execution planning, schema, documentation, and tests only. No credential lookup, provider/model call, private paper read, live Zotero/OpenKB/index/source-pack mutation, main-branch merge, release, package publication, production deployment, or approval bypass."
+documentation_impact:
+  status: updated
+  rationale: README and pipeline contracts document the no-call planning surface and preserve all live approval gates.
+branch_plan: Build one bounded feature PR from synchronized dev, validate it, publish through the approved broker, obtain exact-head Mergeguez review, merge to dev under branch policy, and clean up the branch; stop before dev-to-main promotion.
+executor: OpenClaw main session
+private_data_scan: required; source, schema, tests, and public planning metadata only, with no credentials, private papers, provider payloads, or host-specific paths
+publish_authority: Franck's 2026-07-19 instruction to resume the Millefeuille parent objective; routine policy-gated feature-to-dev publication, review, merge, and cleanup continue without another approval, while dev-to-main remains excluded
+notes:
+  - Started from clean synchronized dev commit 0dd6124ea604ae49a57e54e6755716af4d386756.
+  - PR82 selected the summary model profile; this slice makes that selection inspectable without implementing or authorizing a live adapter.
+evidence:
+  - Baseline full unittest discovery passed: 314 tests.
+  - Final focused execution-plan, stage-CLI, and contract tests passed: 22 tests.
+  - Final full unittest discovery passed: 320 tests.
+  - Ruff, YAML/JSON metadata parse, private-data scan, diff check, Speculoos validation, and publication checks passed.
+  - No credential lookup, provider call, private paper read, or live external write was performed.

@@ -37,6 +37,9 @@
 - The current offline slice adds strict multi-run retrieval manifests, complete
   preflight, and deterministic JSON/Markdown aggregates containing portable
   refs and status metadata only.
+- The current model-planning slice adds deterministic no-call execution plans
+  for page, section, and full-paper summary profiles, including explicit auth,
+  fallback, live-blocker, and provenance requirements.
 - Current integration branch is `dev`; stable branch is `main`.
 - Current package version is `0.4.0`.
 

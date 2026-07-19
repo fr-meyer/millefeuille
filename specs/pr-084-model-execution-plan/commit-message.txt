@@ -1,0 +1,5 @@
+feat: add no-call summary execution plans
+
+Implement Speculoos task pr-084-model-execution-plan.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>
