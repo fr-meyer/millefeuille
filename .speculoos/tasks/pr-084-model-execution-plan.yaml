@@ -12,6 +12,7 @@ write_paths:
   - millefeuille/cli/stages.py
   - millefeuille/domain/model_execution.py
   - millefeuille/domain/model_profiles.py
+  - pyproject.toml
   - specs/millefeuille-pipeline/**
   - specs/pr-084-model-execution-plan/**
   - tests/test_millefeuille_contract_artifacts.py
@@ -49,6 +50,7 @@ acceptance:
   - offline-preview plans remain fixture-only with no provider blockers
   - plans state that credential lookup and provider execution were not performed and approved-live execution is not ready
   - provenance requirements include requested and resolved model, profile/stage, source/output refs, usage, and quality warnings without claiming actual values
+  - Draft 2020-12 validation accepts generated research and fixture plans and rejects malformed nested plans
   - malformed profiles, unknown profiles, unsupported stages, and invalid fallback combinations fail closed
   - focused tests, full unittest discovery, Ruff, metadata parse, diff check, private-data scan, Speculoos validation, and publication checks pass
 validation:
@@ -79,3 +81,4 @@ evidence:
   - No credential lookup, provider call, private paper read, or live external write was performed.
   - PR #84 was opened through the verified fr-meyer user-author path.
   - Initial exact-head Mergeguez review requested changes for schema strictness and provider/backend consistency; the remediation strengthens requested-parameter and conditional schema constraints, tests generated/malformed required shape, and rejects partial fixture markers before planning.
+  - Second exact-head review caught a conflicting global blockers minimum; the remediation scopes the minimum to non-fixture plans and validates both generated plan types with the Draft 2020-12 validator.

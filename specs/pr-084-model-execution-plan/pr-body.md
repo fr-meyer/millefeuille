@@ -14,6 +14,7 @@
 - `millefeuille/cli/stages.py`
 - `millefeuille/domain/model_execution.py`
 - `millefeuille/domain/model_profiles.py`
+- `pyproject.toml`
 - `specs/millefeuille-pipeline/README.md`
 - `specs/millefeuille-pipeline/artifact-storage.md`
 - `specs/millefeuille-pipeline/cli-contract.md`

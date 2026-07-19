@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 import unittest
 
+from jsonschema import Draft202012Validator, ValidationError
+
 from millefeuille.cli.stages import run_stage_cli
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.model_execution import build_summary_execution_plan
@@ -166,35 +168,27 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 self.assertFalse(field_schema["additionalProperties"])
                 self.assertEqual(set(field_schema["required"]), required_fields)
 
+        Draft202012Validator.check_schema(schema)
+        validator = Draft202012Validator(schema)
         generated = build_summary_execution_plan(
             profile="research-default",
             stage="summarize_full_paper",
         )
-        _assert_required_shape(generated, schema)
+        validator.validate(generated)
+        validator.validate(
+            build_summary_execution_plan(
+                profile="offline-preview",
+                stage="summarize_page",
+            )
+        )
         malformed = deepcopy(generated)
         del malformed["authentication"]["lane"]
-        with self.assertRaisesRegex(AssertionError, "authentication.lane"):
-            _assert_required_shape(malformed, schema)
+        with self.assertRaises(ValidationError):
+            validator.validate(malformed)
 
         execution = schema["properties"]["execution"]["properties"]
         self.assertFalse(execution["provider_call_permitted"]["const"])
         self.assertFalse(execution["provider_call_performed"]["const"])
         self.assertFalse(execution["ready_for_approved_live_execution"]["const"])
-
-
-def _assert_required_shape(
-    payload: dict[str, object],
-    schema: dict[str, object],
-) -> None:
-    for field_name in schema["required"]:
-        if field_name not in payload:
-            raise AssertionError(field_name)
-        field_schema = schema["properties"].get(field_name, {})
-        nested_required = field_schema.get("required", [])
-        for nested_name in nested_required:
-            if nested_name not in payload[field_name]:
-                raise AssertionError(f"{field_name}.{nested_name}")
-
-
 if __name__ == "__main__":
     unittest.main()
