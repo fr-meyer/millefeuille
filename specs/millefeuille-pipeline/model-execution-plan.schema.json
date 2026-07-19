@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/model-execution-plan.schema.json",
+  "title": "Millefeuille Model Execution Plan",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "profile",
+    "stage",
+    "backend",
+    "provider",
+    "requested_model",
+    "requested_parameters",
+    "authentication",
+    "fallback",
+    "execution",
+    "provenance_contract"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "millefeuille-model-execution-plan/v0.1"},
+    "status": {"const": "planned-offline"},
+    "profile": {"type": "string", "minLength": 1},
+    "stage": {
+      "enum": [
+        "summarize_page",
+        "summarize_section",
+        "summarize_full_paper"
+      ]
+    },
+    "backend": {"type": "string", "minLength": 1},
+    "provider": {"type": "string", "minLength": 1},
+    "requested_model": {"type": "string", "minLength": 1},
+    "requested_parameters": {
+      "type": "object",
+      "required": ["record_usage"],
+      "additionalProperties": false,
+      "properties": {
+        "temperature": {"type": "number"},
+        "reasoning_effort": {
+          "enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+        },
+        "fast_mode": {"enum": ["off", "on", "auto"]},
+        "prompt_version": {"type": "string", "minLength": 1},
+        "record_usage": {"type": "boolean"}
+      }
+    },
+    "authentication": {
+      "type": "object",
+      "required": ["lane", "credential_lookup_performed"],
+      "additionalProperties": false,
+      "properties": {
+        "lane": {"type": "string", "minLength": 1},
+        "credential_lookup_performed": {"const": false}
+      }
+    },
+    "fallback": {
+      "type": "object",
+      "required": ["policy", "model"],
+      "additionalProperties": false,
+      "properties": {
+        "policy": {"enum": ["none", "explicit"]},
+        "model": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": [
+        "provider_call_permitted",
+        "provider_call_performed",
+        "fixture_only",
+        "ready_for_approved_live_execution",
+        "blockers"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "provider_call_permitted": {"const": false},
+        "provider_call_performed": {"const": false},
+        "fixture_only": {"type": "boolean"},
+        "ready_for_approved_live_execution": {"const": false},
+        "blockers": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      }
+    },
+    "provenance_contract": {
+      "type": "object",
+      "required": ["schema_version", "required_fields", "actual_values_recorded"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"const": "millefeuille-model-provenance/v0.1"},
+        "required_fields": {
+          "const": [
+            "profile",
+            "stage",
+            "requested_model",
+            "resolved_model",
+            "provider",
+            "backend",
+            "reasoning_effort",
+            "fast_mode",
+            "prompt_version",
+            "input_refs",
+            "output_refs",
+            "usage",
+            "quality_warnings"
+          ]
+        },
+        "actual_values_recorded": {"const": false}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"provider": {"const": "none"}}},
+      "then": {
+        "properties": {
+          "backend": {"const": "fixture"},
+          "authentication": {"properties": {"lane": {"const": "none"}}},
+          "execution": {
+            "properties": {
+              "fixture_only": {"const": true},
+              "blockers": {"maxItems": 0}
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "backend": {"not": {"const": "fixture"}},
+          "authentication": {"properties": {"lane": {"not": {"const": "none"}}}},
+          "execution": {
+            "properties": {
+              "fixture_only": {"const": false},
+              "blockers": {"minItems": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"fallback": {"properties": {"policy": {"const": "none"}}}}},
+      "then": {"properties": {"fallback": {"properties": {"model": {"type": "null"}}}}},
+      "else": {"properties": {"fallback": {"properties": {"model": {"type": "string", "minLength": 1}}}}}
+    }
+  ]
+}

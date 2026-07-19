@@ -136,6 +136,9 @@ Every non-trivial run should emit:
 - `stage-manifest.json`
 - `artifact-index.json`
 - `model-provenance.jsonl` when any model or OCR provider is used
+- `model-execution-plan.json` may be emitted before a separately approved live
+  summary call; the v0.1 no-call plan records requested controls and provenance
+  requirements but never claims actual provider execution or usage
 - `reports/acceptance-summary.json` once the acceptance stage is synthesized
 - `classification/classification-plan.json` when classification preview or live
   classification runs

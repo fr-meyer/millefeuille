@@ -38,6 +38,11 @@ dependencies = [
     "omegaconf",
 ]
 
+[project.optional-dependencies]
+test = [
+    "jsonschema>=4.23",
+]
+
 [project.scripts]
 millefeuille = "millefeuille.cli.main:entrypoint"
 

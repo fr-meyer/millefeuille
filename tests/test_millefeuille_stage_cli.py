@@ -489,6 +489,14 @@ class TestMillefeuilleStageCli(unittest.TestCase):
                     "xhigh",
                 )
                 self.assertEqual(research_profile[stage_name]["fast_mode"], "off")
+                self.assertEqual(
+                    research_profile[stage_name]["auth_lane"],
+                    "openclaw-native-codex-oauth",
+                )
+                self.assertEqual(
+                    research_profile[stage_name]["fallback_policy"],
+                    "none",
+                )
 
             self.assertEqual(
                 research_profile["paper_card"],
@@ -517,19 +525,25 @@ class TestMillefeuilleStageCli(unittest.TestCase):
                 models_payload["profiles"]["offline-preview"],
                 {
                     "summarize_page": {
+                        "auth_lane": "none",
                         "backend": "fixture",
+                        "fallback_policy": "none",
                         "model": "offline-preview",
                         "provider": "none",
                         "record_usage": False,
                     },
                     "summarize_section": {
+                        "auth_lane": "none",
                         "backend": "fixture",
+                        "fallback_policy": "none",
                         "model": "offline-preview",
                         "provider": "none",
                         "record_usage": False,
                     },
                     "summarize_full_paper": {
+                        "auth_lane": "none",
                         "backend": "fixture",
+                        "fallback_policy": "none",
                         "model": "offline-preview",
                         "provider": "none",
                         "record_usage": False,

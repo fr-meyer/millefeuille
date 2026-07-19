@@ -75,6 +75,12 @@ Preview/read-only stage commands now live under `millefeuille/cli/stages.py`:
 resume skips only passed stages whose paper/run/source identity and expected
 outputs revalidate.
 
+`models --plan` resolves one page, section, or full-paper summary profile into
+a strict `millefeuille-model-execution-plan/v0.1` object. It is deliberately
+no-call: credential lookup, provider execution, resolved-model claims, and
+actual usage values remain false/unset until a separately approved live lane
+exists.
+
 Manual gates remain explicit: live Zotero reads/writes, PDF recovery/download,
 OCR/Mistral/PageIndex calls, model calls, worker-agent execution, OpenKB
 writes, index writes, source-pack writes, GitHub publication/merge, `dev` to

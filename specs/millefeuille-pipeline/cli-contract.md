@@ -72,7 +72,13 @@ derived artifact write.
     `batches/millefeuille/<batch-id>/retrieval/`.
 
 - `models`
-  - Implemented as a bundled profile lister for preview and planning use.
+  - Lists the bundled profile catalog for preview and planning use.
+  - `--plan --profile <id> --stage summarize_page|summarize_section|summarize_full_paper`
+    resolves a deterministic `millefeuille-model-execution-plan/v0.1` object.
+  - The no-call plan records requested model and parameters, authentication
+    lane, fallback policy, live blockers, and the required provenance shape.
+    It never reads credentials, calls a provider, or claims actual resolved
+    model, usage, input, or output evidence.
 
 - `run`
   - Implements the canonical preview chain from `extract-native` and
