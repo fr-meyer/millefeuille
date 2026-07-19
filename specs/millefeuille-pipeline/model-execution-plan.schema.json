@@ -98,10 +98,21 @@
       "properties": {
         "schema_version": {"const": "millefeuille-model-provenance/v0.1"},
         "required_fields": {
-          "type": "array",
-          "items": {"type": "string", "minLength": 1},
-          "uniqueItems": true,
-          "minItems": 1
+          "const": [
+            "profile",
+            "stage",
+            "requested_model",
+            "resolved_model",
+            "provider",
+            "backend",
+            "reasoning_effort",
+            "fast_mode",
+            "prompt_version",
+            "input_refs",
+            "output_refs",
+            "usage",
+            "quality_warnings"
+          ]
         },
         "actual_values_recorded": {"const": false}
       }

@@ -185,6 +185,10 @@ class ModelExecutionPlanTests(unittest.TestCase):
         del malformed["authentication"]["lane"]
         with self.assertRaises(ValidationError):
             validator.validate(malformed)
+        incomplete_provenance = deepcopy(generated)
+        incomplete_provenance["provenance_contract"]["required_fields"].pop()
+        with self.assertRaises(ValidationError):
+            validator.validate(incomplete_provenance)
 
         execution = schema["properties"]["execution"]["properties"]
         self.assertFalse(execution["provider_call_permitted"]["const"])
