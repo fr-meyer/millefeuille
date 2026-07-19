@@ -27,7 +27,7 @@ github:
   project_item: null
   url: https://github.com/fr-meyer/millefeuille/pull/84
 post_merge_expected:
-  pull_request: pr-number-assigned-after-publication
+  pull_request: 84
   base_branch: dev
   head_branch: feat/pr-084-model-execution-plan
   head_sha: merge-plan-exact-head
