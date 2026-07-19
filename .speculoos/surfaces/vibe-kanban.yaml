@@ -14,7 +14,7 @@ notes:
   - No Vibe cloud or org API is configured for this repo.
   - Bootstrap should not depend on Vibe reachability.
 task:
-  status: planned
-  id: pr-084-model-execution-plan
-  speculoos_task: pr-084-model-execution-plan
-  command: speculoos plancha-apply --task pr-084-model-execution-plan --title "Add deterministic no-call summary execution plans" --branch feat/pr-084-model-execution-plan --status inprogress
+  status: idle
+  id: null
+  speculoos_task: null
+  command: null

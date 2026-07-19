@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-084-model-execution-plan
+canonical_task: null
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: feat/pr-084-model-execution-plan
+  working_branch: null
 status:
-  phase: implementation
-  pret_a_coder: ready
+  phase: idle
+  pret_a_coder: idle
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -57,11 +57,11 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
+    status: none-active
     number: 84
     url: https://github.com/fr-meyer/millefeuille/pull/84
     base_branch: dev
-    head_branch: feat/pr-084-model-execution-plan
+    head_branch: null
     head_sha: null
     merge_commit: null
     project_status: In Progress
@@ -93,7 +93,7 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: pr-084-model-execution-plan
+current_task: null
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
