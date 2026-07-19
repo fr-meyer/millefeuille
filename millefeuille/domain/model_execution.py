@@ -37,6 +37,8 @@ _PARAMETER_FIELDS = (
     "prompt_version",
     "record_usage",
 )
+_REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
+_FAST_MODES = {"off", "on", "auto"}
 
 
 def build_summary_execution_plan(
@@ -76,6 +78,11 @@ def build_summary_execution_plan(
     provider = _required_string(stage_config.get("provider"), "provider")
     backend = _required_string(stage_config.get("backend"), "backend")
     auth_lane = _required_string(stage_config.get("auth_lane"), "auth_lane")
+    _validate_execution_lane(
+        provider=provider,
+        backend=backend,
+        auth_lane=auth_lane,
+    )
     fallback_policy = _required_string(
         stage_config.get("fallback_policy", "none"),
         "fallback_policy",
@@ -92,12 +99,13 @@ def build_summary_execution_plan(
     if fallback_policy == "explicit":
         fallback_model = _required_string(fallback_model, "fallback_model")
 
+    _validate_requested_parameters(stage_config)
     requested_parameters = {
         name: stage_config[name]
         for name in _PARAMETER_FIELDS
         if name in stage_config
     }
-    fixture_only = provider == "none" or backend == "fixture"
+    fixture_only = provider == "none"
     blockers = [] if fixture_only else [
         "provider call requires a separately approved live execution path",
         "approved-live model execution is not implemented by this command",
@@ -139,3 +147,36 @@ def _required_string(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise MillefeuilleContractError(f"{field_name} must be a non-empty string")
     return value.strip()
+
+
+def _validate_execution_lane(*, provider: str, backend: str, auth_lane: str) -> None:
+    fixture_markers = (provider == "none", backend == "fixture", auth_lane == "none")
+    if any(fixture_markers) and not all(fixture_markers):
+        raise MillefeuilleContractError(
+            "fixture execution requires provider='none', backend='fixture', "
+            "and auth_lane='none'; live execution requires none of those markers"
+        )
+
+
+def _validate_requested_parameters(stage_config: dict[str, Any]) -> None:
+    record_usage = stage_config.get("record_usage")
+    if not isinstance(record_usage, bool):
+        raise MillefeuilleContractError("record_usage must be a boolean")
+
+    reasoning_effort = stage_config.get("reasoning_effort")
+    if reasoning_effort is not None and reasoning_effort not in _REASONING_EFFORTS:
+        raise MillefeuilleContractError("reasoning_effort is unsupported")
+
+    fast_mode = stage_config.get("fast_mode")
+    if fast_mode is not None and fast_mode not in _FAST_MODES:
+        raise MillefeuilleContractError("fast_mode is unsupported")
+
+    prompt_version = stage_config.get("prompt_version")
+    if prompt_version is not None:
+        _required_string(prompt_version, "prompt_version")
+
+    temperature = stage_config.get("temperature")
+    if temperature is not None and (
+        isinstance(temperature, bool) or not isinstance(temperature, (int, float))
+    ):
+        raise MillefeuilleContractError("temperature must be a number")

@@ -91,6 +91,17 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 bundle=inconsistent_fallback,
             )
 
+        mismatched_lane = deepcopy(DEFAULT_MODEL_PROFILE_BUNDLE)
+        mismatched_lane["profiles"]["research-default"]["summarize_page"][
+            "backend"
+        ] = "fixture"
+        with self.assertRaisesRegex(MillefeuilleContractError, "fixture execution"):
+            build_summary_execution_plan(
+                profile="research-default",
+                stage="summarize_page",
+                bundle=mismatched_lane,
+            )
+
     def test_models_cli_builds_plan_and_requires_explicit_pair(self):
         stdout = StringIO()
         exit_code = run_stage_cli(
@@ -132,10 +143,57 @@ class ModelExecutionPlanTests(unittest.TestCase):
             "millefeuille-model-execution-plan/v0.1",
         )
         self.assertFalse(schema["additionalProperties"])
+        expected_nested_required = {
+            "requested_parameters": {"record_usage"},
+            "authentication": {"lane", "credential_lookup_performed"},
+            "fallback": {"policy", "model"},
+            "execution": {
+                "provider_call_permitted",
+                "provider_call_performed",
+                "fixture_only",
+                "ready_for_approved_live_execution",
+                "blockers",
+            },
+            "provenance_contract": {
+                "schema_version",
+                "required_fields",
+                "actual_values_recorded",
+            },
+        }
+        for field_name, required_fields in expected_nested_required.items():
+            with self.subTest(field_name=field_name):
+                field_schema = schema["properties"][field_name]
+                self.assertFalse(field_schema["additionalProperties"])
+                self.assertEqual(set(field_schema["required"]), required_fields)
+
+        generated = build_summary_execution_plan(
+            profile="research-default",
+            stage="summarize_full_paper",
+        )
+        _assert_required_shape(generated, schema)
+        malformed = deepcopy(generated)
+        del malformed["authentication"]["lane"]
+        with self.assertRaisesRegex(AssertionError, "authentication.lane"):
+            _assert_required_shape(malformed, schema)
+
         execution = schema["properties"]["execution"]["properties"]
         self.assertFalse(execution["provider_call_permitted"]["const"])
         self.assertFalse(execution["provider_call_performed"]["const"])
         self.assertFalse(execution["ready_for_approved_live_execution"]["const"])
+
+
+def _assert_required_shape(
+    payload: dict[str, object],
+    schema: dict[str, object],
+) -> None:
+    for field_name in schema["required"]:
+        if field_name not in payload:
+            raise AssertionError(field_name)
+        field_schema = schema["properties"].get(field_name, {})
+        nested_required = field_schema.get("required", [])
+        for nested_name in nested_required:
+            if nested_name not in payload[field_name]:
+                raise AssertionError(f"{field_name}.{nested_name}")
 
 
 if __name__ == "__main__":

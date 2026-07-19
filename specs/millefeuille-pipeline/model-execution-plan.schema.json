@@ -32,7 +32,20 @@
     "backend": {"type": "string", "minLength": 1},
     "provider": {"type": "string", "minLength": 1},
     "requested_model": {"type": "string", "minLength": 1},
-    "requested_parameters": {"type": "object"},
+    "requested_parameters": {
+      "type": "object",
+      "required": ["record_usage"],
+      "additionalProperties": false,
+      "properties": {
+        "temperature": {"type": "number"},
+        "reasoning_effort": {
+          "enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+        },
+        "fast_mode": {"enum": ["off", "on", "auto"]},
+        "prompt_version": {"type": "string", "minLength": 1},
+        "record_usage": {"type": "boolean"}
+      }
+    },
     "authentication": {
       "type": "object",
       "required": ["lane", "credential_lookup_performed"],
@@ -48,7 +61,12 @@
       "additionalProperties": false,
       "properties": {
         "policy": {"enum": ["none", "explicit"]},
-        "model": {"type": ["string", "null"]}
+        "model": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        }
       }
     },
     "execution": {
@@ -69,7 +87,8 @@
         "blockers": {
           "type": "array",
           "items": {"type": "string", "minLength": 1},
-          "uniqueItems": true
+          "uniqueItems": true,
+          "minItems": 1
         }
       }
     },
@@ -87,5 +106,39 @@
         "actual_values_recorded": {"const": false}
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"provider": {"const": "none"}}},
+      "then": {
+        "properties": {
+          "backend": {"const": "fixture"},
+          "authentication": {"properties": {"lane": {"const": "none"}}},
+          "execution": {
+            "properties": {
+              "fixture_only": {"const": true},
+              "blockers": {"maxItems": 0}
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "backend": {"not": {"const": "fixture"}},
+          "authentication": {"properties": {"lane": {"not": {"const": "none"}}}},
+          "execution": {
+            "properties": {
+              "fixture_only": {"const": false},
+              "blockers": {"minItems": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"fallback": {"properties": {"policy": {"const": "none"}}}}},
+      "then": {"properties": {"fallback": {"properties": {"model": {"type": "null"}}}}},
+      "else": {"properties": {"fallback": {"properties": {"model": {"type": "string", "minLength": 1}}}}}
+    }
+  ]
 }
