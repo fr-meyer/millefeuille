@@ -16,6 +16,11 @@ Files:
   contract.
 - `artifact-index.schema.json` - machine-readable artifact index shape.
 - `model-profile.schema.yaml` - per-stage model/profile selection shape.
+- `model-execution-evidence.schema.json` - approved execution-evidence shape
+  accepted by provenance materialization.
+- `model-execution-plan.schema.json` - no-call model execution plan shape.
+- `model-provenance-record.schema.json` - provider-payload-free model
+  provenance record shape.
 - `hierarchical-summary.schema.json` - page/section/paper summary shape.
 - `paper-card.schema.json` - compact human/agent card shape.
 - `retrieval-index-status.schema.json` - retrieval/index lane status shape.
@@ -80,6 +85,20 @@ a strict `millefeuille-model-execution-plan/v0.1` object. It is deliberately
 no-call: credential lookup, provider execution, resolved-model claims, and
 actual usage values remain false/unset until a separately approved live lane
 exists.
+
+`models --provenance --plan-file <json> --execution-evidence <json>` validates
+strict `millefeuille-model-execution-evidence/v0.1` against the no-call plan and
+materializes a `millefeuille-model-provenance/v0.1` record to stdout or an
+explicit `--output` JSON path. The materializer rejects unknown fields,
+identity/control drift, invalid fallback resolution, invalid token totals,
+unsafe or duplicate refs, malformed warnings, prompts, provider payloads,
+private paper text, PDF payload markers, and credential/secret markers. It does
+not append to a run package or perform credential lookup/provider execution.
+The complete plan shape, canonical bundled-profile values, and no-call controls
+are revalidated before evidence is trusted. An explicit output uses exclusive
+descriptor-relative no-follow creation, rejects existing files, symlinked
+parents, and run-package marker ancestors, and detects name or parent
+replacement races.
 
 Manual gates remain explicit: live Zotero reads/writes, PDF recovery/download,
 OCR/Mistral/PageIndex calls, model calls, worker-agent execution, OpenKB

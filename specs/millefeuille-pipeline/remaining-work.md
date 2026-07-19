@@ -107,7 +107,13 @@
 10. **Hierarchical Summaries**
     - Produce page, section, figure/table, full-paper, and scope-specific
       summaries.
-    - Preserve source refs and model provenance.
+    - Preserve source refs and model provenance. The offline provenance
+      materializer now validates exact execution evidence against the no-call
+      model plan and emits strict `millefeuille-model-provenance/v0.1` records
+      without accepting prompts, provider payloads, private paper text,
+      credentials, unsafe refs, malformed warnings, or invalid token totals.
+      Remaining work is attaching those records to verified run packages after
+      summary execution exists.
     - Manual gate: model/provider call approval.
 
 11. **Paper Card**

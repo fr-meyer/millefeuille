@@ -1,0 +1,66 @@
+schema_version: '0.1'
+kind: croquis
+id: pr-086-model-provenance-record
+task_id: pr-086-model-provenance-record
+status: ready
+orchestration:
+  workflow_owner: speculoos
+  conversation_owner: openclaw
+  agent_adapter: openclaw-main
+  model_profile: boussole/planning
+objective: Validate approved execution evidence and materialize strict provider-payload-free
+  model provenance records without provider calls or run-package mutation.
+target_paths:
+- millefeuille/domain/model_execution.py
+- millefeuille/domain/secure_io.py
+- millefeuille/cli/stages.py
+- specs/millefeuille-pipeline/model-execution-evidence.schema.json
+- specs/millefeuille-pipeline/model-provenance-record.schema.json
+read_paths:
+- millefeuille/domain/model_profiles.py
+- specs/millefeuille-pipeline/model-execution-plan.schema.json
+allowed_paths:
+- .speculoos/croquis/pr-086-model-provenance-record.yaml
+- .speculoos/tasks/pr-086-model-provenance-record.yaml
+- README.md
+- millefeuille/cli/stages.py
+- millefeuille/domain/model_execution.py
+- millefeuille/domain/secure_io.py
+- specs/millefeuille-pipeline/
+- specs/pr-086-model-provenance-record/
+- tests/test_millefeuille_contract_artifacts.py
+- tests/test_millefeuille_model_execution.py
+blocked_paths:
+- .github/
+- pyproject.toml
+acceptance_criteria:
+- Execution evidence matches plan identity and controls exactly.
+- The plan matches the canonical bundled profile and cannot smuggle payload-bearing
+  values into provenance.
+- Fallback resolution, token totals, artifact refs, and warning records fail closed
+  when malformed.
+- Prompts, provider payloads, private paper text, secrets, credentials, and unknown
+  fields are rejected.
+- The CLI optionally writes only one explicit provenance JSON file and never mutates
+  run packages; run-package destinations are rejected and output creation is
+  exclusive, no-follow, and race-checked.
+implementation_steps:
+- Validate plan and evidence schema versions and exact fields.
+- Enforce identity, control, fallback, usage, ref, warning, and forbidden-payload
+  rules.
+- Expose preview-only CLI materialization and strict schemas.
+- Run focused/full tests, lint, metadata, privacy, and publication gates.
+validation:
+- .venv/bin/python -m unittest tests.test_millefeuille_model_execution tests.test_millefeuille_stage_cli
+  tests.test_millefeuille_contract_artifacts -v
+- .venv/bin/python -m unittest discover
+- .venv/bin/ruff check .
+- git diff --check
+risk_notes:
+- Do not accept arbitrary provider payload fields or free-form private text.
+- Do not claim that no-call planning authorizes or performs a model call.
+- Do not append provenance to a verified run package in this slice.
+artifacts_to_create:
+- .speculoos/croquis/pr-086-model-provenance-record.yaml
+ready_state:
+  status: ready

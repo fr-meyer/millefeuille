@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 import errno
 import json
 import os
@@ -39,7 +40,34 @@ def _open_relative_directory_fd(parent_fd: int, name: str) -> int:
     return os.open(name, flags, dir_fd=parent_fd)
 
 
-def _open_directory_path_no_follow(path: Path, *, label: str) -> int:
+def _reject_directory_markers(
+    directory_fd: int,
+    *,
+    marker_names: frozenset[str],
+    path: Path,
+    label: str,
+) -> None:
+    for marker_name in sorted(marker_names):
+        try:
+            os.stat(marker_name, dir_fd=directory_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise MillefeuilleContractError(
+                f"could not inspect {label} boundary {path}: {exc}"
+            ) from exc
+        raise MillefeuilleContractError(
+            f"{label} must not be created beneath run-package marker "
+            f"{marker_name!r}: {path}"
+        )
+
+
+def _open_directory_path_no_follow(
+    path: Path,
+    *,
+    label: str,
+    forbidden_ancestor_markers: frozenset[str] = frozenset(),
+) -> int:
     if not _supports_no_follow():
         raise MillefeuilleContractError(
             f"{label} requires no-follow filesystem reads on this platform"
@@ -49,6 +77,12 @@ def _open_directory_path_no_follow(path: Path, *, label: str) -> int:
     parts = target.parts[1:] if target.is_absolute() else target.parts
     current_fd = _open_directory_fd(anchor)
     try:
+        _reject_directory_markers(
+            current_fd,
+            marker_names=forbidden_ancestor_markers,
+            path=anchor,
+            label=label,
+        )
         for part in parts:
             if part in {"", "."}:
                 continue
@@ -59,6 +93,12 @@ def _open_directory_path_no_follow(path: Path, *, label: str) -> int:
             next_fd = _open_relative_directory_fd(current_fd, part)
             os.close(current_fd)
             current_fd = next_fd
+            _reject_directory_markers(
+                current_fd,
+                marker_names=forbidden_ancestor_markers,
+                path=target,
+                label=label,
+            )
         opened_stat = os.fstat(current_fd)
         if not stat.S_ISDIR(opened_stat.st_mode):
             raise MillefeuilleContractError(f"{label} is not a directory: {target}")
@@ -78,6 +118,71 @@ def _open_directory_path_no_follow(path: Path, *, label: str) -> int:
             ) from exc
         raise MillefeuilleContractError(
             f"could not open {label} {target}: {exc}"
+        ) from exc
+
+
+def _open_or_create_directory_path_no_follow(
+    path: Path,
+    *,
+    label: str,
+    forbidden_ancestor_markers: frozenset[str] = frozenset(),
+) -> int:
+    """Open one directory path, securely creating missing components."""
+
+    if not _supports_no_follow():
+        raise MillefeuilleContractError(
+            f"{label} requires no-follow filesystem writes on this platform"
+        )
+    target = Path(path)
+    anchor = Path(target.anchor) if target.is_absolute() else Path(".")
+    parts = target.parts[1:] if target.is_absolute() else target.parts
+    current_fd = _open_directory_fd(anchor)
+    try:
+        _reject_directory_markers(
+            current_fd,
+            marker_names=forbidden_ancestor_markers,
+            path=anchor,
+            label=label,
+        )
+        for part in parts:
+            if part in {"", "."}:
+                continue
+            if part == "..":
+                raise MillefeuilleContractError(
+                    f"{label} path must not contain parent traversal: {target}"
+                )
+            try:
+                next_fd = _open_relative_directory_fd(current_fd, part)
+            except FileNotFoundError:
+                # Another writer may win the creation race. The no-follow open
+                # below still decides whether the new entry is acceptable.
+                with suppress(FileExistsError):
+                    os.mkdir(part, mode=0o700, dir_fd=current_fd)
+                next_fd = _open_relative_directory_fd(current_fd, part)
+            os.close(current_fd)
+            current_fd = next_fd
+            _reject_directory_markers(
+                current_fd,
+                marker_names=forbidden_ancestor_markers,
+                path=target,
+                label=label,
+            )
+        opened_stat = os.fstat(current_fd)
+        if not stat.S_ISDIR(opened_stat.st_mode):
+            raise MillefeuilleContractError(f"{label} is not a directory: {target}")
+        return current_fd
+    except MillefeuilleContractError:
+        os.close(current_fd)
+        raise
+    except OSError as exc:
+        os.close(current_fd)
+        if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+            raise MillefeuilleContractError(
+                f"{label} path must not contain symbolic links or non-directories: "
+                f"{target}"
+            ) from exc
+        raise MillefeuilleContractError(
+            f"could not open or create {label} {target}: {exc}"
         ) from exc
 
 
@@ -856,3 +961,131 @@ def load_json_object_no_follow(path: str | Path, label: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise MillefeuilleContractError(f"{label} must be an object")
     return payload
+
+
+def write_new_text_no_follow(
+    path: str | Path,
+    text: str,
+    label: str,
+    *,
+    forbidden_ancestor_markers: frozenset[str] = frozenset(),
+) -> None:
+    """Create one new UTF-8 file through pinned no-follow descriptors.
+
+    Existing outputs are never replaced. Missing parent directories are made
+    descriptor-relatively, and the parent plus final name are rebound after the
+    write so a concurrent rename or symlink substitution fails closed.
+    """
+
+    if not _supports_no_follow():
+        raise MillefeuilleContractError(
+            f"{label} requires no-follow filesystem writes on this platform"
+        )
+    target = Path(path)
+    if target.name in {"", ".", ".."}:
+        raise MillefeuilleContractError(f"{label} is not a regular file: {target}")
+    payload = text.encode("utf-8")
+    parent_fd = _open_or_create_directory_path_no_follow(
+        target.parent,
+        label=f"{label} parent",
+        forbidden_ancestor_markers=forbidden_ancestor_markers,
+    )
+    parent_identity = os.fstat(parent_fd)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    fd: int | None = None
+    opened_identity: tuple[int, int] | None = None
+    try:
+        try:
+            fd = os.open(target.name, flags, 0o600, dir_fd=parent_fd)
+        except FileExistsError as exc:
+            raise MillefeuilleContractError(
+                f"{label} already exists or is a symbolic link: {target}"
+            ) from exc
+        except OSError as exc:
+            if exc.errno in {errno.EEXIST, errno.ELOOP}:
+                raise MillefeuilleContractError(
+                    f"{label} already exists or is a symbolic link: {target}"
+                ) from exc
+            raise MillefeuilleContractError(
+                f"could not create {label} {target}: {exc}"
+            ) from exc
+
+        opened_stat = os.fstat(fd)
+        if not stat.S_ISREG(opened_stat.st_mode) or opened_stat.st_nlink != 1:
+            raise MillefeuilleContractError(
+                f"{label} is not a singly linked regular file: {target}"
+            )
+        opened_identity = (opened_stat.st_dev, opened_stat.st_ino)
+        offset = 0
+        while offset < len(payload):
+            written = os.write(fd, payload[offset:])
+            if written <= 0:
+                raise MillefeuilleContractError(
+                    f"could not write complete {label}: {target}"
+                )
+            offset += written
+        os.fsync(fd)
+
+        final_fd_stat = os.fstat(fd)
+        final_named_stat = os.stat(
+            target.name,
+            dir_fd=parent_fd,
+            follow_symlinks=False,
+        )
+        if (
+            not stat.S_ISREG(final_fd_stat.st_mode)
+            or final_fd_stat.st_nlink != 1
+            or (final_fd_stat.st_dev, final_fd_stat.st_ino) != opened_identity
+            or (final_named_stat.st_dev, final_named_stat.st_ino) != opened_identity
+            or final_fd_stat.st_size != len(payload)
+        ):
+            raise MillefeuilleContractError(
+                f"{label} changed while being written: {target}"
+            )
+
+        rebound_parent_fd = _open_directory_path_no_follow(
+            target.parent,
+            label=f"{label} parent",
+            forbidden_ancestor_markers=forbidden_ancestor_markers,
+        )
+        try:
+            rebound_parent = os.fstat(rebound_parent_fd)
+            rebound_named = os.stat(
+                target.name,
+                dir_fd=rebound_parent_fd,
+                follow_symlinks=False,
+            )
+            if (
+                (rebound_parent.st_dev, rebound_parent.st_ino)
+                != (parent_identity.st_dev, parent_identity.st_ino)
+                or (rebound_named.st_dev, rebound_named.st_ino) != opened_identity
+            ):
+                raise MillefeuilleContractError(
+                    f"{label} path changed while being written: {target}"
+                )
+        finally:
+            os.close(rebound_parent_fd)
+        os.fsync(parent_fd)
+    except Exception as exc:
+        if fd is not None and opened_identity is not None:
+            try:
+                named_stat = os.stat(
+                    target.name,
+                    dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+                if (named_stat.st_dev, named_stat.st_ino) == opened_identity:
+                    os.unlink(target.name, dir_fd=parent_fd)
+            except OSError:
+                pass
+        if isinstance(exc, OSError):
+            raise MillefeuilleContractError(
+                f"could not safely write {label} {target}: {exc}"
+            ) from exc
+        raise
+    finally:
+        if fd is not None:
+            os.close(fd)
+        os.close(parent_fd)

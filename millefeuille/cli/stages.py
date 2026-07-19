@@ -26,6 +26,7 @@ from millefeuille.domain.millefeuille import (
 from millefeuille.domain.model_execution import (
     SUMMARY_MODEL_STAGES,
     build_summary_execution_plan,
+    materialize_model_provenance_record_from_files,
 )
 from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
 from millefeuille.domain.offline_stages import (
@@ -178,7 +179,32 @@ def run_stage_cli(
                     evidence_need=args.evidence_need,
                 )
         elif args.command == "models":
-            if args.plan:
+            if args.provenance:
+                if args.mode != RunMode.PREVIEW.value:
+                    raise MillefeuilleContractError(
+                        "models --provenance is preview-only because it "
+                        "materializes local JSON evidence"
+                    )
+                if args.plan or args.profile or args.stage:
+                    raise MillefeuilleContractError(
+                        "models --provenance cannot be combined with --plan, "
+                        "--profile, or --stage"
+                    )
+                if not args.plan_file or not args.execution_evidence:
+                    raise MillefeuilleContractError(
+                        "models --provenance requires --plan-file and "
+                        "--execution-evidence"
+                    )
+                payload = materialize_model_provenance_record_from_files(
+                    execution_plan_path=args.plan_file,
+                    execution_evidence_path=args.execution_evidence,
+                    output_path=args.output,
+                )
+            elif args.plan:
+                if args.plan_file or args.execution_evidence or args.output:
+                    raise MillefeuilleContractError(
+                        "models --plan cannot be combined with provenance files"
+                    )
                 if not args.profile or not args.stage:
                     raise MillefeuilleContractError(
                         "models --plan requires --profile and --stage"
@@ -188,9 +214,16 @@ def run_stage_cli(
                     stage=args.stage,
                 )
             else:
-                if args.profile or args.stage:
+                if (
+                    args.profile
+                    or args.stage
+                    or args.plan_file
+                    or args.execution_evidence
+                    or args.output
+                ):
                     raise MillefeuilleContractError(
-                        "models --profile/--stage require --plan"
+                        "models --profile/--stage/provenance files require "
+                        "--plan or --provenance"
                     )
                 payload = DEFAULT_MODEL_PROFILE_BUNDLE
         elif args.command == "run":
@@ -368,8 +401,19 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Resolve one summary-stage execution plan without a provider call.",
     )
+    models.add_argument(
+        "--provenance",
+        action="store_true",
+        help=(
+            "Validate model execution evidence against a plan and materialize "
+            "one safe provenance JSON record."
+        ),
+    )
     models.add_argument("--profile")
     models.add_argument("--stage", choices=SUMMARY_MODEL_STAGES)
+    models.add_argument("--plan-file")
+    models.add_argument("--execution-evidence")
+    models.add_argument("--output")
     models.add_argument("--json", action="store_true")
 
     run = subparsers.add_parser(

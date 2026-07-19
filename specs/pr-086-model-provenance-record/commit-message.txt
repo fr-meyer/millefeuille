@@ -1,0 +1,5 @@
+feat: add strict model provenance materialization
+
+Implement Speculoos task pr-086-model-provenance-record.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

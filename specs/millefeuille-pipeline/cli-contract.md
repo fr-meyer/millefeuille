@@ -79,6 +79,19 @@ derived artifact write.
     lane, fallback policy, live blockers, and the required provenance shape.
     It never reads credentials, calls a provider, or claims actual resolved
     model, usage, input, or output evidence.
+  - `--provenance --plan-file <json> --execution-evidence <json>` validates
+    one strict `millefeuille-model-execution-evidence/v0.1` object against the
+    selected plan and materializes a `millefeuille-model-provenance/v0.1`
+    record to stdout or an explicit `--output` JSON path. It rejects unknown
+    fields, identity/control drift, invalid fallback resolution, invalid token
+    totals, unsafe or duplicate refs, malformed warning records, prompts,
+    provider payloads, private paper text, PDF payload markers, and credential
+    or secret markers. This is JSON materialization only; appending provenance
+    to a verified run package remains later work. The full plan/no-call
+    contract and canonical bundled-profile values are revalidated before
+    evidence is trusted. `--output` exclusively creates a new file through
+    descriptor-relative no-follow traversal and fails closed on existing paths,
+    symlinked parents, run-package marker ancestors, or replacement races.
 
 - `run`
   - Implements the canonical preview chain from `extract-native` and
@@ -231,6 +244,9 @@ derived artifact write.
 - `models`
   - List, validate, and explain available model profiles for each model-using
     stage.
+  - Materialize provider-payload-free model provenance from exact execution
+    evidence after a separately approved execution lane has produced that
+    evidence.
 
 - `artifacts`
   - Show artifact-root, source-pack refs, manifest status, missing outputs, and
