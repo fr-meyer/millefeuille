@@ -19,11 +19,12 @@ write_paths:
   - tests/test_millefeuille_stage_cli.py
 github:
   issue: null
-  pull_request: null
+  pull_request: 84
   issue_project_item: null
   pull_request_project_item: null
   project_status: In Progress
   project_item: null
+  url: https://github.com/fr-meyer/millefeuille/pull/84
 post_merge_expected:
   pull_request: pr-number-assigned-after-publication
   base_branch: dev
@@ -76,3 +77,4 @@ evidence:
   - Final full unittest discovery passed: 320 tests.
   - Ruff, YAML/JSON metadata parse, private-data scan, diff check, Speculoos validation, and publication checks passed.
   - No credential lookup, provider call, private paper read, or live external write was performed.
+  - PR #84 was opened through the verified fr-meyer user-author path.

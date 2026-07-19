@@ -57,9 +57,9 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: planned
-    number: null
-    url: null
+    status: open
+    number: 84
+    url: https://github.com/fr-meyer/millefeuille/pull/84
     base_branch: dev
     head_branch: feat/pr-084-model-execution-plan
     head_sha: null

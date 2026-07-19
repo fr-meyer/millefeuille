@@ -16,13 +16,13 @@ notes:
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
   id: pr-084-model-execution-plan
-  pull_request: null
+  pull_request: 84
   project_item: null
   pull_request_project_item: null
   branch: feat/pr-084-model-execution-plan
   status: In Progress
   project_status: In Progress
-pull_request: null
+pull_request: 84
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36
