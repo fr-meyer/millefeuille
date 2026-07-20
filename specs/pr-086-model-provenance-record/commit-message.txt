@@ -1,5 +1,5 @@
-feat: add strict model provenance materialization
+chore: close strict model provenance delivery
 
-Implement Speculoos task pr-086-model-provenance-record.
+Close PR 86 delivery metadata for strict model provenance materialization, including exact-head review, dev merge, and remote branch cleanup.
 
 Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

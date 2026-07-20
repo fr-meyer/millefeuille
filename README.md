@@ -289,8 +289,9 @@ These commands stay offline and preview-only in the current contract slice:
   evidence; callers checking an existing record can use
   `validate_model_provenance_record`. Drift errors identify only the field and
   never echo supplied or expected values.
-  This profile and its deterministic no-call execution-plan contract are merged
-  on `dev`; neither authorizes a live provider call or a promotion to `main`.
+  This profile, its deterministic no-call execution-plan contract, and its
+  strict provider-payload-free provenance materializer are merged on `dev`;
+  none authorizes a live provider call or a promotion to `main`.
 - `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
   and `index` expose the existing fixture writers as explicit single-paper
   stages and update the run manifest and artifact index.

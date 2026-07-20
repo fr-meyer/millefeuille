@@ -1,6 +1,6 @@
 id: pr-086-model-provenance-record
 title: Add strict model provenance materialization
-status: in_progress
+status: merged
 branch: feat/pr-086-model-provenance-record
 base_branch: dev
 post_merge_expected:
@@ -60,4 +60,22 @@ publish_authority: Active Speculoos Millefeuille Feuilleton; routine feature-to-
 notes:
   - Started from clean synchronized dev commit 5d99fc4089647ea996b33eed006a7fc7d6b4a5db.
   - This slice deliberately materializes JSON only; adding provenance records to verified run packages is a later task.
-evidence: []
+evidence:
+  - 'PR #86 merged with merge commit f41c8c2af77e0b1702c3d32d9489ef3ce2fb37d6'
+  - 'Mergeguez approved exact head 715af38e3cb6def668558356ebb5bb47ae1f3ea1 with zero findings: https://github.com/fr-meyer/millefeuille/pull/86#pullrequestreview-4732773210'
+  - 'Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/88291725585'
+  - 'Remote feature branch feat/pr-086-model-provenance-record deleted through the approved post-merge cleanup lane'
+  - Project item unavailable; closeout recorded without ProjectV2 mutation
+  - surface-sync --close-merged-task cleared repo-local active task metadata
+github:
+  issue: null
+  pull_request: 86
+  issue_project_item: null
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: Done
+  url: https://github.com/fr-meyer/millefeuille/pull/86
+  head_sha: 715af38e3cb6def668558356ebb5bb47ae1f3ea1
+  merge_commit: f41c8c2af77e0b1702c3d32d9489ef3ce2fb37d6
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/86#pullrequestreview-4732773210
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88291725585
