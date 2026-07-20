@@ -273,7 +273,16 @@ These commands stay offline and preview-only in the current contract slice:
   live execution. An explicit `--output` is created only when every parent is
   traversable without symlinks and the final path does not already exist;
   descriptor-bound writes fail closed on concurrent path replacement and
-  reject destinations beneath run-package manifest/index markers.
+  reject destinations beneath run-package manifest/index markers. The evidence
+  and record schemas reject padded strings and final-newline refs/codes and
+  publish a mandatory `x-millefeuille-semantic-validation` assertion for token
+  addition, which JSON Schema draft 2020-12 cannot express directly. Generic
+  schema validation must therefore be paired with that assertion. Token counts
+  are capped at `9007199254740991` so exact-integer arithmetic is portable to
+  JSON/JavaScript consumers. The materializer enforces the assertion for
+  execution evidence; callers checking an existing record can use
+  `validate_model_provenance_record`. Drift errors identify only the field and
+  never echo supplied or expected values.
   This profile and its deterministic no-call execution-plan contract are merged
   on `dev`; neither authorizes a live provider call or a promotion to `main`.
 - `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,

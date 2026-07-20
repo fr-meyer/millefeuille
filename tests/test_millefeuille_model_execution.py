@@ -19,6 +19,7 @@ from millefeuille.domain.model_execution import (
     build_summary_execution_plan,
     materialize_model_provenance_record,
     materialize_model_provenance_record_from_files,
+    validate_model_provenance_record,
 )
 from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
 
@@ -317,7 +318,9 @@ class ModelExecutionPlanTests(unittest.TestCase):
         )
         cases: list[tuple[str, object]] = [
             ("profile", " research-default"),
+            ("profile", "research-default\u0085"),
             ("reasoning_effort", "xhigh "),
+            ("prompt_version", "summary-full-paper-v1\u001c"),
             (
                 "input_refs",
                 [
@@ -348,6 +351,207 @@ class ModelExecutionPlanTests(unittest.TestCase):
                     execution_plan=plan,
                     execution_evidence=evidence,
                 )
+
+    def test_model_provenance_drift_errors_do_not_reflect_values(self):
+        plan = build_summary_execution_plan(
+            profile="research-default",
+            stage="summarize_full_paper",
+        )
+        evidence = self._research_execution_evidence()
+        evidence["prompt_version"] = "confidential-research-version"
+
+        with self.assertRaises(MillefeuilleContractError) as raised:
+            materialize_model_provenance_record(
+                execution_plan=plan,
+                execution_evidence=evidence,
+            )
+
+        self.assertEqual(
+            str(raised.exception),
+            "model provenance prompt_version drift",
+        )
+        self.assertNotIn("confidential-research-version", str(raised.exception))
+        self.assertNotIn("summary-full-paper-v1", str(raised.exception))
+
+        no_reflection_cases = [
+            (
+                "unknown field",
+                {"private-case-name": "private-case-value"},
+                "private-case-name",
+                "private-case-value",
+            ),
+            (
+                "duplicate ref",
+                {
+                    "input_refs": [
+                        "private/case-reference.json",
+                        "private/case-reference.json",
+                    ]
+                },
+                "private/case-reference.json",
+                None,
+            ),
+        ]
+        for label, changes, private_value, second_private_value in no_reflection_cases:
+            with self.subTest(label=label):
+                malformed = self._research_execution_evidence()
+                malformed.update(changes)
+                with self.assertRaises(MillefeuilleContractError) as nested_raised:
+                    materialize_model_provenance_record(
+                        execution_plan=plan,
+                        execution_evidence=malformed,
+                    )
+                error = str(nested_raised.exception)
+                self.assertNotIn(private_value, error)
+                if second_private_value is not None:
+                    self.assertNotIn(second_private_value, error)
+
+    def test_model_evidence_and_record_schemas_match_lexical_semantic_contract(self):
+        spec_dir = (
+            Path(__file__).resolve().parents[1]
+            / "specs"
+            / "millefeuille-pipeline"
+        )
+        plan = build_summary_execution_plan(
+            profile="research-default",
+            stage="summarize_full_paper",
+        )
+        evidence = self._research_execution_evidence()
+        record = materialize_model_provenance_record(
+            execution_plan=plan,
+            execution_evidence=evidence,
+        )
+        fixtures = {
+            "model-execution-evidence.schema.json": evidence,
+            "model-provenance-record.schema.json": record,
+        }
+
+        for schema_name, valid_payload in fixtures.items():
+            with self.subTest(schema=schema_name):
+                schema = json.loads(
+                    (spec_dir / schema_name).read_text(encoding="utf-8")
+                )
+                Draft202012Validator.check_schema(schema)
+                validator = Draft202012Validator(schema)
+                validator.validate(valid_payload)
+                semantic = schema["x-millefeuille-semantic-validation"]
+                self.assertTrue(semantic["required"])
+                self.assertEqual(semantic["arithmetic"], "exact-integer")
+                self.assertEqual(semantic["maximum_integer"], 9007199254740991)
+                self.assertEqual(
+                    semantic["assertions"],
+                    [
+                        "usage.total_tokens == usage.input_tokens + "
+                        "usage.output_tokens"
+                    ],
+                )
+                self.assertEqual(
+                    semantic["first_party_validator"]["requires"],
+                    (
+                        ["execution_plan", "execution_evidence"]
+                        if schema_name == "model-execution-evidence.schema.json"
+                        else ["model_provenance_record"]
+                    ),
+                )
+
+                malformed_payloads = []
+                for boundary_whitespace in (
+                    " ",
+                    "\u001c",
+                    "\u001f",
+                    "\u0085",
+                    "\u00a0",
+                    "\u3000",
+                ):
+                    padded_profile = deepcopy(valid_payload)
+                    padded_profile["profile"] = (
+                        boundary_whitespace + "research-default"
+                    )
+                    malformed_payloads.append(padded_profile)
+                    padded_prompt_version = deepcopy(valid_payload)
+                    padded_prompt_version["prompt_version"] = (
+                        "summary-v1" + boundary_whitespace
+                    )
+                    malformed_payloads.append(padded_prompt_version)
+                newline_ref = deepcopy(valid_payload)
+                newline_ref["input_refs"][0] += "\n"
+                malformed_payloads.append(newline_ref)
+                trailing_slash_ref = deepcopy(valid_payload)
+                trailing_slash_ref["input_refs"][0] = "artifact/"
+                malformed_payloads.append(trailing_slash_ref)
+                newline_warning_code = deepcopy(valid_payload)
+                newline_warning_code["quality_warnings"][0]["code"] += "\n"
+                malformed_payloads.append(newline_warning_code)
+                oversized_tokens = deepcopy(valid_payload)
+                oversized_tokens["usage"] = {
+                    "input_tokens": 9007199254740992,
+                    "output_tokens": 0,
+                    "total_tokens": 9007199254740992,
+                }
+                malformed_payloads.append(oversized_tokens)
+
+                for malformed in malformed_payloads:
+                    with self.assertRaises(ValidationError):
+                        validator.validate(malformed)
+
+                byte_order_mark_is_not_boundary_whitespace = deepcopy(valid_payload)
+                byte_order_mark_is_not_boundary_whitespace["prompt_version"] = (
+                    "\ufeffsummary-v1\ufeff"
+                )
+                validator.validate(byte_order_mark_is_not_boundary_whitespace)
+
+                structurally_valid_bad_total = deepcopy(valid_payload)
+                structurally_valid_bad_total["usage"]["total_tokens"] += 1
+                validator.validate(structurally_valid_bad_total)
+
+        byte_order_mark_record = deepcopy(record)
+        byte_order_mark_record["prompt_version"] = "\ufeffsummary-v1\ufeff"
+        self.assertEqual(
+            validate_model_provenance_record(byte_order_mark_record)[
+                "prompt_version"
+            ],
+            "\ufeffsummary-v1\ufeff",
+        )
+
+        maximum_record = deepcopy(record)
+        maximum_record["usage"] = {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 0,
+            "total_tokens": 9007199254740991,
+        }
+        self.assertEqual(
+            validate_model_provenance_record(maximum_record)["usage"][
+                "total_tokens"
+            ],
+            9007199254740991,
+        )
+
+        oversized_record = deepcopy(record)
+        oversized_record["usage"] = {
+            "input_tokens": 9007199254740992,
+            "output_tokens": 0,
+            "total_tokens": 9007199254740992,
+        }
+        with self.assertRaisesRegex(MillefeuilleContractError, "safe-integer"):
+            validate_model_provenance_record(oversized_record)
+
+        trailing_slash_record = deepcopy(record)
+        trailing_slash_record["input_refs"][0] = "artifact/"
+        with self.assertRaisesRegex(MillefeuilleContractError, "safe relative"):
+            validate_model_provenance_record(trailing_slash_record)
+
+        bad_evidence = deepcopy(evidence)
+        bad_evidence["usage"]["total_tokens"] += 1
+        with self.assertRaisesRegex(MillefeuilleContractError, "total_tokens"):
+            materialize_model_provenance_record(
+                execution_plan=plan,
+                execution_evidence=bad_evidence,
+            )
+
+        bad_record = deepcopy(record)
+        bad_record["usage"]["total_tokens"] += 1
+        with self.assertRaisesRegex(MillefeuilleContractError, "total_tokens"):
+            validate_model_provenance_record(bad_record)
 
     def test_model_provenance_rejects_incomplete_or_relaxed_execution_plans(self):
         plan = build_summary_execution_plan(

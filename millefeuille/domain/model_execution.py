@@ -88,6 +88,13 @@ _PROVENANCE_RECORD_FIELDS = frozenset({"schema_version", *_PROVENANCE_REQUIRED_F
 _USAGE_FIELDS = frozenset({"input_tokens", "output_tokens", "total_tokens"})
 _WARNING_FIELDS = frozenset({"code", "severity", "ref"})
 _WARNING_SEVERITIES = frozenset({"info", "warning", "error"})
+_JSON_SAFE_INTEGER_MAX = (1 << 53) - 1
+_BOUNDARY_WHITESPACE = frozenset(
+    "\u0009\u000a\u000b\u000c\u000d"
+    "\u001c\u001d\u001e\u001f\u0020\u0085\u00a0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000"
+)
 _RUN_PACKAGE_MARKERS = frozenset({"artifact-index.json", "stage-manifest.json"})
 _SAFE_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,255}\Z")
 _SAFE_WARNING_CODE = re.compile(r"[a-z][a-z0-9._-]{0,63}\Z")
@@ -141,12 +148,10 @@ def build_summary_execution_plan(
         )
     selected_profile = profiles.get(profile_name)
     if not isinstance(selected_profile, dict):
-        raise MillefeuilleContractError(f"unknown model profile {profile_name!r}")
+        raise MillefeuilleContractError("unknown model profile")
     stage_config = selected_profile.get(stage_name)
     if not isinstance(stage_config, dict):
-        raise MillefeuilleContractError(
-            f"model profile {profile_name!r} has no stage {stage_name!r}"
-        )
+        raise MillefeuilleContractError("model profile has no requested stage")
 
     requested_model = _required_string(stage_config.get("model"), "model")
     provider = _required_string(stage_config.get("provider"), "provider")
@@ -329,8 +334,82 @@ def materialize_model_provenance_record(
         "usage": usage,
         "quality_warnings": quality_warnings,
     }
-    _require_exact_fields(record, _PROVENANCE_RECORD_FIELDS, "model provenance record")
-    return record
+    return validate_model_provenance_record(record)
+
+
+def validate_model_provenance_record(
+    record: dict[str, Any],
+) -> dict[str, Any]:
+    """Apply the semantic v0.1 contract to an existing provenance record.
+
+    JSON Schema validates the record's shape and lexical constraints, but
+    draft 2020-12 cannot express the required token-count addition. Consumers
+    validating an existing record must also use this semantic boundary (or an
+    equivalent implementation of the published semantic assertion).
+    """
+
+    payload = _require_object(record, "model provenance record")
+    _reject_forbidden_evidence_payload(payload, "model provenance record")
+    _require_exact_fields(
+        payload,
+        _PROVENANCE_RECORD_FIELDS,
+        "model provenance record",
+    )
+    if payload.get("schema_version") != MODEL_PROVENANCE_SCHEMA_VERSION:
+        raise MillefeuilleContractError(
+            "model provenance schema_version must be "
+            f"{MODEL_PROVENANCE_SCHEMA_VERSION!r}"
+        )
+
+    profile = _required_string(payload.get("profile"), "profile")
+    stage = _required_string(payload.get("stage"), "stage")
+    if stage not in SUMMARY_MODEL_STAGES:
+        raise MillefeuilleContractError("model provenance stage is unsupported")
+    requested_model = _required_string(
+        payload.get("requested_model"),
+        "requested_model",
+    )
+    resolved_model = _required_string(
+        payload.get("resolved_model"),
+        "resolved_model",
+    )
+    provider = _required_string(payload.get("provider"), "provider")
+    backend = _required_string(payload.get("backend"), "backend")
+    reasoning_effort = _nullable_control(
+        payload.get("reasoning_effort"),
+        "reasoning_effort",
+        _REASONING_EFFORTS,
+    )
+    fast_mode = _nullable_control(
+        payload.get("fast_mode"),
+        "fast_mode",
+        _FAST_MODES,
+    )
+    prompt_version = _nullable_required_string(
+        payload.get("prompt_version"),
+        "prompt_version",
+    )
+    input_refs = _validate_refs(payload.get("input_refs"), "input_refs")
+    output_refs = _validate_refs(payload.get("output_refs"), "output_refs")
+    usage = _validate_usage(payload.get("usage"))
+    quality_warnings = _validate_quality_warnings(payload.get("quality_warnings"))
+
+    return {
+        "schema_version": MODEL_PROVENANCE_SCHEMA_VERSION,
+        "profile": profile,
+        "stage": stage,
+        "requested_model": requested_model,
+        "resolved_model": resolved_model,
+        "provider": provider,
+        "backend": backend,
+        "reasoning_effort": reasoning_effort,
+        "fast_mode": fast_mode,
+        "prompt_version": prompt_version,
+        "input_refs": input_refs,
+        "output_refs": output_refs,
+        "usage": usage,
+        "quality_warnings": quality_warnings,
+    }
 
 
 def materialize_model_provenance_record_from_files(
@@ -364,9 +443,13 @@ def materialize_model_provenance_record_from_files(
 
 
 def _required_string(value: object, field_name: str) -> str:
-    if not isinstance(value, str) or not value.strip():
+    if (
+        not isinstance(value, str)
+        or not value
+        or all(character in _BOUNDARY_WHITESPACE for character in value)
+    ):
         raise MillefeuilleContractError(f"{field_name} must be a non-empty string")
-    if value != value.strip():
+    if value[0] in _BOUNDARY_WHITESPACE or value[-1] in _BOUNDARY_WHITESPACE:
         raise MillefeuilleContractError(
             f"{field_name} must not have leading or trailing whitespace"
         )
@@ -394,9 +477,7 @@ def _require_exact_fields(
     extra = sorted(actual_fields - expected_fields)
     missing = sorted(expected_fields - actual_fields)
     if extra:
-        raise MillefeuilleContractError(
-            f"{label} contains unknown fields: {', '.join(extra)}"
-        )
+        raise MillefeuilleContractError(f"{label} contains unknown fields")
     if missing:
         raise MillefeuilleContractError(
             f"{label} is missing required fields: {', '.join(missing)}"
@@ -405,10 +486,7 @@ def _require_exact_fields(
 
 def _require_equal(actual: object, expected: object, field_name: str) -> None:
     if actual != expected:
-        raise MillefeuilleContractError(
-            f"model provenance {field_name} drift: expected {expected!r}, "
-            f"got {actual!r}"
-        )
+        raise MillefeuilleContractError(f"model provenance {field_name} drift")
 
 
 def _nullable_control(
@@ -579,9 +657,7 @@ def _require_allowed_and_required_fields(
     extra = sorted(actual - allowed)
     missing = sorted(required - actual)
     if extra:
-        raise MillefeuilleContractError(
-            f"{label} contains unknown fields: {', '.join(extra)}"
-        )
+        raise MillefeuilleContractError(f"{label} contains unknown fields")
     if missing:
         raise MillefeuilleContractError(
             f"{label} is missing required fields: {', '.join(missing)}"
@@ -642,9 +718,7 @@ def _validate_refs(value: object, field_name: str) -> list[str]:
                 f"{field_name}[{index}] must be a safe relative artifact ref"
             )
         if ref in seen:
-            raise MillefeuilleContractError(
-                f"{field_name} contains duplicate ref {ref!r}"
-            )
+            raise MillefeuilleContractError(f"{field_name} contains duplicate refs")
         seen.add(ref)
         refs.append(ref)
     return refs
@@ -660,6 +734,10 @@ def _validate_usage(value: object) -> dict[str, int]:
             raise MillefeuilleContractError(f"usage.{field_name} must be an integer")
         if token_count < 0:
             raise MillefeuilleContractError(f"usage.{field_name} must be non-negative")
+        if token_count > _JSON_SAFE_INTEGER_MAX:
+            raise MillefeuilleContractError(
+                f"usage.{field_name} must not exceed the JSON safe-integer maximum"
+            )
         result[field_name] = token_count
     if result["total_tokens"] != result["input_tokens"] + result["output_tokens"]:
         raise MillefeuilleContractError(
@@ -714,7 +792,7 @@ def _reject_forbidden_evidence_payload(value: object, label: str) -> None:
                 raise MillefeuilleContractError(
                     f"{label} must not include forbidden field {key!r}"
                 )
-            _reject_forbidden_evidence_payload(nested, f"{label}.{key}")
+            _reject_forbidden_evidence_payload(nested, label)
     elif isinstance(value, list):
         for index, nested in enumerate(value, start=1):
             _reject_forbidden_evidence_payload(nested, f"{label}[{index}]")

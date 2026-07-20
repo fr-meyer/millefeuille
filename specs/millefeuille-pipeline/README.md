@@ -100,6 +100,19 @@ are revalidated before evidence is trusted. An explicit output uses exclusive
 descriptor-relative no-follow creation, rejects existing files, symlinked
 parents, and run-package marker ancestors, and detects name or parent
 replacement races.
+The evidence and record JSON Schemas enforce the same unpadded-string and
+absolute-end ref/code lexical boundaries. Their explicit boundary-whitespace
+set matches the runtime contract across Python and ECMAScript regex engines.
+JSON Schema draft 2020-12 cannot express cross-property integer addition, so
+generic schema validation must be paired with the mandatory
+`x-millefeuille-semantic-validation` assertion requiring
+`usage.total_tokens == usage.input_tokens + usage.output_tokens`. Token counts
+are capped at the exact cross-runtime JSON integer maximum
+`9007199254740991`. The materializer enforces that assertion for evidence;
+consumers validating an existing record can call
+`validate_model_provenance_record` or implement the published assertion with
+exact integer arithmetic. Drift errors name only the mismatched field and never
+reflect supplied or expected values.
 
 Manual gates remain explicit: live Zotero reads/writes, PDF recovery/download,
 OCR/Mistral/PageIndex calls, model calls, worker-agent execution, OpenKB

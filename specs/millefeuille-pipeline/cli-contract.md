@@ -93,6 +93,15 @@ derived artifact write.
     evidence is trusted. `--output` exclusively creates a new file through
     descriptor-relative no-follow traversal and fails closed on existing paths,
     symlinked parents, run-package marker ancestors, or replacement races.
+    The evidence and record schemas align with runtime unpadded-string and
+    absolute-end ref/code checks. Because draft 2020-12 cannot express integer
+    addition, generic schema validation must be paired with their mandatory
+    `x-millefeuille-semantic-validation` assertion requiring
+    `usage.total_tokens == usage.input_tokens + usage.output_tokens`. Token
+    counts are capped at the exact cross-runtime JSON integer maximum
+    `9007199254740991`; the materializer and
+    `validate_model_provenance_record` enforce the semantic assertion. Drift
+    errors identify only the field and never echo supplied or expected values.
 
 - `run`
   - Implements the canonical preview chain from `extract-native` and
