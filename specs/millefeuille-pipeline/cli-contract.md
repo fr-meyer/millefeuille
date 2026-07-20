@@ -84,8 +84,9 @@ derived artifact write.
     selected plan and materializes a `millefeuille-model-provenance/v0.1`
     record to stdout or an explicit `--output` JSON path. It rejects unknown
     fields, identity/control drift, leading or trailing string whitespace,
-    invalid fallback resolution, invalid token totals, unsafe or duplicate refs,
-    malformed warning records, prompts, provider payloads, private paper text,
+    invalid fallback resolution, invalid token totals, unsafe refs, refs
+    duplicated within or shared across input/output lists, malformed warning
+    records, prompts, provider payloads, private paper text,
     PDF payload markers, and credential or secret markers. This is JSON
     materialization only; appending provenance to a verified run package remains
     later work. The full plan/no-call
@@ -97,8 +98,9 @@ derived artifact write.
     absolute-end ref/code checks. Because draft 2020-12 cannot express integer
     addition, generic schema validation must be paired with their mandatory
     `x-millefeuille-semantic-validation` assertion requiring
-    `usage.total_tokens == usage.input_tokens + usage.output_tokens`. Token
-    counts are capped at the exact cross-runtime JSON integer maximum
+    `usage.total_tokens == usage.input_tokens + usage.output_tokens` and
+    disjoint `input_refs`/`output_refs` sets. Token counts are capped at the
+    exact cross-runtime JSON integer maximum
     `9007199254740991`; the materializer and
     `validate_model_provenance_record` enforce the semantic assertion. Drift
     errors identify only the field and never echo supplied or expected values.

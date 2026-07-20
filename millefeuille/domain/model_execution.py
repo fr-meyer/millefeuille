@@ -313,6 +313,7 @@ def materialize_model_provenance_record(
 
     input_refs = _validate_refs(execution_evidence.get("input_refs"), "input_refs")
     output_refs = _validate_refs(execution_evidence.get("output_refs"), "output_refs")
+    _validate_disjoint_refs(input_refs, output_refs)
     usage = _validate_usage(execution_evidence.get("usage"))
     quality_warnings = _validate_quality_warnings(
         execution_evidence.get("quality_warnings")
@@ -391,6 +392,7 @@ def validate_model_provenance_record(
     )
     input_refs = _validate_refs(payload.get("input_refs"), "input_refs")
     output_refs = _validate_refs(payload.get("output_refs"), "output_refs")
+    _validate_disjoint_refs(input_refs, output_refs)
     usage = _validate_usage(payload.get("usage"))
     quality_warnings = _validate_quality_warnings(payload.get("quality_warnings"))
 
@@ -722,6 +724,13 @@ def _validate_refs(value: object, field_name: str) -> list[str]:
         seen.add(ref)
         refs.append(ref)
     return refs
+
+
+def _validate_disjoint_refs(input_refs: list[str], output_refs: list[str]) -> None:
+    if set(input_refs).intersection(output_refs):
+        raise MillefeuilleContractError(
+            "input_refs and output_refs must not contain shared refs"
+        )
 
 
 def _validate_usage(value: object) -> dict[str, int]:

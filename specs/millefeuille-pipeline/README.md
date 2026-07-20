@@ -91,7 +91,8 @@ strict `millefeuille-model-execution-evidence/v0.1` against the no-call plan and
 materializes a `millefeuille-model-provenance/v0.1` record to stdout or an
 explicit `--output` JSON path. The materializer rejects unknown fields,
 identity/control drift, leading or trailing string whitespace, invalid fallback
-resolution, invalid token totals, unsafe or duplicate refs, malformed warnings,
+resolution, invalid token totals, unsafe refs, refs duplicated within or shared
+across input/output lists, malformed warnings,
 prompts, provider payloads, private paper text, PDF payload markers, and
 credential/secret markers. It does not append to a run package or perform
 credential lookup/provider execution.
@@ -106,7 +107,8 @@ set matches the runtime contract across Python and ECMAScript regex engines.
 JSON Schema draft 2020-12 cannot express cross-property integer addition, so
 generic schema validation must be paired with the mandatory
 `x-millefeuille-semantic-validation` assertion requiring
-`usage.total_tokens == usage.input_tokens + usage.output_tokens`. Token counts
+`usage.total_tokens == usage.input_tokens + usage.output_tokens` and disjoint
+`input_refs`/`output_refs` sets. Token counts
 are capped at the exact cross-runtime JSON integer maximum
 `9007199254740991`. The materializer enforces that assertion for evidence;
 consumers validating an existing record can call

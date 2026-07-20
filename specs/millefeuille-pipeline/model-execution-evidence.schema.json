@@ -9,7 +9,8 @@
     "arithmetic": "exact-integer",
     "maximum_integer": 9007199254740991,
     "assertions": [
-      "usage.total_tokens == usage.input_tokens + usage.output_tokens"
+      "usage.total_tokens == usage.input_tokens + usage.output_tokens",
+      "intersection(input_refs, output_refs) == []"
     ],
     "first_party_validator": {
       "name": "millefeuille.domain.model_execution.materialize_model_provenance_record",

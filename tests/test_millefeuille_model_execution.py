@@ -278,6 +278,14 @@ class ModelExecutionPlanTests(unittest.TestCase):
             ),
             ("output_refs", ["../leak.json"], "safe relative"),
             (
+                "output_refs",
+                [
+                    "structure/structure.json",
+                    "summaries/texts/full-paper.md",
+                ],
+                "shared refs",
+            ),
+            (
                 "quality_warnings",
                 [
                     {
@@ -391,6 +399,15 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 "private/case-reference.json",
                 None,
             ),
+            (
+                "shared ref",
+                {
+                    "input_refs": ["private/shared-reference.json"],
+                    "output_refs": ["private/shared-reference.json"],
+                },
+                "private/shared-reference.json",
+                None,
+            ),
         ]
         for label, changes, private_value, second_private_value in no_reflection_cases:
             with self.subTest(label=label):
@@ -442,7 +459,8 @@ class ModelExecutionPlanTests(unittest.TestCase):
                     semantic["assertions"],
                     [
                         "usage.total_tokens == usage.input_tokens + "
-                        "usage.output_tokens"
+                        "usage.output_tokens",
+                        "intersection(input_refs, output_refs) == []",
                     ],
                 )
                 self.assertEqual(
@@ -504,6 +522,12 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 structurally_valid_bad_total["usage"]["total_tokens"] += 1
                 validator.validate(structurally_valid_bad_total)
 
+                structurally_valid_overlapping_refs = deepcopy(valid_payload)
+                structurally_valid_overlapping_refs["output_refs"][0] = (
+                    structurally_valid_overlapping_refs["input_refs"][0]
+                )
+                validator.validate(structurally_valid_overlapping_refs)
+
         byte_order_mark_record = deepcopy(record)
         byte_order_mark_record["prompt_version"] = "\ufeffsummary-v1\ufeff"
         self.assertEqual(
@@ -539,6 +563,11 @@ class ModelExecutionPlanTests(unittest.TestCase):
         trailing_slash_record["input_refs"][0] = "artifact/"
         with self.assertRaisesRegex(MillefeuilleContractError, "safe relative"):
             validate_model_provenance_record(trailing_slash_record)
+
+        overlapping_record = deepcopy(record)
+        overlapping_record["output_refs"][0] = overlapping_record["input_refs"][0]
+        with self.assertRaisesRegex(MillefeuilleContractError, "shared refs"):
+            validate_model_provenance_record(overlapping_record)
 
         bad_evidence = deepcopy(evidence)
         bad_evidence["usage"]["total_tokens"] += 1

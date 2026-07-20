@@ -267,8 +267,8 @@ These commands stay offline and preview-only in the current contract slice:
   `millefeuille-model-provenance/v0.1` JSON record only. The
   materializer rejects unknown fields, prompt/provider/paper payloads, secret
   markers, identity/control drift, leading or trailing string whitespace,
-  invalid fallback resolution, invalid token totals, unsafe or duplicate refs,
-  and malformed warnings. It does not append
+  invalid fallback resolution, invalid token totals, unsafe refs, refs duplicated
+  within or shared across input/output lists, and malformed warnings. It does not append
   provenance to a run package, look up credentials, call a provider, or approve
   live execution. An explicit `--output` is created only when every parent is
   traversable without symlinks and the final path does not already exist;
@@ -279,8 +279,9 @@ These commands stay offline and preview-only in the current contract slice:
   addition, which JSON Schema draft 2020-12 cannot express directly. Generic
   schema validation must therefore be paired with that assertion. Token counts
   are capped at `9007199254740991` so exact-integer arithmetic is portable to
-  JSON/JavaScript consumers. The materializer enforces the assertion for
-  execution evidence; callers checking an existing record can use
+  JSON/JavaScript consumers. The schemas also require input/output ref sets to
+  be disjoint. The materializer enforces these assertions for execution
+  evidence; callers checking an existing record can use
   `validate_model_provenance_record`. Drift errors identify only the field and
   never echo supplied or expected values.
   This profile and its deterministic no-call execution-plan contract are merged
