@@ -310,6 +310,45 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 execution_evidence=bad_usage,
             )
 
+    def test_model_provenance_rejects_whitespace_padded_controls_and_refs(self):
+        plan = build_summary_execution_plan(
+            profile="research-default",
+            stage="summarize_full_paper",
+        )
+        cases: list[tuple[str, object]] = [
+            ("profile", " research-default"),
+            ("reasoning_effort", "xhigh "),
+            (
+                "input_refs",
+                [
+                    " structure/structure.json",
+                    "summaries/request/full-paper.json",
+                ],
+            ),
+            (
+                "output_refs",
+                [
+                    "summaries/hierarchical-summary.json",
+                    "summaries/texts/full-paper.md ",
+                ],
+            ),
+        ]
+
+        for field_name, value in cases:
+            with (
+                self.subTest(field_name=field_name),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "leading or trailing whitespace",
+                ),
+            ):
+                evidence = self._research_execution_evidence()
+                evidence[field_name] = value
+                materialize_model_provenance_record(
+                    execution_plan=plan,
+                    execution_evidence=evidence,
+                )
+
     def test_model_provenance_rejects_incomplete_or_relaxed_execution_plans(self):
         plan = build_summary_execution_plan(
             profile="research-default",

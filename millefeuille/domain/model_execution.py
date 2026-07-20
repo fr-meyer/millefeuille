@@ -366,7 +366,11 @@ def materialize_model_provenance_record_from_files(
 def _required_string(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise MillefeuilleContractError(f"{field_name} must be a non-empty string")
-    return value.strip()
+    if value != value.strip():
+        raise MillefeuilleContractError(
+            f"{field_name} must not have leading or trailing whitespace"
+        )
+    return value
 
 
 def _nullable_required_string(value: object, field_name: str) -> str | None:

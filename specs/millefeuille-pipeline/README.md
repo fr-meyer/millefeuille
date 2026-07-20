@@ -90,10 +90,11 @@ exists.
 strict `millefeuille-model-execution-evidence/v0.1` against the no-call plan and
 materializes a `millefeuille-model-provenance/v0.1` record to stdout or an
 explicit `--output` JSON path. The materializer rejects unknown fields,
-identity/control drift, invalid fallback resolution, invalid token totals,
-unsafe or duplicate refs, malformed warnings, prompts, provider payloads,
-private paper text, PDF payload markers, and credential/secret markers. It does
-not append to a run package or perform credential lookup/provider execution.
+identity/control drift, leading or trailing string whitespace, invalid fallback
+resolution, invalid token totals, unsafe or duplicate refs, malformed warnings,
+prompts, provider payloads, private paper text, PDF payload markers, and
+credential/secret markers. It does not append to a run package or perform
+credential lookup/provider execution.
 The complete plan shape, canonical bundled-profile values, and no-call controls
 are revalidated before evidence is trusted. An explicit output uses exclusive
 descriptor-relative no-follow creation, rejects existing files, symlinked
