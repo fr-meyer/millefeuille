@@ -37,7 +37,9 @@ REQUIRED_JSON_SCHEMAS = [
     "classification-batch-summary.schema.json",
     "classification-action-evidence.schema.json",
     "classification-action-record.schema.json",
+    "model-execution-evidence.schema.json",
     "model-execution-plan.schema.json",
+    "model-provenance-record.schema.json",
 ]
 
 REQUIRED_STAGES = {

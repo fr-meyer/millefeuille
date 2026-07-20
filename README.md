@@ -233,6 +233,7 @@ millefeuille retrieve --source-pack-root ./source-packs --doi https://doi.org/10
 millefeuille retrieve --source-pack-root ./source-packs --batch-manifest retrieval-batch.json --summary-scope classification --json
 millefeuille models
 millefeuille models --plan --profile research-default --stage summarize_full_paper --json
+millefeuille models --provenance --plan-file model-plan.json --execution-evidence model-execution-evidence.json --output model-provenance.json --json
 millefeuille run --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --stages acceptance,classify,writeback --handoff handoff.jsonl --classification-evidence classification-evidence.json --release-preflight
 ```
 
@@ -260,6 +261,34 @@ These commands stay offline and preview-only in the current contract slice:
   provider call occurred. The
   `research-default` page, section, and full-paper summary stages select
   `openai/gpt-5.6-sol` with `reasoning_effort: xhigh` and `fast_mode: off`.
+  `models --provenance --plan-file <json> --execution-evidence <json>`
+  requires that plan to match the canonical bundled profile, validates exact
+  post-execution evidence against it, and materializes a strict
+  `millefeuille-model-provenance/v0.1` JSON record only. The
+  materializer rejects unknown fields, prompt/provider/paper payloads, secret
+  markers, identity/control drift, leading or trailing string whitespace,
+  invalid fallback resolution, invalid token totals, unsafe refs, bare namespace
+  refs, or refs outside the trusted `structure/` and `summaries/` artifact
+  namespaces, common credential-token and provider-payload marker formats even
+  when embedded in any evidence string, refs duplicated within or shared across
+  input/output lists, and malformed warnings. The existing `summaries/texts`
+  directory ref and arbitrary safe descendants under those namespaces remain
+  valid. It does not append
+  provenance to a run package, look up credentials, call a provider, or approve
+  live execution. An explicit `--output` is created only when every parent is
+  traversable without symlinks and the final path does not already exist;
+  descriptor-bound writes fail closed on concurrent path replacement and
+  reject destinations beneath run-package manifest/index markers. The evidence
+  and record schemas reject padded strings and final-newline refs/codes and
+  publish a mandatory `x-millefeuille-semantic-validation` assertion for token
+  addition, which JSON Schema draft 2020-12 cannot express directly. Generic
+  schema validation must therefore be paired with that assertion. Token counts
+  are capped at `9007199254740991` so exact-integer arithmetic is portable to
+  JSON/JavaScript consumers. The schemas also require input/output ref sets to
+  be disjoint. The materializer enforces these assertions for execution
+  evidence; callers checking an existing record can use
+  `validate_model_provenance_record`. Drift errors identify only the field and
+  never echo supplied or expected values.
   This profile and its deterministic no-call execution-plan contract are merged
   on `dev`; neither authorizes a live provider call or a promotion to `main`.
 - `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
