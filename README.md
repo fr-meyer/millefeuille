@@ -267,8 +267,12 @@ These commands stay offline and preview-only in the current contract slice:
   `millefeuille-model-provenance/v0.1` JSON record only. The
   materializer rejects unknown fields, prompt/provider/paper payloads, secret
   markers, identity/control drift, leading or trailing string whitespace,
-  invalid fallback resolution, invalid token totals, unsafe refs, refs duplicated
-  within or shared across input/output lists, and malformed warnings. It does not append
+  invalid fallback resolution, invalid token totals, unsafe refs or refs
+  outside the trusted `structure/` and `summaries/` artifact namespaces,
+  common credential-token and provider-payload marker formats in any evidence
+  string, refs duplicated within or shared across input/output lists, and
+  malformed warnings. Arbitrary safe summary identifiers and the existing
+  `summaries/texts` directory ref remain valid. It does not append
   provenance to a run package, look up credentials, call a provider, or approve
   live execution. An explicit `--output` is created only when every parent is
   traversable without symlinks and the final path does not already exist;

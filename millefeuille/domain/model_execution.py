@@ -38,12 +38,14 @@ _PROVENANCE_REQUIRED_FIELDS = (
     "usage",
     "quality_warnings",
 )
-_PARAMETER_FIELDS = (
-    "temperature",
-    "reasoning_effort",
-    "fast_mode",
-    "prompt_version",
-    "record_usage",
+_PARAMETER_FIELDS = frozenset(
+    {
+        "temperature",
+        "reasoning_effort",
+        "fast_mode",
+        "prompt_version",
+        "record_usage",
+    }
 )
 _REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
 _FAST_MODES = {"off", "on", "auto"}
@@ -96,6 +98,7 @@ _BOUNDARY_WHITESPACE = frozenset(
     "\u2028\u2029\u202f\u205f\u3000"
 )
 _RUN_PACKAGE_MARKERS = frozenset({"artifact-index.json", "stage-manifest.json"})
+_TRUSTED_ARTIFACT_REF_NAMESPACES = frozenset({"structure", "summaries"})
 _SAFE_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,255}\Z")
 _SAFE_WARNING_CODE = re.compile(r"[a-z][a-z0-9._-]{0,63}\Z")
 _FORBIDDEN_EVIDENCE_FIELDS = frozenset(
@@ -119,6 +122,28 @@ _FORBIDDEN_EVIDENCE_MARKERS = (
     re.compile(r"\bBearer\s+[A-Za-z0-9._~+/-]{8,}", re.IGNORECASE),
     re.compile(r"data:application/pdf", re.IGNORECASE),
     re.compile(r"%PDF-"),
+    re.compile(
+        r"(?<![A-Za-z0-9_-])sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}"
+        r"(?![A-Za-z0-9_-])"
+    ),
+    re.compile(r"(?<![A-Za-z0-9_-])AIza[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])"),
+    re.compile(r"(?<![A-Z0-9])(?:AKIA|ASIA)[A-Z0-9]{16}"),
+    re.compile(r"(?<![A-Za-z0-9_])gh[pousr]_[A-Za-z0-9]{20,}(?![A-Za-z0-9])"),
+    re.compile(r"(?<![A-Za-z0-9_])github_pat_[A-Za-z0-9_]{20,}"),
+    re.compile(r"(?<![A-Za-z0-9_])glpat-[A-Za-z0-9_-]{20,}"),
+    re.compile(r"(?<![A-Za-z0-9_])npm_[A-Za-z0-9]{20,}(?![A-Za-z0-9])"),
+    re.compile(r"(?<![A-Za-z0-9_])dop_v1_[A-Fa-f0-9]{32,}(?![A-Fa-f0-9])"),
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:sk|rk|pk)_(?:live|test)_"
+        r"[A-Za-z0-9]{16,}(?![A-Za-z0-9])"
+    ),
+    re.compile(r"(?<![A-Za-z0-9_])hf_[A-Za-z0-9]{20,}(?![A-Za-z0-9])"),
+    re.compile(r"(?<![A-Za-z0-9-])xox[baprs]-[A-Za-z0-9-]{10,}"),
+    re.compile(
+        r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{10,}\."
+        r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"
+        r"(?![A-Za-z0-9_-])"
+    ),
 )
 
 
@@ -181,7 +206,7 @@ def build_summary_execution_plan(
     _validate_requested_parameters(stage_config)
     requested_parameters = {
         name: stage_config[name]
-        for name in _PARAMETER_FIELDS
+        for name in sorted(_PARAMETER_FIELDS)
         if name in stage_config
     }
     fixture_only = provider == "none"
@@ -529,7 +554,7 @@ def _validate_plan_shape(execution_plan: dict[str, Any]) -> None:
     )
     _require_allowed_and_required_fields(
         requested_parameters,
-        allowed=frozenset(_PARAMETER_FIELDS),
+        allowed=_PARAMETER_FIELDS,
         required=frozenset({"record_usage"}),
         label="requested_parameters",
     )
@@ -710,14 +735,14 @@ def _validate_refs(value: object, field_name: str) -> list[str]:
         ref = _required_string(item, f"{field_name}[{index}]")
         if (
             not _SAFE_REF.fullmatch(ref)
-            or ref.startswith("/")
+            or ref.partition("/")[0] not in _TRUSTED_ARTIFACT_REF_NAMESPACES
             or "//" in ref
             or "\\" in ref
             or ":" in ref
             or any(part in {"", ".", ".."} for part in ref.split("/"))
         ):
             raise MillefeuilleContractError(
-                f"{field_name}[{index}] must be a safe relative artifact ref"
+                f"{field_name}[{index}] must be a trusted relative artifact ref"
             )
         if ref in seen:
             raise MillefeuilleContractError(f"{field_name} contains duplicate refs")

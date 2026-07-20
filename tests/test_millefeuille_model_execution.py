@@ -25,6 +25,42 @@ from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
 
 
 class ModelExecutionPlanTests(unittest.TestCase):
+    @staticmethod
+    def _credential_tokens() -> tuple[str, ...]:
+        return (
+            "sk-" + "proj-" + "abcdefghijklmnopqrstuvwxyz123456",
+            "AI" + "za" + "abcdefghijklmnopqrstuvwx",
+            "AK" + "IA" + "ABCDEFGHIJKLMNOP",
+            "github_" + "pat_" + "abcdefghijklmnopqrstuvwxyz123456",
+            "gl" + "pat-" + "abcdefghijklmnopqrstuvwxyz123456",
+            "npm" + "_" + "abcdefghijklmnopqrstuvwxyz123456",
+            "dop_" + "v1_" + "a" * 64,
+            "rk_" + "live_" + "abcdefghijklmnopqrstuvwxyz",
+            "hf" + "_" + "abcdefghijklmnopqrstuvwxyz123456",
+            "xox" + "b-" + "abcdefghijklmnopqrstuvwxyz123456",
+            "eyJabcdefghijklmno"
+            + ".eyJpqrstuvwxyzAB"
+            + ".cdefghijklmnop",
+        )
+
+    @classmethod
+    def _ref_payload_tokens(cls) -> tuple[str, ...]:
+        return (
+            *cls._credential_tokens(),
+            "github_" + "pat_" + "a" * 24 + "-suffix",
+            "AK" + "IA" + "A" * 16 + "lower",
+        )
+
+    @classmethod
+    def _payload_markers(cls) -> tuple[str, ...]:
+        return (
+            *cls._ref_payload_tokens(),
+            "authorization: basic placeholder",
+            "Bearer abcdefghijklmnop",
+            "%PDF-1.7",
+            "data:application/pdf;base64,AAA",
+        )
+
     def _research_execution_evidence(self) -> dict[str, object]:
         return {
             "schema_version": "millefeuille-model-execution-evidence/v0.1",
@@ -40,7 +76,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
             "fallback_used": False,
             "input_refs": [
                 "structure/structure.json",
-                "summaries/request/full-paper.json",
+                "structure/outline.md",
             ],
             "output_refs": [
                 "summaries/hierarchical-summary.json",
@@ -245,6 +281,16 @@ class ModelExecutionPlanTests(unittest.TestCase):
         )
         evidence = self._research_execution_evidence()
 
+        self.assertEqual(
+            plan["requested_parameters"],
+            {
+                "fast_mode": "off",
+                "prompt_version": "summary-full-paper-v1",
+                "reasoning_effort": "xhigh",
+                "record_usage": True,
+            },
+        )
+
         record = materialize_model_provenance_record(
             execution_plan=plan,
             execution_evidence=evidence,
@@ -259,9 +305,80 @@ class ModelExecutionPlanTests(unittest.TestCase):
         self.assertEqual(record["requested_model"], "openai/gpt-5.6-sol")
         self.assertEqual(record["resolved_model"], "openai/gpt-5.6-sol")
         self.assertEqual(record["usage"]["total_tokens"], 154)
+        compatible_evidence = self._research_execution_evidence()
+        compatible_evidence["output_refs"] = [
+            "summaries/hierarchical-summary.json",
+            "summaries/texts",
+            "summaries/texts/section-methods.md",
+            "summaries/texts/.hidden.md",
+            "summaries/texts/_internal.md",
+            "summaries/texts/-draft.md",
+        ]
+        compatible_record = materialize_model_provenance_record(
+            execution_plan=plan,
+            execution_evidence=compatible_evidence,
+        )
+        self.assertEqual(
+            compatible_record["output_refs"],
+            compatible_evidence["output_refs"],
+        )
         self.assertNotIn("fallback_used", record)
         self.assertNotIn("authentication", record)
         self.assertNotIn("execution", record)
+
+    def test_all_bundled_summary_plans_have_allowed_parameters_and_materialize(self):
+        allowed_parameters = {
+            "temperature",
+            "reasoning_effort",
+            "fast_mode",
+            "prompt_version",
+            "record_usage",
+        }
+        summary_stages = (
+            "summarize_page",
+            "summarize_section",
+            "summarize_full_paper",
+        )
+
+        for profile in ("offline-preview", "research-default"):
+            for stage in summary_stages:
+                with self.subTest(profile=profile, stage=stage):
+                    plan = build_summary_execution_plan(
+                        profile=profile,
+                        stage=stage,
+                    )
+                    requested_parameters = plan["requested_parameters"]
+                    self.assertTrue(requested_parameters)
+                    self.assertLessEqual(
+                        set(requested_parameters),
+                        allowed_parameters,
+                    )
+                    self.assertIn("record_usage", requested_parameters)
+
+                    evidence = self._research_execution_evidence()
+                    evidence.update(
+                        {
+                            "profile": profile,
+                            "stage": stage,
+                            "requested_model": plan["requested_model"],
+                            "resolved_model": plan["requested_model"],
+                            "provider": plan["provider"],
+                            "backend": plan["backend"],
+                            "reasoning_effort": requested_parameters.get(
+                                "reasoning_effort"
+                            ),
+                            "fast_mode": requested_parameters.get("fast_mode"),
+                            "prompt_version": requested_parameters.get(
+                                "prompt_version"
+                            ),
+                        }
+                    )
+                    record = materialize_model_provenance_record(
+                        execution_plan=plan,
+                        execution_evidence=evidence,
+                    )
+                    self.assertEqual(record["profile"], profile)
+                    self.assertEqual(record["stage"], stage)
 
     def test_model_provenance_rejects_unknown_private_or_malformed_evidence(self):
         plan = build_summary_execution_plan(
@@ -276,7 +393,13 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 ["structure/structure.json", "structure/structure.json"],
                 "duplicate",
             ),
-            ("output_refs", ["../leak.json"], "safe relative"),
+            ("output_refs", ["../leak.json"], "trusted relative artifact"),
+            (
+                "output_refs",
+                ["summaries/../leak.json"],
+                "trusted relative artifact",
+            ),
+            ("output_refs", ["private/output.json"], "trusted relative artifact"),
             (
                 "output_refs",
                 [
@@ -333,7 +456,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 "input_refs",
                 [
                     " structure/structure.json",
-                    "summaries/request/full-paper.json",
+                    "structure/outline.md",
                 ],
             ),
             (
@@ -494,9 +617,41 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 newline_ref = deepcopy(valid_payload)
                 newline_ref["input_refs"][0] += "\n"
                 malformed_payloads.append(newline_ref)
+                untrusted_namespace_ref = deepcopy(valid_payload)
+                untrusted_namespace_ref["input_refs"][0] = "private/artifact.json"
+                malformed_payloads.append(untrusted_namespace_ref)
+                for credential_token in self._ref_payload_tokens():
+                    credential_ref = (
+                        f"summaries/texts/{credential_token}.md"
+                    )
+                    for ref_field in ("input_refs", "output_refs"):
+                        credential_payload = deepcopy(valid_payload)
+                        credential_payload[ref_field] = [credential_ref]
+                        malformed_payloads.append(credential_payload)
+                    credential_warning = deepcopy(valid_payload)
+                    credential_warning["quality_warnings"][0]["ref"] = (
+                        credential_ref
+                    )
+                    malformed_payloads.append(credential_warning)
+                for payload_marker in self._payload_markers():
+                    payload_marker_provider = deepcopy(valid_payload)
+                    payload_marker_provider["provider"] = payload_marker
+                    malformed_payloads.append(payload_marker_provider)
+                credential_warning_code = deepcopy(valid_payload)
+                credential_warning_code["quality_warnings"][0]["code"] = (
+                    self._credential_tokens()[4]
+                )
+                malformed_payloads.append(credential_warning_code)
                 trailing_slash_ref = deepcopy(valid_payload)
                 trailing_slash_ref["input_refs"][0] = "artifact/"
                 malformed_payloads.append(trailing_slash_ref)
+                for traversal_ref in (
+                    "summaries/../artifact.json",
+                    "summaries/./artifact.json",
+                ):
+                    traversal_payload = deepcopy(valid_payload)
+                    traversal_payload["input_refs"][0] = traversal_ref
+                    malformed_payloads.append(traversal_payload)
                 newline_warning_code = deepcopy(valid_payload)
                 newline_warning_code["quality_warnings"][0]["code"] += "\n"
                 malformed_payloads.append(newline_warning_code)
@@ -517,6 +672,17 @@ class ModelExecutionPlanTests(unittest.TestCase):
                     "\ufeffsummary-v1\ufeff"
                 )
                 validator.validate(byte_order_mark_is_not_boundary_whitespace)
+
+                compatible_refs = deepcopy(valid_payload)
+                compatible_refs["output_refs"] = [
+                    "summaries/hierarchical-summary.json",
+                    "summaries/texts",
+                    "summaries/texts/section-methods.md",
+                    "summaries/texts/.hidden.md",
+                    "summaries/texts/_internal.md",
+                    "summaries/texts/-draft.md",
+                ]
+                validator.validate(compatible_refs)
 
                 structurally_valid_bad_total = deepcopy(valid_payload)
                 structurally_valid_bad_total["usage"]["total_tokens"] += 1
@@ -561,8 +727,19 @@ class ModelExecutionPlanTests(unittest.TestCase):
 
         trailing_slash_record = deepcopy(record)
         trailing_slash_record["input_refs"][0] = "artifact/"
-        with self.assertRaisesRegex(MillefeuilleContractError, "safe relative"):
+        with self.assertRaisesRegex(
+            MillefeuilleContractError,
+            "trusted relative artifact",
+        ):
             validate_model_provenance_record(trailing_slash_record)
+
+        traversal_record = deepcopy(record)
+        traversal_record["input_refs"][0] = "summaries/../artifact.json"
+        with self.assertRaisesRegex(
+            MillefeuilleContractError,
+            "trusted relative artifact",
+        ):
+            validate_model_provenance_record(traversal_record)
 
         overlapping_record = deepcopy(record)
         overlapping_record["output_refs"][0] = overlapping_record["input_refs"][0]
@@ -692,6 +869,112 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 execution_evidence=evidence,
             )
 
+        canonical_plan = build_summary_execution_plan(
+            profile="research-default",
+            stage="summarize_full_paper",
+        )
+        canonical_record = materialize_model_provenance_record(
+            execution_plan=build_summary_execution_plan(
+                profile="research-default",
+                stage="summarize_full_paper",
+            ),
+            execution_evidence=self._research_execution_evidence(),
+        )
+        for credential_token in self._ref_payload_tokens():
+            credential_ref = f"summaries/texts/{credential_token}.md"
+            for route in ("input_refs", "output_refs", "quality_warnings"):
+                with self.subTest(credential_token=credential_token, route=route):
+                    credential_evidence = self._research_execution_evidence()
+                    if route == "quality_warnings":
+                        credential_evidence[route][0]["ref"] = credential_ref
+                    else:
+                        credential_evidence[route] = [credential_ref]
+                    with self.assertRaisesRegex(
+                        MillefeuilleContractError,
+                        "payload marker",
+                    ) as raised:
+                        materialize_model_provenance_record(
+                            execution_plan=canonical_plan,
+                            execution_evidence=credential_evidence,
+                        )
+                    self.assertNotIn(credential_ref, str(raised.exception))
+
+                    credential_record = deepcopy(canonical_record)
+                    if route == "quality_warnings":
+                        credential_record[route][0]["ref"] = credential_ref
+                    else:
+                        credential_record[route] = [credential_ref]
+                    with self.assertRaisesRegex(
+                        MillefeuilleContractError,
+                        "payload marker",
+                    ) as record_raised:
+                        validate_model_provenance_record(credential_record)
+                    self.assertNotIn(credential_ref, str(record_raised.exception))
+
+        for payload_marker in self._payload_markers():
+            with self.subTest(payload_marker=payload_marker):
+                payload_evidence = self._research_execution_evidence()
+                payload_evidence["provider"] = payload_marker
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "payload marker",
+                ) as payload_raised:
+                    materialize_model_provenance_record(
+                        execution_plan=canonical_plan,
+                        execution_evidence=payload_evidence,
+                    )
+                self.assertNotIn(payload_marker, str(payload_raised.exception))
+
+                payload_record = deepcopy(canonical_record)
+                payload_record["provider"] = payload_marker
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "payload marker",
+                ) as payload_record_raised:
+                    validate_model_provenance_record(payload_record)
+                self.assertNotIn(
+                    payload_marker,
+                    str(payload_record_raised.exception),
+                )
+
+        opaque_ref = "summaries/texts/opaque-token-shaped-value.md"
+        for route in ("input_refs", "output_refs", "quality_warnings"):
+            with self.subTest(opaque_route=route):
+                opaque_evidence = self._research_execution_evidence()
+                if route == "quality_warnings":
+                    opaque_evidence[route][0]["ref"] = opaque_ref
+                else:
+                    opaque_evidence[route] = [opaque_ref]
+                opaque_record = materialize_model_provenance_record(
+                    execution_plan=canonical_plan,
+                    execution_evidence=opaque_evidence,
+                )
+                if route == "quality_warnings":
+                    self.assertEqual(
+                        opaque_record[route][0]["ref"],
+                        opaque_ref,
+                    )
+                else:
+                    self.assertEqual(opaque_record[route], [opaque_ref])
+
+        benign_evidence = self._research_execution_evidence()
+        benign_evidence["quality_warnings"] = [
+            {
+                "code": "risk-assessment",
+                "severity": "warning",
+                "ref": "structure/structure.json",
+            },
+            {"code": "task-generated", "severity": "info"},
+        ]
+        benign_record = materialize_model_provenance_record(
+            execution_plan=canonical_plan,
+            execution_evidence=benign_evidence,
+        )
+        self.assertEqual(
+            [warning["code"] for warning in benign_record["quality_warnings"]],
+            ["risk-assessment", "task-generated"],
+        )
+
     def test_models_cli_materializes_provenance_from_plan_and_evidence_files(self):
         plan = build_summary_execution_plan(
             profile="research-default",
@@ -731,6 +1014,48 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 payload["schema_version"],
                 "millefeuille-model-provenance/v0.1",
             )
+
+    def test_models_cli_rejects_credential_ref_without_reflection_or_output(self):
+        secret_ref = f"summaries/texts/{self._credential_tokens()[0]}.md"
+        plan = build_summary_execution_plan(
+            profile="research-default",
+            stage="summarize_full_paper",
+        )
+        evidence = self._research_execution_evidence()
+        evidence["input_refs"] = [secret_ref]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan_path = root / "plan.json"
+            evidence_path = root / "evidence.json"
+            output_path = root / "provenance" / "model-provenance.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+            stdout = StringIO()
+            stderr = StringIO()
+
+            exit_code = run_stage_cli(
+                [
+                    "models",
+                    "--provenance",
+                    "--plan-file",
+                    str(plan_path),
+                    "--execution-evidence",
+                    str(evidence_path),
+                    "--output",
+                    str(output_path),
+                    "--json",
+                ],
+                stdout=stdout,
+                stderr=stderr,
+            )
+
+            self.assertEqual(exit_code, 2)
+            self.assertIn("payload marker", stderr.getvalue())
+            self.assertNotIn(secret_ref, stdout.getvalue())
+            self.assertNotIn(secret_ref, stderr.getvalue())
+            self.assertFalse(output_path.exists())
+            self.assertFalse(output_path.parent.exists())
 
     @unittest.skipUnless(hasattr(os, "O_NOFOLLOW"), "requires no-follow writes")
     def test_model_provenance_output_rejects_symlinked_paths_and_existing_files(self):

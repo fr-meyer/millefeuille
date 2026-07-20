@@ -39,13 +39,20 @@
     "nonEmptyUnpaddedString": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^(?![\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000])[\\s\\S]*[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000](?![\\s\\S])"
+      "pattern": "^(?![\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000])[\\s\\S]*[^\\u0009-\\u000D\\u001C-\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000](?![\\s\\S])",
+      "allOf": [{"$ref": "#/$defs/credentialFreeString"}]
+    },
+    "credentialFreeString": {
+      "not": {
+        "pattern": "[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]:\\s*(?:[Bb][Ee][Aa][Rr][Ee][Rr]|[Bb][Aa][Ss][Ii][Cc])|\\b[Bb][Ee][Aa][Rr][Ee][Rr]\\s+[A-Za-z0-9._~+/-]{8,}|[Dd][Aa][Tt][Aa]:[Aa][Pp][Pp][Ll][Ii][Cc][Aa][Tt][Ii][Oo][Nn]/[Pp][Dd][Ff]|%PDF-|(?:^|[^A-Za-z0-9_-])sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])|(?:^|[^A-Za-z0-9_-])AIza[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])|(?:^|[^A-Z0-9])(?:AKIA|ASIA)[A-Z0-9]{16}|(?:^|[^A-Za-z0-9_])gh[pousr]_[A-Za-z0-9]{20,}|(?:^|[^A-Za-z0-9_])github_pat_[A-Za-z0-9_]{20,}|(?:^|[^A-Za-z0-9_])glpat-[A-Za-z0-9_-]{20,}|(?:^|[^A-Za-z0-9_])npm_[A-Za-z0-9]{20,}(?![A-Za-z0-9])|(?:^|[^A-Za-z0-9_])dop_v1_[A-Fa-f0-9]{32,}(?![A-Fa-f0-9])|(?:^|[^A-Za-z0-9_])(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{16,}(?![A-Za-z0-9])|(?:^|[^A-Za-z0-9_])hf_[A-Za-z0-9]{20,}(?![A-Za-z0-9])|(?:^|[^A-Za-z0-9-])xox[baprs]-[A-Za-z0-9-]{10,}|(?:^|[^A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}(?![A-Za-z0-9_-])"
+      }
     },
     "safeRef": {
       "type": "string",
       "minLength": 1,
       "maxLength": 256,
-      "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.\\.?(?:/|(?![\\s\\S])))(?!.*\\\\)(?!.*:)[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9._-])?(?![\\s\\S])"
+      "pattern": "^(?:structure|summaries)/(?!.*//)(?!\\.\\.?(?:/|(?![\\s\\S])))(?!.*\\/\\.\\.?(?:/|(?![\\s\\S])))(?!.*\\\\)(?!.*:)[A-Za-z0-9._-](?:[A-Za-z0-9._/-]*[A-Za-z0-9._-])?(?![\\s\\S])",
+      "allOf": [{"$ref": "#/$defs/credentialFreeString"}]
     },
     "usage": {
       "type": "object",
@@ -64,7 +71,8 @@
       "properties": {
         "code": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9._-]{0,63}(?![\\s\\S])"
+          "pattern": "^[a-z][a-z0-9._-]{0,63}(?![\\s\\S])",
+          "allOf": [{"$ref": "#/$defs/credentialFreeString"}]
         },
         "severity": {"enum": ["info", "warning", "error"]},
         "ref": {"$ref": "#/$defs/safeRef"}
