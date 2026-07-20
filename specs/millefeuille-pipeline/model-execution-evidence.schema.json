@@ -44,7 +44,7 @@
     },
     "credentialFreeString": {
       "not": {
-        "pattern": "[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]:\\s*(?:[Bb][Ee][Aa][Rr][Ee][Rr]|[Bb][Aa][Ss][Ii][Cc])|\\b[Bb][Ee][Aa][Rr][Ee][Rr]\\s+[A-Za-z0-9._~+/-]{8,}|[Dd][Aa][Tt][Aa]:[Aa][Pp][Pp][Ll][Ii][Cc][Aa][Tt][Ii][Oo][Nn]/[Pp][Dd][Ff]|%PDF-|(?:^|[^A-Za-z0-9_-])sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])|(?:^|[^A-Za-z0-9_-])AIza[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])|(?:^|[^A-Z0-9])(?:AKIA|ASIA)[A-Z0-9]{16}|(?:^|[^A-Za-z0-9_])gh[pousr]_[A-Za-z0-9]{20,}|(?:^|[^A-Za-z0-9_])github_pat_[A-Za-z0-9_]{20,}|(?:^|[^A-Za-z0-9_])glpat-[A-Za-z0-9_-]{20,}|(?:^|[^A-Za-z0-9_])npm_[A-Za-z0-9]{20,}(?![A-Za-z0-9])|(?:^|[^A-Za-z0-9_])dop_v1_[A-Fa-f0-9]{32,}(?![A-Fa-f0-9])|(?:^|[^A-Za-z0-9_])(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{16,}(?![A-Za-z0-9])|(?:^|[^A-Za-z0-9_])hf_[A-Za-z0-9]{20,}(?![A-Za-z0-9])|(?:^|[^A-Za-z0-9-])xox[baprs]-[A-Za-z0-9-]{10,}|(?:^|[^A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}(?![A-Za-z0-9_-])"
+        "pattern": "[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]:\\s*(?:[Bb][Ee][Aa][Rr][Ee][Rr]|[Bb][Aa][Ss][Ii][Cc])|\\b[Bb][Ee][Aa][Rr][Ee][Rr]\\s+[A-Za-z0-9._~+/-]{8,}|[Dd][Aa][Tt][Aa]:[Aa][Pp][Pp][Ll][Ii][Cc][Aa][Tt][Ii][Oo][Nn]/[Pp][Dd][Ff]|%PDF-|sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{20,}|(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|dop_v1_[A-Fa-f0-9]{32,}|(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{16,}|hf_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}"
       }
     },
     "safeRef": {

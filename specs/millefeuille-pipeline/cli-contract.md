@@ -84,21 +84,20 @@ derived artifact write.
     selected plan and materializes a `millefeuille-model-provenance/v0.1`
     record to stdout or an explicit `--output` JSON path. It rejects unknown
     fields, identity/control drift, leading or trailing string whitespace,
-    invalid fallback resolution, invalid token totals, unsafe refs or refs
-    outside the trusted `structure/` and `summaries/` artifact namespaces,
-    common API-key/credential and provider-payload marker formats in any
-    evidence string, refs duplicated within or shared across input/output
-    lists, malformed warning records, prompts, provider payloads, private paper
-    text,
-    PDF payload markers, and credential or secret markers. This is JSON
-    materialization only; appending provenance to a verified run package remains
-    later work. The full plan/no-call
+    invalid fallback resolution, invalid token totals, unsafe refs, bare
+    namespace refs, or refs outside the trusted `structure/` and `summaries/`
+    artifact namespaces, common API-key/credential and provider-payload marker
+    formats even when embedded in any evidence string, refs duplicated within or
+    shared across input/output lists, malformed warning records, prompts,
+    provider payloads, private paper text, PDF payload markers, and credential or
+    secret markers. This is JSON materialization only; appending provenance to a
+    verified run package remains later work. The full plan/no-call
     contract and canonical bundled-profile values are revalidated before
     evidence is trusted. `--output` exclusively creates a new file through
     descriptor-relative no-follow traversal and fails closed on existing paths,
     symlinked parents, run-package marker ancestors, or replacement races.
-    Arbitrary safe summary identifiers and the existing `summaries/texts`
-    directory ref remain valid.
+    The existing `summaries/texts` directory ref and arbitrary safe descendants
+    under those namespaces remain valid.
     The evidence and record schemas align with runtime unpadded-string and
     absolute-end ref/code checks. Because draft 2020-12 cannot express integer
     addition, generic schema validation must be paired with their mandatory

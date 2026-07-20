@@ -122,27 +122,20 @@ _FORBIDDEN_EVIDENCE_MARKERS = (
     re.compile(r"\bBearer\s+[A-Za-z0-9._~+/-]{8,}", re.IGNORECASE),
     re.compile(r"data:application/pdf", re.IGNORECASE),
     re.compile(r"%PDF-"),
+    re.compile(r"sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}"),
+    re.compile(r"AIza[A-Za-z0-9_-]{20,}"),
+    re.compile(r"(?:AKIA|ASIA)[A-Z0-9]{16}"),
+    re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"),
+    re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
+    re.compile(r"glpat-[A-Za-z0-9_-]{20,}"),
+    re.compile(r"npm_[A-Za-z0-9]{20,}"),
+    re.compile(r"dop_v1_[A-Fa-f0-9]{32,}"),
+    re.compile(r"(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{16,}"),
+    re.compile(r"hf_[A-Za-z0-9]{20,}"),
+    re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"),
     re.compile(
-        r"(?<![A-Za-z0-9_-])sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}"
-        r"(?![A-Za-z0-9_-])"
-    ),
-    re.compile(r"(?<![A-Za-z0-9_-])AIza[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])"),
-    re.compile(r"(?<![A-Z0-9])(?:AKIA|ASIA)[A-Z0-9]{16}"),
-    re.compile(r"(?<![A-Za-z0-9_])gh[pousr]_[A-Za-z0-9]{20,}(?![A-Za-z0-9])"),
-    re.compile(r"(?<![A-Za-z0-9_])github_pat_[A-Za-z0-9_]{20,}"),
-    re.compile(r"(?<![A-Za-z0-9_])glpat-[A-Za-z0-9_-]{20,}"),
-    re.compile(r"(?<![A-Za-z0-9_])npm_[A-Za-z0-9]{20,}(?![A-Za-z0-9])"),
-    re.compile(r"(?<![A-Za-z0-9_])dop_v1_[A-Fa-f0-9]{32,}(?![A-Fa-f0-9])"),
-    re.compile(
-        r"(?<![A-Za-z0-9_])(?:sk|rk|pk)_(?:live|test)_"
-        r"[A-Za-z0-9]{16,}(?![A-Za-z0-9])"
-    ),
-    re.compile(r"(?<![A-Za-z0-9_])hf_[A-Za-z0-9]{20,}(?![A-Za-z0-9])"),
-    re.compile(r"(?<![A-Za-z0-9-])xox[baprs]-[A-Za-z0-9-]{10,}"),
-    re.compile(
-        r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{10,}\."
+        r"eyJ[A-Za-z0-9_-]{10,}\."
         r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"
-        r"(?![A-Za-z0-9_-])"
     ),
 )
 
@@ -735,6 +728,7 @@ def _validate_refs(value: object, field_name: str) -> list[str]:
         ref = _required_string(item, f"{field_name}[{index}]")
         if (
             not _SAFE_REF.fullmatch(ref)
+            or "/" not in ref
             or ref.partition("/")[0] not in _TRUSTED_ARTIFACT_REF_NAMESPACES
             or "//" in ref
             or "\\" in ref

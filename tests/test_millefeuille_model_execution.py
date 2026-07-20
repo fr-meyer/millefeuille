@@ -45,10 +45,11 @@ class ModelExecutionPlanTests(unittest.TestCase):
 
     @classmethod
     def _ref_payload_tokens(cls) -> tuple[str, ...]:
+        credential_tokens = cls._credential_tokens()
         return (
-            *cls._credential_tokens(),
-            "github_" + "pat_" + "a" * 24 + "-suffix",
-            "AK" + "IA" + "A" * 16 + "lower",
+            *credential_tokens,
+            *(f"archive_{token}" for token in credential_tokens),
+            *(f"{token}-suffix" for token in credential_tokens),
         )
 
     @classmethod
@@ -400,6 +401,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 "trusted relative artifact",
             ),
             ("output_refs", ["private/output.json"], "trusted relative artifact"),
+            ("output_refs", ["summaries"], "trusted relative artifact"),
             (
                 "output_refs",
                 [
@@ -620,6 +622,10 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 untrusted_namespace_ref = deepcopy(valid_payload)
                 untrusted_namespace_ref["input_refs"][0] = "private/artifact.json"
                 malformed_payloads.append(untrusted_namespace_ref)
+                for bare_namespace in ("structure", "summaries"):
+                    bare_namespace_payload = deepcopy(valid_payload)
+                    bare_namespace_payload["input_refs"][0] = bare_namespace
+                    malformed_payloads.append(bare_namespace_payload)
                 for credential_token in self._ref_payload_tokens():
                     credential_ref = (
                         f"summaries/texts/{credential_token}.md"
@@ -740,6 +746,14 @@ class ModelExecutionPlanTests(unittest.TestCase):
             "trusted relative artifact",
         ):
             validate_model_provenance_record(traversal_record)
+
+        bare_namespace_record = deepcopy(record)
+        bare_namespace_record["input_refs"][0] = "summaries"
+        with self.assertRaisesRegex(
+            MillefeuilleContractError,
+            "trusted relative artifact",
+        ):
+            validate_model_provenance_record(bare_namespace_record)
 
         overlapping_record = deepcopy(record)
         overlapping_record["output_refs"][0] = overlapping_record["input_refs"][0]
