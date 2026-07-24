@@ -18,6 +18,29 @@ release_policy:
   integration_branch: dev
   tag_policy: no-release-in-bootstrap
   release_gate: separate-explicit-approval
+review_policy:
+  self_managed:
+    policy: optional
+    fallback_role: emergency_fallback
+    evidence_source: ignored local --self-review-artifact JSON
+  legacy_pullfrog:
+    policy: disabled
+    evidence_source: historical-only
+  legacy_coderabbit:
+    policy: disabled
+    evidence_source: historical-only
+  mergeguez_review:
+    policy: primary
+    evidence_source: broker pr-state reviewers/reviews/checks normalized by
+      review-evidence and merge-plan
+  required_pr_review:
+    policy: required
+    primary:
+      - mergeguez_review
+    fallback_any_of:
+      - self_managed
+    fallback_summary: self_managed is an emergency fallback when hosted
+      Mergeguez review is unavailable.
 validation:
   unit_tests:
     status: passed

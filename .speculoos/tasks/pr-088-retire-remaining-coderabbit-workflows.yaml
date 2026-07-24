@@ -7,12 +7,14 @@ write_paths:
   - .coderabbit.yaml
   - .github/workflows/coderabbit-pr-automation-manual.yml
   - .github/workflows/coderabbit-pr-comment-trigger.yml
+  - .speculoos/manifest.yaml
   - .speculoos/tasks/pr-088-retire-remaining-coderabbit-workflows.yaml
   - specs/pr-088-retire-remaining-coderabbit-workflows/**
 scope:
   - remove the remaining active manual and comment-triggered CodeRabbit workflows
   - remove the obsolete repository-level CodeRabbit configuration
   - preserve historical PR80 task/evidence records and existing Mergeguez policy
+  - record Mergeguez as the primary required review source and legacy reviewer lanes as disabled
   - record the retirement boundary in repository-local Speculoos metadata
 non_goals:
   - changing Mergeguez, Speculoos review policy, branch protection, rulesets, or merge authority

@@ -25,6 +25,7 @@ Historical PR80 records remain intact as audit evidence of the earlier partial r
 - `.coderabbit.yaml`
 - `.github/workflows/coderabbit-pr-automation-manual.yml`
 - `.github/workflows/coderabbit-pr-comment-trigger.yml`
+- `.speculoos/manifest.yaml`
 - `.speculoos/tasks/pr-088-retire-remaining-coderabbit-workflows.yaml`
 - `specs/pr-088-retire-remaining-coderabbit-workflows/commit-message.txt`
 - `specs/pr-088-retire-remaining-coderabbit-workflows/pr-body.md`
@@ -36,6 +37,7 @@ Historical PR80 records remain intact as audit evidence of the earlier partial r
 - Ruff
 - `git diff --check`
 - explicit absence check for active CodeRabbit workflow/configuration files
+- explicit Mergeguez-primary review-policy metadata check
 - Speculoos validation and publication checks
 
 ## Documentation Impact
