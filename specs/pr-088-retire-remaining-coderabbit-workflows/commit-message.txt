@@ -1,0 +1,5 @@
+ci: retire remaining CodeRabbit workflows
+
+Remove the remaining manual and comment-triggered CodeRabbit workflows plus the obsolete repository configuration. Preserve historical PR80 evidence and keep Mergeguez/Speculoos as the review and merge-policy lane.
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

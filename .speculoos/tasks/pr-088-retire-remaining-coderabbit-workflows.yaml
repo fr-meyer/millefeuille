@@ -1,0 +1,61 @@
+id: pr-088-retire-remaining-coderabbit-workflows
+title: Retire remaining CodeRabbit workflows and configuration
+status: local-implementation
+branch: chore/pr-088-retire-remaining-coderabbit-workflows
+base_branch: dev
+write_paths:
+  - .coderabbit.yaml
+  - .github/workflows/coderabbit-pr-automation-manual.yml
+  - .github/workflows/coderabbit-pr-comment-trigger.yml
+  - .speculoos/manifest.yaml
+  - .speculoos/tasks/pr-088-retire-remaining-coderabbit-workflows.yaml
+  - specs/pr-088-retire-remaining-coderabbit-workflows/**
+scope:
+  - remove the remaining active manual and comment-triggered CodeRabbit workflows
+  - remove the obsolete repository-level CodeRabbit configuration
+  - preserve historical PR80 task/evidence records and existing Mergeguez policy
+  - record Mergeguez as the primary required review source and legacy reviewer lanes as disabled
+  - record the retirement boundary in repository-local Speculoos metadata
+non_goals:
+  - changing Mergeguez, Speculoos review policy, branch protection, rulesets, or merge authority
+  - changing application code, tests, model/provider behavior, credentials, or deployment
+  - rewriting historical PR80 metadata or deleting historical GitHub evidence
+  - adding a replacement GitHub Actions reviewer workflow
+acceptance:
+  - no active CodeRabbit workflow or repository configuration remains
+  - historical PR80 task/evidence files remain unchanged
+  - Mergeguez remains the configured review lane
+  - YAML/JSON metadata parses and tests/lint remain green
+  - Speculoos validation and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest discover -v"
+  - ".venv/bin/ruff check ."
+  - "ruby -ryaml -rjson -e 'Dir[\".speculoos/**/*.yaml\", \"specs/**/*.yaml\"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[\".speculoos/**/*.json\", \"specs/**/*.json\"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts \"metadata ok\"'"
+  - "git diff --check"
+  - "speculoos validate --task pr-088-retire-remaining-coderabbit-workflows --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-088-retire-remaining-coderabbit-workflows --pr-body specs/pr-088-retire-remaining-coderabbit-workflows/pr-body.md --commit-message specs/pr-088-retire-remaining-coderabbit-workflows/commit-message.txt --json"
+publication_boundary:
+  statement: "Repository CI metadata only: retire obsolete CodeRabbit workflow/configuration surfaces while preserving historical evidence and Mergeguez/Speculoos gates. No credentials, provider calls, application code, deployment, release, main-branch change, or approval bypass."
+documentation_impact:
+  status: none
+  rationale: This is repository CI wiring retirement; the task and PR body carry the operator-facing rationale without changing product documentation.
+branch_plan: Create one isolated dev-target cleanup PR, obtain exact-head Mergeguez approval, policy-merge, then delete the branch through the approved cleanup lane.
+executor: OpenClaw main session
+private_data_scan: required; workflow and metadata only, with no secrets or private payloads
+publish_authority: Active Speculoos feature-to-dev publication; stable-branch promotion and live operations remain excluded.
+github:
+  issue: null
+  pull_request: null
+  issue_project_item: null
+  project_item: unavailable
+  project_status: In Progress
+  url: null
+  head_sha: null
+  merge_commit: null
+post_merge_expected:
+  pull_request: 88
+  base_branch: dev
+  head_branch: chore/pr-088-retire-remaining-coderabbit-workflows
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
