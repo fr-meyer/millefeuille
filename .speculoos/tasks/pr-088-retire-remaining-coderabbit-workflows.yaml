@@ -52,3 +52,10 @@ github:
   url: null
   head_sha: null
   merge_commit: null
+post_merge_expected:
+  pull_request: 88
+  base_branch: dev
+  head_branch: chore/pr-088-retire-remaining-coderabbit-workflows
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
