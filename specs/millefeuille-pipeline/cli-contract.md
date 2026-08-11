@@ -297,8 +297,17 @@ derived artifact write.
     privacy-sensitive refs for a paper or run.
 
 - `status`
-  - Read stage manifests, source packs, Zotero tags, artifact indexes, and
-    index state.
+  - Strictly join a canonical local source-pack identity, stage manifest,
+    artifact index, index state, acceptance, classification, and writeback.
+  - `--source-pack-root` plus one exact paper/item selector and `--run-id` is
+    the canonical form; `--index` and `--artifact-root` remain progressive.
+  - Repeatable `--evidence` accepts content-addressed, run-bound local
+    observations for coarse Zotero state, exact provider usage, written index
+    lanes, completion-gate quality, and writeback results. Missing observations
+    remain `not-observed`; they are never fabricated or authority-granting.
+  - Performs no provider/store call, credential load, private-content read, or
+    artifact write. `--strict` evaluates all joined blockers. See
+    `status-observability.md`.
 
 - `run`
   - Current implementation sequences the fixture-only extraction, route,

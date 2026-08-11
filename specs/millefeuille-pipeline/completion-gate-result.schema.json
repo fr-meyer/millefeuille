@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/completion-gate-result.schema.json",
+  "title": "Millefeuille Completion Gate Result",
+  "type": "object",
+  "required": ["schema_version", "paper_id", "run_id", "source_hash", "status", "checks_total", "checks_passed", "checks_failed", "integrity"],
+  "additionalProperties": false,
+  "$defs": {
+    "safeInteger": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "properties": {
+    "schema_version": {"const": "millefeuille-completion-gate-result/v0.1"},
+    "paper_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "source_hash": {"type": "string", "pattern": "^sha256(?:-aggregate)?:[0-9a-f]{64}$"},
+    "status": {"enum": ["passed", "needs-review", "failed"]},
+    "checks_total": {"$ref": "#/$defs/safeInteger"},
+    "checks_passed": {"$ref": "#/$defs/safeInteger"},
+    "checks_failed": {"$ref": "#/$defs/safeInteger"},
+    "integrity": {
+      "type": "object",
+      "required": ["algorithm", "content_digest"],
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "content_digest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

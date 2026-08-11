@@ -111,7 +111,15 @@ class TestArtifactCli(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("ZOTERO_READ_KEY", result.stderr)
         payload = json.loads(result.stdout)
-        self.assertTrue(payload["status"]["complete"])
+        self.assertFalse(payload["status"]["complete"])
+        self.assertEqual(
+            payload["canonical"]["stage_manifest"]["state"],
+            "not-observed",
+        )
+        self.assertIn(
+            "source-pack identity: not-observed",
+            payload["status"]["blocking_items"],
+        )
 
 
 if __name__ == "__main__":

@@ -85,6 +85,11 @@ Each processed paper should expose a predictable package:
 - Zotero writeback preview or verified writeback result;
 - quality and completion-gate reports.
 
+The operator status view progressively joins those canonical local records and
+optional content-addressed observations without reading paper content or
+contacting live systems. Its approved-live wording is explicitly
+non-authoritative and does not replace a manual approval gate.
+
 ## Manual Gates
 
 This vision does not grant any live permission by itself. Live Zotero reads,
