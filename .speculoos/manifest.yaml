@@ -1,13 +1,13 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-089-reconcile-delivery-ledgers
+canonical_task: pr-098-reconcile-delivery-ledgers
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: chore/mf-000-ledger-reconciliation
+  working_branch: chore/pr-098-ledger-reconciliation
 status:
   phase: implementation
   pret_a_coder: ready
@@ -84,10 +84,10 @@ surfaces:
   github_pull_request:
     enabled: true
     status: open
-    number: 89
-    url: https://github.com/fr-meyer/millefeuille/pull/89
+    number: 98
+    url: https://github.com/fr-meyer/millefeuille/pull/98
     base_branch: dev
-    head_branch: chore/mf-000-ledger-reconciliation
+    head_branch: chore/pr-098-ledger-reconciliation
     head_sha: null
     merge_commit: null
     project_status: unavailable
@@ -119,7 +119,7 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: pr-089-reconcile-delivery-ledgers
+current_task: pr-098-reconcile-delivery-ledgers
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap

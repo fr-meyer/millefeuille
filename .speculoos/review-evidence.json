@@ -25,30 +25,30 @@
     "local_validation": {
       "kind": "local_validation",
       "status": "passed",
-      "summary": "PR #89 metadata parse, completed-ledger consistency, branch-truth invariants, and diff checks passed on the current branch.",
-      "evidence_ref": ".speculoos/tasks/pr-089-reconcile-delivery-ledgers.yaml",
-      "updated_at": "pr-089-reconcile-delivery-ledgers"
+      "summary": "PR #98 metadata parse, completed-ledger consistency, branch-truth invariants, and diff checks passed on the current branch.",
+      "evidence_ref": ".speculoos/tasks/pr-098-reconcile-delivery-ledgers.yaml",
+      "updated_at": "pr-098-reconcile-delivery-ledgers"
     },
     "github_checks": {
       "kind": "github_checks",
       "status": "pending-live-read",
-      "summary": "Live GitHub checks for draft PR #89 must pass before merge.",
-      "evidence_ref": "https://github.com/fr-meyer/millefeuille/pull/89/checks",
-      "updated_at": "pr-089-reconcile-delivery-ledgers"
+      "summary": "Live GitHub checks for PR #98 must pass before merge.",
+      "evidence_ref": "https://github.com/fr-meyer/millefeuille/pull/98/checks",
+      "updated_at": "pr-098-reconcile-delivery-ledgers"
     },
     "self_managed": {
       "kind": "self_managed",
       "status": "pending",
       "summary": "Self-managed review remains an emergency fallback if hosted Mergeguez review is unavailable.",
       "evidence_ref": null,
-      "updated_at": "pr-089-reconcile-delivery-ledgers"
+      "updated_at": "pr-098-reconcile-delivery-ledgers"
     },
     "mergeguez_review": {
       "kind": "mergeguez_review",
       "status": "pending-live-read",
-      "summary": "Exact-head Mergeguez review is required for PR #89 before merge.",
-      "evidence_ref": "https://github.com/fr-meyer/millefeuille/pull/89",
-      "updated_at": "pr-089-reconcile-delivery-ledgers"
+      "summary": "Exact-head Mergeguez review is required for PR #98 before merge.",
+      "evidence_ref": "https://github.com/fr-meyer/millefeuille/pull/98",
+      "updated_at": "pr-098-reconcile-delivery-ledgers"
     }
   }
 }
