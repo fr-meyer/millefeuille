@@ -20,6 +20,54 @@ _WINDOWS_REPARSE_POINT = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x0400)
 _StatObjectIdentity = tuple[int, int, int]
 _StatStabilitySnapshot = tuple[int, ...]
 _StatRecord = tuple[_StatObjectIdentity, _StatStabilitySnapshot]
+_READ_CHUNK_BYTES = 65_536
+
+
+def _validated_max_bytes(max_bytes: int | None, *, label: str) -> int | None:
+    if max_bytes is None:
+        return None
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 0:
+        raise MillefeuilleContractError(
+            f"{label} max_bytes must be a non-negative integer"
+        )
+    return max_bytes
+
+
+def _read_opened_file_bytes(
+    fd: int,
+    opened_stat: os.stat_result,
+    *,
+    path: Path,
+    label: str,
+    max_bytes: int | None,
+) -> bytes:
+    """Read one opened file without accumulating beyond ``max_bytes``."""
+
+    if max_bytes is not None and opened_stat.st_size > max_bytes:
+        raise MillefeuilleContractError(f"{label} exceeds {max_bytes} bytes")
+
+    chunks: list[bytes] = []
+    total_bytes = 0
+    while True:
+        read_size = _READ_CHUNK_BYTES
+        if max_bytes is not None:
+            # Probe one byte past the remaining allowance so growth after the
+            # opened-file metadata check is rejected without an unbounded read.
+            read_size = min(read_size, max_bytes - total_bytes + 1)
+        chunk = os.read(fd, read_size)
+        if not chunk:
+            break
+        total_bytes += len(chunk)
+        if max_bytes is not None and total_bytes > max_bytes:
+            raise MillefeuilleContractError(f"{label} exceeds {max_bytes} bytes")
+        chunks.append(chunk)
+
+    payload = b"".join(chunks)
+    if max_bytes is not None and len(payload) > max_bytes:
+        raise MillefeuilleContractError(f"{label} exceeds {max_bytes} bytes")
+    if len(payload) != opened_stat.st_size:
+        raise MillefeuilleContractError(f"{label} changed while read: {path}")
+    return payload
 
 
 def _supports_no_follow() -> bool:
@@ -620,19 +668,26 @@ class RootArtifactReader:
             raise
         return True
 
-    def read_bytes(self, path: str | Path, label: str) -> bytes:
+    def read_bytes(
+        self,
+        path: str | Path,
+        label: str,
+        *,
+        max_bytes: int | None = None,
+    ) -> bytes:
+        max_bytes = _validated_max_bytes(max_bytes, label=label)
         parent_fd, fd, name, opened_stat, target = self._open_regular_file(
             path,
             label=label,
         )
         try:
-            chunks: list[bytes] = []
-            while True:
-                chunk = os.read(fd, 65536)
-                if not chunk:
-                    break
-                chunks.append(chunk)
-            payload = b"".join(chunks)
+            payload = _read_opened_file_bytes(
+                fd,
+                opened_stat,
+                path=target,
+                label=label,
+                max_bytes=max_bytes,
+            )
             self._require_unchanged_regular_file(
                 parent_fd=parent_fd,
                 fd=fd,
@@ -641,8 +696,6 @@ class RootArtifactReader:
                 label=label,
                 expected_stat=opened_stat,
             )
-            if len(payload) != opened_stat.st_size:
-                raise MillefeuilleContractError(f"{label} changed while read: {target}")
             self._remember_regular_file(target, label, opened_stat)
             return payload
         except OSError as exc:
@@ -653,19 +706,31 @@ class RootArtifactReader:
             os.close(fd)
             os.close(parent_fd)
 
-    def read_text(self, path: str | Path, label: str) -> str:
+    def read_text(
+        self,
+        path: str | Path,
+        label: str,
+        *,
+        max_bytes: int | None = None,
+    ) -> str:
         target = self._target(path, label=label)
         try:
-            return self.read_bytes(target, label).decode("utf-8")
+            return self.read_bytes(target, label, max_bytes=max_bytes).decode("utf-8")
         except UnicodeDecodeError as exc:
             raise MillefeuilleContractError(
                 f"{label} is not valid UTF-8: {target}"
             ) from exc
 
-    def load_json_object(self, path: str | Path, label: str) -> dict[str, Any]:
+    def load_json_object(
+        self,
+        path: str | Path,
+        label: str,
+        *,
+        max_bytes: int | None = None,
+    ) -> dict[str, Any]:
         target = self._target(path, label=label)
         try:
-            payload = json.loads(self.read_text(target, label))
+            payload = json.loads(self.read_text(target, label, max_bytes=max_bytes))
         except json.JSONDecodeError as exc:
             raise MillefeuilleContractError(
                 f"{label} is not valid JSON: {target}"
@@ -940,9 +1005,15 @@ def verify_regular_file_no_follow(path: str | Path, label: str) -> None:
         os.close(parent_fd)
 
 
-def read_bytes_no_follow(path: str | Path, label: str) -> bytes:
+def read_bytes_no_follow(
+    path: str | Path,
+    label: str,
+    *,
+    max_bytes: int | None = None,
+) -> bytes:
     """Read stable bytes with no-follow descriptors when the platform supports it."""
 
+    max_bytes = _validated_max_bytes(max_bytes, label=label)
     target = Path(path)
     if not _supports_no_follow():
         try:
@@ -955,13 +1026,13 @@ def read_bytes_no_follow(path: str | Path, label: str) -> bytes:
                 f"could not read {label} {target}: {exc}"
             ) from exc
         try:
-            chunks: list[bytes] = []
-            while True:
-                chunk = os.read(fd, 65536)
-                if not chunk:
-                    break
-                chunks.append(chunk)
-            payload = b"".join(chunks)
+            payload = _read_opened_file_bytes(
+                fd,
+                opened_stat,
+                path=target,
+                label=label,
+                max_bytes=max_bytes,
+            )
             final_fd_stat = os.fstat(fd)
             final_named_stat = _portable_lstat_regular_file(target, label=label)
             expected_identity = _stat_object_identity(opened_stat)
@@ -975,8 +1046,6 @@ def read_bytes_no_follow(path: str | Path, label: str) -> bytes:
                 _stat_object_identity(final_named_stat) != expected_identity
                 or _stat_stability_snapshot(final_named_stat) != expected_snapshot
             ):
-                raise MillefeuilleContractError(f"{label} changed while read: {target}")
-            if len(payload) != opened_stat.st_size:
                 raise MillefeuilleContractError(f"{label} changed while read: {target}")
             return payload
         except OSError as exc:
@@ -996,13 +1065,13 @@ def read_bytes_no_follow(path: str | Path, label: str) -> bytes:
             f"could not read {label} {target}: {exc}"
         ) from exc
     try:
-        chunks: list[bytes] = []
-        while True:
-            chunk = os.read(fd, 65536)
-            if not chunk:
-                break
-            chunks.append(chunk)
-        payload = b"".join(chunks)
+        payload = _read_opened_file_bytes(
+            fd,
+            opened_stat,
+            path=target,
+            label=label,
+            max_bytes=max_bytes,
+        )
         final_fd_stat = os.fstat(fd)
         final_named_stat = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
         expected_identity = _stat_object_identity(opened_stat)
@@ -1017,8 +1086,6 @@ def read_bytes_no_follow(path: str | Path, label: str) -> bytes:
             or _stat_stability_snapshot(final_named_stat) != expected_snapshot
         ):
             raise MillefeuilleContractError(f"{label} changed while read: {target}")
-        if len(payload) != opened_stat.st_size:
-            raise MillefeuilleContractError(f"{label} changed while read: {target}")
         return payload
     except OSError as exc:
         raise MillefeuilleContractError(
@@ -1029,20 +1096,30 @@ def read_bytes_no_follow(path: str | Path, label: str) -> bytes:
         os.close(parent_fd)
 
 
-def read_text_no_follow(path: str | Path, label: str) -> str:
+def read_text_no_follow(
+    path: str | Path,
+    label: str,
+    *,
+    max_bytes: int | None = None,
+) -> str:
     target = Path(path)
     try:
-        return read_bytes_no_follow(target, label).decode("utf-8")
+        return read_bytes_no_follow(target, label, max_bytes=max_bytes).decode("utf-8")
     except UnicodeDecodeError as exc:
         raise MillefeuilleContractError(
             f"{label} is not valid UTF-8: {target}"
         ) from exc
 
 
-def load_json_object_no_follow(path: str | Path, label: str) -> dict[str, Any]:
+def load_json_object_no_follow(
+    path: str | Path,
+    label: str,
+    *,
+    max_bytes: int | None = None,
+) -> dict[str, Any]:
     target = Path(path)
     try:
-        payload = json.loads(read_text_no_follow(target, label))
+        payload = json.loads(read_text_no_follow(target, label, max_bytes=max_bytes))
     except json.JSONDecodeError as exc:
         raise MillefeuilleContractError(f"{label} is not valid JSON: {target}") from exc
     if not isinstance(payload, dict):

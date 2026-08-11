@@ -20,6 +20,7 @@ REQUIRED_DOCS = [
     "release-version-policy.md",
     "release-candidate-preflight.md",
     "live-run-plan.md",
+    "approved-live-receipts.md",
 ]
 
 REQUIRED_JSON_SCHEMAS = [
@@ -40,6 +41,8 @@ REQUIRED_JSON_SCHEMAS = [
     "model-execution-evidence.schema.json",
     "model-execution-plan.schema.json",
     "model-provenance-record.schema.json",
+    "approved-live-receipt.schema.json",
+    "approved-live-audit.schema.json",
 ]
 
 REQUIRED_STAGES = {

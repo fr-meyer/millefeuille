@@ -13,6 +13,9 @@ explicit without weakening their manual gates.
 Implemented stage-command controls are:
 
 - `--mode preview|read-only-live|approved-live`
+- `--approval-receipt <json>` for exact-scope gate validation only; it is
+  rejected outside explicit `approved-live`, and valid receipts still stop at
+  the current unsupported-live gate
 - `--source-pack-root <path>` plus `--paper-id|--item-key` and `--run-id`
 - `retrieve --batch-manifest <path>` as the locator source for deterministic
   multi-run preview output
@@ -456,12 +459,21 @@ write live Zotero/OpenKB/index/source-pack state.
     source-pack writes, or package publication.
 
 - `approved-live`
-  - Requires a named approval token or operator confirmation outside committed
-    files.
+  - Requires an exact, unexpired, untampered approval receipt from a trusted
+    operator approval channel.
   - Used for PDF recovery, OCR calls, model calls, source-pack writes, OpenKB
     writes, index writes, Zotero writes, and release actions.
-  - The current stage-oriented preview CLI stops with exit code `3`; it does
-    not implement approved-live execution.
+  - The available CLI bindings must match operation, target/selector, run, item
+    cap, and canonical roots. The normative receipt contract additionally binds
+    provider/model, budget, disposal, stop, expiry, and single-use replay state.
+  - Receipt validation never promotes `preview` or `read-only-live`.
+  - Zotero writeback additionally requires explicit
+    `--writeback approved-live`; the global mode and writeback mode do not
+    imply one another.
+  - The current stage-oriented CLI stops with exit code `3` even after a valid
+    receipt; it does not implement provider calls or approved-live writes.
+  - The full receipt, replay, audit, and adapter obligations are normative in
+    `approved-live-receipts.md`.
 
 ## Exit Rules
 
