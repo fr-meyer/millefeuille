@@ -261,6 +261,22 @@ millefeuille models --provenance --plan-file model-plan.json --execution-evidenc
 millefeuille run --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --stages acceptance,classify,writeback --handoff handoff.jsonl --classification-evidence classification-evidence.json --release-preflight
 ```
 
+Single-run stage commands may select an external run package created by the
+dry-run artifact writer, or an exact custom manifest within that package:
+
+```bash
+millefeuille summarize --source-pack-root ./source-packs --artifact-root ./artifacts --paper-id zotero-ITEM1 --run-id run-001 --evidence summary-evidence.json
+millefeuille retrieve --source-pack-root ./source-packs --stage-manifest ./artifacts/zotero-ITEM1/run-001/run-state.json --paper-id zotero-ITEM1 --run-id run-001 --json
+```
+
+The default remains the canonical source-pack run. `--artifact-root
+source-pack` selects it explicitly. A path root must resolve exactly one
+declared package layout; `--stage-manifest` must be inside that package and its
+filename must match every manifest ref in the sibling artifact index. Parent
+traversal, ambiguous roots, symbolic links or Windows reparse points, and
+paper/run/source/stage cross-wiring fail before writes. Batch manifests do not
+accept these single-run overrides.
+
 These commands stay offline and preview-only in the current contract slice:
 
 - `acceptance` synthesizes a final verdict from handoff, source-pack,
@@ -322,9 +338,10 @@ These commands stay offline and preview-only in the current contract slice:
 - `run` chains those fixture stages through `acceptance`, `classify`, and
   `writeback` in canonical order, supports `--resume` with output
   revalidation, and can emit optional release-candidate preflight reporting.
-- Derived writes and resume fail closed when paper, run, source hash, source
-  identity, stage set, or stage status differs across the source-pack manifest,
-  stage manifest, and artifact index.
+- Derived writes and resume fail closed when artifact root, manifest ref,
+  paper, run, source-pack ref, source hash, source identity, stage set, or stage
+  status differs across the selected package, source-pack manifest, stage
+  manifest, and artifact index.
 - `--mode approved-live` and approved-live writeback stop at exit code `3`;
   these commands never turn a preview invocation into a live provider or
   Zotero mutation.

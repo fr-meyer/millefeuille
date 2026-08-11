@@ -114,6 +114,8 @@ def write_offline_fixture_stage(
     run_id: str,
     paper_id: str | None = None,
     item_key: str | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> OfflineStageWriteResult:
     stage_name = _coerce_fixture_stage(stage)
     resolved = resolve_run_artifacts(
@@ -121,6 +123,8 @@ def write_offline_fixture_stage(
         run_id=run_id,
         paper_id=paper_id,
         item_key=item_key,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
     evidence = Path(evidence_path)
     records, results = _write_stage(
@@ -129,6 +133,7 @@ def write_offline_fixture_stage(
         source_pack_root=source_pack_root,
         run_id=resolved.run_id,
         expected_paper_id=resolved.paper_id,
+        artifact_run_dir=resolved.run_dir,
     )
     _require_single_paper_record(
         stage_name=stage_name,
@@ -143,6 +148,8 @@ def write_offline_fixture_stage(
         source_pack_root=source_pack_root,
         run_id=resolved.run_id,
         paper_id=resolved.paper_id,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
     output_records = _output_records(stage_name, result)
     output_refs = [
@@ -283,6 +290,7 @@ def _write_stage(
     source_pack_root: str | Path,
     run_id: str,
     expected_paper_id: str,
+    artifact_run_dir: Path,
 ) -> tuple[list[Any], list[Any]]:
     if stage_name == StageName.EXTRACT_NATIVE:
         records = load_native_extraction_evidence_batch(evidence_path)
@@ -319,6 +327,7 @@ def _write_stage(
             evidence_path=evidence_path,
             source_pack_root=source_pack_root,
             run_id=run_id,
+            artifact_run_dir=artifact_run_dir,
         )
     elif stage_name == StageName.CARD:
         records = load_card_fixture_evidence_batch(evidence_path)
@@ -327,6 +336,7 @@ def _write_stage(
             evidence_path=evidence_path,
             source_pack_root=source_pack_root,
             run_id=run_id,
+            artifact_run_dir=artifact_run_dir,
         )
     elif stage_name == StageName.INDEX:
         records = load_index_fixture_evidence_batch(evidence_path)
@@ -335,6 +345,7 @@ def _write_stage(
             evidence_path=evidence_path,
             source_pack_root=source_pack_root,
             run_id=run_id,
+            artifact_run_dir=artifact_run_dir,
         )
     else:  # pragma: no cover - guarded by _coerce_fixture_stage
         raise MillefeuilleContractError(

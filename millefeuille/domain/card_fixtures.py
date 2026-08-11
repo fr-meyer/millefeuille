@@ -198,12 +198,21 @@ def write_cards_from_evidence(
     evidence_path: str | Path,
     source_pack_root: str | Path,
     run_id: str,
+    artifact_run_dir: str | Path | None = None,
 ) -> list[CardFixtureWriteResult]:
     root = Path(source_pack_root)
     resolved_run_id = _required_string(run_id, "run_id")
     records = load_card_fixture_evidence_batch(evidence_path)
     _reject_duplicate_records(records)
-    planned = [_plan_card(record, root, resolved_run_id) for record in records]
+    planned = [
+        _plan_card(
+            record,
+            root,
+            resolved_run_id,
+            artifact_run_dir=artifact_run_dir,
+        )
+        for record in records
+    ]
     return [_apply_planned_card_write(plan) for plan in planned]
 
 
@@ -217,6 +226,8 @@ def _plan_card(
     evidence: CardFixtureEvidence,
     source_pack_root: Path,
     run_id: str,
+    *,
+    artifact_run_dir: str | Path | None,
 ) -> _PlannedCardWrite:
     source_pack_dir, source_hash = _resolve_source_pack_dir(
         source_pack_root=source_pack_root,
@@ -228,7 +239,11 @@ def _plan_card(
         paper_id=evidence.paper_id,
     )
     paper_id = source_pack_dir.name
-    run_dir = source_pack_dir / "analyses" / "millefeuille" / run_id
+    run_dir = (
+        Path(artifact_run_dir)
+        if artifact_run_dir is not None
+        else source_pack_dir / "analyses" / "millefeuille" / run_id
+    )
     _validate_summary_dependency(
         source_pack_dir=source_pack_dir,
         run_dir=run_dir,

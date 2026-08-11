@@ -210,30 +210,32 @@ def resolve_artifact_run_context(
 
     paper_id = paper_id_for_item(item)
     artifact_root = str(config.artifact_root).strip()
-    if artifact_root != SOURCE_PACK_ARTIFACT_ROOT:
-        run_dir = Path(config.artifact_root) / paper_id / run_id
-        return ArtifactRunContext(
-            run_dir=run_dir,
-            source_pack_ref=f"source-packs/zotero/{paper_id}",
-        )
-
     source_pack_root = config.source_pack_root or DEFAULT_SOURCE_PACK_ROOT
     source_pack_dir = Path(source_pack_root) / "zotero" / paper_id
     source_pack_manifest = source_pack_dir / "manifest.json"
+    if artifact_root == SOURCE_PACK_ARTIFACT_ROOT:
+        run_dir = source_pack_dir / "analyses" / "millefeuille" / run_id
+    else:
+        run_dir = Path(config.artifact_root) / paper_id / run_id
+
     if not source_pack_manifest.is_file():
-        raise ValueError(
-            "export.artifacts.artifact_root=source-pack requires an existing "
-            f"source-pack manifest at {source_pack_manifest}"
+        if artifact_root == SOURCE_PACK_ARTIFACT_ROOT:
+            raise ValueError(
+                "export.artifacts.artifact_root=source-pack requires an existing "
+                f"source-pack manifest at {source_pack_manifest.as_posix()}"
+            )
+        return ArtifactRunContext(
+            run_dir=run_dir,
+            source_pack_ref=str(source_pack_dir),
         )
     try:
         source_pack_hash = load_source_pack_manifest_source_hash(source_pack_manifest)
     except ValueError as exc:
         raise ValueError(
-            "export.artifacts.artifact_root=source-pack requires a source-pack "
-            f"manifest with a verified source_hash at {source_pack_manifest}: {exc}"
+            "artifact export requires a source-pack manifest with a verified "
+            f"source_hash at {source_pack_manifest.as_posix()}: {exc}"
         ) from exc
 
-    run_dir = source_pack_dir / "analyses" / "millefeuille" / run_id
     manifest_ref = _relative_ref(source_pack_manifest, run_dir)
     extraction_refs = _resolve_extraction_refs(
         source_pack_dir=source_pack_dir,
