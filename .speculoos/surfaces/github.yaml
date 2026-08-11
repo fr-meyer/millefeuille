@@ -2,7 +2,8 @@ surface: github
 status: repo-present
 repository: fr-meyer/millefeuille
 url: https://github.com/fr-meyer/millefeuille
-default_branch: dev
+default_branch: main
+integration_branch: dev
 write_path: mergeguez
 project:
   status: pending-broker-link
@@ -337,3 +338,63 @@ completed_pull_requests:
     merge_commit: 1e8ba5849ba6abb67ad5b4677e83236b311a06d3
     mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/77#pullrequestreview-4712534915
     mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87590611535
+  - id: pr-079-batch-retrieval
+    number: 79
+    url: https://github.com/fr-meyer/millefeuille/pull/79
+    status: merged
+    base_branch: dev
+    head_branch: feat/pr-079-batch-retrieval
+    head_sha: c950bb07e6abadfd4d41426ecd0404e99eae49c3
+    merge_commit: 18c452bcd070d43ccd1e167164613e9262054f22
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/79#pullrequestreview-4728318466
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88071003328
+  - id: pr-080-ci-retire-broken-coderabbit
+    number: 80
+    url: https://github.com/fr-meyer/millefeuille/pull/80
+    status: merged
+    base_branch: dev
+    head_branch: fix/pr-080-ci-retire-broken-coderabbit
+    head_sha: 0538e0a4574b24d193d5fa720cd08ca0ecd15484
+    merge_commit: 0e428db047a9bf81d087f5bafca03a9295527b98
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/80#pullrequestreview-4728221677
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88065960480
+  - id: pr-082-gpt56-summary-profiles
+    number: 82
+    url: https://github.com/fr-meyer/millefeuille/pull/82
+    status: merged
+    base_branch: dev
+    head_branch: feat/pr-082-gpt56-summary-profiles
+    head_sha: 5f01b378d4c8c84b14bb3e41ada2cb6e9fd59d72
+    merge_commit: ba7ce07f48732a981be5de5751fa7e34380c84d6
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/82#pullrequestreview-4728585238
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88084819154
+  - id: pr-084-model-execution-plan
+    number: 84
+    url: https://github.com/fr-meyer/millefeuille/pull/84
+    status: merged
+    base_branch: dev
+    head_branch: feat/pr-084-model-execution-plan
+    head_sha: 71273cfc48f4a8106592ee6feea89e842351a6e2
+    merge_commit: 969acda50aeba56e1a15106b8b1e49513e1f3570
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/84#pullrequestreview-4730250837
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88164488944
+  - id: pr-086-model-provenance-record
+    number: 86
+    url: https://github.com/fr-meyer/millefeuille/pull/86
+    status: merged
+    base_branch: dev
+    head_branch: feat/pr-086-model-provenance-record
+    head_sha: 715af38e3cb6def668558356ebb5bb47ae1f3ea1
+    merge_commit: f41c8c2af77e0b1702c3d32d9489ef3ce2fb37d6
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/86#pullrequestreview-4732773210
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88291725585
+  - id: pr-088-retire-remaining-coderabbit-workflows
+    number: 88
+    url: https://github.com/fr-meyer/millefeuille/pull/88
+    status: merged
+    base_branch: dev
+    head_branch: chore/pr-088-retire-remaining-coderabbit-workflows
+    head_sha: 8c0fdb8cbcc9e3928f4baa89356fe64603fed7fa
+    merge_commit: 130aba5f962b190f7816347c41a5e4d07a17752e
+    mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/88#pullrequestreview-4773052125
+    mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/89478145706
