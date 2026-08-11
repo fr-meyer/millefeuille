@@ -1,5 +1,10 @@
 # CLI Contract
 
+The command router currently preserves both the original Hydra-configured
+workflow and the named source-pack stage commands. Their ownership,
+compatibility window, PageIndex connector boundary, and rollback rules are
+normative in [Legacy-to-Lifecycle Migration And Deprecation Contract](legacy-migration.md).
+
 The CLI now exposes preview/read-only stage commands for `extract-native`,
 `extract-ocr`, `route`, `structure`, `summarize`, `card`, `index`,
 `acceptance`, `classify`, `writeback`, `retrieve`, `models`, and `run`,

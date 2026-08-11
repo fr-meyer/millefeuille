@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import unittest
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
 SPEC_DIR = Path(__file__).resolve().parents[1] / "specs" / "millefeuille-pipeline"
 
 REQUIRED_DOCS = [
@@ -12,6 +13,7 @@ REQUIRED_DOCS = [
     "vision.md",
     "remaining-work.md",
     "cli-contract.md",
+    "legacy-migration.md",
     "artifact-storage.md",
     "retrieval-index-contract.md",
     "classification-orchestration.md",
@@ -178,6 +180,39 @@ class TestMillefeuilleContractArtifacts(unittest.TestCase):
                     pattern.search(text),
                     f"forbidden marker in {path.name}: {pattern.pattern}",
                 )
+
+    def test_legacy_migration_contract_pins_compatibility_boundaries(self):
+        migration = (SPEC_DIR / "legacy-migration.md").read_text(encoding="utf-8")
+        required_markers = [
+            "Legacy Hydra surface",
+            "Lifecycle stage surface",
+            "millefeuille-source-pack-manifest/v0.1",
+            "millefeuille-source-pack-manifest/v0.2",
+            "PageIndex MCP-only",
+            "millefeuille-processed",
+            "millefeuille-acceptance-passed",
+            "No earlier than `1.0.0`",
+            "Safe Stop And Rollback",
+        ]
+        for marker in required_markers:
+            with self.subTest(marker=marker):
+                self.assertIn(marker, migration)
+
+        self.assertLess(
+            migration.index("`0.4.x` (current)"),
+            migration.index("No earlier than `1.0.0`"),
+        )
+
+    def test_migration_contract_is_linked_from_operator_navigation(self):
+        packet_readme = (SPEC_DIR / "README.md").read_text(encoding="utf-8")
+        root_readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("`legacy-migration.md`", packet_readme)
+        self.assertIn(
+            "(specs/millefeuille-pipeline/legacy-migration.md)",
+            root_readme,
+        )
+        self.assertTrue((SPEC_DIR / "legacy-migration.md").is_file())
 
 
 if __name__ == "__main__":
