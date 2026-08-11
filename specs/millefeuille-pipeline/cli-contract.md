@@ -3,7 +3,8 @@
 The CLI now exposes preview/read-only stage commands for `extract-native`,
 `extract-ocr`, `route`, `structure`, `summarize`, `card`, `index`,
 `acceptance`, `classify`, `writeback`, `retrieve`, `models`, and `run`,
-alongside the older `artifacts`, `status`, and `source-pack` helpers. The
+plus the no-effect `operator-preflight`, alongside the older `artifacts`,
+`status`, and `source-pack` helpers. The
 remaining command-surface goal is to make discovery, handoff, recovery,
 source-pack intake, OpenKB addition, and approved-live execution equally
 explicit without weakening their manual gates.
@@ -31,6 +32,30 @@ source-pack root and rejects cross-wired manifest/index identity before any
 derived artifact write.
 
 ## Current Preview Surface
+
+- `operator-preflight`
+  - Requires `--packet <json>` and an explicit
+    `--mode preview|read-only-live|approved-live`; packet and invocation modes
+    must match exactly.
+  - Validates exact source adapter/selector/count, run and roots, operations,
+    targets and destination roles, provider/model/profile and budgets,
+    disposal, stop and rollback controls, acceptance, credential-reference
+    readiness, and packet content identity.
+  - Operation names and their destination, provider, credential, and acceptance
+    requirements are frozen by the v0.1 matrix; unknown aliases and prefix or
+    suffix variants fail closed.
+  - Approved-live also requires `--approval-receipt <json>`. A reserved
+    content-addressed MF-100 target binds packet-only controls, and every
+    normal receipt field is derived independently from the packet.
+  - Checks only whether each allowlisted environment reference is non-empty;
+    values never enter hashes, JSON, Markdown, logs, or errors.
+  - `--format json|markdown` emits a deterministic allowlisted result to
+    standard output. It creates no file and performs no source/provider/store
+    operation.
+  - Ready preview/read-only returns `0`, blocked non-approved validation returns
+    `2`, and every approved-live path returns `3`, including exact valid scope,
+    because external execution remains unsupported.
+  - The complete manual approval contract is `operator-preflight.md`.
 
 - `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
   and `index`

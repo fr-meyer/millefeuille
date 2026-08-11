@@ -23,6 +23,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from millefeuille.cli.artifacts import run_artifact_cli
 from millefeuille.cli.commands import dry_run_command, process_command
+from millefeuille.cli.operator_preflight import run_operator_preflight_cli
 from millefeuille.cli.source_pack import run_source_pack_cli
 from millefeuille.cli.stages import run_stage_cli
 from millefeuille.clients.exceptions import (
@@ -789,6 +790,8 @@ def entrypoint() -> None:
         sys.exit(run_artifact_cli(argv))
     if argv and argv[0] == "source-pack":
         sys.exit(run_source_pack_cli(argv))
+    if argv and argv[0] == "operator-preflight":
+        sys.exit(run_operator_preflight_cli(argv))
     if argv and argv[0] in {
         "extract-native",
         "extract-ocr",

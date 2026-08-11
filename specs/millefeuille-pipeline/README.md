@@ -27,6 +27,12 @@ Files:
   evidence shape.
 - `approved-live-receipts.md` - normative hash, scope, replay, audit, and CLI
   gate contract.
+- `operator-preflight-packet.schema.json` - exact no-effect operator request,
+  readiness controls, and reserved receipt-scope binding.
+- `operator-preflight-result.schema.json` - deterministic sanitized readiness
+  result shape.
+- `operator-preflight.md` - normative packet, credential-reference,
+  authorization-context, output, and exit-code contract.
 - `hierarchical-summary.schema.json` - page/section/paper summary shape.
 - `paper-card.schema.json` - compact human/agent card shape.
 - `retrieval-index-status.schema.json` - retrieval/index lane status shape.
@@ -59,6 +65,17 @@ Approved-live receipt parsing and exact request validation live in
 only as part of its fail-closed manual gate: no validated receipt enables a
 provider call or external write yet, and presenting a receipt in preview or
 read-only mode is rejected.
+
+Offline operator-packet validation lives in
+`millefeuille/domain/operator_preflight.py` and is exposed by
+`millefeuille operator-preflight`. It independently binds mode, adapter,
+selection and count, roots, operations, destination roles, provider/profile,
+budgets, disposal, stop, rollback, acceptance, allowlisted credential
+references, and the exact MF-100 receipt identity. Approved-live adds a
+reserved content-addressed receipt target so controls not represented directly
+by MF-100 cannot drift. The command checks only credential presence, never
+credential values, performs no external effect, and preserves the exit-3
+unsupported-live boundary after successful approval validation.
 
 Executable offline contract models live in
 `millefeuille/domain/millefeuille.py`. They cover stage manifests,
