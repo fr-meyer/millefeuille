@@ -1,0 +1,209 @@
+{
+  "authority": "local-artifact-evidence-not-zotero-tags",
+  "content_identity": "sha256:f5eb1f82d936108f930e9dc84e9c0c515c416220d940bfa03501790928133844",
+  "exception_transition_policy": {
+    "destinations": [
+      "millefeuille-error",
+      "millefeuille-needs-review"
+    ],
+    "from": "any-canonical-state"
+  },
+  "legacy_tags": [
+    {
+      "canonical_mapping": null,
+      "match": "exact",
+      "observed_meaning": "legacy-millefeuille-processing-reported-success",
+      "removal_policy": "preserve-history",
+      "selector": "millefeuille-processed"
+    },
+    {
+      "canonical_mapping": null,
+      "match": "prefix",
+      "observed_meaning": "external-predecessor-outcome",
+      "removal_policy": "preserve-history",
+      "selector": "docai"
+    }
+  ],
+  "registry_id": "millefeuille-lifecycle",
+  "registry_version": "0.1",
+  "schema_version": "millefeuille-lifecycle-tag-registry/v0.1",
+  "tags": [
+    {
+      "evidence_stage": null,
+      "kind": "selection",
+      "tag": "millefeuille"
+    },
+    {
+      "evidence_stage": "discover",
+      "kind": "progress",
+      "tag": "millefeuille-previewed"
+    },
+    {
+      "evidence_stage": "handoff",
+      "kind": "progress",
+      "tag": "millefeuille-handoff-exported"
+    },
+    {
+      "evidence_stage": "recover",
+      "kind": "progress",
+      "tag": "millefeuille-source-verified"
+    },
+    {
+      "evidence_stage": "source-pack",
+      "kind": "progress",
+      "tag": "millefeuille-source-packed"
+    },
+    {
+      "evidence_stage": "extract-native",
+      "kind": "progress",
+      "tag": "millefeuille-extracted-native"
+    },
+    {
+      "evidence_stage": "extract-ocr",
+      "kind": "progress",
+      "tag": "millefeuille-extracted-ocr"
+    },
+    {
+      "evidence_stage": "structure",
+      "kind": "progress",
+      "tag": "millefeuille-structure-ready"
+    },
+    {
+      "evidence_stage": "summarize",
+      "kind": "progress",
+      "tag": "millefeuille-summarized"
+    },
+    {
+      "evidence_stage": "card",
+      "kind": "progress",
+      "tag": "millefeuille-card-ready"
+    },
+    {
+      "evidence_stage": "openkb-add",
+      "kind": "progress",
+      "tag": "millefeuille-openkb-added"
+    },
+    {
+      "evidence_stage": "index",
+      "kind": "progress",
+      "tag": "millefeuille-indexed"
+    },
+    {
+      "evidence_stage": "acceptance",
+      "kind": "acceptance",
+      "tag": "millefeuille-acceptance-passed"
+    },
+    {
+      "evidence_stage": "acceptance",
+      "kind": "acceptance",
+      "tag": "millefeuille-ready-for-classification"
+    },
+    {
+      "evidence_stage": "classify",
+      "kind": "terminal-success",
+      "tag": "millefeuille-classified"
+    },
+    {
+      "evidence_stage": null,
+      "kind": "exception",
+      "tag": "millefeuille-needs-review"
+    },
+    {
+      "evidence_stage": null,
+      "kind": "exception",
+      "tag": "millefeuille-error"
+    }
+  ],
+  "terminal_success": {
+    "requires_acceptance_pass": true,
+    "requires_classification_decision": "classified",
+    "requires_released_taxonomy_lock": true,
+    "tag": "millefeuille-classified"
+  },
+  "transitions": [
+    {
+      "from": "millefeuille",
+      "to": "millefeuille-previewed"
+    },
+    {
+      "from": "millefeuille-acceptance-passed",
+      "to": "millefeuille-ready-for-classification"
+    },
+    {
+      "from": "millefeuille-card-ready",
+      "to": "millefeuille-indexed"
+    },
+    {
+      "from": "millefeuille-card-ready",
+      "to": "millefeuille-openkb-added"
+    },
+    {
+      "from": "millefeuille-extracted-native",
+      "to": "millefeuille-openkb-added"
+    },
+    {
+      "from": "millefeuille-extracted-native",
+      "to": "millefeuille-structure-ready"
+    },
+    {
+      "from": "millefeuille-extracted-ocr",
+      "to": "millefeuille-openkb-added"
+    },
+    {
+      "from": "millefeuille-extracted-ocr",
+      "to": "millefeuille-structure-ready"
+    },
+    {
+      "from": "millefeuille-handoff-exported",
+      "to": "millefeuille-source-verified"
+    },
+    {
+      "from": "millefeuille-indexed",
+      "to": "millefeuille-acceptance-passed"
+    },
+    {
+      "from": "millefeuille-openkb-added",
+      "to": "millefeuille-acceptance-passed"
+    },
+    {
+      "from": "millefeuille-openkb-added",
+      "to": "millefeuille-indexed"
+    },
+    {
+      "from": "millefeuille-previewed",
+      "to": "millefeuille-handoff-exported"
+    },
+    {
+      "from": "millefeuille-ready-for-classification",
+      "to": "millefeuille-classified"
+    },
+    {
+      "from": "millefeuille-source-packed",
+      "to": "millefeuille-extracted-native"
+    },
+    {
+      "from": "millefeuille-source-packed",
+      "to": "millefeuille-extracted-ocr"
+    },
+    {
+      "from": "millefeuille-source-verified",
+      "to": "millefeuille-source-packed"
+    },
+    {
+      "from": "millefeuille-structure-ready",
+      "to": "millefeuille-summarized"
+    },
+    {
+      "from": "millefeuille-summarized",
+      "to": "millefeuille-card-ready"
+    }
+  ],
+  "write_policy": {
+    "historical_tags_preserved_by_default": true,
+    "legacy_outcome_removal": "never-auto-propose",
+    "mode": "preview-only",
+    "requires_current-zotero-version-recheck": true,
+    "requires_separate_approved-live_writeback": true,
+    "selection_removal": "terminal-success-only"
+  }
+}

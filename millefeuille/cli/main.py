@@ -23,6 +23,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from millefeuille.cli.artifacts import run_artifact_cli
 from millefeuille.cli.commands import dry_run_command, process_command
+from millefeuille.cli.lifecycle_tags import run_lifecycle_tags_cli
 from millefeuille.cli.source_pack import run_source_pack_cli
 from millefeuille.cli.stages import run_stage_cli
 from millefeuille.cli.taxonomy import run_taxonomy_cli
@@ -751,6 +752,11 @@ Offline taxonomy governance commands:
   millefeuille taxonomy validate --registry /path/to/taxonomy-registry.json
   millefeuille taxonomy lock --registry /path/to/taxonomy-registry.json ...
 
+Offline lifecycle-tag migration commands:
+  millefeuille lifecycle-tags registry
+  millefeuille lifecycle-tags validate --registry /path/to/lifecycle-registry.json
+  millefeuille lifecycle-tags plan --registry /path/to/lifecycle-registry.json ...
+
 Artifact-writer source-pack fixture flags:
   --native-extraction-evidence /path/to/native-extraction-evidence.jsonl
   --ocr-extraction-evidence /path/to/ocr-extraction-evidence.jsonl
@@ -796,6 +802,8 @@ def entrypoint() -> None:
         sys.exit(run_source_pack_cli(argv))
     if argv and argv[0] == "taxonomy":
         sys.exit(run_taxonomy_cli(argv[1:]))
+    if argv and argv[0] == "lifecycle-tags":
+        sys.exit(run_lifecycle_tags_cli(argv[1:]))
     if argv and argv[0] in {
         "extract-native",
         "extract-ocr",

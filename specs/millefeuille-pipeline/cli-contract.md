@@ -3,7 +3,8 @@
 The CLI now exposes preview/read-only stage commands for `extract-native`,
 `extract-ocr`, `route`, `structure`, `summarize`, `card`, `index`,
 `acceptance`, `classify`, `writeback`, `retrieve`, `models`, and `run`,
-alongside the older `artifacts`, `status`, and `source-pack` helpers. The
+alongside `taxonomy`, `lifecycle-tags`, and the older `artifacts`, `status`,
+and `source-pack` helpers. The
 remaining command-surface goal is to make discovery, handoff, recovery,
 source-pack intake, OpenKB addition, and approved-live execution equally
 explicit without weakening their manual gates.
@@ -42,6 +43,23 @@ derived artifact write.
     while changing only active status to deprecated.
   - No taxonomy subcommand replaces a file, changes an active batch, calls a
     model/agent, or performs a live write.
+
+- `lifecycle-tags`
+  - `registry` prints the immutable content-addressed v0.1 registry whose tags
+    and transitions match `TagState` and `ALLOWED_TAG_TRANSITIONS`.
+  - `validate --registry <json> [--plan <json>]` exact-validates the canonical
+    registry and optionally one content-addressed preview.
+  - `plan` binds the exact Zotero item version/current-tag observation plus
+    local stage-manifest, artifact-index, paper/run/source, acceptance,
+    classification, and released single-run taxonomy-lock evidence.
+  - Existing Zotero tags never satisfy an evidence requirement.
+    `millefeuille-processed` and every `docai`-prefixed tag are preserved;
+    `docai-pageindex` cannot derive `millefeuille-indexed`.
+  - Only the exact `millefeuille` selection tag can be proposed for removal,
+    only after terminal classified evidence. The output remains preview-only
+    and requires MF-160 to recheck the Zotero version and obtain separate
+    approved-live authority. No subcommand reads or writes Zotero, calls a
+    provider, or writes an artifact.
 
 - `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
   and `index`

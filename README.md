@@ -20,6 +20,7 @@ classification lifecycle for research-paper attachments discovered from Zotero.
 - [PDF Download](#pdf-download)
 - [OpenKB/Millefeuille Handoff Export](#openkbmillefeuille-handoff-export)
 - [Artifact and Status Inspection](#artifact-and-status-inspection)
+- [Lifecycle Tag Migration Preview](#lifecycle-tag-migration-preview)
 - [Extraction Modes](#extraction-modes)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
@@ -259,6 +260,8 @@ millefeuille models
 millefeuille models --plan --profile research-default --stage summarize_full_paper --json
 millefeuille models --provenance --plan-file model-plan.json --execution-evidence model-execution-evidence.json --output model-provenance.json --json
 millefeuille taxonomy validate --registry taxonomy-registry.json
+millefeuille lifecycle-tags registry
+millefeuille lifecycle-tags validate --registry lifecycle-tag-registry.v0.1.json --plan migration-plan.json
 millefeuille run --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --stages acceptance,classify,writeback --handoff handoff.jsonl --classification-evidence classification-evidence.json --release-preflight
 ```
 
@@ -267,6 +270,10 @@ These commands stay offline and preview-only in the current contract slice:
 - `taxonomy` validates and derives content-addressed registry, lock, proposal,
   review, apply, and forward-only rollback JSON without generating labels,
   replacing registry files, changing active batch locks, or making live calls.
+- `lifecycle-tags` prints or validates the immutable lifecycle vocabulary and
+  derives a content-addressed, preview-only migration plan from exact local
+  run evidence. Existing Zotero tags remain observations and the command does
+  not read or mutate Zotero.
 - `acceptance` synthesizes a final verdict from handoff, source-pack,
   extraction, route, structure, summary, card, and index evidence.
 - `classify` materializes classification plans, decision records, review
@@ -332,6 +339,42 @@ These commands stay offline and preview-only in the current contract slice:
 - `--mode approved-live` and approved-live writeback stop at exit code `3`;
   these commands never turn a preview invocation into a live provider or
   Zotero mutation.
+
+### Lifecycle Tag Migration Preview
+
+MF-161 provides an offline control plane for reviewing lifecycle-tag changes
+without contacting Zotero:
+
+```bash
+millefeuille lifecycle-tags plan \
+  --registry specs/millefeuille-pipeline/lifecycle-tag-registry.v0.1.json \
+  --plan-id PLAN-ITEM1-42 \
+  --item-key ITEM1 \
+  --zotero-version 42 \
+  --current-tag millefeuille \
+  --current-tag millefeuille-processed \
+  --stage-manifest stage-manifest.json \
+  --artifact-index artifact-index.json \
+  --acceptance-summary reports/acceptance-summary.json \
+  --classification-plan classification/classification-plan.json \
+  --classification-decision classification/decisions/ITEM1.json \
+  --taxonomy-lock taxonomy-lock.json \
+  --remove-selection-after-terminal-success
+```
+
+The plan binds the item key, exact observed item version and tags, paper, run,
+source hash, manifest/index identities, and any acceptance, classification, and
+released single-run taxonomy-lock evidence. Tags never count as evidence.
+`millefeuille-processed` and every `docai`-prefixed tag are observation-only
+and preserved; `docai-pageindex` never means indexed. Classification requires
+a passing acceptance summary, classified decision, and matching released lock.
+
+The sole possible removal is the exact `millefeuille` selection tag after
+terminal success. It remains a proposal: the future MF-160 executor must
+re-read the Zotero version and tags, validate separate approved-live authority,
+and emit its own result before any mutation. See the normative
+[`lifecycle-tag-migration.md`](specs/millefeuille-pipeline/lifecycle-tag-migration.md)
+contract.
 
 ### Offline Batch Retrieval
 
