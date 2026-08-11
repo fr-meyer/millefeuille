@@ -24,31 +24,31 @@
   "sources": {
     "local_validation": {
       "kind": "local_validation",
-      "status": "not-current",
-      "summary": "No active pull request. Each new task must replace this placeholder with exact-head local validation evidence.",
-      "evidence_ref": null,
-      "updated_at": "2026-08-11-ledger-reconciliation"
+      "status": "passed",
+      "summary": "PR #89 metadata parse, completed-ledger consistency, branch-truth invariants, and diff checks passed on the current branch.",
+      "evidence_ref": ".speculoos/tasks/pr-089-reconcile-delivery-ledgers.yaml",
+      "updated_at": "pr-089-reconcile-delivery-ledgers"
     },
     "github_checks": {
       "kind": "github_checks",
-      "status": "not-applicable",
-      "summary": "No active pull request. Live checks are required again after a branch is published.",
-      "evidence_ref": null,
-      "updated_at": "2026-08-11-ledger-reconciliation"
+      "status": "pending-live-read",
+      "summary": "Live GitHub checks for draft PR #89 must pass before merge.",
+      "evidence_ref": "https://github.com/fr-meyer/millefeuille/pull/89/checks",
+      "updated_at": "pr-089-reconcile-delivery-ledgers"
     },
     "self_managed": {
       "kind": "self_managed",
-      "status": "not-applicable",
-      "summary": "No active pull request. Self-managed review remains an emergency fallback only.",
+      "status": "pending",
+      "summary": "Self-managed review remains an emergency fallback if hosted Mergeguez review is unavailable.",
       "evidence_ref": null,
-      "updated_at": "2026-08-11-ledger-reconciliation"
+      "updated_at": "pr-089-reconcile-delivery-ledgers"
     },
     "mergeguez_review": {
       "kind": "mergeguez_review",
-      "status": "not-applicable",
-      "summary": "No active pull request. Exact-head Mergeguez evidence remains required before the next merge.",
-      "evidence_ref": null,
-      "updated_at": "2026-08-11-ledger-reconciliation"
+      "status": "pending-live-read",
+      "summary": "Exact-head Mergeguez review is required for PR #89 before merge.",
+      "evidence_ref": "https://github.com/fr-meyer/millefeuille/pull/89",
+      "updated_at": "pr-089-reconcile-delivery-ledgers"
     }
   }
 }
