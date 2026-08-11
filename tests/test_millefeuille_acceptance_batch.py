@@ -16,6 +16,7 @@ from millefeuille.domain.acceptance import (
     ACCEPTANCE_BATCH_SUMMARY_REF,
     ACCEPTANCE_SUMMARY_REF,
 )
+from millefeuille.domain.card_index_contract import canonical_json_bytes
 from millefeuille.domain.index_fixtures import INDEX_STATUS_REF
 from millefeuille.domain.summary_fixtures import SUMMARY_ARTIFACT_REF
 from tests.test_millefeuille_stage_cli import (
@@ -27,10 +28,7 @@ from tests.test_millefeuille_stage_cli import (
 
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    path.write_bytes(canonical_json_bytes(payload))
 
 
 def _clone_fixture_run(run_dir: Path, run_id: str) -> Path:
@@ -40,6 +38,7 @@ def _clone_fixture_run(run_dir: Path, run_id: str) -> Path:
         Path("stage-manifest.json"),
         Path("artifact-index.json"),
         SUMMARY_ARTIFACT_REF,
+        Path("cards/paper-card.json"),
         INDEX_STATUS_REF,
     ):
         target = destination / relative_path
@@ -91,8 +90,7 @@ def _snapshot_acceptance_outputs(source_pack_root: Path) -> dict[str, bytes]:
         for path in sorted(source_pack_root.rglob("*"))
         if path.is_file()
         and (
-            "acceptance-summary" in path.name
-            or "acceptance-batch-summary" in path.name
+            "acceptance-summary" in path.name or "acceptance-batch-summary" in path.name
         )
     }
 

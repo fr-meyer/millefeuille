@@ -17,6 +17,10 @@ import unicodedata
 
 from millefeuille.domain.acceptance import ACCEPTANCE_SUMMARY_REF
 from millefeuille.domain.card_fixtures import CARD_JSON_REF
+from millefeuille.domain.card_index_contract import (
+    validate_canonical_card_index_contract,
+    validate_paper_card_identity,
+)
 from millefeuille.domain.classification import (
     CLASSIFICATION_PLAN_REF,
     WRITEBACK_PREVIEW_REF,
@@ -184,9 +188,7 @@ def write_retrieval_batch_result(
             "classification_plans": sum(
                 "classification_plan_ref" in run for run in runs
             ),
-            "writeback_previews": sum(
-                "writeback_preview_ref" in run for run in runs
-            ),
+            "writeback_previews": sum("writeback_preview_ref" in run for run in runs),
         }
         result: dict[str, Any] = {
             "schema_version": RETRIEVAL_BATCH_RESULT_SCHEMA,
@@ -270,7 +272,10 @@ def _prepare_retrieval(
     )
 
     _validate_resolved_package_paths(resolved, artifact_reader=artifact_reader)
-    _load_verified_paper_card(resolved, artifact_reader=artifact_reader)
+    card_payload = _load_verified_paper_card(
+        resolved,
+        artifact_reader=artifact_reader,
+    )
     summary_path = resolved.run_dir / SUMMARY_ARTIFACT_REF
     summary_payload = HierarchicalSummaryRecord.from_dict(
         _load_retrieval_json(
@@ -329,6 +334,7 @@ def _prepare_retrieval(
     )
     _validate_canonical_index_refs(
         resolved,
+        card_payload,
         index_payload,
         artifact_reader=artifact_reader,
     )
@@ -2103,41 +2109,41 @@ def _load_verified_paper_card(
             artifact_reader=artifact_reader,
         )
     ).to_dict()
-    _require_identity(
-        payload=card_payload,
-        label="paper card",
+    validate_paper_card_identity(
+        card_payload,
         paper_id=resolved.paper_id,
-        run_id=None,
-        source_hash=None,
+        run_id=resolved.run_id,
+        source_hash=resolved.source_hash,
     )
     return card_payload
 
 
 def _validate_canonical_index_refs(
     resolved: ResolvedRunArtifacts,
+    card_payload: dict[str, Any],
     index_payload: dict[str, Any],
     *,
     artifact_reader: RootArtifactReader | None = None,
 ) -> None:
-    index_dir = resolved.run_dir / INDEX_STATUS_REF.parent
-    expected_paths = {
-        "selected_fulltext_ref": resolved.source_pack_dir / ROUTE_MARKDOWN_REF,
-        "summary_ref": resolved.run_dir / SUMMARY_ARTIFACT_REF,
-        "paper_card_ref": resolved.run_dir / CARD_JSON_REF,
-    }
-    for field_name, expected_path in expected_paths.items():
-        expected_ref = relative_ref(expected_path, index_dir)
-        actual_ref = index_payload.get(field_name)
-        if actual_ref != expected_ref:
-            raise MillefeuilleContractError(
-                f"retrieval index {field_name} drift: "
-                f"expected {expected_ref!r}, got {actual_ref!r}"
-            )
+    def verify_file(path: Path, label: str) -> None:
         _verify_retrieval_file(
-            expected_path,
-            field_name,
+            path,
+            label,
             artifact_reader=artifact_reader,
         )
+
+    validate_canonical_card_index_contract(
+        card_payload=card_payload,
+        index_payload=index_payload,
+        paper_id=resolved.paper_id,
+        run_id=resolved.run_id,
+        source_hash=resolved.source_hash,
+        index_dir=resolved.run_dir / INDEX_STATUS_REF.parent,
+        selected_fulltext_path=resolved.source_pack_dir / ROUTE_MARKDOWN_REF,
+        summary_path=resolved.run_dir / SUMMARY_ARTIFACT_REF,
+        card_path=resolved.run_dir / CARD_JSON_REF,
+        verify_file=verify_file,
+    )
 
 
 def _require_regular_artifact(
