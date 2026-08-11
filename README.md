@@ -258,11 +258,15 @@ millefeuille retrieve --source-pack-root ./source-packs --batch-manifest retriev
 millefeuille models
 millefeuille models --plan --profile research-default --stage summarize_full_paper --json
 millefeuille models --provenance --plan-file model-plan.json --execution-evidence model-execution-evidence.json --output model-provenance.json --json
+millefeuille taxonomy validate --registry taxonomy-registry.json
 millefeuille run --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --stages acceptance,classify,writeback --handoff handoff.jsonl --classification-evidence classification-evidence.json --release-preflight
 ```
 
 These commands stay offline and preview-only in the current contract slice:
 
+- `taxonomy` validates and derives content-addressed registry, lock, proposal,
+  review, apply, and forward-only rollback JSON without generating labels,
+  replacing registry files, changing active batch locks, or making live calls.
 - `acceptance` synthesizes a final verdict from handoff, source-pack,
   extraction, route, structure, summary, card, and index evidence.
 - `classify` materializes classification plans, decision records, review

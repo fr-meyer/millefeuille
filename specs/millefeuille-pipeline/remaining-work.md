@@ -40,6 +40,10 @@
 - The current model-planning slice adds deterministic no-call execution plans
   for page, section, and full-paper summary profiles, including explicit auth,
   fallback, live-blocker, and provenance requirements.
+- The current taxonomy-governance slice adds content-addressed two-level
+  registries, immutable scope locks, exact-diff proposals, independent
+  three-role reviews, forward apply records, and forward-only rollback without
+  generating labels or mutating active batches.
 - Current integration branch is `dev`; stable branch is `main`.
 - Current package version is `0.4.0`.
 
@@ -174,9 +178,12 @@
       validate prior-decision lineage and taxonomy identity, preserve immutable
       action/final-decision packages, and advance canonical run refs. Escalation
       and taxonomy-gap outcomes retain deterministic queue/request artifacts.
+    - Offline taxonomy governance now validates stable-ID registry versions,
+      snapshots released versions per batch/pilot/run, and derives manual
+      proposal, review, apply, and rollback artifacts without replacing files.
     - Remaining work: live model-backed classification, worker-agent execution,
-      and taxonomy governance automation beyond reviewable change-request
-      artifacts.
+      binding live runs to registry locks, and later taxonomy-governance
+      automation beyond the manual reviewed lifecycle.
     - Manual gate: model/provider calls and worker-agent execution when used.
 
 15. **Zotero Writeback**

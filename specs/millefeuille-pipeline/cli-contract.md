@@ -29,6 +29,20 @@ derived artifact write.
 
 ## Current Preview Surface
 
+- `taxonomy`
+  - `seal` canonicalizes an explicitly authored registry draft and calculates
+    its content hash; it does not generate labels or approve the draft.
+  - `validate` checks a registry and optional exact lock binding.
+  - `lock` prints an immutable, self-contained released-registry snapshot for
+    one batch, pilot, or run.
+  - `propose`, `review`, `apply`, and `rollback` implement the manual
+    three-role workflow in `taxonomy-registry.md` as pure JSON derivation,
+    including independent requester, required-reviewer, and applying actor
+    identities and forward rollback that retains later-added stable IDs exactly
+    while changing only active status to deprecated.
+  - No taxonomy subcommand replaces a file, changes an active batch, calls a
+    model/agent, or performs a live write.
+
 - `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
   and `index`
   - Implemented as fixture-only, single-paper stage adapters over existing
