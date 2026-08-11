@@ -13,9 +13,34 @@ from typing import Any
 
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 
+_WINDOWS = os.name == "nt"
+_WINDOWS_REPARSE_POINT = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x0400)
+
+
+_StatObjectIdentity = tuple[int, int, int]
+_StatStabilitySnapshot = tuple[int, ...]
+_StatRecord = tuple[_StatObjectIdentity, _StatStabilitySnapshot]
+
 
 def _supports_no_follow() -> bool:
     return hasattr(os, "O_NOFOLLOW")
+
+
+def _regular_file_read_flags(*, no_follow: bool) -> int:
+    """Return flags for an exact byte read of one regular file."""
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOINHERIT"):
+        flags |= os.O_NOINHERIT
+    if no_follow and hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    if hasattr(os, "O_NONBLOCK"):
+        flags |= os.O_NONBLOCK
+    return flags
 
 
 def _open_directory_fd(path: Path) -> int:
@@ -235,13 +260,7 @@ def _open_regular_file_fd(
     label: str,
 ) -> tuple[int, int, str, os.stat_result]:
     parent_fd, name = _open_parent_directory_fd(path, label=label)
-    flags = os.O_RDONLY
-    if hasattr(os, "O_CLOEXEC"):
-        flags |= os.O_CLOEXEC
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    if hasattr(os, "O_NONBLOCK"):
-        flags |= os.O_NONBLOCK
+    flags = _regular_file_read_flags(no_follow=True)
     try:
         fd = os.open(name, flags, dir_fd=parent_fd)
     except FileNotFoundError as exc:
@@ -263,13 +282,8 @@ def _open_regular_file_fd(
         if not stat.S_ISREG(opened_stat.st_mode) or not stat.S_ISREG(
             named_stat.st_mode
         ):
-            raise MillefeuilleContractError(
-                f"{label} is not a regular file: {path}"
-            )
-        if (opened_stat.st_dev, opened_stat.st_ino) != (
-            named_stat.st_dev,
-            named_stat.st_ino,
-        ):
+            raise MillefeuilleContractError(f"{label} is not a regular file: {path}")
+        if _stat_object_identity(opened_stat) != _stat_object_identity(named_stat):
             raise MillefeuilleContractError(f"{label} changed while opening: {path}")
         return parent_fd, fd, name, opened_stat
     except Exception:
@@ -278,16 +292,80 @@ def _open_regular_file_fd(
         raise
 
 
-def _stable_stat_identity(value: os.stat_result) -> tuple[int, ...]:
+def _stat_object_identity(value: os.stat_result) -> _StatObjectIdentity:
+    """Return fields that bind a path and descriptor to the same object."""
+
     return (
         value.st_dev,
         value.st_ino,
         stat.S_IFMT(value.st_mode),
+    )
+
+
+def _stat_stability_snapshot(value: os.stat_result) -> _StatStabilitySnapshot:
+    """Return fields that reveal mutation without read-side timestamp noise.
+
+    POSIX ``ctime`` is a mutation signal and remains part of the snapshot.
+    Windows exposes creation/change timestamps inconsistently between path and
+    descriptor stats, and may change descriptor-side ``ctime`` merely because
+    the descriptor was read. Size and mtime checks remain active there.
+    """
+
+    snapshot = (
         value.st_nlink,
         value.st_size,
         value.st_mtime_ns,
-        value.st_ctime_ns,
     )
+    if not _WINDOWS:
+        return (*snapshot, value.st_ctime_ns)
+    return snapshot
+
+
+def _stat_record(value: os.stat_result) -> _StatRecord:
+    return _stat_object_identity(value), _stat_stability_snapshot(value)
+
+
+def _has_stable_object_identity(value: os.stat_result) -> bool:
+    """Whether replacement checks can distinguish this filesystem object."""
+
+    return value.st_ino != 0
+
+
+def _is_windows_reparse_point(value: os.stat_result) -> bool:
+    """Detect Windows junctions and other reparse-backed path components."""
+
+    if not _WINDOWS:
+        return False
+    attributes = getattr(value, "st_file_attributes", 0)
+    reparse_tag = getattr(value, "st_reparse_tag", 0)
+    return bool(attributes & _WINDOWS_REPARSE_POINT) or bool(reparse_tag)
+
+
+def _require_portable_directory(
+    path: Path,
+    *,
+    target: Path,
+    label: str,
+) -> None:
+    """Require one checked directory in a portable read path."""
+
+    try:
+        directory_stat = os.lstat(path)
+    except FileNotFoundError as exc:
+        raise MillefeuilleContractError(f"{label} not found: {target}") from exc
+    except OSError as exc:
+        raise MillefeuilleContractError(
+            f"could not inspect {label} path {target}: {exc}"
+        ) from exc
+    if (
+        stat.S_ISLNK(directory_stat.st_mode)
+        or _is_windows_reparse_point(directory_stat)
+        or not stat.S_ISDIR(directory_stat.st_mode)
+    ):
+        raise MillefeuilleContractError(
+            f"{label} path must not contain symbolic links, reparse points, "
+            f"or non-directories: {target}"
+        )
 
 
 def _portable_lstat_regular_file(path: Path, *, label: str) -> os.stat_result:
@@ -299,6 +377,7 @@ def _portable_lstat_regular_file(path: Path, *, label: str) -> os.stat_result:
     if not parts or parts[-1] in {"", ".", ".."}:
         raise MillefeuilleContractError(f"{label} is not a regular file: {target}")
 
+    _require_portable_directory(anchor, target=target, label=label)
     current = anchor
     for part in parts[:-1]:
         if part in {"", "."}:
@@ -308,21 +387,7 @@ def _portable_lstat_regular_file(path: Path, *, label: str) -> os.stat_result:
                 f"{label} path must not contain parent traversal: {target}"
             )
         current /= part
-        try:
-            parent_stat = os.lstat(current)
-        except FileNotFoundError as exc:
-            raise MillefeuilleContractError(f"{label} not found: {target}") from exc
-        except OSError as exc:
-            raise MillefeuilleContractError(
-                f"could not inspect {label} path {target}: {exc}"
-            ) from exc
-        if stat.S_ISLNK(parent_stat.st_mode) or not stat.S_ISDIR(
-            parent_stat.st_mode
-        ):
-            raise MillefeuilleContractError(
-                f"{label} path must not contain symbolic links or non-directories: "
-                f"{target}"
-            )
+        _require_portable_directory(current, target=target, label=label)
 
     try:
         named_stat = os.lstat(target)
@@ -332,9 +397,9 @@ def _portable_lstat_regular_file(path: Path, *, label: str) -> os.stat_result:
         raise MillefeuilleContractError(
             f"could not inspect {label} {target}: {exc}"
         ) from exc
-    if stat.S_ISLNK(named_stat.st_mode):
+    if stat.S_ISLNK(named_stat.st_mode) or _is_windows_reparse_point(named_stat):
         raise MillefeuilleContractError(
-            f"{label} must not be a symbolic link: {target}"
+            f"{label} must not be a symbolic link or reparse point: {target}"
         )
     if not stat.S_ISREG(named_stat.st_mode):
         raise MillefeuilleContractError(f"{label} is not a regular file: {target}")
@@ -350,11 +415,11 @@ def _open_portable_regular_file_fd(
 
     target = Path(path)
     expected_stat = _portable_lstat_regular_file(target, label=label)
-    flags = os.O_RDONLY
-    if hasattr(os, "O_CLOEXEC"):
-        flags |= os.O_CLOEXEC
-    if hasattr(os, "O_NONBLOCK"):
-        flags |= os.O_NONBLOCK
+    if not _has_stable_object_identity(expected_stat):
+        raise MillefeuilleContractError(
+            f"{label} filesystem does not expose stable file identity: {target}"
+        )
+    flags = _regular_file_read_flags(no_follow=False)
     try:
         fd = os.open(target, flags)
     except FileNotFoundError as exc:
@@ -367,13 +432,21 @@ def _open_portable_regular_file_fd(
     try:
         opened_stat = os.fstat(fd)
         if not stat.S_ISREG(opened_stat.st_mode):
-            raise MillefeuilleContractError(
-                f"{label} is not a regular file: {target}"
-            )
-        if _stable_stat_identity(opened_stat) != _stable_stat_identity(expected_stat):
+            raise MillefeuilleContractError(f"{label} is not a regular file: {target}")
+        expected_identity = _stat_object_identity(expected_stat)
+        expected_snapshot = _stat_stability_snapshot(expected_stat)
+        if (
+            not _has_stable_object_identity(opened_stat)
+            or _stat_object_identity(opened_stat) != expected_identity
+            or _stat_stability_snapshot(opened_stat) != expected_snapshot
+        ):
             raise MillefeuilleContractError(f"{label} changed while opening: {target}")
         named_stat = _portable_lstat_regular_file(target, label=label)
-        if _stable_stat_identity(named_stat) != _stable_stat_identity(expected_stat):
+        if (
+            not _has_stable_object_identity(named_stat)
+            or _stat_object_identity(named_stat) != expected_identity
+            or _stat_stability_snapshot(named_stat) != expected_snapshot
+        ):
             raise MillefeuilleContractError(f"{label} changed while opening: {target}")
         return fd, opened_stat
     except Exception:
@@ -388,14 +461,14 @@ class RootArtifactReader:
         self.root = Path(root).absolute()
         self._root_fd: int | None = None
         self._root_identity: tuple[int, int] | None = None
-        self._file_snapshots: dict[Path, tuple[str, tuple[int, ...]]] = {}
+        self._file_snapshots: dict[Path, tuple[str, _StatRecord]] = {}
         self._missing_file_snapshots: dict[Path, str] = {}
         self._directory_snapshots: dict[
             Path,
             tuple[
                 str,
-                tuple[int, ...],
-                tuple[tuple[str, tuple[int, ...]], ...],
+                _StatRecord,
+                tuple[tuple[str, _StatRecord], ...],
             ],
         ] = {}
 
@@ -467,7 +540,7 @@ class RootArtifactReader:
                     label=label,
                     expected_stat=opened_stat,
                 )
-                if _stable_stat_identity(opened_stat) != expected:
+                if _stat_record(opened_stat) != expected:
                     raise MillefeuilleContractError(
                         f"{label} changed after batch preflight: {target}"
                     )
@@ -505,7 +578,7 @@ class RootArtifactReader:
             target = self.root / relative
             directory_fd = self._open_relative_directory(relative, label=label)
             try:
-                current_stat = _stable_stat_identity(os.fstat(directory_fd))
+                current_stat = _stat_record(os.fstat(directory_fd))
                 current_entries = self._directory_entries(
                     directory_fd,
                     path=target,
@@ -569,9 +642,7 @@ class RootArtifactReader:
                 expected_stat=opened_stat,
             )
             if len(payload) != opened_stat.st_size:
-                raise MillefeuilleContractError(
-                    f"{label} changed while read: {target}"
-                )
+                raise MillefeuilleContractError(f"{label} changed while read: {target}")
             self._remember_regular_file(target, label, opened_stat)
             return payload
         except OSError as exc:
@@ -616,11 +687,11 @@ class RootArtifactReader:
                 label=label,
             )
             after_stat = os.fstat(directory_fd)
-            if _stable_stat_identity(before_stat) != _stable_stat_identity(after_stat):
+            if _stat_record(before_stat) != _stat_record(after_stat):
                 raise MillefeuilleContractError(
                     f"{label} changed while listed: {self.root / relative}"
                 )
-            snapshot = (label, _stable_stat_identity(after_stat), entries)
+            snapshot = (label, _stat_record(after_stat), entries)
             previous = self._directory_snapshots.get(relative)
             if previous is not None and previous != snapshot:
                 raise MillefeuilleContractError(
@@ -661,7 +732,7 @@ class RootArtifactReader:
             raise MillefeuilleContractError(
                 f"{label} appeared after first inspection: {target}"
             )
-        snapshot = (label, _stable_stat_identity(opened_stat))
+        snapshot = (label, _stat_record(opened_stat))
         previous = self._file_snapshots.get(relative)
         if previous is not None and previous[1] != snapshot[1]:
             raise MillefeuilleContractError(
@@ -688,13 +759,13 @@ class RootArtifactReader:
         *,
         path: Path,
         label: str,
-    ) -> tuple[tuple[str, tuple[int, ...]], ...]:
+    ) -> tuple[tuple[str, _StatRecord], ...]:
         try:
             names = sorted(os.listdir(directory_fd))
             return tuple(
                 (
                     name,
-                    _stable_stat_identity(
+                    _stat_record(
                         os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
                     ),
                 )
@@ -765,13 +836,7 @@ class RootArtifactReader:
         parent_relative = Path(*relative.parts[:-1])
         parent_fd = self._open_relative_directory(parent_relative, label=label)
         name = relative.parts[-1]
-        flags = os.O_RDONLY
-        if hasattr(os, "O_CLOEXEC"):
-            flags |= os.O_CLOEXEC
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
-        if hasattr(os, "O_NONBLOCK"):
-            flags |= os.O_NONBLOCK
+        flags = _regular_file_read_flags(no_follow=True)
         try:
             fd = os.open(name, flags, dir_fd=parent_fd)
         except FileNotFoundError as exc:
@@ -823,10 +888,17 @@ class RootArtifactReader:
             raise MillefeuilleContractError(
                 f"{label} changed while read: {path}"
             ) from exc
-        expected = _stable_stat_identity(expected_stat)
-        if _stable_stat_identity(fd_stat) != expected:
+        expected_identity = _stat_object_identity(expected_stat)
+        expected_snapshot = _stat_stability_snapshot(expected_stat)
+        if (
+            _stat_object_identity(fd_stat) != expected_identity
+            or _stat_stability_snapshot(fd_stat) != expected_snapshot
+        ):
             raise MillefeuilleContractError(f"{label} changed while read: {path}")
-        if _stable_stat_identity(named_stat) != expected:
+        if (
+            _stat_object_identity(named_stat) != expected_identity
+            or _stat_stability_snapshot(named_stat) != expected_snapshot
+        ):
             raise MillefeuilleContractError(f"{label} changed while read: {path}")
 
 
@@ -847,12 +919,19 @@ def verify_regular_file_no_follow(path: str | Path, label: str) -> None:
     try:
         final_fd_stat = os.fstat(fd)
         final_named_stat = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-        expected = _stable_stat_identity(opened_stat)
-        if _stable_stat_identity(final_fd_stat) != expected:
+        expected_identity = _stat_object_identity(opened_stat)
+        expected_snapshot = _stat_stability_snapshot(opened_stat)
+        if (
+            _stat_object_identity(final_fd_stat) != expected_identity
+            or _stat_stability_snapshot(final_fd_stat) != expected_snapshot
+        ):
             raise MillefeuilleContractError(
                 f"{label} changed while being verified: {target}"
             )
-        if _stable_stat_identity(final_named_stat) != expected:
+        if (
+            _stat_object_identity(final_named_stat) != expected_identity
+            or _stat_stability_snapshot(final_named_stat) != expected_snapshot
+        ):
             raise MillefeuilleContractError(
                 f"{label} changed while being verified: {target}"
             )
@@ -885,19 +964,20 @@ def read_bytes_no_follow(path: str | Path, label: str) -> bytes:
             payload = b"".join(chunks)
             final_fd_stat = os.fstat(fd)
             final_named_stat = _portable_lstat_regular_file(target, label=label)
-            expected = _stable_stat_identity(opened_stat)
-            if _stable_stat_identity(final_fd_stat) != expected:
-                raise MillefeuilleContractError(
-                    f"{label} changed while read: {target}"
-                )
-            if _stable_stat_identity(final_named_stat) != expected:
-                raise MillefeuilleContractError(
-                    f"{label} changed while read: {target}"
-                )
+            expected_identity = _stat_object_identity(opened_stat)
+            expected_snapshot = _stat_stability_snapshot(opened_stat)
+            if (
+                _stat_object_identity(final_fd_stat) != expected_identity
+                or _stat_stability_snapshot(final_fd_stat) != expected_snapshot
+            ):
+                raise MillefeuilleContractError(f"{label} changed while read: {target}")
+            if (
+                _stat_object_identity(final_named_stat) != expected_identity
+                or _stat_stability_snapshot(final_named_stat) != expected_snapshot
+            ):
+                raise MillefeuilleContractError(f"{label} changed while read: {target}")
             if len(payload) != opened_stat.st_size:
-                raise MillefeuilleContractError(
-                    f"{label} changed while read: {target}"
-                )
+                raise MillefeuilleContractError(f"{label} changed while read: {target}")
             return payload
         except OSError as exc:
             raise MillefeuilleContractError(
@@ -925,10 +1005,17 @@ def read_bytes_no_follow(path: str | Path, label: str) -> bytes:
         payload = b"".join(chunks)
         final_fd_stat = os.fstat(fd)
         final_named_stat = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-        expected = _stable_stat_identity(opened_stat)
-        if _stable_stat_identity(final_fd_stat) != expected:
+        expected_identity = _stat_object_identity(opened_stat)
+        expected_snapshot = _stat_stability_snapshot(opened_stat)
+        if (
+            _stat_object_identity(final_fd_stat) != expected_identity
+            or _stat_stability_snapshot(final_fd_stat) != expected_snapshot
+        ):
             raise MillefeuilleContractError(f"{label} changed while read: {target}")
-        if _stable_stat_identity(final_named_stat) != expected:
+        if (
+            _stat_object_identity(final_named_stat) != expected_identity
+            or _stat_stability_snapshot(final_named_stat) != expected_snapshot
+        ):
             raise MillefeuilleContractError(f"{label} changed while read: {target}")
         if len(payload) != opened_stat.st_size:
             raise MillefeuilleContractError(f"{label} changed while read: {target}")
@@ -1057,11 +1144,10 @@ def write_new_text_no_follow(
                 dir_fd=rebound_parent_fd,
                 follow_symlinks=False,
             )
-            if (
-                (rebound_parent.st_dev, rebound_parent.st_ino)
-                != (parent_identity.st_dev, parent_identity.st_ino)
-                or (rebound_named.st_dev, rebound_named.st_ino) != opened_identity
-            ):
+            if (rebound_parent.st_dev, rebound_parent.st_ino) != (
+                parent_identity.st_dev,
+                parent_identity.st_ino,
+            ) or (rebound_named.st_dev, rebound_named.st_ino) != opened_identity:
                 raise MillefeuilleContractError(
                     f"{label} path changed while being written: {target}"
                 )

@@ -24,6 +24,22 @@ from tests.test_millefeuille_stage_cli import (
 )
 
 
+def _can_create_symbolic_links() -> bool:
+    with tempfile.TemporaryDirectory() as tempdir:
+        root = Path(tempdir)
+        target = root / "target"
+        link = root / "link"
+        target.write_bytes(b"target")
+        try:
+            link.symlink_to(target)
+        except (NotImplementedError, OSError):
+            return False
+        return link.is_symlink()
+
+
+_SYMLINKS_AVAILABLE = _can_create_symbolic_links()
+
+
 class TestMillefeuilleRetrieve(unittest.TestCase):
     def test_relative_dot_source_pack_root_remains_supported(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -59,6 +75,10 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
             self.assertEqual(payload["paper_id"], PAPER_ID)
             self.assertEqual(payload["run_id"], RUN_ID)
 
+    @unittest.skipUnless(
+        _SYMLINKS_AVAILABLE,
+        "symbolic-link creation is unavailable",
+    )
     def test_portable_single_run_rejects_symlinked_artifact_paths(self):
         cases = (
             ("file", "paper card must not be a symbolic link"),
@@ -100,7 +120,9 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
                 self.assertIn(expected_error, stderr.getvalue())
 
     def test_portable_reader_rejects_symlinked_and_non_regular_paths(self):
-        cases = ["file", "parent", "directory"]
+        cases = ["directory"]
+        if _SYMLINKS_AVAILABLE:
+            cases[:0] = ["file", "parent"]
         if hasattr(os, "mkfifo"):
             cases.append("fifo")
         for kind in cases:
@@ -138,6 +160,10 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
                 ):
                     read_bytes_no_follow(candidate, "portable artifact")
 
+    @unittest.skipUnless(
+        _SYMLINKS_AVAILABLE,
+        "symbolic-link creation is unavailable",
+    )
     def test_portable_reader_rejects_lstat_open_swap_before_read_and_closes_fd(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
@@ -404,6 +430,10 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
             self.assertEqual(exit_code, 2)
             self.assertIn("paper card paper_id drift", stderr.getvalue())
 
+    @unittest.skipUnless(
+        _SYMLINKS_AVAILABLE,
+        "symbolic-link creation is unavailable",
+    )
     def test_direct_lookup_rejects_symlinked_paper_card(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -459,6 +489,10 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
                 ["texts/page 1.md", "요약/전체.md"],
             )
 
+    @unittest.skipUnless(
+        _SYMLINKS_AVAILABLE,
+        "symbolic-link creation is unavailable",
+    )
     def test_direct_and_corpus_lookup_reject_symlinked_manifests_before_reads(self):
         cases = (
             (
@@ -480,10 +514,13 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
             ),
         )
         for path_factory, locator_args, expected_error in cases:
-            with self.subTest(
-                locator_args=locator_args,
-                expected_error=expected_error,
-            ), tempfile.TemporaryDirectory() as tempdir:
+            with (
+                self.subTest(
+                    locator_args=locator_args,
+                    expected_error=expected_error,
+                ),
+                tempfile.TemporaryDirectory() as tempdir,
+            ):
                 source_pack_root, run_dir = _prepare_fixture_run(tempdir)
                 _update_card_identity(
                     run_dir,
@@ -517,6 +554,10 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
                 self.assertIn(expected_error, stderr.getvalue())
                 self.assertNotIn("PRIVATE SYMLINK CONTENT", stderr.getvalue())
 
+    @unittest.skipUnless(
+        _SYMLINKS_AVAILABLE,
+        "symbolic-link creation is unavailable",
+    )
     def test_direct_lookup_rejects_intermediate_symlink_before_read(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -596,9 +637,7 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
                 stdout=StringIO(),
             )
             self.assertEqual(pipeline_exit, 0)
-            preview_path = (
-                run_dir / "classification" / "zotero-writeback-preview.json"
-            )
+            preview_path = run_dir / "classification" / "zotero-writeback-preview.json"
             preview_payload = _read_json(preview_path)
             preview_payload["paper_id"] = "zotero-WRONG"
             _write_json(preview_path, preview_payload)
