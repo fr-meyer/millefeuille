@@ -134,6 +134,17 @@ def write_retrieval_batch_result(
     batch_id, locators, batch_manifest_bytes = _load_retrieval_batch_manifest(
         batch_manifest_target
     )
+    # Keep argument validation portable and deterministic even when this host
+    # cannot provide the stronger filesystem primitives required to publish.
+    _normalize_retrieval_filters(
+        summary_scope=summary_scope,
+        grain=grain,
+        index_lane=index_lane,
+        section=section,
+        page=page,
+        evidence_need=evidence_need,
+        strict_choices=True,
+    )
     root = Path(source_pack_root).absolute()
     with RootArtifactReader(root) as artifact_reader:
         source_root_identity = artifact_reader.root_identity

@@ -12,6 +12,7 @@ classification lifecycle for research-paper attachments discovered from Zotero.
 
 - [Quick Start](#quick-start)
 - [Installation](#installation)
+- [Platform Support](#platform-support)
 - [Runtime Prerequisites](#runtime-prerequisites)
 - [Configuration](#configuration)
 - [Item Selection & Tagging](#item-selection--tagging)
@@ -109,6 +110,29 @@ pip install .
 ```
 
 The `environment.yml` file includes all required dependencies: Python 3.11+, Hydra Core, PyZotero, Mistral AI SDK, PageIndex SDK, and markdown processing libraries.
+
+## Platform Support
+
+The supported CI matrix is CPython 3.11, 3.12, and 3.13 on current Ubuntu and
+Windows GitHub-hosted runners. Portable commands, contract validation, legacy
+single-run retrieval, and secure local reads run on both operating systems.
+
+Some write paths intentionally require filesystem guarantees that Windows does
+not expose through Python's POSIX descriptor APIs:
+
+| Capability | Ubuntu | Windows |
+| --- | --- | --- |
+| Package import, CLI, validation, and portable secure reads | Supported | Supported |
+| Legacy single-run retrieval | Supported | Supported |
+| Atomic retrieval-batch publication | Supported and fully tested | Fails closed before publication |
+| Exclusive no-follow model-provenance output | Supported and fully tested | Fails closed before output creation |
+
+Capability-marked tests for POSIX locks, descriptor-relative mutation checks,
+and atomic no-replace publication still run in every Ubuntu matrix job. Windows
+jobs skip only those unsupported success/race scenarios and instead exercise
+the corresponding fail-closed contracts. macOS is not yet part of the supported
+CI matrix; its atomic filesystem semantics must be validated before support is
+declared.
 
 ## Runtime Prerequisites
 
