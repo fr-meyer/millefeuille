@@ -444,6 +444,51 @@ state. `no-change`, `corrected`, and `confirmed` return `0`; `escalated` and
 This offline command does not call models, run workers, mutate the taxonomy, or
 write live Zotero/OpenKB/index/source-pack state.
 
+## Evidence-Safe Staging Maintenance
+
+The local maintenance group is separate from stage execution and performs no
+provider, Zotero, OpenKB, PageIndex, source-pack, or network operation:
+
+```bash
+millefeuille maintenance staging inspect \
+  --source-root /exact/source-pack-root \
+  --quarantine-root /exact/quarantine-root \
+  --json
+
+millefeuille maintenance staging plan \
+  --source-root /exact/source-pack-root \
+  --quarantine-root /exact/quarantine-root \
+  --run-id run-maintenance-001 \
+  --candidate batches/millefeuille/batch-1/.retrieval.tmp-0123456789abcdef \
+  --candidate-count 1 \
+  --disposal quarantine-until-mf-197 \
+  --stop-condition candidate-drift \
+  --stop-condition concurrent-namespace-change \
+  --stop-condition first-error \
+  --stop-condition root-identity-drift \
+  --stop-condition stale-or-active-lock \
+  --stop-condition unsupported-atomic-primitive \
+  --json
+
+millefeuille maintenance staging apply \
+  --source-root /exact/source-pack-root \
+  --quarantine-root /exact/quarantine-root \
+  --plan cleanup-plan.json \
+  --approval-receipt exact-receipt.json \
+  --mode approved-live \
+  --json
+```
+
+`inspect` and `plan` are read-only on Windows and POSIX. `apply` defaults to a
+no-effect preview refusal. Local mutation requires the exact content-addressed
+plan, exact MF-100 maintenance receipt, stable same-device roots, and the Linux
+pinned descriptor/`renameat2(RENAME_NOREPLACE)` boundary. It atomically moves
+only strictly recognized abandoned unpublished generations into quarantine,
+pre-reserves consumed audit evidence, and never deletes. Windows and macOS
+apply fail before audit reservation. Full candidate, manifest, lock, rollback,
+idempotence, recovery, and MF-197 disposal rules are normative in
+`staging-cleanup.md`.
+
 ## Run Modes
 
 - `preview`

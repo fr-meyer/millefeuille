@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/staging-cleanup-plan.schema.json",
+  "title": "Millefeuille Staging Cleanup Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "operation",
+    "roots",
+    "source_namespace_identity",
+    "quarantine_namespace_identity",
+    "candidate_count",
+    "candidates",
+    "disposal",
+    "stop_conditions",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {"const": "millefeuille-staging-cleanup-plan/v0.1"},
+    "run_id": {"$ref": "approved-live-receipt.schema.json#/$defs/exactIdentity"},
+    "operation": {"const": "maintenance.quarantine-abandoned-retrieval-staging-and-bridge-assets"},
+    "roots": {"$ref": "#/$defs/rootIdentities"},
+    "source_namespace_identity": {"$ref": "#/$defs/digest"},
+    "quarantine_namespace_identity": {"$ref": "#/$defs/digest"},
+    "candidate_count": {"type": "integer", "minimum": 1, "maximum": 256},
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "relative_path",
+          "generation_identity",
+          "source_snapshot_identity",
+          "quarantine_name"
+        ],
+        "properties": {
+          "kind": {"$ref": "#/$defs/candidateKind"},
+          "relative_path": {"$ref": "#/$defs/relativeCandidate"},
+          "generation_identity": {"$ref": "#/$defs/digest"},
+          "source_snapshot_identity": {"$ref": "#/$defs/digest"},
+          "quarantine_name": {
+            "type": "string",
+            "pattern": "^mf106-(?:retrieval|bridge)-[0-9a-f]{64}$",
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "disposal": {"const": "quarantine-until-mf-197"},
+    "stop_conditions": {
+      "const": [
+        "candidate-drift",
+        "concurrent-namespace-change",
+        "first-error",
+        "root-identity-drift",
+        "stale-or-active-lock",
+        "unsupported-atomic-primitive"
+      ]
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "content_digest"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "content_digest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "rootIdentities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "quarantine"],
+      "properties": {
+        "source": {"$ref": "#/$defs/digest"},
+        "quarantine": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "candidateKind": {
+      "enum": ["retrieval-staging-generation", "temporary-bridge-generation"]
+    },
+    "relativeCandidate": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^(?:batches/millefeuille/[A-Za-z0-9][A-Za-z0-9._-]{0,127}/\\.retrieval\\.tmp-[0-9a-f]{16}|\\.millefeuille-bridge\\.tmp-[0-9a-f]{16})$"
+    }
+  },
+  "x-millefeuille-semantic-validation": [
+    "Compute integrity.content_digest over canonical UTF-8 JSON of every top-level field except integrity; reject duplicate keys, non-finite numbers, unknown fields, and secret-bearing material.",
+    "Root identities bind normalized absolute root spellings plus stable filesystem object identities but serialize only SHA-256 identities, never the absolute paths.",
+    "Candidates must be sorted and unique by kind and relative_path. generation_identity binds the verified generation independently of location; source_snapshot_identity additionally detects plan/apply drift.",
+    "Every candidate must still be the only planned object at its source name and its deterministic quarantine_name must be absent before apply. Namespace identities, root identities, same-filesystem status, and the Linux descriptor-relative atomic no-replace executor must be revalidated after locking and before mutation. Windows and macOS v0.1 plans are inspectable but cannot be applied."
+  ]
+}
