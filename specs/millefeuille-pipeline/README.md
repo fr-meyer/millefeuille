@@ -5,11 +5,18 @@ offline-first contract. It is safe to review and test without Zotero
 credentials, PDF bytes, OCR providers, OpenKB writes, source-pack writes,
 GitHub publication, releases, or package-index changes.
 
+Reusable packets for carrying this contract through feature delivery, bounded
+approval, adapter evidence, dogfood, maintenance handoff, migration, and
+release are indexed in the adjacent
+[`millefeuille-delivery`](../millefeuille-delivery/README.md) directory.
+
 Files:
 
 - `vision.md` - complete paper-processing product vision.
 - `remaining-work.md` - end-to-end work pipeline and manual gates.
 - `cli-contract.md` - intended command groups and run modes.
+- `legacy-migration.md` - operator migration and deprecation contract for the
+  original Hydra workflow and the source-pack lifecycle.
 - `stage-manifest.schema.json` - machine-readable stage manifest shape.
 - `artifact-storage.md` - artifact-root and source-pack storage contract.
 - `source-pack-manifest.schema.json` - source-pack source identity and hash

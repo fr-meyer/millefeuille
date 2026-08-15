@@ -120,6 +120,12 @@
     - Generate Markdown and JSON paper card artifacts.
     - Include paper identity, one-line thesis, contribution, method, results,
       limitations, classification clues, index state, and quality warnings.
+    - The v0.2 contract materializes planned/pending lanes before indexing and
+      permits only a controlled post-index refresh to observed canonical lane
+      outcomes. Existing v0.1 cards remain readable but immutable.
+    - v0.2 accepts aggregate source identities, but multi-source pack
+      propagation through card/index fixture materialization remains MF-114;
+      this lifecycle repair does not claim end-to-end multi-PDF support.
     - Manual gate: model/provider call approval when the card is model-made.
 
 12. **Retrieval And Index Layer**

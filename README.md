@@ -10,6 +10,7 @@ classification lifecycle for research-paper attachments discovered from Zotero.
 
 ## Table of Contents
 
+- [Choosing a Command Surface](#choosing-a-command-surface)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Platform Support](#platform-support)
@@ -24,6 +25,21 @@ classification lifecycle for research-paper attachments discovered from Zotero.
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 - [Contributing](#contributing)
+
+## Choosing a Command Surface
+
+Millefeuille currently preserves two command surfaces. Root-level Hydra
+overrides such as `millefeuille ocr.enabled=true` run the original monolithic
+Zotero/OCR workflow. Named commands such as `millefeuille extract-native` and
+`millefeuille run` operate on explicit, verified source-pack evidence. New
+automation should target the lifecycle commands, while operators migrating an
+existing installation should follow the
+[legacy-to-lifecycle migration contract](specs/millefeuille-pipeline/legacy-migration.md).
+
+The migration contract includes the exact command/config mapping, artifact and
+tag compatibility, the legacy PageIndex API/SDK versus lifecycle MCP-only
+boundary, the release-based deprecation timetable, and safe rollback rules. It
+does not remove the working legacy path or grant approval for live operations.
 
 ## Quick Start
 
@@ -182,7 +198,7 @@ export MISTRAL_API_KEY="your-mistral-api-key"      # For Mistral OCR
 ```
 
 **Provider Setup:**
-- **PageIndex:** Obtain API key from [PageIndex dashboard](https://docs.pageindex.ai). Optional SDK mode: install with `pip install pageindex` and set `use_sdk: true` in `millefeuille/conf/ocr/pageindex.yaml`.
+- **PageIndex:** Obtain an API key from the [PageIndex dashboard](https://docs.pageindex.ai). The direct HTTP and optional SDK modes are retained for the legacy Hydra workflow. New lifecycle PageIndex ingestion follows the MCP-only boundary in the [migration contract](specs/millefeuille-pipeline/legacy-migration.md).
 - **Mistral:** Obtain API key from [Mistral platform](https://docs.mistral.ai).
 
 > **Note:** `PAGEINDEX_API_KEY` and `MISTRAL_API_KEY` are required **only** when `ocr.enabled=true`. The following run modes work **without** any OCR provider key: export-only dry-run (`processing.dry_run=true export.attachment_urls.enabled=true`), tag-adding-only (`tag_adding.enabled=true`), and download-only (`download.enabled=true`).
@@ -234,7 +250,12 @@ The pipeline supports two OCR providers:
 | Tree Structure | ✅ Full support | ⚠️ Requires PageIndex credentials |
 | Best For | Batch processing, hierarchical organization | Single documents, fast processing |
 
-**Recommendation:** For new installations, **PageIndex OCR** is recommended for batch processing and hierarchical document organization. Use **Mistral OCR** for single-document processing when tree structure is not needed.
+**Recommendation:** For existing legacy installations, **PageIndex OCR** remains
+supported for batch processing and hierarchical document organization. New
+lifecycle automation should not adopt the direct PageIndex API/SDK client; its
+production PageIndex connector follows the MCP-only migration contract and is
+not implemented by the fixture-only `extract-ocr` stage yet. Use **Mistral OCR**
+for the legacy single-document path when tree structure is not needed.
 
 ## Artifact and Status Inspection
 
@@ -260,6 +281,22 @@ millefeuille models --plan --profile research-default --stage summarize_full_pap
 millefeuille models --provenance --plan-file model-plan.json --execution-evidence model-execution-evidence.json --output model-provenance.json --json
 millefeuille run --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --stages acceptance,classify,writeback --handoff handoff.jsonl --classification-evidence classification-evidence.json --release-preflight
 ```
+
+Single-run stage commands may select an external run package created by the
+dry-run artifact writer, or an exact custom manifest within that package:
+
+```bash
+millefeuille summarize --source-pack-root ./source-packs --artifact-root ./artifacts --paper-id zotero-ITEM1 --run-id run-001 --evidence summary-evidence.json
+millefeuille retrieve --source-pack-root ./source-packs --stage-manifest ./artifacts/zotero-ITEM1/run-001/run-state.json --paper-id zotero-ITEM1 --run-id run-001 --json
+```
+
+The default remains the canonical source-pack run. `--artifact-root
+source-pack` selects it explicitly. A path root must resolve exactly one
+declared package layout; `--stage-manifest` must be inside that package and its
+filename must match every manifest ref in the sibling artifact index. Parent
+traversal, ambiguous roots, symbolic links or Windows reparse points, and
+paper/run/source/stage cross-wiring fail before writes. Batch manifests do not
+accept these single-run overrides.
 
 These commands stay offline and preview-only in the current contract slice:
 
@@ -322,9 +359,10 @@ These commands stay offline and preview-only in the current contract slice:
 - `run` chains those fixture stages through `acceptance`, `classify`, and
   `writeback` in canonical order, supports `--resume` with output
   revalidation, and can emit optional release-candidate preflight reporting.
-- Derived writes and resume fail closed when paper, run, source hash, source
-  identity, stage set, or stage status differs across the source-pack manifest,
-  stage manifest, and artifact index.
+- Derived writes and resume fail closed when artifact root, manifest ref,
+  paper, run, source-pack ref, source hash, source identity, stage set, or stage
+  status differs across the selected package, source-pack manifest, stage
+  manifest, and artifact index.
 - `--mode approved-live` and approved-live writeback stop at exit code `3`;
   these commands never turn a preview invocation into a live provider or
   Zotero mutation.
@@ -417,8 +455,10 @@ every parent and target, rejects symbolic links, Windows reparse points, and
 non-regular entries, and binds the opened descriptor to the checked identity
 before and after an exact binary read. Size and modification-time snapshots
 remain enforced on every platform; POSIX also retains change-time checks, while
-Windows excludes its inconsistent descriptor-side `ctime`. This preview-only
-path never includes summary or
+Windows excludes its inconsistent descriptor-side `ctime` and opens the file
+with a kernel handle that permits shared readers but denies concurrent write
+and delete access for the descriptor lifetime. This preview-only path never
+includes summary or
 paper-card prose, PDFs, or provider payloads, and does not read live Zotero,
 recover PDFs, call OCR/models/providers, write OpenKB or an index, or grant
 approval for publication or release operations.
@@ -704,13 +744,15 @@ millefeuille --artifact-root source-pack \
   processing.dry_run=true
 ```
 
-Paper-card fixture evidence points to a local
-`millefeuille-paper-card/v0.1` JSON file plus Markdown card content. The
+Paper-card fixture evidence points to a local JSON file plus Markdown card
+content. New fixtures should use `millefeuille-paper-card/v0.2`: they bind the
+run id and declare the intended index lanes as `planned`/`pending`. The
 dry-run path preflights the source-pack manifest and existing hierarchical
 summary bundle, then writes `cards/paper-card.json` and `cards/paper-card.md`
 under `analyses/millefeuille/<run-id>/`. The artifact index marks `card`
 passed and exposes both refs without calling model providers or writing
-OpenKB/index lanes.
+OpenKB/index lanes. Legacy v0.1 cards remain readable and are never rewritten
+by the index stage.
 
 Once the paper-card bundle exists, the same dry-run path can stage retrieval
 and index fixture evidence:
@@ -730,6 +772,33 @@ preflights the source-pack manifest, selected fulltext, hierarchical summary,
 and paper card, then writes `index/index-status.json` under
 `analyses/millefeuille/<run-id>/`. The artifact index marks `index` passed and
 surfaces the lane statuses without writing OpenKB/PageIndex/ConDB/ChatIndex.
+For a v0.2 card, the same commit refreshes only `index_state` to `observed`,
+copies the canonical lane outcomes, and records
+`../index/index-status.json`. Identity, prose, evidence, and provenance must
+remain value-for-value identical; lane or identity conflicts fail closed, and
+an exact rerun is a no-op.
+
+The fixture transaction holds one per-run card/index lock for cooperating
+writers. Index publication is create-only. One content-addressed transaction
+directory under `recovery/card-index/<digest>/` retains the exact staged index
+hardlink and card exchange history; exact retries reuse and validate that
+deterministic location instead of accumulating random files in `cards/` or
+`index/`. Card refresh uses an atomic capture-and-replace operation: the exact
+bytes and stable file identity displaced at the commit point are captured,
+revalidated immediately before rollback, and checked again at the restored
+canonical path. Rejected replacement bytes remain in the same transaction
+directory for operator recovery. The lock serializes Millefeuille writers,
+while the atomic capture detects an out-of-band mutation immediately before
+commit. A hostile same-owner process can still swap a parent or transaction
+name after its last binding check, or keep mutating canonical files after
+commit; those observed races fail without reporting success, but preventing
+them requires trusted ownership, cooperative writers, or stronger immutable
+storage.
+
+The v0.2 card schema and runtime accept both `sha256:<hex>` and
+`sha256-aggregate:<hex>` identities. This slice does not make the single-source
+card/index fixture evidence resolvers multi-source aware: downstream
+materialization from v0.2 multi-PDF packs remains roadmap item MF-114.
 
 ### Command-Line Configuration
 

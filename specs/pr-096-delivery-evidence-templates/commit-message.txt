@@ -1,0 +1,8 @@
+docs: complete PR #96 delivery gates
+
+Record the canonical MF-002 Speculoos task and publication artifacts for the
+reusable delivery and evidence packet templates.
+
+Task: pr-096-delivery-evidence-templates
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

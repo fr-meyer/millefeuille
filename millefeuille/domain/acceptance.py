@@ -8,6 +8,10 @@ import re
 from typing import Any
 
 from millefeuille.domain.card_fixtures import CARD_JSON_REF, load_paper_card
+from millefeuille.domain.card_index_contract import (
+    load_and_validate_canonical_card_index,
+    validate_paper_card_identity,
+)
 from millefeuille.domain.extraction_fixtures import (
     NATIVE_EVIDENCE_REF,
     OCR_EVIDENCE_REF,
@@ -31,6 +35,7 @@ from millefeuille.domain.millefeuille import (
 )
 from millefeuille.domain.route_fixtures import (
     ROUTE_EVIDENCE_REF,
+    ROUTE_MARKDOWN_REF,
     load_route_selection_sidecar,
 )
 from millefeuille.domain.stage_runtime import (
@@ -59,9 +64,7 @@ ACCEPTANCE_SUMMARY_REF = Path("reports/acceptance-summary.json")
 ACCEPTANCE_SUMMARY_MARKDOWN_REF = Path("reports/acceptance-summary.md")
 ACCEPTANCE_BATCH_ROOT_REF = Path("batches/millefeuille")
 ACCEPTANCE_BATCH_SUMMARY_REF = Path("reports/acceptance-batch-summary.json")
-ACCEPTANCE_BATCH_SUMMARY_MARKDOWN_REF = Path(
-    "reports/acceptance-batch-summary.md"
-)
+ACCEPTANCE_BATCH_SUMMARY_MARKDOWN_REF = Path("reports/acceptance-batch-summary.md")
 ACCEPTANCE_BATCH_MANIFEST_SCHEMA = "millefeuille-acceptance-batch-manifest/v0.1"
 _SAFE_BATCH_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _SAFE_BATCH_LOCATOR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,255}\Z")
@@ -113,12 +116,16 @@ def write_acceptance_summary(
     item_key: str | None = None,
     handoff_path: str | Path | None = None,
     duplicate_scan_path: str | Path | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> AcceptanceWriteResult:
     resolved = resolve_run_artifacts(
         source_pack_root=source_pack_root,
         run_id=run_id,
         paper_id=paper_id,
         item_key=item_key,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
     summary = _build_acceptance_summary(
         resolved=resolved,
@@ -281,8 +288,7 @@ def _load_acceptance_batch_manifest(
     unexpected = sorted(set(payload) - {"schema_version", "batch_id", "runs"})
     if unexpected:
         raise MillefeuilleContractError(
-            "acceptance batch manifest has unsupported fields: "
-            + ", ".join(unexpected)
+            "acceptance batch manifest has unsupported fields: " + ", ".join(unexpected)
         )
     schema_version = payload.get("schema_version")
     if not isinstance(schema_version, str):
@@ -721,15 +727,24 @@ def _load_run_scoped_card_check(
             notes=["paper card not found"],
         )
     payload = load_paper_card(card_path)
-    identity = payload.get("identity", {})
+    identity_error: str | None = None
+    try:
+        validate_paper_card_identity(
+            payload,
+            paper_id=resolved.paper_id,
+            run_id=resolved.run_id,
+            source_hash=resolved.source_hash,
+            require_source_hash=True,
+        )
+    except MillefeuilleContractError as exc:
+        identity_error = str(exc)
     status = (
         AcceptanceCheckStatus.PASSED
-        if payload["paper_id"] == resolved.paper_id
-        and identity.get("source_hash") in (None, resolved.source_hash)
+        if identity_error is None
         else AcceptanceCheckStatus.NEEDS_REVIEW
     )
     if status != AcceptanceCheckStatus.PASSED:
-        review_reasons.append("paper card identity drift detected")
+        review_reasons.append(identity_error or "paper card identity drift detected")
     return AcceptanceCheckRecord(
         name="card",
         status=status,
@@ -757,23 +772,36 @@ def _load_run_scoped_index_check(
             {},
         )
     payload = load_retrieval_index_status(index_path)
+    join_error: str | None = None
+    try:
+        card_artifact, index_artifact = load_and_validate_canonical_card_index(
+            card_path=resolved.run_dir / CARD_JSON_REF,
+            index_path=index_path,
+            paper_id=resolved.paper_id,
+            run_id=resolved.run_id,
+            source_hash=resolved.source_hash,
+            selected_fulltext_path=resolved.source_pack_dir / ROUTE_MARKDOWN_REF,
+            summary_path=resolved.run_dir / SUMMARY_ARTIFACT_REF,
+        )
+        del card_artifact
+        payload = index_artifact.payload
+    except MillefeuilleContractError as exc:
+        join_error = str(exc)
     status = (
         AcceptanceCheckStatus.PASSED
-        if payload["paper_id"] == resolved.paper_id
-        and payload["run_id"] == resolved.run_id
-        and payload["source_hash"] == resolved.source_hash
+        if join_error is None
         else AcceptanceCheckStatus.NEEDS_REVIEW
     )
     if status != AcceptanceCheckStatus.PASSED:
-        review_reasons.append("retrieval/index identity drift detected")
+        review_reasons.append(join_error or "retrieval/index identity drift detected")
     return (
         AcceptanceCheckRecord(
             name="index",
             status=status,
             refs=[relative_ref(index_path, resolved.run_dir)],
-            notes=["retrieval index verified"]
+            notes=["retrieval index and paper card state verified"]
             if status == AcceptanceCheckStatus.PASSED
-            else ["retrieval index drift"],
+            else [join_error or "retrieval index drift"],
             details={"lanes": [lane["lane"] for lane in payload.get("lanes", [])]},
         ),
         payload,

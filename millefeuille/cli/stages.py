@@ -111,6 +111,8 @@ def run_stage_cli(
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
             )
             payload = result.to_dict()
         elif args.command == "acceptance":
@@ -130,6 +132,8 @@ def run_stage_cli(
                     item_key=args.item_key,
                     handoff_path=args.handoff,
                     duplicate_scan_path=args.duplicate_scans,
+                    artifact_root=args.artifact_root,
+                    stage_manifest=args.stage_manifest,
                 )
             payload = result.to_dict()
         elif args.command == "classify":
@@ -148,6 +152,8 @@ def run_stage_cli(
                     paper_id=args.paper_id,
                     item_key=args.item_key,
                     default_profile=args.model_profile,
+                    artifact_root=args.artifact_root,
+                    stage_manifest=args.stage_manifest,
                 )
             else:
                 result = write_classification_from_evidence(
@@ -157,6 +163,8 @@ def run_stage_cli(
                     paper_id=args.paper_id,
                     item_key=args.item_key,
                     default_profile=args.model_profile,
+                    artifact_root=args.artifact_root,
+                    stage_manifest=args.stage_manifest,
                 )
             payload = result.to_dict()
         elif args.command == "writeback":
@@ -170,6 +178,8 @@ def run_stage_cli(
                 paper_id=args.paper_id,
                 item_key=args.item_key,
                 preview_path=args.preview_path,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
             )
             payload = result.to_dict()
         elif args.command == "retrieve":
@@ -200,6 +210,8 @@ def run_stage_cli(
                     section=args.section,
                     page=args.page,
                     evidence_need=args.evidence_need,
+                    artifact_root=args.artifact_root,
+                    stage_manifest=args.stage_manifest,
                 )
         elif args.command == "models":
             if args.provenance:
@@ -315,6 +327,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_mode_arg(acceptance)
     acceptance.add_argument("--source-pack-root", required=True)
+    _add_artifact_locator_args(acceptance)
     acceptance_source = acceptance.add_mutually_exclusive_group()
     acceptance_source.add_argument("--paper-id")
     acceptance_source.add_argument("--item-key")
@@ -346,6 +359,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_mode_arg(classify)
     classify.add_argument("--source-pack-root", required=True)
+    _add_artifact_locator_args(classify)
     classify_source = classify.add_mutually_exclusive_group()
     classify_source.add_argument("--paper-id")
     classify_source.add_argument("--item-key")
@@ -389,6 +403,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_mode_arg(retrieve)
     retrieve.add_argument("--source-pack-root", required=True)
+    _add_artifact_locator_args(retrieve)
     retrieve_source = retrieve.add_mutually_exclusive_group()
     retrieve_source.add_argument("--paper-id")
     retrieve_source.add_argument("--item-key")
@@ -490,10 +505,28 @@ def _build_parser() -> argparse.ArgumentParser:
 def _add_run_locator_args(parser: argparse.ArgumentParser) -> None:
     _add_mode_arg(parser)
     parser.add_argument("--source-pack-root", required=True)
+    _add_artifact_locator_args(parser)
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--paper-id")
     source.add_argument("--item-key")
     parser.add_argument("--run-id", required=True)
+
+
+def _add_artifact_locator_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--artifact-root",
+        help=(
+            "Run-package directory or declared container root. Defaults to the "
+            "verified source-pack run; 'source-pack' explicitly selects it."
+        ),
+    )
+    parser.add_argument(
+        "--stage-manifest",
+        help=(
+            "Exact stage-manifest file inside the selected run package. The "
+            "artifact index must reference the same file."
+        ),
+    )
 
 
 def _add_mode_arg(parser: argparse.ArgumentParser) -> None:
@@ -523,6 +556,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
             )
             if can_resume_stage(resolved, stage):
                 results[stage] = {"status": "resumed"}
@@ -538,6 +573,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
             )
             results[stage] = result.to_dict()
         elif stage == StageName.ACCEPTANCE.value:
@@ -546,6 +583,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
                 handoff_path=args.handoff,
                 duplicate_scan_path=args.duplicate_scans,
             )
@@ -561,6 +600,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
                 default_profile=args.model_profile,
             )
             results["classify"] = result.to_dict()
@@ -574,6 +615,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
             )
             results["writeback"] = result.to_dict()
 
@@ -585,6 +628,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
             item_key=args.item_key,
             repo_root=Path(__file__).resolve().parents[2],
             candidate_version=args.candidate_version,
+            artifact_root=args.artifact_root,
+            stage_manifest=args.stage_manifest,
         ).to_dict()
     return results
 
@@ -627,6 +672,8 @@ def _preflight_run_request(
                     run_id=args.run_id,
                     paper_id=args.paper_id,
                     item_key=args.item_key,
+                    artifact_root=args.artifact_root,
+                    stage_manifest=args.stage_manifest,
                 )
             if can_resume_stage(resolved_for_resume, stage):
                 continue
@@ -802,6 +849,7 @@ def _cli_live_target_and_selector(
 def _validate_acceptance_args(args: argparse.Namespace) -> None:
     single_locator_supplied = bool(args.paper_id or args.item_key or args.run_id)
     if args.batch_manifest:
+        _reject_batch_artifact_overrides(args, "acceptance")
         if single_locator_supplied:
             raise MillefeuilleContractError(
                 "acceptance --batch-manifest cannot be combined with "
@@ -818,6 +866,7 @@ def _validate_acceptance_args(args: argparse.Namespace) -> None:
 def _validate_classify_args(args: argparse.Namespace) -> None:
     single_locator_supplied = bool(args.paper_id or args.item_key or args.run_id)
     if args.batch_manifest:
+        _reject_batch_artifact_overrides(args, "classify")
         if single_locator_supplied:
             raise MillefeuilleContractError(
                 "classify --batch-manifest cannot be combined with --paper-id, "
@@ -846,6 +895,7 @@ def _validate_retrieve_args(args: argparse.Namespace) -> None:
     single_locator_supplied = any(value is not None for value in locator_values)
     batch_manifest_supplied = args.batch_manifest is not None
     if batch_manifest_supplied:
+        _reject_batch_artifact_overrides(args, "retrieve")
         if not isinstance(args.batch_manifest, str) or not args.batch_manifest.strip():
             raise MillefeuilleContractError(
                 "retrieve --batch-manifest must not be empty"
@@ -866,6 +916,18 @@ def _validate_retrieve_args(args: argparse.Namespace) -> None:
         raise MillefeuilleContractError(
             "retrieve requires --batch-manifest or a single-run locator "
             "(--paper-id|--item-key|--slug|--doi|--title plus --run-id)"
+        )
+
+
+def _reject_batch_artifact_overrides(
+    args: argparse.Namespace,
+    command: str,
+) -> None:
+    if args.artifact_root is not None or args.stage_manifest is not None:
+        raise MillefeuilleContractError(
+            f"{command} --batch-manifest cannot be combined with "
+            "--artifact-root or --stage-manifest; each batch entry resolves its "
+            "canonical source-pack run"
         )
 
 

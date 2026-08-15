@@ -1,5 +1,10 @@
 # CLI Contract
 
+The command router currently preserves both the original Hydra-configured
+workflow and the named source-pack stage commands. Their ownership,
+compatibility window, PageIndex connector boundary, and rollback rules are
+normative in [Legacy-to-Lifecycle Migration And Deprecation Contract](legacy-migration.md).
+
 The CLI now exposes preview/read-only stage commands for `extract-native`,
 `extract-ocr`, `route`, `structure`, `summarize`, `card`, `index`,
 `acceptance`, `classify`, `writeback`, `retrieve`, `models`, and `run`,
@@ -17,6 +22,10 @@ Implemented stage-command controls are:
   rejected outside explicit `approved-live`, and valid receipts still stop at
   the current unsupported-live gate
 - `--source-pack-root <path>` plus `--paper-id|--item-key` and `--run-id`
+- `--artifact-root source-pack|<path>` for an exact run package or declared
+  package container layout
+- `--stage-manifest <path>` for an exact manifest inside the selected run
+  package
 - `retrieve --batch-manifest <path>` as the locator source for deterministic
   multi-run preview output
 - `--model-profile <profile-id-or-file>` for model-using stages
@@ -24,11 +33,26 @@ Implemented stage-command controls are:
 - `run --resume`, which skips only passed stages after their expected outputs
   and paper/run/source identity revalidate
 
-Arbitrary `--artifact-root <path>` selection and an explicit
-`--stage-manifest <path>` override remain contract work. The current stage
-surface deliberately resolves the canonical run directory from the verified
-source-pack root and rejects cross-wired manifest/index identity before any
-derived artifact write.
+Without either override, stage commands preserve the canonical source-pack
+default at
+`<source-pack-root>/zotero/<paper-id>/analyses/millefeuille/<run-id>/`.
+`--artifact-root source-pack` selects that default explicitly. A path-valued
+artifact root may be the run directory itself or a container holding exactly
+one matching package at `<paper-id>/<run-id>/`, `<run-id>/`,
+`analyses/millefeuille/<run-id>/`,
+`<paper-id>/analyses/millefeuille/<run-id>/`, or
+`zotero/<paper-id>/analyses/millefeuille/<run-id>/`. Multiple complete matches
+are an error; search order never decides identity.
+
+`--stage-manifest` selects one existing regular file whose parent is the run
+directory. When an artifact root is also supplied, the manifest parent must be
+one of that root's declared layouts. The sibling `artifact-index.json` must
+name the same paper, run, source pack, source hash, artifact root, stage set,
+stage statuses, and manifest ref. Custom manifest filenames are preserved on
+every stage update. Parent traversal, whitespace-padded paths, symbolic links,
+Windows reparse points, non-regular files, cross-wired roots, and mismatched
+identities fail before derived writes. Batch manifests cannot use single-run
+artifact or manifest overrides; each batch entry retains canonical resolution.
 
 ## Current Preview Surface
 
@@ -282,7 +306,7 @@ derived artifact write.
   - `--resume` revalidates before skipping; idempotent reruns preserve the
     artifact package byte-for-byte for identical evidence.
   - Future expansion should add discovery/source-pack/OpenKB and approved-live
-    execution with explicit artifact-root and approval-token gates.
+    execution with approval-token gates.
 
 ## Example
 

@@ -11,10 +11,14 @@ import unittest
 import yaml
 
 from millefeuille.cli.stages import run_stage_cli
-from millefeuille.domain.acceptance import ACCEPTANCE_SUMMARY_REF
+from millefeuille.domain.acceptance import (
+    ACCEPTANCE_SUMMARY_REF,
+    write_acceptance_summary,
+)
 from millefeuille.domain.artifact_writer import write_dry_run_artifacts
 from millefeuille.domain.artifacts import load_artifact_index
 from millefeuille.domain.card_fixtures import write_cards_from_evidence
+from millefeuille.domain.card_index_contract import canonical_json_bytes
 from millefeuille.domain.classification import (
     CLASSIFICATION_PLAN_REF,
     WRITEBACK_PREVIEW_REF,
@@ -25,10 +29,12 @@ from millefeuille.domain.extraction_fixtures import (
     write_ocr_extractions_from_evidence,
 )
 from millefeuille.domain.index_fixtures import write_indexes_from_evidence
+from millefeuille.domain.millefeuille import MillefeuilleContractError, StageName
+from millefeuille.domain.offline_stages import can_resume_stage
 from millefeuille.domain.release_preflight import RELEASE_PREFLIGHT_JSON_REF
 from millefeuille.domain.route_fixtures import write_route_selections_from_evidence
 from millefeuille.domain.source_packs import write_source_pack_from_recovered_pdf
-from millefeuille.domain.stage_runtime import load_stage_manifest
+from millefeuille.domain.stage_runtime import load_stage_manifest, resolve_run_artifacts
 from millefeuille.domain.structure_fixtures import write_structures_from_evidence
 from millefeuille.domain.summary_fixtures import write_summaries_from_evidence
 from millefeuille.domain.writeback import WRITEBACK_PLAN_REF
@@ -347,6 +353,87 @@ class TestMillefeuilleStageCli(unittest.TestCase):
 
             artifact_index = load_artifact_index(run_dir / "artifact-index.json")
             self.assertIn("acceptance_summary", artifact_index.artifacts)
+
+    def test_acceptance_and_index_resume_reject_each_noncanonical_index_ref(self):
+        for field_name in (
+            "selected_fulltext_ref",
+            "summary_ref",
+            "paper_card_ref",
+        ):
+            with (
+                self.subTest(field=field_name),
+                tempfile.TemporaryDirectory() as tempdir,
+            ):
+                source_pack_root, run_dir = _prepare_fixture_run(tempdir)
+                index_path = run_dir / "index" / "index-status.json"
+                payload = json.loads(index_path.read_text(encoding="utf-8"))
+                payload[field_name] = "noncanonical/ref.json"
+                index_path.write_bytes(canonical_json_bytes(payload))
+                resolved = resolve_run_artifacts(
+                    source_pack_root=source_pack_root,
+                    run_id=RUN_ID,
+                    paper_id=PAPER_ID,
+                )
+
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    field_name,
+                ):
+                    can_resume_stage(resolved, StageName.INDEX)
+
+                result = write_acceptance_summary(
+                    source_pack_root=source_pack_root,
+                    paper_id=PAPER_ID,
+                    run_id=RUN_ID,
+                    handoff_path=_write_handoff_jsonl(tempdir),
+                )
+                self.assertEqual(result.status, "needs-review")
+                summary = json.loads(result.summary_path.read_text(encoding="utf-8"))
+                self.assertTrue(
+                    any(field_name in reason for reason in summary["review_reasons"])
+                )
+
+    def test_v02_card_resume_and_artifact_exposure_require_run_and_source(self):
+        for field_name, drift_value in (
+            ("run_id", "other-run"),
+            ("source_hash", "sha256:" + ("f" * 64)),
+        ):
+            with (
+                self.subTest(field=field_name),
+                tempfile.TemporaryDirectory() as tempdir,
+            ):
+                source_pack_root, run_dir = _prepare_fixture_run(tempdir)
+                card_path = run_dir / "cards" / "paper-card.json"
+                payload = json.loads(card_path.read_text(encoding="utf-8"))
+                if field_name == "run_id":
+                    payload["run_id"] = drift_value
+                else:
+                    payload["identity"]["source_hash"] = drift_value
+                card_path.write_bytes(canonical_json_bytes(payload))
+                resolved = resolve_run_artifacts(
+                    source_pack_root=source_pack_root,
+                    run_id=RUN_ID,
+                    paper_id=PAPER_ID,
+                )
+
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    f"paper card {field_name} drift",
+                ):
+                    can_resume_stage(resolved, StageName.CARD)
+
+                with self.assertRaisesRegex(ValueError, field_name):
+                    write_dry_run_artifacts(
+                        items=[_make_item()],
+                        handoff_rows=[_make_handoff_row()],
+                        config=ArtifactExportConfig(
+                            enabled=True,
+                            artifact_root="source-pack",
+                            source_pack_root=str(source_pack_root),
+                            run_id=RUN_ID,
+                        ),
+                        handoff_enabled=True,
+                    )
 
     def test_classify_and_writeback_commands_materialize_preview_artifacts(self):
         with tempfile.TemporaryDirectory() as tempdir:

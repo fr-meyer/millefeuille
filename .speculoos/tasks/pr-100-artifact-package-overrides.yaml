@@ -1,0 +1,103 @@
+id: pr-100-artifact-package-overrides
+roadmap_card: MF-103
+title: Add governed artifact package overrides
+status: in-progress
+branch: feat/pr-mf-103-artifact-root-stage-manifest
+base_branch: dev
+github:
+  issue: null
+  pull_request: 100
+  issue_project_item: unavailable
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/100
+  head_sha: null  # Active-task exact-head binding is external; see notes.
+  merge_commit: null
+write_paths:
+  - .speculoos/tasks/pr-100-artifact-package-overrides.yaml
+  - README.md
+  - millefeuille/cli/stages.py
+  - millefeuille/domain/acceptance.py
+  - millefeuille/domain/artifact_writer.py
+  - millefeuille/domain/card_fixtures.py
+  - millefeuille/domain/classification.py
+  - millefeuille/domain/index_fixtures.py
+  - millefeuille/domain/offline_stages.py
+  - millefeuille/domain/release_preflight.py
+  - millefeuille/domain/retrieve.py
+  - millefeuille/domain/stage_runtime.py
+  - millefeuille/domain/summary_fixtures.py
+  - millefeuille/domain/writeback.py
+  - specs/millefeuille-pipeline/artifact-storage.md
+  - specs/millefeuille-pipeline/cli-contract.md
+  - specs/pr-100-artifact-package-overrides/**
+  - tests/test_millefeuille_acceptance_batch.py
+  - tests/test_millefeuille_artifact_overrides.py
+  - tests/test_millefeuille_classification_batch.py
+  - tests/test_millefeuille_retrieval_batch.py
+  - tests/test_millefeuille_retrieve.py
+scope:
+  - add explicit artifact-root and exact stage-manifest overrides across
+    single-run stage, lifecycle, run, resume, preflight, and retrieve flows
+  - resolve declared external run packages deterministically and preserve
+    caller-selected manifest references for run-scoped outputs
+  - fail closed on traversal, ambiguity, symbolic-link or reparse-point
+    indirection, and package, source, paper, run, or stage identity drift
+  - reject single-run package overrides for batch manifests where mixed roots
+    are intentionally unsupported
+  - align README and storage/CLI contracts with the governed override boundary
+  - keep the override regression compatible with the current secure-read error
+    contract after integrating dev
+non_goals:
+  - allowing package overrides to bypass stage identity or source-hash checks
+  - supporting mixed artifact roots or stage manifests in batch operations
+  - weakening no-follow reads, fail-closed publication, or path containment
+  - credentials, provider/model/OCR calls, live Zotero reads or writes, private
+    paper access, PDF recovery, source-pack mutation, or OpenKB/PageIndex writes
+  - dev-to-main promotion, release tags, package publication, deployment, or
+    approval bypass
+acceptance:
+  - every supported single-run entry point accepts the two explicit overrides
+    and routes outputs to the verified selected run package
+  - declared stage manifests are verified against package, source, paper, run,
+    stage, and artifact identities before they are trusted
+  - traversal, ambiguous package layouts, and path indirection fail closed
+  - batch commands reject the single-run override flags deterministically
+  - focused tests, full unittest discovery, Ruff, diff check, private-data scan,
+    Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_artifact_overrides tests.test_millefeuille_acceptance_batch tests.test_millefeuille_classification_batch tests.test_millefeuille_retrieval_batch tests.test_millefeuille_retrieve -v"
+  - ".venv/bin/python -m unittest discover -s tests"
+  - ".venv/bin/ruff check ."
+  - "git diff --check"
+  - "speculoos validate --task pr-100-artifact-package-overrides --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-100-artifact-package-overrides --pr-body specs/pr-100-artifact-package-overrides/pr-body.md --commit-message specs/pr-100-artifact-package-overrides/commit-message.txt --json"
+publication_boundary:
+  statement: Repository-local artifact package selection, offline runtime
+    validation, CLI and documentation contracts, synthetic tests, and
+    Speculoos metadata only. No credential lookup, provider/model/OCR call,
+    private paper read, live Zotero/OpenKB/PageIndex/source-pack mutation,
+    stable-branch promotion, release, tag, package publication, deployment, or
+    approval bypass.
+documentation_impact:
+  status: updated
+  rationale: README and the artifact storage and CLI contracts document exact
+    artifact-root and stage-manifest selection and rejection behavior.
+private_data_scan: required; public source, documentation, synthetic tests, and
+  repository-local Speculoos artifacts only, with no credentials, private
+  papers, provider payloads, or host-specific paths
+publish_authority: Active Millefeuille delivery-train supervisor; routine
+  feature-to-dev publication, exact-head Mergeguez review, policy-gated merge,
+  dependent-PR retargeting, cleanup, and next-episode advancement are approved.
+  Live operations, dev-to-main promotion, release, and deployment remain
+  excluded.
+notes:
+  - The active task head field remains null while the PR is open because
+    embedding a commit's own SHA creates a self-reference cycle. Exact pre-merge
+    review and check evidence bind validation to GitHub's live head.
+  - Current dev was integrated before validation; the original stacked
+    dependency wording is obsolete and PR #100 now targets dev directly.
+delivery:
+  mode: inherit_branch_policy
+  continue_after_review: true

@@ -1,0 +1,79 @@
+id: pr-094-aggregate-source-hash
+roadmap_card: MF-006
+title: Accept aggregate source-pack identities in retrieval indexes
+status: in-progress
+branch: fix/pr-090-aggregate-source-hash
+base_branch: dev
+github:
+  issue: null
+  pull_request: 94
+  issue_project_item: unavailable
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/94
+  head_sha: null
+  merge_commit: null
+write_paths:
+  - .speculoos/tasks/pr-094-aggregate-source-hash.yaml
+  - millefeuille/domain/millefeuille.py
+  - specs/millefeuille-pipeline/retrieval-index-contract.md
+  - specs/millefeuille-pipeline/retrieval-index-status.schema.json
+  - specs/pr-094-aggregate-source-hash/**
+  - tests/test_millefeuille_source_hash_compatibility.py
+scope:
+  - accept strict sha256:<hex> identities from v0.1 single-PDF source packs
+  - accept strict sha256-aggregate:<hex> identities from v0.2 multi-PDF source packs
+  - align retrieval-index runtime validation, JSON Schema, contract documentation,
+    fixture loading, and regression coverage
+  - preserve the aggregate source identity across multi-PDF manifest parsing and
+    retrieval-index record materialization
+non_goals:
+  - accepting uppercase, whitespace-padded, newline-tainted, truncated, oversized,
+    or non-SHA-256 identities
+  - changing source-pack hashing algorithms or retrieval/index behavior beyond
+    strict identity compatibility
+  - credentials, provider/model/OCR calls, live Zotero reads or writes, private
+    paper access, PDF recovery, source-pack mutation, or OpenKB/PageIndex writes
+  - dev-to-main promotion, release tags, package publication, deployment, or
+    approval bypass
+acceptance:
+  - runtime and schema validation accept exactly sha256:<64 lowercase hex> and
+    sha256-aggregate:<64 lowercase hex>
+  - malformed, uppercase, padded, newline-tainted, wrong-prefix, short, and long
+    identities fail closed
+  - the fixture loader preserves both accepted identities without normalization
+  - a synthetic v0.2 multi-PDF source-pack aggregate hash reaches the retrieval
+    index unchanged
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check,
+    private-data scan, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_source_hash_compatibility -v"
+  - ".venv/bin/python -m unittest discover -s tests"
+  - ".venv/bin/ruff check ."
+  - "git diff --check"
+  - "speculoos validate --task pr-094-aggregate-source-hash --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-094-aggregate-source-hash --pr-body specs/pr-094-aggregate-source-hash/pr-body.md --commit-message specs/pr-094-aggregate-source-hash/commit-message.txt --json"
+publication_boundary:
+  statement: Offline retrieval-index runtime, schema, contract, synthetic tests,
+    and Speculoos metadata only. No credential lookup, provider/model/OCR call,
+    private paper read, live Zotero/OpenKB/PageIndex/source-pack mutation,
+    stable-branch promotion, release, package publication, deployment, or
+    approval bypass.
+documentation_impact:
+  status: none
+  rationale: The normative contract file clarifies schema/runtime behavior, but
+    this PR changes no user-facing product behavior or operator workflow
+    requiring README or docs updates.
+private_data_scan: required; public source, schema, contract, synthetic tests, and
+  repository-local metadata only, with no credentials, private papers, provider
+  payloads, or host-specific paths
+publish_authority: Active Millefeuille delivery-train supervisor; routine
+  feature-to-dev publication, exact-head Mergeguez review, policy-gated merge,
+  cleanup, and next-episode advancement are approved. Live operations,
+  dev-to-main promotion, release, and deployment remain excluded.
+notes:
+  - Supersedes closed PR 90; the fix/pr-090-aggregate-source-hash branch satisfies
+    the repository actor policy.
+  - Refreshed without history rewriting by merging dev commit
+    f3edc5cf75faf38e913c4e6e47b52a6f5a421cfd before exact-head validation.
