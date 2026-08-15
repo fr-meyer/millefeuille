@@ -414,8 +414,10 @@ every parent and target, rejects symbolic links, Windows reparse points, and
 non-regular entries, and binds the opened descriptor to the checked identity
 before and after an exact binary read. Size and modification-time snapshots
 remain enforced on every platform; POSIX also retains change-time checks, while
-Windows excludes its inconsistent descriptor-side `ctime`. This preview-only
-path never includes summary or
+Windows excludes its inconsistent descriptor-side `ctime` and opens the file
+with a kernel handle that permits shared readers but denies concurrent write
+and delete access for the descriptor lifetime. This preview-only path never
+includes summary or
 paper-card prose, PDFs, or provider payloads, and does not read live Zotero,
 recover PDFs, call OCR/models/providers, write OpenKB or an index, or grant
 approval for publication or release operations.

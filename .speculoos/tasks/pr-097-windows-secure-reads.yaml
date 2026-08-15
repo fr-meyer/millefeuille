@@ -22,6 +22,9 @@ write_paths:
   - tests/test_millefeuille_retrieve.py
   - tests/test_millefeuille_secure_io.py
 scope:
+  - open Windows portable-read handles with shared-read access only so the
+    kernel denies concurrent write and delete access for the full descriptor
+    lifetime
   - preserve exact binary reads on Windows by enabling binary and non-inheritable
     descriptor flags when the platform exposes them
   - separate stable object identity from mutation snapshots so POSIX retains
@@ -47,6 +50,8 @@ acceptance:
     translation
   - Windows read-side ctime drift does not create false failures while POSIX
     ctime remains a mutation signal
+  - Windows kernel share mode blocks same-size, mtime-preserving concurrent
+    mutation for the complete read
   - path replacement, in-place mutation, short reads, zero-inode identities,
     symbolic links, reparse points, and non-regular paths fail closed
   - existing retrieval behavior and repository-wide tests remain green

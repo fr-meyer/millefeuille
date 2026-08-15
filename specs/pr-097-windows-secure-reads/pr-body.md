@@ -1,6 +1,7 @@
 ## Summary
 
 - preserve exact binary artifact reads on Windows with binary and non-inheritable descriptor flags
+- hold a Windows kernel handle that permits shared readers but denies concurrent write and delete access for the complete read
 - separate stable object identity from mutation snapshots so Windows avoids inconsistent descriptor-side ctime while POSIX retains ctime checks
 - reject symbolic links, reparse points, non-directories, unstable identities, path replacement, mutation, and partial reads in the portable fallback
 - document the compatibility boundary and add focused cross-platform regression coverage
@@ -18,8 +19,8 @@
 
 ## Validation
 
-- 26 focused secure-I/O and retrieval tests passed
-- all 359 repository tests passed
+- 28 focused secure-I/O and retrieval tests passed
+- all 361 repository tests passed
 - repository-wide Ruff passed
 - changed metadata parsing passed
 - `git diff --check`, privacy/manual-gate contract checks, Speculoos validation, and publication checks passed
@@ -34,9 +35,10 @@ successful GitHub checks before merge. It does not authorize promotion to
 
 ## Documentation Impact
 
-`README.md` now documents Windows binary-read flags, reparse-point rejection, stable
-identity binding, and the platform-specific timestamp checks used by the
-portable fallback.
+`README.md` now documents Windows binary-read flags, reparse-point rejection,
+stable identity binding, kernel-enforced exclusion of concurrent writes and
+deletes, and the platform-specific timestamp checks used by the portable
+fallback.
 
 ## Publication Boundary
 
