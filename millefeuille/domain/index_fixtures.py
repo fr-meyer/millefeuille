@@ -156,6 +156,7 @@ class _PlannedIndexWrite:
     paper_id: str
     run_id: str
     status: str
+    source_pack_dir: Path
     run_dir: Path
     index_status_output_path: Path
     expected_payload: dict[str, Any]
@@ -333,6 +334,7 @@ def _plan_index(
         paper_id=paper_id,
         run_id=run_id,
         status=status or "created",
+        source_pack_dir=source_pack_dir,
         run_dir=run_dir,
         index_status_output_path=index_status_output_path,
         expected_payload=expected_payload,
@@ -515,14 +517,13 @@ def _require_expected_index(plan: _PlannedIndexWrite) -> None:
 
 
 def _load_and_validate_final_join(plan: _PlannedIndexWrite) -> None:
-    source_pack_dir = plan.run_dir.parents[2]
     load_and_validate_canonical_card_index(
         card_path=plan.card_json_path,
         index_path=plan.index_status_output_path,
         paper_id=plan.paper_id,
         run_id=plan.run_id,
         source_hash=plan.expected_payload["source_hash"],
-        selected_fulltext_path=source_pack_dir / ROUTE_MARKDOWN_REF,
+        selected_fulltext_path=plan.source_pack_dir / ROUTE_MARKDOWN_REF,
         summary_path=plan.run_dir / SUMMARY_ARTIFACT_REF,
     )
 
