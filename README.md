@@ -263,6 +263,30 @@ The read-only artifact commands inspect Millefeuille artifact indexes without
 initializing Zotero, OCR providers, OpenKB, PageIndex, ConDB, ChatIndex, or
 model clients.
 
+### Operator Preflight
+
+Validate one strict future-operation packet before any adapter or manual
+approval step:
+
+```bash
+millefeuille operator-preflight \
+  --packet operator-preflight.json \
+  --mode preview \
+  --format json
+```
+
+The packet binds exact mode, source selector and resolved count, run and roots,
+operations, targets and destinations, provider/model/profile and budgets,
+disposal, stop and rollback controls, acceptance, and allowlisted credential
+references. The command checks credential presence without returning or hashing
+values and performs no Zotero, provider, OpenKB, index, PDF, or source-pack
+operation. Approved-live additionally requires a separate exact MF-100 receipt
+and still exits `3` after validation because external execution is unsupported.
+A receipt cannot promote preview or read-only-live. See
+`specs/millefeuille-pipeline/operator-preflight.md` for the packet/result
+schemas, reserved receipt-scope binding, deterministic output, and manual
+approval rules.
+
 ### Preview Stage Commands
 
 For offline artifact-package validation, Millefeuille also exposes preview and

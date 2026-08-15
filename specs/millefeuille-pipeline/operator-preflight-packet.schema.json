@@ -1,0 +1,507 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/operator-preflight-packet.schema.json",
+  "title": "Millefeuille Operator Preflight Packet",
+  "description": "An exact, content-addressed, no-effect operator request. Runtime semantic validation and a separate MF-100 receipt are mandatory for approved-live.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "packet_id",
+    "mode",
+    "source",
+    "run_id",
+    "roots",
+    "operations",
+    "targets",
+    "destinations",
+    "provider",
+    "limits",
+    "disposal_policy",
+    "stop_conditions",
+    "rollback_actions",
+    "acceptance_status",
+    "credential_requirements",
+    "approval_receipt",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-operator-preflight-packet/v0.1"
+    },
+    "packet_id": {
+      "$ref": "#/$defs/exactIdentity"
+    },
+    "mode": {
+      "enum": ["preview", "read-only-live", "approved-live"]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "selector",
+        "item_cap",
+        "resolved_item_count"
+      ],
+      "properties": {
+        "adapter": {
+          "enum": ["local-fixture", "openkb", "source-pack", "zotero"]
+        },
+        "selector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": {
+              "enum": [
+                "batch-manifest",
+                "doi",
+                "paper-id",
+                "slug",
+                "source-pack",
+                "title",
+                "zotero-item-key",
+                "zotero-query",
+                "zotero-tag"
+              ]
+            },
+            "value": {
+              "allOf": [
+                {"$ref": "#/$defs/exactScopeValue"},
+                {"maxLength": 512}
+              ]
+            }
+          }
+        },
+        "item_cap": {
+          "$ref": "#/$defs/positiveSafeInteger"
+        },
+        "resolved_item_count": {
+          "$ref": "#/$defs/nonNegativeSafeInteger"
+        }
+      }
+    },
+    "run_id": {
+      "$ref": "#/$defs/exactIdentity"
+    },
+    "roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_root", "source_pack_root"],
+      "properties": {
+        "artifact_root": {"$ref": "#/$defs/absoluteRoot"},
+        "source_pack_root": {"$ref": "#/$defs/absoluteRoot"}
+      }
+    },
+    "operations": {
+      "$ref": "#/$defs/operationArray"
+    },
+    "targets": {
+      "$ref": "#/$defs/targetArray"
+    },
+    "destinations": {
+      "$ref": "#/$defs/targetArray"
+    },
+    "provider": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider_id", "model_id", "profile_id"],
+          "properties": {
+            "provider_id": {
+              "allOf": [
+                {"$ref": "#/$defs/exactScopeValue"},
+                {"maxLength": 128}
+              ]
+            },
+            "model_id": {
+              "allOf": [
+                {"$ref": "#/$defs/exactScopeValue"},
+                {"maxLength": 256}
+              ]
+            },
+            "profile_id": {
+              "allOf": [
+                {"$ref": "#/$defs/exactScopeValue"},
+                {"maxLength": 256}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_provider_calls", "max_cost_usd_micros"],
+      "properties": {
+        "max_provider_calls": {
+          "$ref": "#/$defs/nonNegativeSafeInteger"
+        },
+        "max_cost_usd_micros": {
+          "$ref": "#/$defs/nonNegativeSafeInteger"
+        }
+      }
+    },
+    "disposal_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pdfs", "provider_payloads", "temporary_files"],
+      "properties": {
+        "pdfs": {
+          "enum": [
+            "delete-after-verification",
+            "delete-after-run",
+            "retain-until-expiry",
+            "not-applicable"
+          ]
+        },
+        "provider_payloads": {
+          "enum": [
+            "never-persist",
+            "delete-after-run",
+            "not-applicable"
+          ]
+        },
+        "temporary_files": {
+          "enum": [
+            "delete-after-run",
+            "delete-on-failure",
+            "not-applicable"
+          ]
+        }
+      }
+    },
+    "stop_conditions": {
+      "$ref": "#/$defs/codeArray"
+    },
+    "rollback_actions": {
+      "$ref": "#/$defs/codeArray"
+    },
+    "acceptance_status": {
+      "enum": ["not-applicable", "pass"]
+    },
+    "credential_requirements": {
+      "type": "array",
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/credentialRequirement"
+      }
+    },
+    "approval_receipt": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["receipt_id", "content_digest"],
+          "properties": {
+            "receipt_id": {"$ref": "#/$defs/exactIdentity"},
+            "content_digest": {"$ref": "#/$defs/digest"}
+          }
+        }
+      ]
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "content_digest"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "content_digest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"mode": {"const": "approved-live"}},
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {
+          "approval_receipt": {"type": "object"}
+        }
+      },
+      "else": {
+        "properties": {
+          "approval_receipt": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operations": {
+            "contains": {
+              "enum": [
+                "classification.adjudicate",
+                "classification.review",
+                "model.classify",
+                "zotero.writeback"
+              ]
+            }
+          }
+        },
+        "required": ["operations"]
+      },
+      "then": {
+        "properties": {"acceptance_status": {"const": "pass"}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"mode": {"const": "read-only-live"}},
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {
+          "operations": {
+            "items": {
+              "enum": [
+                "index.read",
+                "source-pack.read",
+                "status.inspect",
+                "zotero.discover",
+                "zotero.handoff-preview"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "exactIdentity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@/+\\-]*$",
+      "not": {"enum": ["all", "any", "everything"]}
+    },
+    "exactScopeValue": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^\\S(?:.*\\S)?$",
+      "not": {"pattern": "\\*|^(?:all|any|everything)$"}
+    },
+    "absoluteRoot": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "positiveSafeInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "nonNegativeSafeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "codeArray": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "maxLength": 256,
+        "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9][a-z0-9-]*)*$",
+        "not": {"pattern": "(?:^|[.-])(?:all|any|everything)(?:$|[.-])"}
+      }
+    },
+    "operationArray": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "classification.adjudicate",
+          "classification.review",
+          "index.read",
+          "index.write",
+          "model.card",
+          "model.classify",
+          "model.execute",
+          "model.summarize",
+          "ocr.execute",
+          "openkb.write",
+          "source-pack.read",
+          "source-pack.write",
+          "stage.acceptance",
+          "stage.extract-native",
+          "stage.route",
+          "stage.structure",
+          "status.inspect",
+          "zotero.discover",
+          "zotero.handoff-export",
+          "zotero.handoff-preview",
+          "zotero.recover-pdf",
+          "zotero.writeback"
+        ]
+      }
+    },
+    "targetArray": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "id"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+          },
+          "id": {
+            "allOf": [
+              {"$ref": "#/$defs/exactScopeValue"},
+              {"maxLength": 256}
+            ]
+          }
+        }
+      }
+    },
+    "credentialRequirement": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/indexWriteCredential"
+        },
+        {
+          "$ref": "#/$defs/modelOauthCredential"
+        },
+        {
+          "$ref": "#/$defs/ocrProviderCredential"
+        },
+        {
+          "$ref": "#/$defs/openkbWriteCredential"
+        },
+        {
+          "$ref": "#/$defs/zoteroLibraryCredential"
+        },
+        {
+          "$ref": "#/$defs/zoteroReadCredential"
+        },
+        {
+          "$ref": "#/$defs/zoteroWriteCredential"
+        }
+      ]
+    },
+    "indexWriteCredential": {
+      "$ref": "#/$defs/credentialObject",
+      "properties": {
+        "type": {"const": "index-write"},
+        "reference": {
+          "enum": ["PAGEINDEX_API_KEY", "MILLEFEUILLE_CREDENTIAL_INDEX_WRITE"]
+        }
+      }
+    },
+    "modelOauthCredential": {
+      "$ref": "#/$defs/credentialObject",
+      "properties": {
+        "type": {"const": "model-oauth"},
+        "reference": {
+          "enum": [
+            "OPENCLAW_CODEX_OAUTH_READY",
+            "MILLEFEUILLE_CREDENTIAL_MODEL_OAUTH"
+          ]
+        }
+      }
+    },
+    "ocrProviderCredential": {
+      "$ref": "#/$defs/credentialObject",
+      "properties": {
+        "type": {"const": "ocr-provider"},
+        "reference": {
+          "enum": [
+            "MISTRAL_API_KEY",
+            "PAGEINDEX_API_KEY",
+            "MILLEFEUILLE_CREDENTIAL_OCR_PROVIDER"
+          ]
+        }
+      }
+    },
+    "openkbWriteCredential": {
+      "$ref": "#/$defs/credentialObject",
+      "properties": {
+        "type": {"const": "openkb-write"},
+        "reference": {
+          "enum": ["OPENKB_API_KEY", "MILLEFEUILLE_CREDENTIAL_OPENKB_WRITE"]
+        }
+      }
+    },
+    "zoteroLibraryCredential": {
+      "$ref": "#/$defs/credentialObject",
+      "properties": {
+        "type": {"const": "zotero-library-id"},
+        "reference": {
+          "enum": [
+            "ZOTERO_LIBRARY_ID",
+            "MILLEFEUILLE_CREDENTIAL_ZOTERO_LIBRARY_ID"
+          ]
+        }
+      }
+    },
+    "zoteroReadCredential": {
+      "$ref": "#/$defs/credentialObject",
+      "properties": {
+        "type": {"const": "zotero-read"},
+        "reference": {
+          "enum": ["ZOTERO_READ_KEY", "MILLEFEUILLE_CREDENTIAL_ZOTERO_READ"]
+        }
+      }
+    },
+    "zoteroWriteCredential": {
+      "$ref": "#/$defs/credentialObject",
+      "properties": {
+        "type": {"const": "zotero-write"},
+        "reference": {
+          "enum": ["ZOTERO_WRITE_KEY", "MILLEFEUILLE_CREDENTIAL_ZOTERO_WRITE"]
+        }
+      }
+    },
+    "credentialObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "reference"],
+      "properties": {
+        "type": {"type": "string"},
+        "reference": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{1,127}$"
+        }
+      }
+    }
+  },
+  "x-millefeuille-semantic-validation": [
+    "Reject duplicate or unknown fields, non-finite numbers, non-NFC strings, and every interior Unicode control or format character before rendering.",
+    "Compute integrity.content_digest over canonical UTF-8 JSON of every top-level field except integrity, with sorted object keys, unescaped Unicode, no insignificant whitespace, and no non-finite numbers.",
+    "source.selector.kind must be compatible with source.adapter; resolved_item_count must not exceed item_cap.",
+    "Operations are closed to the exact v0.1 vocabulary in operationArray. Unknown names, aliases, suffixes, and prefixes are unsupported until a reviewed adapter contract extends the schema and runtime matrix.",
+    "operations, targets by (kind,id), destinations by (kind,id), stop_conditions, rollback_actions, and credential_requirements by (type,reference) must be sorted and unique.",
+    "Every destination must be an exact member of targets, cannot be the reserved preflight-scope target, must have a role allowed by at least one operation, and must satisfy every operation's required role. Artifact-root and source-pack-root destination ids must be the SHA-256 identity of the corresponding validated platform root identity.",
+    "Approved-live requires exactly one reserved preflight-scope target. Its id is the canonical authorization-context digest over every packet field except approval_receipt and integrity, with the reserved target removed from targets.",
+    "The authorization-context digest binds source adapter, selector, cap, resolved count, roots, run, operations, ordinary targets, destination roles, provider model and profile, budgets, disposal, stop conditions, rollback actions, acceptance, and credential references.",
+    "Preview and read-only-live must contain no approval receipt or preflight-scope target; a receipt can never promote their explicit mode.",
+    "Roots must be absolute normalized paths without dot or parent-traversal components. Runtime authorization compares equivalent platform root identities without changing packet content identity.",
+    "Provider and limits must obey the MF-100 provider rules. The provider binding must be present exactly when a frozen provider operation is requested; model and OCR operations require an exact provider, model, profile, positive call cap, budget, and provider-payload disposal policy.",
+    "Credential requirements must exactly equal the frozen per-operation credential mapping plus Zotero source discovery requirements, with one allowlisted environment reference per type. Credential values are never serialized, logged, returned, or hashed.",
+    "All frozen classification operations and Zotero writeback require acceptance_status pass; unknown classification aliases or prefixed variants remain unsupported.",
+    "Approved-live requires a separate exact MF-100 receipt identity and runtime receipt validation against the independently derived request, including liveness, replay state when supplied, scope, and the preflight-scope target.",
+    "Secret-bearing fields, common credential material, authenticated URLs, private PDF bytes, and provider response material must be rejected without reflection."
+  ]
+}

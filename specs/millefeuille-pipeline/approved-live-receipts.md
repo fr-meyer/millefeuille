@@ -158,6 +158,28 @@ fail-closed. Future live adapters must independently derive every request
 field; they must not copy policy, budget, or target values from a receipt merely
 to make validation pass.
 
+## Operator Preflight Integration
+
+`millefeuille operator-preflight` validates the stricter MF-102 operator packet
+before any future adapter call. The packet is not approval and does not consume
+a receipt. It binds adapter, resolved count, destination roles, provider
+profile, rollback actions, acceptance status, and allowlisted credential
+reference names in addition to the controls modeled here.
+
+For approved-live, those additional controls are represented in this receipt's
+normal exact target set by one reserved `preflight-scope` target. Its ID is the
+canonical authorization-context digest defined in `operator-preflight.md`.
+The operator-packet model recomputes that digest, while this contract's existing
+exact target comparison independently requires the receipt to contain it. The
+reserved target is not a write destination. Changing any covered control
+requires a new packet identity and a new manual approval receipt.
+
+The preflight checks only presence of allowlisted credential references and
+emits no credential values. Successful approved-live validation still exits
+through the unsupported-live boundary with no provider call or external write.
+The eventual executor must load durable replay state and reserve consumption at
+its own effect boundary.
+
 ## Adapter Checklist
 
 Before the first live effect, an adapter must:

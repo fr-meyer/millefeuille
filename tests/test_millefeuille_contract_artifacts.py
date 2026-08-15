@@ -24,6 +24,7 @@ REQUIRED_DOCS = [
     "release-candidate-preflight.md",
     "live-run-plan.md",
     "approved-live-receipts.md",
+    "operator-preflight.md",
 ]
 
 REQUIRED_JSON_SCHEMAS = [
@@ -51,6 +52,8 @@ REQUIRED_JSON_SCHEMAS = [
     "model-provenance-record.schema.json",
     "approved-live-receipt.schema.json",
     "approved-live-audit.schema.json",
+    "operator-preflight-packet.schema.json",
+    "operator-preflight-result.schema.json",
 ]
 
 REQUIRED_STAGES = {
