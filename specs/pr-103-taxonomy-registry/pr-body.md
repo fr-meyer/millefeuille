@@ -8,6 +8,8 @@
   deprecate later-added IDs without mutating their other values
 - bind every non-root registry to its exact predecessor content identity and
   reject fabricated or merely structurally compatible rollback sources
+- restore the historical source's exact governing basis and owner during
+  rollback, even when the current registry changed that metadata
 - enforce the declared add, clarify, rename, deprecate, split, or merge
   operation against the candidate's exact registry diff
 - enforce requester, reviewer, and applier separation
@@ -42,8 +44,8 @@
 
 ## Validation
 
-- 25 focused taxonomy and contract-artifact tests passed
-- all 443 repository tests passed with 7 capability skips
+- 26 focused taxonomy and contract-artifact tests passed
+- all 444 repository tests passed with 7 capability skips
 - repository-wide Ruff, changed-Python-file format, and diff checks passed
 - taxonomy JSON Schemas, tracked JSON/YAML metadata, Speculoos validation, and
   publication checks passed

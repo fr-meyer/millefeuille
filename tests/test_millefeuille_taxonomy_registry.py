@@ -68,6 +68,8 @@ def _registry(
     previous_registry: dict[str, object] | None = None,
     training_label: str = "Training",
     status: str = "released",
+    governing_basis: str = "primary intellectual contribution",
+    owner_id: str = "taxonomy-owner",
     entries: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     if previous_registry is not None:
@@ -89,8 +91,8 @@ def _registry(
             "previous_version": previous_version,
             "previous_content_identity": previous_content_identity,
             "status": status,
-            "governing_basis": "primary intellectual contribution",
-            "owner_id": "taxonomy-owner",
+            "governing_basis": governing_basis,
+            "owner_id": owner_id,
             "entries": entries
             or [
                 _entry(
@@ -911,6 +913,45 @@ class TaxonomyRegistryTests(unittest.TestCase):
                 applied_by="release-owner",
                 applied_at="2026-08-11T14:00:00Z",
             )
+
+    def test_rollback_restores_historical_governance_metadata(self):
+        current = _registry(
+            "v20",
+            previous_registry=self.base,
+            training_label="Training methods",
+            governing_basis="operational deployment stage",
+            owner_id="successor-taxonomy-owner",
+        )
+        rollback_candidate = _registry(
+            "v21",
+            previous_registry=current,
+            training_label="Training",
+            governing_basis=str(self.base["governing_basis"]),
+            owner_id=str(self.base["owner_id"]),
+        )
+        proposal = _proposal(
+            current,
+            rollback_candidate,
+            operation="rollback",
+            rollback_source=self.base,
+        )
+
+        result, application = rollback_taxonomy_change(
+            base_registry=current,
+            rollback_source_registry=self.base,
+            proposal=proposal,
+            reviews=_reviews(proposal, current),
+            application_id="ROLLBACK-GOVERNANCE-METADATA",
+            applied_by="release-owner",
+            applied_at="2026-08-11T14:00:00Z",
+        )
+
+        self.assertEqual(result["governing_basis"], self.base["governing_basis"])
+        self.assertEqual(result["owner_id"], self.base["owner_id"])
+        self.assertNotEqual(result["governing_basis"], current["governing_basis"])
+        self.assertNotEqual(result["owner_id"], current["owner_id"])
+        self.assertEqual(result["entries"], self.base["entries"])
+        self.assertEqual(application["status"], "rolled-back")
 
     def test_forward_rollback_deprecates_nodes_added_after_historical_source(self):
         changed_training = deepcopy(self.base["entries"][1])

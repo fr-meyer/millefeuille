@@ -1006,7 +1006,12 @@ def _validate_registry_transition(
     affected_entry_ids: Sequence[str],
     operation: str,
 ) -> None:
-    for field_name in ("registry_id", "governing_basis", "owner_id"):
+    immutable_fields = (
+        ("registry_id",)
+        if operation == "rollback"
+        else ("registry_id", "governing_basis", "owner_id")
+    )
+    for field_name in immutable_fields:
         if base[field_name] != candidate[field_name]:
             raise MillefeuilleContractError(
                 f"taxonomy change cannot mutate registry {field_name}"
