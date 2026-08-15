@@ -105,6 +105,7 @@ def validate_taxonomy_registry(payload: Mapping[str, Any]) -> dict[str, Any]:
             "registry_id",
             "taxonomy_version",
             "previous_version",
+            "previous_content_identity",
             "status",
             "governing_basis",
             "owner_id",
@@ -127,6 +128,21 @@ def validate_taxonomy_registry(payload: Mapping[str, Any]) -> dict[str, Any]:
             raise MillefeuilleContractError(
                 "taxonomy registry previous_version must differ from taxonomy_version"
             )
+    previous_content_identity = registry["previous_content_identity"]
+    if previous_version is None:
+        if previous_content_identity is not None:
+            raise MillefeuilleContractError(
+                "root taxonomy registry previous_content_identity must be null"
+            )
+    else:
+        if previous_content_identity is None:
+            raise MillefeuilleContractError(
+                "non-root taxonomy registry requires previous_content_identity"
+            )
+        _require_identity(
+            previous_content_identity,
+            "taxonomy registry previous_content_identity",
+        )
     if registry["status"] not in {"draft", "released", "deprecated", "archived"}:
         raise MillefeuilleContractError("taxonomy registry status is unsupported")
     _require_string(registry["governing_basis"], "taxonomy registry governing_basis")
@@ -463,6 +479,17 @@ def validate_taxonomy_change_proposal(
     base_binding = _validate_registry_binding(
         proposal["base_registry"], "taxonomy change proposal base_registry"
     )
+    validated_base: dict[str, Any] | None = None
+    if base_registry is not None:
+        validated_base = validate_taxonomy_registry(base_registry)
+        if validated_base["status"] != "released":
+            raise MillefeuilleContractError(
+                "taxonomy change base registry must be released"
+            )
+        if _registry_binding(validated_base) != base_binding:
+            raise MillefeuilleContractError(
+                "taxonomy change proposal base registry identity drift"
+            )
     candidate = validate_taxonomy_registry(proposal["candidate_registry"])
     if candidate["status"] != "released":
         raise MillefeuilleContractError(
@@ -477,6 +504,10 @@ def validate_taxonomy_change_proposal(
     if candidate["previous_version"] != base_binding["taxonomy_version"]:
         raise MillefeuilleContractError(
             "taxonomy change candidate previous_version must equal the base version"
+        )
+    if candidate["previous_content_identity"] != base_binding["content_identity"]:
+        raise MillefeuilleContractError(
+            "taxonomy change candidate must bind the exact base content identity"
         )
     affected_entry_ids = _require_sorted_unique_strings(
         proposal["affected_entry_ids"],
@@ -558,20 +589,12 @@ def validate_taxonomy_change_proposal(
     )
     _require_content_identity(proposal, "taxonomy change proposal")
 
-    if base_registry is not None:
-        base = validate_taxonomy_registry(base_registry)
-        if base["status"] != "released":
-            raise MillefeuilleContractError(
-                "taxonomy change base registry must be released"
-            )
-        if _registry_binding(base) != base_binding:
-            raise MillefeuilleContractError(
-                "taxonomy change proposal base registry identity drift"
-            )
+    if validated_base is not None:
         _validate_registry_transition(
-            base=base,
+            base=validated_base,
             candidate=candidate,
             affected_entry_ids=affected_entry_ids,
+            operation=str(proposal["operation"]),
         )
 
     proposal["base_registry"] = base_binding
@@ -950,6 +973,7 @@ def _validate_registry_transition(
     base: Mapping[str, Any],
     candidate: Mapping[str, Any],
     affected_entry_ids: Sequence[str],
+    operation: str,
 ) -> None:
     for field_name in ("registry_id", "governing_basis", "owner_id"):
         if base[field_name] != candidate[field_name]:
@@ -983,6 +1007,106 @@ def _validate_registry_transition(
         )
     if not actual_affected:
         raise MillefeuilleContractError("taxonomy change candidate is a no-op")
+    _validate_operation_semantics(
+        operation=operation,
+        base_entries=base_entries,
+        candidate_entries=candidate_entries,
+    )
+
+
+def _validate_operation_semantics(
+    *,
+    operation: str,
+    base_entries: Mapping[str, Mapping[str, Any]],
+    candidate_entries: Mapping[str, Mapping[str, Any]],
+) -> None:
+    """Bind each specific operation name to an enforceable registry diff shape."""
+
+    if operation in {"mixed", "rollback"}:
+        return
+    added_ids = set(candidate_entries) - set(base_entries)
+    changed_existing = {
+        entry_id: _changed_entry_fields(
+            base_entries[entry_id], candidate_entries[entry_id]
+        )
+        for entry_id in set(base_entries) & set(candidate_entries)
+        if base_entries[entry_id] != candidate_entries[entry_id]
+    }
+
+    def is_deprecation_only(entry_id: str) -> bool:
+        before = base_entries[entry_id]
+        after = candidate_entries[entry_id]
+        fields = changed_existing[entry_id]
+        return (
+            before["status"] == "active"
+            and after["status"] == "deprecated"
+            and fields <= {"status", "replacement_id"}
+        )
+
+    if operation == "add":
+        valid = bool(added_ids) and not changed_existing
+    elif operation == "rename":
+        valid = (
+            not added_ids
+            and bool(changed_existing)
+            and all(fields == {"label"} for fields in changed_existing.values())
+        )
+    elif operation == "clarify":
+        clarification_fields = {
+            "definition",
+            "include_when",
+            "exclude_when",
+            "boundary_notes",
+        }
+        valid = (
+            not added_ids
+            and bool(changed_existing)
+            and all(
+                bool(fields) and fields <= clarification_fields
+                for fields in changed_existing.values()
+            )
+        )
+    elif operation == "deprecate":
+        valid = (
+            not added_ids
+            and bool(changed_existing)
+            and all(is_deprecation_only(entry_id) for entry_id in changed_existing)
+        )
+    elif operation == "split":
+        valid = (
+            len(added_ids) >= 2
+            and bool(changed_existing)
+            and all(is_deprecation_only(entry_id) for entry_id in changed_existing)
+        )
+    elif operation == "merge":
+        valid = len(changed_existing) >= 2 and all(
+            is_deprecation_only(entry_id) for entry_id in changed_existing
+        )
+        if valid:
+            replacement_ids = {
+                candidate_entries[entry_id]["replacement_id"]
+                for entry_id in changed_existing
+            }
+            valid = (
+                len(replacement_ids) == 1
+                and None not in replacement_ids
+                and added_ids <= replacement_ids
+            )
+    else:  # The public validator rejects unknown operations before this point.
+        return
+    if not valid:
+        raise MillefeuilleContractError(
+            f"taxonomy change operation {operation} does not match the exact "
+            "registry diff"
+        )
+
+
+def _changed_entry_fields(
+    before: Mapping[str, Any], after: Mapping[str, Any]
+) -> set[str]:
+    return {
+        field_name for field_name in before if before[field_name] != after[field_name]
+    }
 
 
 def _validate_rollback_candidate(
@@ -996,6 +1120,13 @@ def _validate_rollback_candidate(
         or base["registry_id"] != source["registry_id"]
     ):
         raise MillefeuilleContractError("rollback candidate registry_id drift")
+    if (
+        base["previous_version"] != source["taxonomy_version"]
+        or base["previous_content_identity"] != source["content_identity"]
+    ):
+        raise MillefeuilleContractError(
+            "rollback source is not the exact content-addressed predecessor of the base"
+        )
     for field_name in ("governing_basis", "owner_id"):
         if candidate[field_name] != source[field_name]:
             raise MillefeuilleContractError(

@@ -59,17 +59,30 @@ def _entry(
 def _registry(
     version: str,
     *,
-    previous_version: str | None,
+    previous_version: str | None = None,
+    previous_registry: dict[str, object] | None = None,
     training_label: str = "Training",
     status: str = "released",
     entries: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
+    if previous_registry is not None:
+        if previous_version is not None:
+            raise AssertionError("pass previous_registry or previous_version, not both")
+        previous_version = str(previous_registry["taxonomy_version"])
+        previous_content_identity = str(previous_registry["content_identity"])
+    else:
+        if previous_version is not None:
+            raise AssertionError(
+                "non-root test registries must supply their exact previous_registry"
+            )
+        previous_content_identity = None
     return seal_taxonomy_registry(
         {
             "schema_version": TAXONOMY_REGISTRY_SCHEMA_VERSION,
             "registry_id": "research-papers",
             "taxonomy_version": version,
             "previous_version": previous_version,
+            "previous_content_identity": previous_content_identity,
             "status": status,
             "governing_basis": "primary intellectual contribution",
             "owner_id": "taxonomy-owner",
@@ -157,10 +170,15 @@ def _rehash(payload: dict[str, object]) -> dict[str, object]:
 class TaxonomyRegistryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.base = _registry("v19", previous_version=None)
+        renamed_training = deepcopy(self.base["entries"][1])
+        renamed_training["label"] = "Training methods"
         self.candidate = _registry(
             "v20",
-            previous_version="v19",
-            training_label="Training methods",
+            previous_registry=self.base,
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                renamed_training,
+            ],
         )
         self.proposal = _proposal(self.base, self.candidate)
         self.reviews = _reviews(self.proposal, self.base)
@@ -343,7 +361,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         ]
         deleted_candidate = _registry(
             "v20",
-            previous_version="v19",
+            previous_registry=self.base,
             entries=deleted_entries,
         )
         with self.assertRaisesRegex(MillefeuilleContractError, "cannot delete"):
@@ -368,7 +386,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         moved_training["parent_id"] = "L1-OTHER"
         moved = _registry(
             "v20",
-            previous_version="v19",
+            previous_registry=self.base,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 _entry(
@@ -407,6 +425,148 @@ class TaxonomyRegistryTests(unittest.TestCase):
                 requested_by="requester-a",
                 requested_at="2026-08-11T12:00:00Z",
             )
+
+    def test_specific_proposal_operations_match_their_exact_diff_shapes(self):
+        clarified_training = deepcopy(self.base["entries"][1])
+        clarified_training["definition"] = "A clarified training definition."
+        clarify_candidate = _registry(
+            "v20",
+            previous_registry=self.base,
+            entries=[deepcopy(self.base["entries"][0]), clarified_training],
+        )
+        added_entry = _entry(
+            "L2-EVALUATION",
+            level=2,
+            parent_id="L1-METHODS",
+            label="Evaluation methods",
+        )
+        add_candidate = _registry(
+            "v20",
+            previous_registry=self.base,
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                added_entry,
+                deepcopy(self.base["entries"][1]),
+            ],
+        )
+        deprecate_base = _registry(
+            "deprecate-v1",
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                deepcopy(added_entry),
+                deepcopy(self.base["entries"][1]),
+            ],
+        )
+        deprecated_training = deepcopy(deprecate_base["entries"][2])
+        deprecated_training["status"] = "deprecated"
+        deprecate_candidate = _registry(
+            "deprecate-v2",
+            previous_registry=deprecate_base,
+            entries=[
+                deepcopy(deprecate_base["entries"][0]),
+                deepcopy(deprecate_base["entries"][1]),
+                deprecated_training,
+            ],
+        )
+        split_candidate = _registry(
+            "v20",
+            previous_registry=self.base,
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                deprecated_training,
+                _entry(
+                    "L2-TRAINING-SUPERVISED",
+                    level=2,
+                    parent_id="L1-METHODS",
+                    label="Supervised training",
+                ),
+                _entry(
+                    "L2-TRAINING-UNSUPERVISED",
+                    level=2,
+                    parent_id="L1-METHODS",
+                    label="Unsupervised training",
+                ),
+            ],
+        )
+        merge_base = _registry(
+            "merge-v1",
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                _entry(
+                    "L2-TRAINING-A", level=2, parent_id="L1-METHODS", label="Training A"
+                ),
+                _entry(
+                    "L2-TRAINING-B", level=2, parent_id="L1-METHODS", label="Training B"
+                ),
+            ],
+        )
+        merged_entries = deepcopy(merge_base["entries"])
+        for entry in merged_entries[1:]:
+            entry["status"] = "deprecated"
+            entry["replacement_id"] = "L2-TRAINING-COMBINED"
+        merged_entries.append(
+            _entry(
+                "L2-TRAINING-COMBINED",
+                level=2,
+                parent_id="L1-METHODS",
+                label="Combined training",
+            )
+        )
+        merge_candidate = _registry(
+            "merge-v2", previous_registry=merge_base, entries=merged_entries
+        )
+
+        valid_cases = [
+            ("add", self.base, add_candidate, ["L2-EVALUATION"]),
+            ("clarify", self.base, clarify_candidate, ["L2-TRAINING"]),
+            ("rename", self.base, self.candidate, ["L2-TRAINING"]),
+            ("deprecate", deprecate_base, deprecate_candidate, ["L2-TRAINING"]),
+            (
+                "split",
+                self.base,
+                split_candidate,
+                ["L2-TRAINING", "L2-TRAINING-SUPERVISED", "L2-TRAINING-UNSUPERVISED"],
+            ),
+            (
+                "merge",
+                merge_base,
+                merge_candidate,
+                ["L2-TRAINING-A", "L2-TRAINING-B", "L2-TRAINING-COMBINED"],
+            ),
+            ("mixed", self.base, add_candidate, ["L2-EVALUATION"]),
+        ]
+        for operation, base, candidate, affected in valid_cases:
+            with self.subTest(valid_operation=operation):
+                _proposal(
+                    base, candidate, operation=operation, affected_entry_ids=affected
+                )
+
+        base_entries = {item["entry_id"]: item for item in self.base["entries"]}
+        mismatched_cases = [
+            ("add", self.candidate),
+            ("clarify", add_candidate),
+            ("rename", clarify_candidate),
+            ("deprecate", self.candidate),
+            ("split", add_candidate),
+            ("merge", split_candidate),
+        ]
+        for operation, candidate in mismatched_cases:
+            affected = sorted(
+                entry["entry_id"]
+                for entry in candidate["entries"]
+                if entry["entry_id"] not in base_entries
+                or entry != base_entries.get(entry["entry_id"])
+            )
+            with (
+                self.subTest(mismatched_operation=operation),
+                self.assertRaisesRegex(MillefeuilleContractError, "does not match"),
+            ):
+                _proposal(
+                    self.base,
+                    candidate,
+                    operation=operation,
+                    affected_entry_ids=affected,
+                )
 
     def test_application_requires_exact_three_role_approval_and_separation(self):
         for role in sorted(REQUIRED_REVIEW_ROLES):
@@ -545,7 +705,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
     def test_rollback_restores_exact_source_as_new_forward_version(self):
         rollback_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=self.candidate,
             training_label="Training",
         )
         proposal = _proposal(
@@ -587,7 +747,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
 
         bad_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=self.candidate,
             training_label="Not the historical definition",
         )
         with self.assertRaisesRegex(MillefeuilleContractError, "source entry exactly"):
@@ -618,7 +778,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         )
         current = _registry(
             "v20",
-            previous_version="v19",
+            previous_registry=self.base,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 added_entry,
@@ -629,7 +789,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         deprecated_added_entry["status"] = "deprecated"
         rollback_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=current,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 deprecated_added_entry,
@@ -662,16 +822,25 @@ class TaxonomyRegistryTests(unittest.TestCase):
 
         already_deprecated_current = _registry(
             "v20",
-            previous_version="v19",
+            previous_registry=self.base,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 deepcopy(deprecated_added_entry),
                 deepcopy(changed_training),
             ],
         )
+        already_deprecated_rollback_candidate = _registry(
+            "v21",
+            previous_registry=already_deprecated_current,
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                deepcopy(deprecated_added_entry),
+                deepcopy(self.base["entries"][1]),
+            ],
+        )
         already_deprecated_proposal = _proposal(
             already_deprecated_current,
-            rollback_candidate,
+            already_deprecated_rollback_candidate,
             operation="rollback",
             rollback_source=self.base,
             affected_entry_ids=["L2-TRAINING"],
@@ -695,7 +864,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
 
         active_later_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=current,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 deepcopy(added_entry),
@@ -717,7 +886,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         edited_later_entry["definition"] = "Unrelated prose smuggled into rollback."
         edited_later_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=current,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 edited_later_entry,
@@ -751,7 +920,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         )
         unrelated_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=current,
             entries=[
                 deepcopy(unrelated_source["entries"][0]),
                 deepcopy(deprecated_added_entry),
@@ -759,7 +928,9 @@ class TaxonomyRegistryTests(unittest.TestCase):
                 deepcopy(unrelated_source["entries"][2]),
             ],
         )
-        with self.assertRaisesRegex(MillefeuilleContractError, "not an ancestor"):
+        with self.assertRaisesRegex(
+            MillefeuilleContractError, "content-addressed predecessor"
+        ):
             _proposal(
                 current,
                 unrelated_candidate,
@@ -774,7 +945,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
 
         extra_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=current,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 deepcopy(deprecated_added_entry),
@@ -798,6 +969,27 @@ class TaxonomyRegistryTests(unittest.TestCase):
                     "L2-INTRUDER",
                     "L2-TRAINING",
                 ],
+            )
+
+    def test_rollback_rejects_fabricated_structurally_compatible_source(self):
+        fabricated_source = deepcopy(self.base)
+        fabricated_source["entries"][1]["label"] = "Fabricated historical label"
+        fabricated_source["entries"][1]["definition"] = "Fabricated history."
+        _rehash(fabricated_source)
+        fabricated_candidate = _registry(
+            "v21",
+            previous_registry=self.candidate,
+            entries=deepcopy(fabricated_source["entries"]),
+        )
+        with self.assertRaisesRegex(
+            MillefeuilleContractError, "exact content-addressed predecessor"
+        ):
+            _proposal(
+                self.candidate,
+                fabricated_candidate,
+                operation="rollback",
+                rollback_source=fabricated_source,
+                affected_entry_ids=["L2-TRAINING"],
             )
 
     def test_generated_artifacts_match_all_json_schemas(self):
@@ -857,6 +1049,8 @@ class TaxonomyRegistryTests(unittest.TestCase):
             ]
         )
         self.assertIn("base/source union", proposal_semantics)
+        self.assertIn("content-addressed immediate predecessor", proposal_semantics)
+        self.assertIn("operation", proposal_semantics)
         self.assertIn("distinct from proposal requested_by", review_semantics)
         self.assertIn("distinct from requested_by", application_semantics)
 
@@ -1004,7 +1198,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
             )
 
             rollback_candidate = _registry(
-                "v21", previous_version="v20", training_label="Training"
+                "v21", previous_registry=self.candidate, training_label="Training"
             )
             rollback_candidate_path = root / "v21.json"
             _write_json(rollback_candidate_path, rollback_candidate)

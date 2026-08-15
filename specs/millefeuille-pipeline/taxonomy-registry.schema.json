@@ -8,7 +8,8 @@
     "entries and set-like arrays are sorted and duplicate-free",
     "entry IDs and sibling labels are unique",
     "level, parent, replacement, active-parent, and released-tree coverage rules pass",
-    "previous_version differs from taxonomy_version"
+    "previous_version differs from taxonomy_version",
+    "root registries have null previous_version and previous_content_identity; non-root registries require both"
   ],
   "type": "object",
   "additionalProperties": false,
@@ -17,6 +18,7 @@
     "registry_id",
     "taxonomy_version",
     "previous_version",
+    "previous_content_identity",
     "status",
     "governing_basis",
     "owner_id",
@@ -32,6 +34,12 @@
     "previous_version": {
       "oneOf": [
         {"$ref": "#/$defs/safeId"},
+        {"type": "null"}
+      ]
+    },
+    "previous_content_identity": {
+      "oneOf": [
+        {"$ref": "#/$defs/contentIdentity"},
         {"type": "null"}
       ]
     },

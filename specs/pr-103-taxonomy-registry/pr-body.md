@@ -6,6 +6,10 @@
   forward-only rollback artifacts plus CLI commands
 - preserve stable IDs during rollback, restore historical entries exactly, and
   deprecate later-added IDs without mutating their other values
+- bind every non-root registry to its exact predecessor content identity and
+  reject fabricated or merely structurally compatible rollback sources
+- enforce the declared add, clarify, rename, deprecate, split, or merge
+  operation against the candidate's exact registry diff
 - enforce requester, reviewer, and applier separation
 - add five strict JSON Schemas, a deliberately non-authoritative draft example,
   governance documentation, and regression coverage
@@ -35,8 +39,8 @@
 
 ## Validation
 
-- 22 focused taxonomy and contract-artifact tests passed
-- all 440 repository tests passed with 7 capability skips
+- 24 focused taxonomy and contract-artifact tests passed
+- all 442 repository tests passed with 7 capability skips
 - repository-wide Ruff, changed-Python-file format, and diff checks passed
 - taxonomy JSON Schemas, tracked JSON/YAML metadata, Speculoos validation, and
   publication checks passed

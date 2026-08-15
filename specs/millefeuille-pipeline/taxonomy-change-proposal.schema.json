@@ -5,11 +5,12 @@
   "x-millefeuille-semantic-validation": [
     "content_identity equals canonical SHA-256 excluding content_identity",
     "the base and candidate are released exact registry versions",
-    "candidate previous_version equals the base version",
+    "candidate previous_version and previous_content_identity equal the exact base version and content identity",
     "stable IDs are not deleted, re-leveled, or reparented",
     "affected_entry_ids equals the complete entry diff",
+    "specific add, clarify, rename, deprecate, split, and merge operations match their enforceable registry diff shapes; mixed is explicit",
     "rollback_source is present only for rollback",
-    "with the exact rollback source supplied, source IDs are a structurally compatible subset of base IDs",
+    "the rollback source is the exact content-addressed immediate predecessor of the base",
     "a rollback candidate restores source entries exactly, retains base-only entries byte-for-value except active status becomes deprecated, leaves already-deprecated base-only entries unchanged, and has no IDs outside the base/source union"
   ],
   "type": "object",
