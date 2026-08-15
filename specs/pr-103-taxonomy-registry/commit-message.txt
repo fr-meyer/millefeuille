@@ -1,0 +1,9 @@
+feat: complete PR #103 governed taxonomy registry
+
+Record the canonical MF-154 task and publication artifacts after integrating
+current dev and validating deterministic registry, governance, rollback, and
+offline CLI boundaries.
+
+Task: pr-103-taxonomy-registry
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

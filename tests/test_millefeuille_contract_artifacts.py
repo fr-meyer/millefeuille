@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import unittest
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
 SPEC_DIR = Path(__file__).resolve().parents[1] / "specs" / "millefeuille-pipeline"
 
 REQUIRED_DOCS = [
@@ -12,9 +13,11 @@ REQUIRED_DOCS = [
     "vision.md",
     "remaining-work.md",
     "cli-contract.md",
+    "legacy-migration.md",
     "artifact-storage.md",
     "retrieval-index-contract.md",
     "classification-orchestration.md",
+    "taxonomy-registry.md",
     "tag-state-machine.md",
     "ocr-backend-contract.md",
     "release-version-policy.md",
@@ -39,6 +42,11 @@ REQUIRED_JSON_SCHEMAS = [
     "classification-batch-summary.schema.json",
     "classification-action-evidence.schema.json",
     "classification-action-record.schema.json",
+    "taxonomy-registry.schema.json",
+    "taxonomy-lock.schema.json",
+    "taxonomy-change-proposal.schema.json",
+    "taxonomy-change-review.schema.json",
+    "taxonomy-application.schema.json",
     "model-execution-evidence.schema.json",
     "model-execution-plan.schema.json",
     "model-provenance-record.schema.json",
@@ -184,6 +192,90 @@ class TestMillefeuilleContractArtifacts(unittest.TestCase):
                     pattern.search(text),
                     f"forbidden marker in {path.name}: {pattern.pattern}",
                 )
+
+    def test_legacy_migration_contract_pins_compatibility_boundaries(self):
+        migration = (SPEC_DIR / "legacy-migration.md").read_text(encoding="utf-8")
+        required_markers = [
+            "Legacy Hydra surface",
+            "Lifecycle stage surface",
+            "millefeuille-source-pack-manifest/v0.1",
+            "millefeuille-source-pack-manifest/v0.2",
+            "millefeuille-processed",
+            "millefeuille-acceptance-passed",
+            "No earlier than `1.0.0`",
+            "Safe Stop And Rollback",
+        ]
+        for marker in required_markers:
+            with self.subTest(marker=marker):
+                self.assertIn(marker, migration)
+
+        pageindex = migration.split("## PageIndex Boundary", 1)[1].split(
+            "## Output And Artifact Root Mapping",
+            1,
+        )[0]
+        normalized_pageindex = " ".join(pageindex.split())
+        pageindex_guarantees = [
+            "direct PageIndex HTTP API mode and a PageIndex SDK mode",
+            "All newly implemented lifecycle PageIndex ingestion and indexing "
+            "must follow the later **PageIndex MCP-only** policy.",
+            "Lifecycle code must not reuse the legacy direct HTTP client, SDK "
+            "client, or an ad-hoc multipart upload as its production connector.",
+            "fail-closed access control",
+            "an authenticated bridge request or a narrowly scoped, unguessable, "
+            "short-lived, single-use capability URL",
+            "reject expired, replayed, or mismatched access attempts",
+            "revoke the serving capability",
+            "must not enter handoff rows, source-pack manifests, committed "
+            "evidence, logs, or the bridge ledger",
+        ]
+        for guarantee in pageindex_guarantees:
+            with self.subTest(pageindex_guarantee=guarantee):
+                self.assertIn(guarantee, normalized_pageindex)
+
+        removal = migration.split(
+            "Legacy removal is not automatic at `1.0.0`. "
+            "It requires all of the following:",
+            1,
+        )[1].split("## Safe Stop And Rollback", 1)[0]
+        actual_exit_criteria: list[str] = []
+        current = ""
+        for raw_line in removal.splitlines():
+            if raw_line.startswith("- "):
+                if current:
+                    actual_exit_criteria.append(
+                        current.removesuffix("; and").rstrip(";.")
+                    )
+                current = raw_line[2:].strip()
+            elif current and raw_line.startswith("  "):
+                current += " " + raw_line.strip()
+        if current:
+            actual_exit_criteria.append(current.removesuffix("; and").rstrip(";."))
+
+        expected_exit_criteria = [
+            "staged discovery through writeback has bounded live evidence",
+            "v0.1 and v0.2 source packs remain readable or have a tested migration",
+            "PageIndex MCP bridge and ledger reconciliation are operational",
+            "legacy tag and output migrations have audit reports",
+            "a clean-install and upgrade test passes on supported platforms",
+            "release notes provide a rollback path",
+            "the incompatible CLI change receives explicit release approval",
+        ]
+        self.assertEqual(expected_exit_criteria, actual_exit_criteria)
+        self.assertLess(
+            migration.index("`0.4.x` (current)"),
+            migration.index("No earlier than `1.0.0`"),
+        )
+
+    def test_migration_contract_is_linked_from_operator_navigation(self):
+        packet_readme = (SPEC_DIR / "README.md").read_text(encoding="utf-8")
+        root_readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("`legacy-migration.md`", packet_readme)
+        self.assertIn(
+            "(specs/millefeuille-pipeline/legacy-migration.md)",
+            root_readme,
+        )
+        self.assertTrue((SPEC_DIR / "legacy-migration.md").is_file())
 
 
 if __name__ == "__main__":

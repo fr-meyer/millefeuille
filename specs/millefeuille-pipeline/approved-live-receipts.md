@@ -61,12 +61,20 @@ approved_at <= evaluation_time < expires_at
 ```
 
 Live executors must build `ReceiptReplayState` from a durable audit ledger and
-reject a previously consumed receipt ID or content digest before any external
-effect. They must reserve or record consumption atomically with their
+reject a previously reserved receipt ID or content digest before any external
+effect. The live authorization and audit-builder APIs fail closed when callers
+omit replay state; an explicit state loaded from the durable ledger is
+mandatory. Only the separately named no-effect validation helper may use an
+empty snapshot, and it must never guard a live adapter. They must reserve or
+record consumption atomically with their
 execution boundary; a crash after reservation requires explicit operator
-resolution, never automatic replay. A `validated` audit record proves only a
-no-effect gate check and does not consume the receipt. Only `consumed` records
-enter replay state.
+resolution, never automatic replay.
+
+Every structurally and cryptographically verified durable audit record enters
+replay state, including a `validated` no-effect record. The
+`validated|consumed` status is informational and never controls replay
+reservation. This conservative rule means changing that mutable status cannot
+make a single-use receipt reusable.
 
 The current CLI never records consumption because it cannot execute live work.
 After successful receipt validation it still exits through the unsupported-live
@@ -112,7 +120,9 @@ the supplied value in an error.
 - `secret_material_persisted: false`.
 
 The builder reruns liveness, replay, and exact-scope authorization at the
-recorded evaluation time before it emits either status. It cannot manufacture a
+recorded evaluation time before it emits either status. If a caller durably
+records either result, that record reserves the receipt; callers that need a
+non-reserving diagnostic must not append it to the replay ledger. It cannot manufacture a
 `validated` or `consumed` record for a mismatched, expired, or replayed request.
 
 It never serializes credentials, request headers, private bytes, prompts,
@@ -120,20 +130,26 @@ provider responses, authenticated URLs, or arbitrary caller fields.
 
 ## Current CLI Gate
 
-All current stage commands accept `--approval-receipt <json>` alongside
-`--mode`. The rules are:
+All current stage commands accept `--approval-receipt <json>` alongside `--mode`.
+They use the explicitly no-effect receipt validator, never the live-authorization
+primitive. The rules are:
 
 1. `--approval-receipt` with `preview` or `read-only-live` exits at the gate.
    A receipt never changes the selected mode.
 2. Live writeback requires both explicit `--mode approved-live` and explicit
    `--writeback approved-live`, plus a receipt. Neither flag implies the other.
 3. The present single-run gate derives one operation, one target/selector,
-   item cap `1`, run ID, and canonical source-pack root from CLI arguments.
-   Until an explicit artifact root exists, that same canonical root is the
-   bound output root.
-4. The present CLI has no provider execution controls, so its request binds a
+   item cap `1`, run ID, canonical source-pack root, and effective output root
+   from CLI arguments. The output root is the source-pack root only when
+   `--artifact-root` is omitted or explicitly set to `source-pack`; otherwise
+   it is the normalized path supplied by `--artifact-root`.
+4. The request independently requires all three explicit
+   `--approved-live-*-disposal` controls and one or more repeated
+   `--approved-live-stop-condition` values. Missing controls refuse
+   validation; receipt values are never copied into the request.
+5. The present CLI has no provider execution controls, so its request binds a
    null provider and zero provider limits.
-5. A missing, expired, replayed, tampered, secret-bearing, over-broad, or
+6. A missing, expired, replayed, tampered, secret-bearing, over-broad, or
    drifted receipt is rejected. A valid receipt is reported by content digest,
    then execution still exits as unsupported.
 

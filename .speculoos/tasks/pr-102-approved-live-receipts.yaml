@@ -1,0 +1,100 @@
+id: pr-102-approved-live-receipts
+roadmap_card: MF-100
+title: Add approved-live receipt controls
+status: in-progress
+branch: feat/pr-mf-100-approved-live-receipts
+base_branch: dev
+github:
+  issue: null
+  pull_request: 102
+  issue_project_item: unavailable
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/102
+  head_sha: null  # Active-task exact-head binding is external; see notes.
+  merge_commit: null
+write_paths:
+  - .speculoos/tasks/pr-102-approved-live-receipts.yaml
+  - millefeuille/cli/stages.py
+  - millefeuille/domain/live_receipts.py
+  - millefeuille/domain/secure_io.py
+  - specs/millefeuille-pipeline/README.md
+  - specs/millefeuille-pipeline/approved-live-audit.schema.json
+  - specs/millefeuille-pipeline/approved-live-receipt.schema.json
+  - specs/millefeuille-pipeline/approved-live-receipts.md
+  - specs/millefeuille-pipeline/cli-contract.md
+  - specs/millefeuille-pipeline/live-run-plan.md
+  - specs/pr-102-approved-live-receipts/**
+  - tests/test_millefeuille_contract_artifacts.py
+  - tests/test_millefeuille_live_receipts.py
+  - tests/test_millefeuille_secure_io.py
+scope:
+  - add a strict approved-live receipt model, JSON Schema, bounded secure loader,
+    canonical SHA-256 identity, expiry window, and exact single-use replay state
+  - bind exact operations, targets, selectors, item caps, runs, roots,
+    provider/model choices, call and cost limits, disposal, and stop conditions
+  - reject tampering, replay, wildcard scope, secret-like material, duplicate
+    fields, malformed or non-finite JSON, digest forgery, and authorization drift
+  - emit allowlisted self-verifying audit records with canonical root identities
+    and no credential material
+  - expose an explicit CLI receipt gate while preserving the no-effect exit-3
+    boundary because approved-live provider and persistence effects remain
+    unimplemented
+  - extend secure no-follow reads with a backwards-compatible byte limit and
+    file-growth detection
+non_goals:
+  - implementing or performing provider/model/OCR calls, credential lookup,
+    private paper access, PDF recovery, or live Zotero/OpenKB/PageIndex writes
+  - treating a valid receipt as proof that any requested live effect completed
+  - accepting unbounded, wildcard, reusable, expired, or scope-drifted authority
+  - dev-to-main promotion, release tags, package publication, deployment, or
+    approval bypass
+acceptance:
+  - canonical receipts bind every approved-live dimension and reject any
+    mutation, replay, expiry, duplicate key, malformed value, or scope drift
+  - replay state is reserved exactly once and audit output is deterministic,
+    allowlisted, self-verifying, and secret-free
+  - CLI receipt validation remains fail-closed and cannot promote the
+    unimplemented approved-live path beyond exit code 3
+  - bounded secure reads reject oversize input and growth without weakening
+    existing no-follow and identity protections
+  - focused tests, full unittest discovery, schema parsing, Ruff, diff check,
+    private-data scan, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_live_receipts tests.test_millefeuille_secure_io tests.test_millefeuille_stage_cli tests.test_millefeuille_contract_artifacts"
+  - ".venv/bin/python -m unittest discover -s tests"
+  - ".venv/bin/ruff check ."
+  - "git diff --check"
+  - "speculoos validate --task pr-102-approved-live-receipts --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-102-approved-live-receipts --pr-body specs/pr-102-approved-live-receipts/pr-body.md --commit-message specs/pr-102-approved-live-receipts/commit-message.txt --json"
+publication_boundary:
+  statement: Repository-local approved-live authorization contracts, secure
+    bounded reads, no-effect CLI validation, schemas, documentation, synthetic
+    tests, and Speculoos metadata only. No credential value access,
+    provider/model/OCR call, private paper read, live Zotero/OpenKB/PageIndex
+    write, source-pack mutation, stable-branch promotion, release, tag, package
+    publication, deployment, or approval bypass.
+documentation_impact:
+  status: none
+  rationale: No top-level README.md or docs/ surface changes are required.
+    The existing pipeline-specific README, approved-live receipt contract, CLI
+    contract, and live-run plan under specs/ already document exact authority,
+    replay, audit, and no-effect boundaries.
+private_data_scan: required; public source, documentation, synthetic tests, and
+  repository-local Speculoos artifacts only, with no credentials, private
+  papers, provider payloads, or host-specific paths
+publish_authority: Active Millefeuille delivery-train supervisor; routine
+  feature-to-dev publication, exact-head Mergeguez review, policy-gated merge,
+  dependent-PR retargeting, cleanup, and next-episode advancement are approved.
+  Live operations, dev-to-main promotion, release, and deployment remain
+  excluded.
+notes:
+  - The active task head field remains null while the PR is open because
+    embedding a commit's own SHA creates a self-reference cycle. Exact pre-merge
+    review and check evidence bind validation to GitHub's live head.
+  - Current dev was integrated before validation; the original pull request 99
+    stack wording is obsolete and pull request 102 now targets dev directly.
+delivery:
+  mode: inherit_branch_policy
+  continue_after_review: true

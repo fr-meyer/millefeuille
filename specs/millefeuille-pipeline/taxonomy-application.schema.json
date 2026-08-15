@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/millefeuille/taxonomy-application.schema.json",
+  "title": "Millefeuille Taxonomy Application Record",
+  "x-millefeuille-semantic-validation": [
+    "content_identity equals canonical SHA-256 excluding content_identity",
+    "the exact proposal and candidate pass runtime transition validation",
+    "three distinct required roles approve with distinct accountable reviewer identities that differ from requested_by",
+    "applied_by is an accountable actor identity distinct from requested_by and every reviewer_id",
+    "applied_at does not predate the proposal or any review",
+    "existing registries and active locks remain unchanged"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "application_id",
+    "change_id",
+    "operation",
+    "status",
+    "proposal_content_identity",
+    "base_registry",
+    "result_registry",
+    "review_content_identities",
+    "active_batch_policy",
+    "applied_by",
+    "applied_at",
+    "content_identity"
+  ],
+  "properties": {
+    "schema_version": {"const": "millefeuille-taxonomy-application/v0.1"},
+    "application_id": {"$ref": "#/$defs/safeId"},
+    "change_id": {"$ref": "#/$defs/safeId"},
+    "operation": {"enum": ["apply", "rollback"]},
+    "status": {"enum": ["applied", "rolled-back"]},
+    "proposal_content_identity": {"$ref": "#/$defs/contentIdentity"},
+    "base_registry": {"$ref": "#/$defs/registryBinding"},
+    "result_registry": {"$ref": "#/$defs/registryBinding"},
+    "review_content_identities": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/contentIdentity"}
+    },
+    "active_batch_policy": {"const": "preserve-locked-version"},
+    "applied_by": {"$ref": "#/$defs/text"},
+    "applied_at": {"$ref": "#/$defs/timestamp"},
+    "content_identity": {"$ref": "#/$defs/contentIdentity"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"operation": {"const": "apply"}}},
+      "then": {"properties": {"status": {"const": "applied"}}},
+      "else": {"properties": {"status": {"const": "rolled-back"}}}
+    }
+  ],
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^\\S(?:[^\\r\\n\\u0000-\\u001f]*\\S)?$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "contentIdentity": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "registryBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registry_id", "taxonomy_version", "content_identity"],
+      "properties": {
+        "registry_id": {"$ref": "#/$defs/safeId"},
+        "taxonomy_version": {"$ref": "#/$defs/safeId"},
+        "content_identity": {"$ref": "#/$defs/contentIdentity"}
+      }
+    }
+  }
+}

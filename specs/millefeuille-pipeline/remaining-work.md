@@ -40,6 +40,10 @@
 - The current model-planning slice adds deterministic no-call execution plans
   for page, section, and full-paper summary profiles, including explicit auth,
   fallback, live-blocker, and provenance requirements.
+- The current taxonomy-governance slice adds content-addressed two-level
+  registries, immutable scope locks, exact-diff proposals, independent
+  three-role reviews, forward apply records, and forward-only rollback without
+  generating labels or mutating active batches.
 - Current integration branch is `dev`; stable branch is `main`.
 - Current package version is `0.4.0`.
 
@@ -120,6 +124,12 @@
     - Generate Markdown and JSON paper card artifacts.
     - Include paper identity, one-line thesis, contribution, method, results,
       limitations, classification clues, index state, and quality warnings.
+    - The v0.2 contract materializes planned/pending lanes before indexing and
+      permits only a controlled post-index refresh to observed canonical lane
+      outcomes. Existing v0.1 cards remain readable but immutable.
+    - v0.2 accepts aggregate source identities, but multi-source pack
+      propagation through card/index fixture materialization remains MF-114;
+      this lifecycle repair does not claim end-to-end multi-PDF support.
     - Manual gate: model/provider call approval when the card is model-made.
 
 12. **Retrieval And Index Layer**
@@ -174,9 +184,12 @@
       validate prior-decision lineage and taxonomy identity, preserve immutable
       action/final-decision packages, and advance canonical run refs. Escalation
       and taxonomy-gap outcomes retain deterministic queue/request artifacts.
+    - Offline taxonomy governance now validates stable-ID registry versions,
+      snapshots released versions per batch/pilot/run, and derives manual
+      proposal, review, apply, and rollback artifacts without replacing files.
     - Remaining work: live model-backed classification, worker-agent execution,
-      and taxonomy governance automation beyond reviewable change-request
-      artifacts.
+      binding live runs to registry locks, and later taxonomy-governance
+      automation beyond the manual reviewed lifecycle.
     - Manual gate: model/provider calls and worker-agent execution when used.
 
 15. **Zotero Writeback**

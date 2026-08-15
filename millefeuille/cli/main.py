@@ -26,6 +26,7 @@ from millefeuille.cli.commands import dry_run_command, process_command
 from millefeuille.cli.operator_preflight import run_operator_preflight_cli
 from millefeuille.cli.source_pack import run_source_pack_cli
 from millefeuille.cli.stages import run_stage_cli
+from millefeuille.cli.taxonomy import run_taxonomy_cli
 from millefeuille.clients.exceptions import (
     OCRClientError,
     OpenKBHandoffValidationError,
@@ -747,6 +748,10 @@ Offline source-pack commands:
   millefeuille source-pack intake --evidence recovered-pdf-evidence.json
     --source-pack-root /path/to/source-packs
 
+Offline taxonomy governance commands:
+  millefeuille taxonomy validate --registry /path/to/taxonomy-registry.json
+  millefeuille taxonomy lock --registry /path/to/taxonomy-registry.json ...
+
 Artifact-writer source-pack fixture flags:
   --native-extraction-evidence /path/to/native-extraction-evidence.jsonl
   --ocr-extraction-evidence /path/to/ocr-extraction-evidence.jsonl
@@ -792,6 +797,8 @@ def entrypoint() -> None:
         sys.exit(run_source_pack_cli(argv))
     if argv and argv[0] == "operator-preflight":
         sys.exit(run_operator_preflight_cli(argv))
+    if argv and argv[0] == "taxonomy":
+        sys.exit(run_taxonomy_cli(argv[1:]))
     if argv and argv[0] in {
         "extract-native",
         "extract-ocr",

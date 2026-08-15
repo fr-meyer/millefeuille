@@ -15,3 +15,9 @@ Current boundary:
 - Default validation must stay offline and credential-free.
 - Live Zotero, OCR, OpenKB, PageIndex, Mistral, and source-pack writes require
   a separate explicit operator approval.
+
+Reusable feature, approval, adapter, dogfood, maintenance, migration, and
+release packets are indexed in
+[`specs/millefeuille-delivery/`](../specs/millefeuille-delivery/README.md).
+They supplement this canonical control plane; they do not replace task,
+review, approval, or merge records.

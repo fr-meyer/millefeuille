@@ -25,30 +25,30 @@
     "local_validation": {
       "kind": "local_validation",
       "status": "passed",
-      "summary": "PR #51 closeout metadata validation passed: metadata/schema parse, git diff check, Speculoos status, and Speculoos validate/private-data scan.",
-      "evidence_ref": ".speculoos/tasks/pr-051-pr50-closeout-metadata.yaml",
-      "updated_at": "pr-051-pr50-closeout-metadata"
+      "summary": "PR #98 metadata parse, completed-ledger consistency, branch-truth invariants, and diff checks passed on the current branch.",
+      "evidence_ref": ".speculoos/tasks/pr-098-reconcile-delivery-ledgers.yaml",
+      "updated_at": "pr-098-reconcile-delivery-ledgers"
     },
     "github_checks": {
       "kind": "github_checks",
       "status": "pending-live-read",
-      "summary": "Live GitHub checks must be read through the broker before merge execution.",
-      "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-051-pr50-closeout-metadata"
+      "summary": "Live GitHub checks for PR #98 must pass before merge.",
+      "evidence_ref": "https://github.com/fr-meyer/millefeuille/pull/98/checks",
+      "updated_at": "pr-098-reconcile-delivery-ledgers"
     },
     "self_managed": {
       "kind": "self_managed",
       "status": "pending",
-      "summary": "Ignored local self-managed reviewer artifact is the emergency fallback if hosted Mergeguez review is unavailable.",
-      "evidence_ref": ".speculoos/reviews/pr-051-pr50-closeout-metadata/self-review.json",
-      "updated_at": "pr-051-pr50-closeout-metadata"
+      "summary": "Self-managed review remains an emergency fallback if hosted Mergeguez review is unavailable.",
+      "evidence_ref": null,
+      "updated_at": "pr-098-reconcile-delivery-ledgers"
     },
     "mergeguez_review": {
       "kind": "mergeguez_review",
       "status": "pending-live-read",
-      "summary": "Live @mergeguez review evidence is the primary required reviewer source when exact-head and clean.",
-      "evidence_ref": "broker:mergeguez pr-state --json",
-      "updated_at": "pr-051-pr50-closeout-metadata"
+      "summary": "Exact-head Mergeguez review is required for PR #98 before merge.",
+      "evidence_ref": "https://github.com/fr-meyer/millefeuille/pull/98",
+      "updated_at": "pr-098-reconcile-delivery-ledgers"
     }
   }
 }

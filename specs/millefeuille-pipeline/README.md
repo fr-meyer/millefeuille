@@ -5,11 +5,18 @@ offline-first contract. It is safe to review and test without Zotero
 credentials, PDF bytes, OCR providers, OpenKB writes, source-pack writes,
 GitHub publication, releases, or package-index changes.
 
+Reusable packets for carrying this contract through feature delivery, bounded
+approval, adapter evidence, dogfood, maintenance handoff, migration, and
+release are indexed in the adjacent
+[`millefeuille-delivery`](../millefeuille-delivery/README.md) directory.
+
 Files:
 
 - `vision.md` - complete paper-processing product vision.
 - `remaining-work.md` - end-to-end work pipeline and manual gates.
 - `cli-contract.md` - intended command groups and run modes.
+- `legacy-migration.md` - operator migration and deprecation contract for the
+  original Hydra workflow and the source-pack lifecycle.
 - `stage-manifest.schema.json` - machine-readable stage manifest shape.
 - `artifact-storage.md` - artifact-root and source-pack storage contract.
 - `source-pack-manifest.schema.json` - source-pack source identity and hash
@@ -50,9 +57,18 @@ Files:
   adjudication action inputs.
 - `classification-action-record.schema.json` - immutable action lineage and
   final-decision refs.
+- `taxonomy-registry.schema.json` and `taxonomy-registry.example.json` -
+  content-addressed two-level registry contract and non-production draft.
+- `taxonomy-lock.schema.json` - immutable batch/pilot/run registry snapshot.
+- `taxonomy-change-proposal.schema.json` and
+  `taxonomy-change-review.schema.json` - exact candidate, impact, migration,
+  and independent approval contracts.
+- `taxonomy-application.schema.json` - governed forward apply/rollback record.
 - `retrieval-index-contract.md` - OpenKB/PageIndex and optional index lanes.
 - `classification-orchestration.md` - CLI-owned classification modes and
   multi-agent governance.
+- `taxonomy-registry.md` - locking, stable-ID, manual change, and rollback
+  rules.
 - `tag-state-machine.md` - Zotero tag lifecycle design.
 - `ocr-backend-contract.md` - native/OCR evidence adapter contract.
 - `release-version-policy.md` - Speculoos-governed release and version path.
@@ -101,6 +117,12 @@ unverified namespace entries in place for explicit operator cleanup; unavailable
 primitives fail closed before publication. This boundary assumes trusted
 ownership or cooperative same-UID writers: POSIX locks and mode bits do not
 prevent an uncooperative owner from mutating staging after the last check.
+
+Taxonomy registry validation and pure artifact derivation live in
+`millefeuille/domain/taxonomy.py`. The `millefeuille taxonomy` command seals
+explicit drafts, validates registries/locks, and derives proposals, independent
+reviews, applications, and forward-only rollbacks as JSON without choosing
+labels, replacing files, or making live calls.
 
 Preview/read-only stage commands now live under `millefeuille/cli/stages.py`:
 `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,
