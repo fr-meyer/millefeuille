@@ -2,6 +2,8 @@
 
 - add a strict approved-live receipt model, schema, bounded secure loader,
   canonical SHA-256 identity, expiry window, and exact single-use replay state
+- require explicit durable replay state at live authorization and audit-builder
+  boundaries while keeping the current CLI on a separately named no-effect path
 - bind exact operations, targets, selectors, item caps, runs, roots,
   provider/model choices, call and cost limits, disposal, and stop conditions;
   the CLI derives the effective artifact output root and explicit policy
@@ -35,9 +37,9 @@
 
 ## Validation
 
-- 59 focused receipt, secure-I/O, CLI, and contract tests passed with 2
+- 60 focused receipt, secure-I/O, CLI, and contract tests passed with 2
   capability skips
-- all 425 repository tests passed with 7 capability skips
+- all 426 repository tests passed with 7 capability skips
 - repository-wide Ruff and diff checks passed
 - all JSON Schemas, tracked JSON/YAML metadata, Speculoos validation, and
   publication checks passed

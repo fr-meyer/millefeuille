@@ -62,7 +62,11 @@ approved_at <= evaluation_time < expires_at
 
 Live executors must build `ReceiptReplayState` from a durable audit ledger and
 reject a previously reserved receipt ID or content digest before any external
-effect. They must reserve or record consumption atomically with their
+effect. The live authorization and audit-builder APIs fail closed when callers
+omit replay state; an explicit state loaded from the durable ledger is
+mandatory. Only the separately named no-effect validation helper may use an
+empty snapshot, and it must never guard a live adapter. They must reserve or
+record consumption atomically with their
 execution boundary; a crash after reservation requires explicit operator
 resolution, never automatic replay.
 
@@ -126,8 +130,9 @@ provider responses, authenticated URLs, or arbitrary caller fields.
 
 ## Current CLI Gate
 
-All current stage commands accept `--approval-receipt <json>` alongside
-`--mode`. The rules are:
+All current stage commands accept `--approval-receipt <json>` alongside `--mode`.
+They use the explicitly no-effect receipt validator, never the live-authorization
+primitive. The rules are:
 
 1. `--approval-receipt` with `preview` or `read-only-live` exits at the gate.
    A receipt never changes the selected mode.

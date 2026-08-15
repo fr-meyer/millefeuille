@@ -24,7 +24,7 @@ from millefeuille.domain.live_receipts import (
     LiveSelector,
     LiveTarget,
     load_approved_live_receipt,
-    validate_approved_live_receipt,
+    validate_approved_live_receipt_for_no_effect,
 )
 from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
@@ -776,7 +776,7 @@ def _mode_gate(args: argparse.Namespace, err: TextIO) -> int | None:
         try:
             receipt = load_approved_live_receipt(receipt_path)
             request = _build_cli_approved_live_request(args)
-            validate_approved_live_receipt(receipt, request)
+            validate_approved_live_receipt_for_no_effect(receipt, request)
         except MillefeuilleContractError as exc:
             print(f"millefeuille {args.command}: {exc}", file=err)
             return 3

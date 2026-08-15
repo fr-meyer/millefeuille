@@ -179,6 +179,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                 receipt,
                 request,
                 now=EVALUATION_TIME,
+                replay_state=ReceiptReplayState(),
             )
             self.assertEqual(receipt.to_dict(), payload)
             self.assertEqual(
@@ -241,6 +242,26 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
             ):
                 load_approved_live_receipt(receipt_path)
 
+    def test_replay_state_omission_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            receipt = ApprovedLiveReceipt.from_dict(_receipt_payload(root))
+            request = _request(root)
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "explicit replay_state",
+            ):
+                validate_approved_live_receipt(
+                    receipt,
+                    request,
+                    now=EVALUATION_TIME,
+                )
+            with self.assertRaisesRegex(MillefeuilleContractError, "replay_state"):
+                build_approved_live_audit_record(
+                    receipt, request, evaluated_at=EVALUATION_TIME
+                )
+
     def test_expired_and_not_yet_active_receipts_are_rejected(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
@@ -252,12 +273,14 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                     receipt,
                     request,
                     now=datetime(2026, 8, 11, 11, 0, tzinfo=UTC),
+                    replay_state=ReceiptReplayState(),
                 )
             with self.assertRaisesRegex(MillefeuilleContractError, "not active"):
                 validate_approved_live_receipt(
                     receipt,
                     request,
                     now=datetime(2026, 8, 11, 9, 59, tzinfo=UTC),
+                    replay_state=ReceiptReplayState(),
                 )
 
     def test_validity_window_cannot_be_over_broad(self):
@@ -326,6 +349,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                         receipt,
                         request,
                         now=EVALUATION_TIME,
+                        replay_state=ReceiptReplayState(),
                     )
 
     def test_wrong_output_and_source_pack_roots_are_rejected(self):
@@ -347,6 +371,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                         receipt,
                         request,
                         now=EVALUATION_TIME,
+                        replay_state=ReceiptReplayState(),
                     )
 
     def test_provider_model_and_budget_are_exact(self):
@@ -371,6 +396,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                 receipt,
                 correct,
                 now=EVALUATION_TIME,
+                replay_state=ReceiptReplayState(),
             )
 
             for request, message in (
@@ -413,6 +439,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                         receipt,
                         request,
                         now=EVALUATION_TIME,
+                        replay_state=ReceiptReplayState(),
                     )
 
     def test_provider_operations_cannot_omit_provider_and_model(self):
@@ -483,6 +510,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                 receipt,
                 request,
                 evaluated_at=EVALUATION_TIME,
+                replay_state=ReceiptReplayState(),
             )
 
             self.assertEqual(
@@ -521,6 +549,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                     receipt,
                     _request(root, run_id="other-run"),
                     evaluated_at=EVALUATION_TIME,
+                    replay_state=ReceiptReplayState(),
                 )
 
             consumed = deepcopy(validated)
@@ -561,12 +590,14 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                 canonical_request,
                 evaluated_at=EVALUATION_TIME,
                 status="consumed",
+                replay_state=ReceiptReplayState(),
             )
             variant_record = build_approved_live_audit_record(
                 receipt,
                 request,
                 evaluated_at=EVALUATION_TIME,
                 status="consumed",
+                replay_state=ReceiptReplayState(),
             )
 
             self.assertEqual(

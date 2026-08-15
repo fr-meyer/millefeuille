@@ -828,6 +828,10 @@ def validate_approved_live_receipt(
 ) -> None:
     """Authorize only an exact, unexpired, unconsumed request scope."""
 
+    if replay_state is None:
+        raise MillefeuilleContractError(
+            "approved-live authorization requires an explicit replay_state"
+        )
     evaluation_time = _normalize_now(now)
     approved_at = _parse_utc_timestamp(
         receipt.approval.approved_at,
@@ -839,7 +843,7 @@ def validate_approved_live_receipt(
     if evaluation_time >= expires_at:
         raise MillefeuilleContractError("approved-live receipt has expired")
 
-    replay = replay_state or ReceiptReplayState()
+    replay = replay_state
     if receipt.receipt_id in replay.receipt_ids:
         raise MillefeuilleContractError(
             "approved-live receipt has already been consumed"
@@ -891,6 +895,24 @@ def validate_approved_live_receipt(
     )
 
 
+def validate_approved_live_receipt_for_no_effect(
+    receipt: ApprovedLiveReceipt,
+    request: ApprovedLiveRequest,
+    *,
+    now: datetime | None = None,
+) -> None:
+    """Validate a receipt only for a boundary that cannot perform live effects.
+
+    This deliberately supplies an empty replay snapshot and therefore must not
+    be used as authorization by a live adapter.  Live authorization calls
+    ``validate_approved_live_receipt`` with an explicitly loaded durable state.
+    """
+
+    validate_approved_live_receipt(
+        receipt, request, now=now, replay_state=ReceiptReplayState()
+    )
+
+
 def build_approved_live_audit_record(
     receipt: ApprovedLiveReceipt,
     request: ApprovedLiveRequest,
@@ -899,7 +921,10 @@ def build_approved_live_audit_record(
     status: str = "validated",
     replay_state: ReceiptReplayState | None = None,
 ) -> dict[str, Any]:
-    """Return a strict allowlisted audit object without credential material."""
+    """Return a strict allowlisted audit object without credential material.
+
+    Omitted replay state fails closed through the authorization primitive.
+    """
 
     if status not in {"validated", "consumed"}:
         raise MillefeuilleContractError("approved-live audit status is unsupported")
