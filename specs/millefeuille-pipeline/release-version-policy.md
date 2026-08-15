@@ -22,6 +22,11 @@ Use semantic versioning after the Millefeuille contract stabilizes:
 
 Current version: `0.4.0`.
 
+The legacy Hydra surface remains available through the compatibility window
+defined in `legacy-migration.md`. Removing or disabling that surface is an
+incompatible CLI change and must not occur earlier than a separately approved
+`1.0.0` proposal whose migration exit criteria pass.
+
 ## Release Candidate Checklist
 
 - `dev` contains the intended feature PRs.

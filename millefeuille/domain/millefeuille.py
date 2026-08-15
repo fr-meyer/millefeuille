@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+import re
 from typing import Any
 
 
@@ -913,6 +914,14 @@ class RetrievalIndexRecord:
                 raise MillefeuilleContractError(
                     f"{field_name} must be a non-empty string"
                 )
+        if re.fullmatch(
+            r"sha256(?:-aggregate)?:[0-9a-f]{64}",
+            self.source_hash,
+        ) is None:
+            raise MillefeuilleContractError(
+                "source_hash must use sha256:<hex> or "
+                "sha256-aggregate:<hex> form"
+            )
         if self.duplicate_scan is not None and not isinstance(
             self.duplicate_scan, dict
         ):
@@ -958,7 +967,7 @@ class RetrievalIndexRecord:
         return cls(
             paper_id=str(payload.get("paper_id", "")).strip(),
             run_id=str(payload.get("run_id", "")).strip(),
-            source_hash=str(payload.get("source_hash", "")).strip(),
+            source_hash=str(payload.get("source_hash", "")),
             selected_fulltext_ref=str(payload.get("selected_fulltext_ref", "")).strip(),
             summary_ref=str(payload.get("summary_ref", "")).strip(),
             paper_card_ref=str(payload.get("paper_card_ref", "")).strip(),
