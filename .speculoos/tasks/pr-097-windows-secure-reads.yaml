@@ -1,0 +1,88 @@
+id: pr-097-windows-secure-reads
+roadmap_card: MF-001
+title: Harden portable secure reads on Windows
+status: in-progress
+branch: fix/pr-097-windows-secure-reads
+base_branch: dev
+github:
+  issue: null
+  pull_request: 97
+  issue_project_item: unavailable
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/97
+  head_sha: null  # Active-task exact-head binding is external; see notes.
+  merge_commit: null
+write_paths:
+  - .speculoos/tasks/pr-097-windows-secure-reads.yaml
+  - README.md
+  - millefeuille/domain/secure_io.py
+  - specs/pr-097-windows-secure-reads/**
+  - tests/test_millefeuille_retrieve.py
+  - tests/test_millefeuille_secure_io.py
+scope:
+  - preserve exact binary reads on Windows by enabling binary and non-inheritable
+    descriptor flags when the platform exposes them
+  - separate stable object identity from mutation snapshots so POSIX retains
+    change-time checks while Windows avoids inconsistent descriptor-side ctime
+  - reject symbolic links, Windows reparse points, non-directories, and unstable
+    zero-inode identities in the portable read fallback
+  - bind pre-open, descriptor, post-open path, and post-read observations to the
+    same regular file with size and modification-time stability checks
+  - document the portable fallback and add synthetic cross-platform regressions
+non_goals:
+  - weakening descriptor-relative no-follow reads or batch-retrieval fail-closed
+    behavior on POSIX or platforms without the required directory primitives
+  - accepting reparse-backed parents or files, unstable object identities,
+    partial reads, or mutation during inspection
+  - changing artifact formats, retrieval semantics, provider adapters, or write
+    paths beyond the portable secure-read compatibility fix
+  - credentials, provider/model/OCR calls, live Zotero reads or writes, private
+    paper access, PDF recovery, source-pack mutation, or OpenKB/PageIndex writes
+  - dev-to-main promotion, release tags, package publication, deployment, or
+    approval bypass
+acceptance:
+  - portable reads round-trip binary bytes exactly without newline or control-Z
+    translation
+  - Windows read-side ctime drift does not create false failures while POSIX
+    ctime remains a mutation signal
+  - path replacement, in-place mutation, short reads, zero-inode identities,
+    symbolic links, reparse points, and non-regular paths fail closed
+  - existing retrieval behavior and repository-wide tests remain green
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check,
+    private-data scan, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_secure_io tests.test_millefeuille_retrieve -v"
+  - ".venv/bin/python -m unittest discover -s tests"
+  - ".venv/bin/ruff check ."
+  - "git diff --check"
+  - "speculoos validate --task pr-097-windows-secure-reads --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-097-windows-secure-reads --pr-body specs/pr-097-windows-secure-reads/pr-body.md --commit-message specs/pr-097-windows-secure-reads/commit-message.txt --json"
+publication_boundary:
+  statement: Offline secure-read runtime, README guidance, synthetic tests, and
+    repository-local Speculoos metadata only. No credential lookup,
+    provider/model/OCR call, private paper read, live
+    Zotero/OpenKB/PageIndex/source-pack mutation, stable-branch promotion,
+    release, tag, package publication, deployment, or approval bypass.
+documentation_impact:
+  status: updated
+  rationale: README now documents Windows binary-read flags, reparse-point
+    rejection, identity binding, and platform-specific timestamp stability.
+private_data_scan: required; public source, README guidance, synthetic tests, and
+  repository-local metadata only, with no credentials, private papers, provider
+  payloads, or host-specific paths
+publish_authority: Active Millefeuille delivery-train supervisor; routine
+  feature-to-dev publication, exact-head Mergeguez review, policy-gated merge,
+  cleanup, dependent-PR retargeting, and next-episode advancement are approved.
+  Live operations, dev-to-main promotion, release, and deployment remain
+  excluded.
+notes:
+  - The active task head field remains null while the PR is open because
+    embedding a commit's own SHA creates a self-reference cycle. Exact pre-merge
+    binding is the immutable GitHub head referenced by the Mergeguez review and
+    check; closeout records head_sha and merge_commit after merge.
+  - Refreshed without history rewriting by merging dev commit
+    4b14ea8a64d37dd80fdc0bfe7ae2d7eca7511ea6 before exact-head validation.
+  - PR 99 currently depends on this branch and must be retargeted safely after
+    PR 97 merges; retain the remote branch until that dependency is removed.
