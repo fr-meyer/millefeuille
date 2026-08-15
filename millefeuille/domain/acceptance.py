@@ -113,12 +113,16 @@ def write_acceptance_summary(
     item_key: str | None = None,
     handoff_path: str | Path | None = None,
     duplicate_scan_path: str | Path | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> AcceptanceWriteResult:
     resolved = resolve_run_artifacts(
         source_pack_root=source_pack_root,
         run_id=run_id,
         paper_id=paper_id,
         item_key=item_key,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
     summary = _build_acceptance_summary(
         resolved=resolved,

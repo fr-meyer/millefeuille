@@ -1,0 +1,8 @@
+feat: complete PR #100 artifact package overrides
+
+Record the canonical MF-103 task and publication artifacts after integrating
+current dev and validating governed artifact-root and stage-manifest selection.
+
+Task: pr-100-artifact-package-overrides
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>
