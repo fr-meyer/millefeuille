@@ -18,6 +18,15 @@ explicit without weakening their manual gates.
 Implemented stage-command controls are:
 
 - `--mode preview|read-only-live|approved-live`
+- `--approval-receipt <json>` for exact-scope gate validation only; it is
+  rejected outside explicit `approved-live`, and valid receipts still stop at
+  the current unsupported-live gate
+- `--approved-live-pdf-disposal`,
+  `--approved-live-provider-payload-disposal`, and
+  `--approved-live-temporary-file-disposal` for an independently requested
+  exact disposal policy; all three are required by the current live gate
+- repeated `--approved-live-stop-condition <code>` values for the complete,
+  sorted, independently requested stop-condition set
 - `--source-pack-root <path>` plus `--paper-id|--item-key` and `--run-id`
 - `--artifact-root source-pack|<path>` for an exact run package or declared
   package container layout
@@ -480,12 +489,21 @@ write live Zotero/OpenKB/index/source-pack state.
     source-pack writes, or package publication.
 
 - `approved-live`
-  - Requires a named approval token or operator confirmation outside committed
-    files.
+  - Requires an exact, unexpired, untampered approval receipt from a trusted
+    operator approval channel.
   - Used for PDF recovery, OCR calls, model calls, source-pack writes, OpenKB
     writes, index writes, Zotero writes, and release actions.
-  - The current stage-oriented preview CLI stops with exit code `3`; it does
-    not implement approved-live execution.
+  - The available CLI bindings must match operation, target/selector, run, item
+    cap, and canonical roots. The normative receipt contract additionally binds
+    provider/model, budget, disposal, stop, expiry, and single-use replay state.
+  - Receipt validation never promotes `preview` or `read-only-live`.
+  - Zotero writeback additionally requires explicit
+    `--writeback approved-live`; the global mode and writeback mode do not
+    imply one another.
+  - The current stage-oriented CLI stops with exit code `3` even after a valid
+    receipt; it does not implement provider calls or approved-live writes.
+  - The full receipt, replay, audit, and adapter obligations are normative in
+    `approved-live-receipts.md`.
 
 ## Exit Rules
 

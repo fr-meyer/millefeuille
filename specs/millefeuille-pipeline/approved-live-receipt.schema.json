@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/approved-live-receipt.schema.json",
+  "title": "Millefeuille Approved Live Receipt",
+  "description": "A short-lived, single-use, exact-scope approval record. Runtime semantic validation and replay state are mandatory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "run_id",
+    "approval",
+    "expires_at",
+    "scope",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-approved-live-receipt/v0.1"
+    },
+    "receipt_id": {
+      "$ref": "#/$defs/exactIdentity"
+    },
+    "run_id": {
+      "$ref": "#/$defs/exactIdentity"
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approver_id", "approved_at"],
+      "properties": {
+        "approver_id": {
+          "$ref": "#/$defs/exactIdentity"
+        },
+        "approved_at": {
+          "$ref": "#/$defs/canonicalUtcTimestamp"
+        }
+      }
+    },
+    "expires_at": {
+      "$ref": "#/$defs/canonicalUtcTimestamp"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operations",
+        "targets",
+        "max_items",
+        "selector",
+        "output_root",
+        "source_pack_root",
+        "provider",
+        "limits",
+        "disposal_policy",
+        "stop_conditions"
+      ],
+      "properties": {
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9][a-z0-9-]*)*$",
+            "maxLength": 256
+          }
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "id"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+                "maxLength": 64
+              },
+              "id": {
+                "$ref": "#/$defs/exactScopeValue"
+              }
+            }
+          }
+        },
+        "max_items": {
+          "$ref": "#/$defs/positiveSafeInteger"
+        },
+        "selector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": {
+              "enum": [
+                "zotero-tag",
+                "zotero-query",
+                "paper-id",
+                "zotero-item-key",
+                "source-pack",
+                "batch-manifest",
+                "doi",
+                "title",
+                "slug"
+              ]
+            },
+            "value": {
+              "allOf": [
+                {"$ref": "#/$defs/exactScopeValue"},
+                {"maxLength": 512}
+              ]
+            }
+          }
+        },
+        "output_root": {
+          "$ref": "#/$defs/absoluteRoot"
+        },
+        "source_pack_root": {
+          "$ref": "#/$defs/absoluteRoot"
+        },
+        "provider": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["provider_id", "model_id"],
+              "properties": {
+                "provider_id": {
+                  "allOf": [
+                    {"$ref": "#/$defs/exactScopeValue"},
+                    {"maxLength": 128}
+                  ]
+                },
+                "model_id": {
+                  "$ref": "#/$defs/exactScopeValue"
+                }
+              }
+            }
+          ]
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_provider_calls", "max_cost_usd_micros"],
+          "properties": {
+            "max_provider_calls": {
+              "$ref": "#/$defs/nonNegativeSafeInteger"
+            },
+            "max_cost_usd_micros": {
+              "$ref": "#/$defs/nonNegativeSafeInteger"
+            }
+          }
+        },
+        "disposal_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pdfs", "provider_payloads", "temporary_files"],
+          "properties": {
+            "pdfs": {
+              "enum": [
+                "delete-after-verification",
+                "delete-after-run",
+                "retain-until-expiry",
+                "not-applicable"
+              ]
+            },
+            "provider_payloads": {
+              "enum": [
+                "never-persist",
+                "delete-after-run",
+                "not-applicable"
+              ]
+            },
+            "temporary_files": {
+              "enum": [
+                "delete-after-run",
+                "delete-on-failure",
+                "not-applicable"
+              ]
+            }
+          }
+        },
+        "stop_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9-]+)*$",
+            "maxLength": 256
+          }
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "content_digest"],
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "content_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "canonicalUtcTimestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "exactIdentity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@/+\\-]*$",
+      "not": {
+        "enum": ["all", "any", "everything"]
+      }
+    },
+    "exactScopeValue": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^\\S(?:.*\\S)?$",
+      "not": {
+        "pattern": "\\*|^(?:all|any|everything)$"
+      }
+    },
+    "absoluteRoot": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "positiveSafeInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "nonNegativeSafeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "x-millefeuille-semantic-validation": [
+    "Compute integrity.content_digest as sha256:<lowercase hex> over canonical UTF-8 JSON of every top-level field except integrity, using lexicographically sorted object keys, no insignificant whitespace, unescaped Unicode, and no non-finite numbers.",
+    "operations, targets by (kind,id), and stop_conditions must each be lexicographically sorted as well as unique.",
+    "output_root and source_pack_root must be absolute normalized paths without dot or parent-traversal components.",
+    "expires_at must be later than approval.approved_at and no more than 24 hours later; authorization also requires approved_at <= evaluation_time < expires_at.",
+    "Operations beginning model. or ocr. require an exact provider/model binding. Otherwise provider must be null exactly when both provider limits are zero; a bound provider requires max_provider_calls >= 1 and an applicable provider-payload disposal policy.",
+    "Unknown or secret-bearing fields and credential, private-PDF, authenticated-URL, or provider-payload markers anywhere in the receipt must be rejected without reflecting supplied values.",
+    "A live request must independently derive and exactly match run_id, operations, targets, item cap, selector, roots, provider/model, limits, disposal policy, and stop conditions; selected item count must not exceed max_items.",
+    "A durable consumed-receipt index must reject either a previously consumed receipt_id or content_digest before any external effect."
+  ]
+}

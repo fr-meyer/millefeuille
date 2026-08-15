@@ -28,6 +28,12 @@ Files:
 - `model-execution-plan.schema.json` - no-call model execution plan shape.
 - `model-provenance-record.schema.json` - provider-payload-free model
   provenance record shape.
+- `approved-live-receipt.schema.json` - exact-scope, short-lived, single-use
+  live approval shape.
+- `approved-live-audit.schema.json` - sanitized receipt validation/consumption
+  evidence shape.
+- `approved-live-receipts.md` - normative hash, scope, replay, audit, and CLI
+  gate contract.
 - `hierarchical-summary.schema.json` - page/section/paper summary shape.
 - `paper-card.schema.json` - compact human/agent card shape.
 - `retrieval-index-status.schema.json` - retrieval/index lane status shape.
@@ -54,6 +60,12 @@ Files:
 - `release-candidate-preflight.md` - local RC preflight artifacts and stop
   points before promotion/tagging.
 - `live-run-plan.md` - future live dogfood plan, still requiring approval.
+
+Approved-live receipt parsing and exact request validation live in
+`millefeuille/domain/live_receipts.py`. The current CLI can validate a receipt
+only as part of its fail-closed manual gate: no validated receipt enables a
+provider call or external write yet, and presenting a receipt in preview or
+read-only mode is rejected.
 
 Executable offline contract models live in
 `millefeuille/domain/millefeuille.py`. They cover stage manifests,

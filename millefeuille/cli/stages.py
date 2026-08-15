@@ -18,6 +18,14 @@ from millefeuille.domain.classification import (
     write_classification_batch_summary,
     write_classification_from_evidence,
 )
+from millefeuille.domain.live_receipts import (
+    ApprovedLiveRequest,
+    LiveDisposalPolicy,
+    LiveSelector,
+    LiveTarget,
+    load_approved_live_receipt,
+    validate_approved_live_receipt_for_no_effect,
+)
 from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
     RunMode,
@@ -63,6 +71,21 @@ FIXTURE_EVIDENCE_ARGS = {
     StageName.SUMMARIZE.value: "summary_evidence",
     StageName.CARD.value: "card_evidence",
     StageName.INDEX.value: "index_evidence",
+}
+
+_LIVE_OPERATION_BY_COMMAND = {
+    StageName.EXTRACT_NATIVE.value: "stage.extract-native",
+    StageName.EXTRACT_OCR.value: "ocr.execute",
+    StageName.ROUTE.value: "stage.route",
+    StageName.STRUCTURE.value: "stage.structure",
+    StageName.SUMMARIZE.value: "model.summarize",
+    StageName.CARD.value: "model.card",
+    StageName.INDEX.value: "index.write",
+    StageName.ACCEPTANCE.value: "stage.acceptance",
+    StageName.CLASSIFY.value: "model.classify",
+    StageName.WRITEBACK.value: "zotero.writeback",
+    "retrieve": "index.read",
+    "models": "model.execute",
 }
 
 
@@ -512,6 +535,48 @@ def _add_mode_arg(parser: argparse.ArgumentParser) -> None:
         choices=tuple(sorted(RunMode.values())),
         default=RunMode.PREVIEW.value,
     )
+    parser.add_argument(
+        "--approval-receipt",
+        help=(
+            "Path to an exact-scope approved-live receipt. A receipt never "
+            "promotes preview mode and current live execution remains unsupported."
+        ),
+    )
+    parser.add_argument(
+        "--approved-live-pdf-disposal",
+        choices=(
+            "delete-after-verification",
+            "delete-after-run",
+            "retain-until-expiry",
+            "not-applicable",
+        ),
+        help="Exact PDF disposal policy independently requested for approved-live.",
+    )
+    parser.add_argument(
+        "--approved-live-provider-payload-disposal",
+        choices=("never-persist", "delete-after-run", "not-applicable"),
+        help=(
+            "Exact provider-payload disposal policy independently requested "
+            "for approved-live."
+        ),
+    )
+    parser.add_argument(
+        "--approved-live-temporary-file-disposal",
+        choices=("delete-after-run", "delete-on-failure", "not-applicable"),
+        help=(
+            "Exact temporary-file disposal policy independently requested "
+            "for approved-live."
+        ),
+    )
+    parser.add_argument(
+        "--approved-live-stop-condition",
+        action="append",
+        dest="approved_live_stop_conditions",
+        help=(
+            "One exact approved-live stop-condition code; repeat for the "
+            "complete sorted request set."
+        ),
+    )
 
 
 def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
@@ -660,10 +725,65 @@ def _preflight_run_request(
 
 def _mode_gate(args: argparse.Namespace, err: TextIO) -> int | None:
     mode = getattr(args, "mode", RunMode.PREVIEW.value)
-    if mode == RunMode.APPROVED_LIVE.value:
+    receipt_path = getattr(args, "approval_receipt", None)
+    writeback_mode = getattr(args, "writeback_mode", "preview")
+    approved_live_policy_values = (
+        getattr(args, "approved_live_pdf_disposal", None),
+        getattr(args, "approved_live_provider_payload_disposal", None),
+        getattr(args, "approved_live_temporary_file_disposal", None),
+        getattr(args, "approved_live_stop_conditions", None),
+    )
+    if receipt_path is not None and mode != RunMode.APPROVED_LIVE.value:
         print(
-            f"millefeuille {args.command}: approved-live requires a separate "
-            "manual approval and is not implemented by this offline command",
+            f"millefeuille {args.command}: --approval-receipt requires explicit "
+            "--mode approved-live; a receipt cannot promote preview or "
+            "read-only-live execution",
+            file=err,
+        )
+        return 3
+    if writeback_mode == "approved-live" and mode != RunMode.APPROVED_LIVE.value:
+        print(
+            f"millefeuille {args.command}: --writeback approved-live requires "
+            "explicit --mode approved-live and a separate manual approval receipt",
+            file=err,
+        )
+        return 3
+    if (
+        any(value is not None for value in approved_live_policy_values)
+        and mode != RunMode.APPROVED_LIVE.value
+    ):
+        print(
+            f"millefeuille {args.command}: approved-live disposal and stop "
+            "controls require explicit --mode approved-live",
+            file=err,
+        )
+        return 3
+    if mode == RunMode.APPROVED_LIVE.value:
+        if receipt_path is None:
+            print(
+                f"millefeuille {args.command}: approved-live requires a separate "
+                "manual approval receipt via --approval-receipt",
+                file=err,
+            )
+            return 3
+        if _cli_requests_writeback(args) and writeback_mode != "approved-live":
+            print(
+                f"millefeuille {args.command}: approved-live writeback requires "
+                "explicit --writeback approved-live as well as the approval receipt",
+                file=err,
+            )
+            return 3
+        try:
+            receipt = load_approved_live_receipt(receipt_path)
+            request = _build_cli_approved_live_request(args)
+            validate_approved_live_receipt_for_no_effect(receipt, request)
+        except MillefeuilleContractError as exc:
+            print(f"millefeuille {args.command}: {exc}", file=err)
+            return 3
+        print(
+            f"millefeuille {args.command}: approved-live receipt "
+            f"{receipt.content_digest} validated, but live execution is not "
+            "implemented by this offline command",
             file=err,
         )
         return 3
@@ -677,15 +797,142 @@ def _mode_gate(args: argparse.Namespace, err: TextIO) -> int | None:
             file=err,
         )
         return 3
-    writeback_mode = getattr(args, "writeback_mode", "preview")
-    if writeback_mode == "approved-live":
-        print(
-            f"millefeuille {args.command}: approved-live Zotero writeback "
-            "requires a separate manual approval and is not implemented",
-            file=err,
-        )
-        return 3
     return None
+
+
+def _cli_requests_writeback(args: argparse.Namespace) -> bool:
+    if args.command == StageName.WRITEBACK.value:
+        return True
+    if args.command != "run":
+        return False
+    return StageName.WRITEBACK.value in {
+        stage.strip() for stage in args.stages.split(",") if stage.strip()
+    }
+
+
+def _build_cli_approved_live_request(
+    args: argparse.Namespace,
+) -> ApprovedLiveRequest:
+    """Bind only controls independently supplied by today's CLI request."""
+
+    operations = _cli_live_operations(args)
+    target, selector = _cli_live_target_and_selector(args)
+    run_id = getattr(args, "run_id", None)
+    if not isinstance(run_id, str) or not run_id:
+        raise MillefeuilleContractError(
+            "current approved-live gate cannot bind an exact run_id"
+        )
+    source_pack_root = getattr(args, "source_pack_root", None)
+    if not isinstance(source_pack_root, str) or not source_pack_root:
+        raise MillefeuilleContractError(
+            "current approved-live gate cannot bind an exact source-pack root"
+        )
+    canonical_source_root = str(Path(source_pack_root).absolute())
+    artifact_root = getattr(args, "artifact_root", None)
+    if artifact_root is None or artifact_root == "source-pack":
+        canonical_output_root = canonical_source_root
+    elif (
+        isinstance(artifact_root, str)
+        and artifact_root
+        and artifact_root == artifact_root.strip()
+    ):
+        canonical_output_root = str(Path(artifact_root).absolute())
+    else:
+        raise MillefeuilleContractError(
+            "current approved-live gate cannot bind an exact output root"
+        )
+    pdf_disposal = getattr(args, "approved_live_pdf_disposal", None)
+    provider_payload_disposal = getattr(
+        args,
+        "approved_live_provider_payload_disposal",
+        None,
+    )
+    temporary_file_disposal = getattr(
+        args,
+        "approved_live_temporary_file_disposal",
+        None,
+    )
+    if not all(
+        isinstance(value, str) and value
+        for value in (
+            pdf_disposal,
+            provider_payload_disposal,
+            temporary_file_disposal,
+        )
+    ):
+        raise MillefeuilleContractError(
+            "current approved-live gate requires all explicit disposal controls"
+        )
+    stop_conditions = getattr(args, "approved_live_stop_conditions", None)
+    if not isinstance(stop_conditions, list) or not stop_conditions:
+        raise MillefeuilleContractError(
+            "current approved-live gate requires explicit stop conditions"
+        )
+    return ApprovedLiveRequest(
+        run_id=run_id,
+        operations=operations,
+        targets=(target,),
+        item_cap=1,
+        selected_item_count=1,
+        selector=selector,
+        output_root=canonical_output_root,
+        source_pack_root=canonical_source_root,
+        provider=None,
+        provider_call_limit=0,
+        cost_limit_usd_micros=0,
+        disposal_policy=LiveDisposalPolicy(
+            pdfs=pdf_disposal,
+            provider_payloads=provider_payload_disposal,
+            temporary_files=temporary_file_disposal,
+        ),
+        stop_conditions=tuple(stop_conditions),
+    )
+
+
+def _cli_live_operations(args: argparse.Namespace) -> tuple[str, ...]:
+    if args.command == "run":
+        requested = [stage.strip() for stage in args.stages.split(",") if stage.strip()]
+        try:
+            operations = {_LIVE_OPERATION_BY_COMMAND[stage] for stage in requested}
+        except KeyError as exc:
+            raise MillefeuilleContractError(
+                "current approved-live gate cannot bind an unsupported run stage"
+            ) from exc
+        if not operations:
+            raise MillefeuilleContractError(
+                "current approved-live gate requires at least one exact operation"
+            )
+        return tuple(sorted(operations))
+    operation = _LIVE_OPERATION_BY_COMMAND.get(args.command)
+    if operation is None:
+        raise MillefeuilleContractError(
+            "current approved-live gate cannot bind an exact operation"
+        )
+    return (operation,)
+
+
+def _cli_live_target_and_selector(
+    args: argparse.Namespace,
+) -> tuple[LiveTarget, LiveSelector]:
+    locators = (
+        ("paper-id", "paper_id"),
+        ("zotero-item-key", "item_key"),
+        ("slug", "slug"),
+        ("doi", "doi"),
+        ("title", "title"),
+        ("source-pack", "source_pack"),
+    )
+    supplied = [
+        (kind, value)
+        for kind, attribute in locators
+        if isinstance(value := getattr(args, attribute, None), str) and value
+    ]
+    if len(supplied) != 1:
+        raise MillefeuilleContractError(
+            "current approved-live gate requires one exact source selector"
+        )
+    kind, value = supplied[0]
+    return LiveTarget(kind=kind, id=value), LiveSelector(kind=kind, value=value)
 
 
 def _validate_acceptance_args(args: argparse.Namespace) -> None:

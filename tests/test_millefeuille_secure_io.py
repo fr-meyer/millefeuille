@@ -52,6 +52,76 @@ class TestMillefeuilleSecureIo(unittest.TestCase):
 
         self.assertEqual(actual, payload)
 
+    def test_portable_bounded_read_rejects_opened_size_before_payload_read(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "oversized.bin"
+            path.write_bytes(b"oversized")
+
+            with (
+                mock.patch.object(
+                    secure_io,
+                    "_supports_no_follow",
+                    return_value=False,
+                ),
+                mock.patch.object(secure_io.os, "read") as read,
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "exceeds 8 bytes",
+                ),
+            ):
+                secure_io.read_bytes_no_follow(
+                    path,
+                    "bounded artifact",
+                    max_bytes=8,
+                )
+
+        read.assert_not_called()
+
+    def test_portable_bounded_read_accepts_the_exact_boundary(self):
+        payload = b"boundary"
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "boundary.bin"
+            path.write_bytes(payload)
+
+            with mock.patch.object(
+                secure_io,
+                "_supports_no_follow",
+                return_value=False,
+            ):
+                actual = secure_io.read_bytes_no_follow(
+                    path,
+                    "bounded artifact",
+                    max_bytes=len(payload),
+                )
+
+        self.assertEqual(actual, payload)
+
+    def test_portable_bounded_read_rejects_growth_during_read(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "growing.bin"
+            path.write_bytes(b"ok")
+            reads = iter((b"ok", b"x"))
+
+            with (
+                mock.patch.object(
+                    secure_io,
+                    "_supports_no_follow",
+                    return_value=False,
+                ),
+                mock.patch.object(secure_io.os, "read", side_effect=reads) as read,
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "exceeds 2 bytes",
+                ),
+            ):
+                secure_io.read_bytes_no_follow(
+                    path,
+                    "growing artifact",
+                    max_bytes=2,
+                )
+
+        self.assertEqual([call.args[1] for call in read.call_args_list], [3, 1])
+
     def test_regular_file_read_flags_include_binary_mode_when_available(self):
         binary_flag = 1 << 27
         with mock.patch.object(

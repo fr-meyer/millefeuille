@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/approved-live-audit.schema.json",
+  "title": "Millefeuille Approved Live Audit Record",
+  "description": "Sanitized receipt-validation or receipt-consumption evidence. It never contains credentials, private payloads, or provider responses.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "receipt_id",
+    "receipt_digest",
+    "request_digest",
+    "run_id",
+    "approval",
+    "expires_at",
+    "scope",
+    "selected_item_count",
+    "evaluated_at",
+    "secret_material_persisted"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-approved-live-audit/v0.1"
+    },
+    "status": {
+      "enum": ["validated", "consumed"]
+    },
+    "receipt_id": {
+      "$ref": "approved-live-receipt.schema.json#/$defs/exactIdentity"
+    },
+    "receipt_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "request_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "run_id": {
+      "$ref": "approved-live-receipt.schema.json#/$defs/exactIdentity"
+    },
+    "approval": {
+      "$ref": "approved-live-receipt.schema.json#/properties/approval"
+    },
+    "expires_at": {
+      "$ref": "approved-live-receipt.schema.json#/$defs/canonicalUtcTimestamp"
+    },
+    "scope": {
+      "$ref": "approved-live-receipt.schema.json#/properties/scope"
+    },
+    "selected_item_count": {
+      "$ref": "approved-live-receipt.schema.json#/$defs/nonNegativeSafeInteger"
+    },
+    "evaluated_at": {
+      "$ref": "approved-live-receipt.schema.json#/$defs/canonicalUtcTimestamp"
+    },
+    "secret_material_persisted": {
+      "const": false
+    }
+  },
+  "x-millefeuille-semantic-validation": [
+    "Runtime construction must use the allowlisted receipt model and independently derived request digest; arbitrary receipt or request fields must never be copied into audit output.",
+    "Consumers must reconstruct and verify both receipt_digest and request_digest, the approval/evaluation window, selected_item_count <= scope.max_items, and secret_material_persisted=false before audit records influence replay state.",
+    "Every verified durable record enters replay state; status is informational and cannot remove the single-use reservation."
+  ]
+}

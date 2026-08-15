@@ -1,0 +1,9 @@
+feat: complete PR #102 approved-live receipts
+
+Record the canonical MF-100 task and publication artifacts after integrating
+current dev and validating strict receipt, replay, audit, and no-effect CLI
+boundaries.
+
+Task: pr-102-approved-live-receipts
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>
