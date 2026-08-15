@@ -1,0 +1,95 @@
+id: pr-099-cross-platform-ci
+roadmap_card: MF-004
+title: Add governed Ubuntu and Windows CI coverage
+status: in-progress
+branch: test/pr-mf-004-cross-platform-ci
+base_branch: dev
+github:
+  issue: null
+  pull_request: 99
+  issue_project_item: unavailable
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/99
+  head_sha: null  # Active-task exact-head binding is external; see notes.
+  merge_commit: null
+write_paths:
+  - .github/workflows/ci.yml
+  - .speculoos/tasks/pr-099-cross-platform-ci.yaml
+  - README.md
+  - millefeuille/domain/retrieve.py
+  - pyproject.toml
+  - specs/pr-099-cross-platform-ci/**
+  - tests/platform_capabilities.py
+  - tests/test_cross_platform_ci.py
+  - tests/test_millefeuille_artifact_writer.py
+  - tests/test_millefeuille_model_execution.py
+  - tests/test_millefeuille_retrieval_batch.py
+scope:
+  - run repository lint and unit tests on Ubuntu and Windows for CPython 3.11,
+    3.12, and 3.13 with read-only workflow permissions
+  - expose Ruff through the test extra so every clean matrix environment uses
+    the same declared test tooling
+  - centralize capability markers for descriptor-relative no-follow writes,
+    POSIX locks, and atomic no-replace publication
+  - run supported portable behavior everywhere while requiring unsupported
+    Windows write paths to fail closed before output or aggregate publication
+  - validate retrieval filters deterministically before platform capability
+    failure and document the exact support matrix
+non_goals:
+  - claiming macOS support or silently skipping supported Ubuntu/Windows behavior
+  - emulating POSIX atomic publication, lock, rename, or no-follow write
+    guarantees on Windows
+  - weakening secure-read, artifact-writer, model-provenance, or batch-publication
+    failure boundaries
+  - credentials, provider/model/OCR calls, live Zotero reads or writes, private
+    paper access, PDF recovery, source-pack mutation, or OpenKB/PageIndex writes
+  - dev-to-main promotion, release tags, package publication, deployment, or
+    approval bypass
+acceptance:
+  - CI runs six Ubuntu/Windows and Python-version combinations with independent
+    failures, package installation, Ruff, and full unittest discovery
+  - workflow permissions remain contents-read only
+  - README names supported and fail-closed platform behavior without claiming
+    untested macOS support
+  - capability markers skip only unavailable success/race scenarios and exercise
+    corresponding fail-closed contracts
+  - invalid retrieval filters fail deterministically before unsupported
+    publication primitives are reached
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check,
+    private-data scan, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_cross_platform_ci tests.test_millefeuille_artifact_writer tests.test_millefeuille_model_execution tests.test_millefeuille_retrieval_batch -v"
+  - ".venv/bin/python -m unittest discover -s tests"
+  - ".venv/bin/ruff check ."
+  - "git diff --check"
+  - "speculoos validate --task pr-099-cross-platform-ci --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-099-cross-platform-ci --pr-body specs/pr-099-cross-platform-ci/pr-body.md --commit-message specs/pr-099-cross-platform-ci/commit-message.txt --json"
+publication_boundary:
+  statement: Repository CI configuration, offline runtime validation ordering,
+    README support guidance, synthetic tests, and repository-local Speculoos
+    metadata only. No credential lookup, provider/model/OCR call, private paper
+    read, live Zotero/OpenKB/PageIndex/source-pack mutation, stable-branch
+    promotion, release, tag, package publication, deployment, or approval bypass.
+documentation_impact:
+  status: updated
+  rationale: README adds the supported Ubuntu/Windows Python matrix and explicit
+    supported versus fail-closed capability table.
+private_data_scan: required; public workflow, source, README, synthetic tests,
+  packaging metadata, and repository-local Speculoos artifacts only, with no
+  credentials, private papers, provider payloads, or host-specific paths
+publish_authority: Active Millefeuille delivery-train supervisor; routine
+  feature-to-dev publication, exact-head Mergeguez review, policy-gated merge,
+  dependent-PR retargeting, cleanup, and next-episode advancement are approved.
+  Live operations, dev-to-main promotion, release, and deployment remain
+  excluded.
+notes:
+  - The active task head field remains null while the PR is open because
+    embedding a commit's own SHA creates a self-reference cycle. Exact pre-merge
+    binding is the immutable GitHub head referenced by the Mergeguez review and
+    check; closeout records head_sha and merge_commit after merge.
+  - Refreshed without history rewriting by merging dev commit
+    f11db56b76f915345722bb1757beb5e698e4c7ce before exact-head validation.
+  - PR 100, PR 102, and PR 103 depend on this branch and must be retargeted
+    safely after PR 99 merges; retain the branch until all dependencies move.
