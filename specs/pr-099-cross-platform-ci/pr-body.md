@@ -1,6 +1,7 @@
 ## Summary
 
 - add a read-only GitHub Actions matrix for Ubuntu and Windows across CPython 3.11, 3.12, and 3.13
+- pin the official checkout and Python-setup actions to reviewed immutable commits
 - install declared test tooling, run repository-wide Ruff, and run full unittest discovery in every matrix job
 - centralize filesystem capability markers so supported behavior runs everywhere and unsupported Windows write paths prove their fail-closed contracts
 - validate retrieval filters before platform capability failure and document the exact support boundary
@@ -19,11 +20,13 @@
 - `tests/test_cross_platform_ci.py`
 - `tests/test_millefeuille_artifact_writer.py`
 - `tests/test_millefeuille_model_execution.py`
+- `tests/test_millefeuille_retrieve.py`
 - `tests/test_millefeuille_retrieval_batch.py`
+- `tests/test_millefeuille_secure_io.py`
 
 ## Validation
 
-- 91 focused CI, writer, model-execution, and retrieval-batch tests passed with 2 capability skips
+- 119 focused CI, writer, model-execution, retrieval, retrieval-batch, and secure-I/O tests passed with 3 capability skips
 - all 365 repository tests passed with 3 capability skips
 - repository-wide Ruff passed
 - `git diff --check`, privacy/manual-gate contract checks, Speculoos validation, and publication checks passed

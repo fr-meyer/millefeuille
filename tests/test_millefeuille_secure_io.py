@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import os
 from pathlib import Path
 import stat
@@ -359,7 +360,10 @@ class TestMillefeuilleSecureIo(unittest.TestCase):
                             ns=(before.st_atime_ns, before.st_mtime_ns),
                         )
                     except OSError as exc:
-                        if getattr(exc, "winerror", None) not in {5, 32, 33}:
+                        if (
+                            getattr(exc, "winerror", None) not in {5, 32, 33}
+                            and exc.errno != errno.EACCES
+                        ):
                             raise
                         mutation_attempts.append("blocked")
                     else:

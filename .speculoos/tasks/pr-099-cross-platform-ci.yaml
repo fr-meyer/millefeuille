@@ -25,8 +25,12 @@ write_paths:
   - tests/test_cross_platform_ci.py
   - tests/test_millefeuille_artifact_writer.py
   - tests/test_millefeuille_model_execution.py
+  - tests/test_millefeuille_retrieve.py
   - tests/test_millefeuille_retrieval_batch.py
+  - tests/test_millefeuille_secure_io.py
 scope:
+  - pin official checkout and Python-setup actions to reviewed immutable commits
+    while retaining human-readable major-version comments
   - run repository lint and unit tests on Ubuntu and Windows for CPython 3.11,
     3.12, and 3.13 with read-only workflow permissions
   - expose Ruff through the test extra so every clean matrix environment uses
@@ -37,6 +41,8 @@ scope:
     Windows write paths to fail closed before output or aggregate publication
   - validate retrieval filters deterministically before platform capability
     failure and document the exact support matrix
+  - keep generic portable-open race tests platform-explicit and recognize the
+    expected Windows EACCES result from kernel-enforced sharing denial
 non_goals:
   - claiming macOS support or silently skipping supported Ubuntu/Windows behavior
   - emulating POSIX atomic publication, lock, rename, or no-follow write
@@ -60,7 +66,7 @@ acceptance:
   - focused tests, full unittest discovery, Ruff, metadata parse, diff check,
     private-data scan, Speculoos validation, and publication checks pass
 validation:
-  - ".venv/bin/python -m unittest tests.test_cross_platform_ci tests.test_millefeuille_artifact_writer tests.test_millefeuille_model_execution tests.test_millefeuille_retrieval_batch -v"
+  - ".venv/bin/python -m unittest tests.test_cross_platform_ci tests.test_millefeuille_artifact_writer tests.test_millefeuille_model_execution tests.test_millefeuille_retrieve tests.test_millefeuille_retrieval_batch tests.test_millefeuille_secure_io -v"
   - ".venv/bin/python -m unittest discover -s tests"
   - ".venv/bin/ruff check ."
   - "git diff --check"
