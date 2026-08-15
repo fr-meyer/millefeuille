@@ -509,10 +509,12 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
             encoded = json.dumps(validated, sort_keys=True)
             for forbidden in ("api_key", "authorization", "raw_response"):
                 self.assertNotIn(forbidden, encoded.casefold())
-            self.assertEqual(
-                ReceiptReplayState.from_audit_records([validated]),
-                ReceiptReplayState(),
+            validated_replay = ReceiptReplayState.from_audit_records([validated])
+            self.assertIn(
+                receipt.receipt_id,
+                validated_replay.receipt_ids,
             )
+            self.assertIn(receipt.content_digest, validated_replay.content_digests)
 
             with self.assertRaisesRegex(MillefeuilleContractError, "run_id drift"):
                 build_approved_live_audit_record(
@@ -523,6 +525,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
 
             consumed = deepcopy(validated)
             consumed["status"] = "consumed"
+            # A status rewrite cannot remove the durable replay reservation.
             replay = ReceiptReplayState.from_audit_records([consumed])
             self.assertIn(receipt.receipt_id, replay.receipt_ids)
             self.assertIn(receipt.content_digest, replay.content_digests)

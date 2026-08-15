@@ -631,7 +631,12 @@ class ApprovedLiveRequest:
 
 @dataclass(frozen=True)
 class ReceiptReplayState:
-    """Previously consumed receipt identities from a durable audit ledger."""
+    """Previously reserved receipt identities from a durable audit ledger.
+
+    Every verified record reserves its receipt.  Replay safety must not depend
+    on the mutable informational distinction between ``validated`` and
+    ``consumed``.
+    """
 
     receipt_ids: frozenset[str] = frozenset()
     content_digests: frozenset[str] = frozenset()
@@ -753,9 +758,8 @@ class ReceiptReplayState:
                 raise MillefeuilleContractError(
                     "approved-live audit request_digest mismatch"
                 )
-            if status == "consumed":
-                receipt_ids.add(receipt_id)
-                content_digests.add(digest)
+            receipt_ids.add(receipt_id)
+            content_digests.add(digest)
         return cls(frozenset(receipt_ids), frozenset(content_digests))
 
 

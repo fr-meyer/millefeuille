@@ -61,12 +61,16 @@ approved_at <= evaluation_time < expires_at
 ```
 
 Live executors must build `ReceiptReplayState` from a durable audit ledger and
-reject a previously consumed receipt ID or content digest before any external
+reject a previously reserved receipt ID or content digest before any external
 effect. They must reserve or record consumption atomically with their
 execution boundary; a crash after reservation requires explicit operator
-resolution, never automatic replay. A `validated` audit record proves only a
-no-effect gate check and does not consume the receipt. Only `consumed` records
-enter replay state.
+resolution, never automatic replay.
+
+Every structurally and cryptographically verified durable audit record enters
+replay state, including a `validated` no-effect record. The
+`validated|consumed` status is informational and never controls replay
+reservation. This conservative rule means changing that mutable status cannot
+make a single-use receipt reusable.
 
 The current CLI never records consumption because it cannot execute live work.
 After successful receipt validation it still exits through the unsupported-live
@@ -112,7 +116,9 @@ the supplied value in an error.
 - `secret_material_persisted: false`.
 
 The builder reruns liveness, replay, and exact-scope authorization at the
-recorded evaluation time before it emits either status. It cannot manufacture a
+recorded evaluation time before it emits either status. If a caller durably
+records either result, that record reserves the receipt; callers that need a
+non-reserving diagnostic must not append it to the replay ledger. It cannot manufacture a
 `validated` or `consumed` record for a mismatched, expired, or replayed request.
 
 It never serializes credentials, request headers, private bytes, prompts,
