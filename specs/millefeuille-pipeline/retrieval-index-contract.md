@@ -20,7 +20,9 @@ The index stage must record:
 - skip reasons for disabled lanes.
 
 The offline fixture-first status shape is
-`millefeuille-retrieval-index-status/v0.1`.
+`millefeuille-retrieval-index-status/v0.1`. Its `source_hash` preserves the
+source-pack identity: `sha256:<hex>` for v0.1 single-PDF packs and
+`sha256-aggregate:<hex>` for v0.2 multi-PDF packs.
 
 ## Optional Lanes
 
