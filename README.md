@@ -10,6 +10,7 @@ classification lifecycle for research-paper attachments discovered from Zotero.
 
 ## Table of Contents
 
+- [Choosing a Command Surface](#choosing-a-command-surface)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Runtime Prerequisites](#runtime-prerequisites)
@@ -23,6 +24,21 @@ classification lifecycle for research-paper attachments discovered from Zotero.
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 - [Contributing](#contributing)
+
+## Choosing a Command Surface
+
+Millefeuille currently preserves two command surfaces. Root-level Hydra
+overrides such as `millefeuille ocr.enabled=true` run the original monolithic
+Zotero/OCR workflow. Named commands such as `millefeuille extract-native` and
+`millefeuille run` operate on explicit, verified source-pack evidence. New
+automation should target the lifecycle commands, while operators migrating an
+existing installation should follow the
+[legacy-to-lifecycle migration contract](specs/millefeuille-pipeline/legacy-migration.md).
+
+The migration contract includes the exact command/config mapping, artifact and
+tag compatibility, the legacy PageIndex API/SDK versus lifecycle MCP-only
+boundary, the release-based deprecation timetable, and safe rollback rules. It
+does not remove the working legacy path or grant approval for live operations.
 
 ## Quick Start
 
@@ -158,7 +174,7 @@ export MISTRAL_API_KEY="your-mistral-api-key"      # For Mistral OCR
 ```
 
 **Provider Setup:**
-- **PageIndex:** Obtain API key from [PageIndex dashboard](https://docs.pageindex.ai). Optional SDK mode: install with `pip install pageindex` and set `use_sdk: true` in `millefeuille/conf/ocr/pageindex.yaml`.
+- **PageIndex:** Obtain an API key from the [PageIndex dashboard](https://docs.pageindex.ai). The direct HTTP and optional SDK modes are retained for the legacy Hydra workflow. New lifecycle PageIndex ingestion follows the MCP-only boundary in the [migration contract](specs/millefeuille-pipeline/legacy-migration.md).
 - **Mistral:** Obtain API key from [Mistral platform](https://docs.mistral.ai).
 
 > **Note:** `PAGEINDEX_API_KEY` and `MISTRAL_API_KEY` are required **only** when `ocr.enabled=true`. The following run modes work **without** any OCR provider key: export-only dry-run (`processing.dry_run=true export.attachment_urls.enabled=true`), tag-adding-only (`tag_adding.enabled=true`), and download-only (`download.enabled=true`).
@@ -210,7 +226,12 @@ The pipeline supports two OCR providers:
 | Tree Structure | ✅ Full support | ⚠️ Requires PageIndex credentials |
 | Best For | Batch processing, hierarchical organization | Single documents, fast processing |
 
-**Recommendation:** For new installations, **PageIndex OCR** is recommended for batch processing and hierarchical document organization. Use **Mistral OCR** for single-document processing when tree structure is not needed.
+**Recommendation:** For existing legacy installations, **PageIndex OCR** remains
+supported for batch processing and hierarchical document organization. New
+lifecycle automation should not adopt the direct PageIndex API/SDK client; its
+production PageIndex connector follows the MCP-only migration contract and is
+not implemented by the fixture-only `extract-ocr` stage yet. Use **Mistral OCR**
+for the legacy single-document path when tree structure is not needed.
 
 ## Artifact and Status Inspection
 
