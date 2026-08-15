@@ -1,0 +1,8 @@
+fix: complete PR #97 Windows secure-read gates
+
+Record the canonical MF-001 Speculoos task and publication artifacts after
+integrating current dev and validating the portable Windows read hardening.
+
+Task: pr-097-windows-secure-reads
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>
