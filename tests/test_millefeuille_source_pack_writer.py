@@ -2305,15 +2305,14 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
             planned_bytes = card_path.read_bytes()
             index_path = run_dir / "index" / "index-status.json"
             concurrent_bytes = b'{"concurrent":"index"}\n'
-            real_link = os.link
 
-            def create_concurrent_destination(src, dst, **kwargs):
+            def create_concurrent_destination(_src, dst):
                 Path(dst).write_bytes(concurrent_bytes)
-                return real_link(src, dst, **kwargs)
+                raise FileExistsError
 
             with (
                 patch(
-                    "millefeuille.domain.index_fixtures.os.link",
+                    "millefeuille.domain.index_fixtures._move_file_no_replace",
                     side_effect=create_concurrent_destination,
                 ),
                 self.assertRaises(MillefeuilleContractError),
@@ -2326,6 +2325,40 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
 
             self.assertEqual(index_path.read_bytes(), concurrent_bytes)
             self.assertEqual(card_path.read_bytes(), planned_bytes)
+
+    def test_index_recovery_mutation_cannot_change_canonical_index(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            write_indexes_from_evidence(
+                evidence_path=index_evidence,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )
+
+            index_path = run_dir / "index" / "index-status.json"
+            canonical_bytes = index_path.read_bytes()
+            transaction_dirs = list(
+                (run_dir / CARD_INDEX_TRANSACTION_ROOT_REF).iterdir()
+            )
+            self.assertEqual(len(transaction_dirs), 1)
+            recovery_path = transaction_dirs[0] / "index-status.json"
+            self.assertEqual(recovery_path.read_bytes(), canonical_bytes)
+            self.assertNotEqual(
+                (recovery_path.stat().st_dev, recovery_path.stat().st_ino),
+                (index_path.stat().st_dev, index_path.stat().st_ino),
+            )
+
+            recovery_path.write_bytes(b'{"mutated":"recovery"}\n')
+
+            self.assertEqual(index_path.read_bytes(), canonical_bytes)
+            self.assertEqual(
+                load_paper_card(run_dir / "cards" / "paper-card.json")[
+                    "index_state"
+                ]["phase"],
+                "observed",
+            )
 
     def test_interrupted_exchange_preserves_card_and_drifted_transaction_entry(self):
         with tempfile.TemporaryDirectory() as tempdir:

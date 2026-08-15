@@ -6,6 +6,7 @@ from contextlib import contextmanager, suppress
 import copy
 import ctypes
 from dataclasses import dataclass
+import errno
 import hashlib
 import json
 import os
@@ -398,15 +399,11 @@ def _card_index_transaction_dir(plan: _PlannedIndexWrite) -> Path:
 def _ensure_expected_index(plan: _PlannedIndexWrite) -> str:
     expected_bytes = canonical_json_bytes(plan.expected_payload)
     if plan.index_status_output_path.exists():
-        current = load_retrieval_index_artifact(plan.index_status_output_path)
-        if (
-            current.payload != plan.expected_payload
-            or current.raw_bytes != expected_bytes
-        ):
-            raise MillefeuilleContractError(
-                f"existing retrieval index status drift: "
-                f"{plan.index_status_output_path}"
-            )
+        _capture_expected_index(
+            plan.index_status_output_path,
+            expected_bytes,
+            "existing retrieval index status",
+        )
         return "existing"
 
     transaction_dir = _card_index_transaction_dir(plan)
@@ -415,41 +412,66 @@ def _ensure_expected_index(plan: _PlannedIndexWrite) -> str:
         plan.index_status_output_path.parent,
         "retrieval index status parent",
     )
+    staged_path = transaction_dir / "index-status.json"
     staged_path = _stage_exact_bytes(
-        transaction_dir / "index-status.json",
+        staged_path,
         expected_bytes,
         label="retrieval index status",
     )
+    status = "created"
     try:
-        os.link(
+        _move_file_no_replace(
             staged_path,
             plan.index_status_output_path,
-            follow_symlinks=False,
         )
     except FileExistsError:
-        current = load_retrieval_index_artifact(plan.index_status_output_path)
-        if (
-            current.payload == plan.expected_payload
-            and current.raw_bytes == expected_bytes
-        ):
-            return "existing"
-        raise MillefeuilleContractError(
-            "retrieval index status was created concurrently with "
-            f"conflicting bytes: {plan.index_status_output_path}"
-        ) from None
-    except OSError as exc:
-        raise MillefeuilleContractError(
-            "could not atomically publish retrieval index status "
-            f"{plan.index_status_output_path}: {exc}"
-        ) from exc
+        status = "existing"
 
-    current = load_retrieval_index_artifact(plan.index_status_output_path)
-    if current.payload != plan.expected_payload or current.raw_bytes != expected_bytes:
+    current = _capture_expected_index(
+        plan.index_status_output_path,
+        expected_bytes,
+        "retrieval index status after publication",
+    )
+    _ensure_independent_index_evidence(
+        staged_path=staged_path,
+        expected_bytes=expected_bytes,
+        canonical=current,
+    )
+    return status
+
+
+def _capture_expected_index(
+    path: Path,
+    expected_bytes: bytes,
+    label: str,
+) -> _CapturedFileEntry:
+    current = _capture_file_entry(path, label)
+    if current.raw_bytes != expected_bytes:
+        raise MillefeuilleContractError(f"{label} bytes drifted: {path}")
+    return current
+
+
+def _ensure_independent_index_evidence(
+    *,
+    staged_path: Path,
+    expected_bytes: bytes,
+    canonical: _CapturedFileEntry,
+) -> None:
+    evidence_path = _stage_exact_bytes(
+        staged_path,
+        expected_bytes,
+        label="retrieval index status",
+    )
+    evidence = _capture_expected_index(
+        evidence_path,
+        expected_bytes,
+        "retrieval index transaction evidence",
+    )
+    if evidence.file_key == canonical.file_key:
         raise MillefeuilleContractError(
-            f"retrieval index status changed after publication: "
-            f"{plan.index_status_output_path}"
+            "retrieval index transaction evidence must not alias the canonical "
+            f"index: {evidence_path}"
         )
-    return "created"
 
 
 def _commit_card_refresh(plan: _PlannedIndexWrite) -> None:
@@ -523,13 +545,12 @@ def _commit_card_refresh(plan: _PlannedIndexWrite) -> None:
 
 
 def _require_expected_index(plan: _PlannedIndexWrite) -> None:
-    current = load_retrieval_index_artifact(plan.index_status_output_path)
     expected_bytes = canonical_json_bytes(plan.expected_payload)
-    if current.payload != plan.expected_payload or current.raw_bytes != expected_bytes:
-        raise MillefeuilleContractError(
-            f"retrieval index status changed before card refresh: "
-            f"{plan.index_status_output_path}"
-        )
+    _capture_expected_index(
+        plan.index_status_output_path,
+        expected_bytes,
+        "retrieval index status before card refresh",
+    )
 
 
 def _load_and_validate_final_join(plan: _PlannedIndexWrite) -> None:
@@ -797,6 +818,73 @@ def _atomic_capture_replace(
     raise MillefeuilleContractError(
         "atomic card/index state exchange is unavailable on this platform"
     )
+
+
+def _move_file_no_replace(source: Path, destination: Path) -> None:
+    if os.name == "nt":
+        try:
+            os.rename(source, destination)
+        except FileExistsError:
+            raise
+        except OSError as exc:
+            raise MillefeuilleContractError(
+                "could not atomically publish retrieval index status "
+                f"{destination}: {exc}"
+            ) from exc
+        return
+    if sys.platform.startswith("linux"):
+        _linux_move_no_replace(source, destination)
+        return
+    if sys.platform == "darwin":
+        _darwin_move_no_replace(source, destination)
+        return
+    raise MillefeuilleContractError(
+        "atomic no-replace index publication is unavailable on this platform"
+    )
+
+
+def _linux_move_no_replace(source: Path, destination: Path) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    renameat2 = getattr(libc, "renameat2", None)
+    if renameat2 is None:
+        raise MillefeuilleContractError(
+            "atomic no-replace index publication requires renameat2 on Linux"
+        )
+    renameat2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    if renameat2(-100, os.fsencode(source), -100, os.fsencode(destination), 1) != 0:
+        error = ctypes.get_errno()
+        if error == errno.EEXIST:
+            raise FileExistsError(error, os.strerror(error), destination)
+        raise MillefeuilleContractError(
+            "could not atomically publish retrieval index status "
+            f"{destination}: errno {error}"
+        )
+
+
+def _darwin_move_no_replace(source: Path, destination: Path) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    renamex_np = getattr(libc, "renamex_np", None)
+    if renamex_np is None:
+        raise MillefeuilleContractError(
+            "atomic no-replace index publication requires renamex_np on macOS"
+        )
+    renamex_np.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+    renamex_np.restype = ctypes.c_int
+    if renamex_np(os.fsencode(source), os.fsencode(destination), 4) != 0:
+        error = ctypes.get_errno()
+        if error == errno.EEXIST:
+            raise FileExistsError(error, os.strerror(error), destination)
+        raise MillefeuilleContractError(
+            "could not atomically publish retrieval index status "
+            f"{destination}: errno {error}"
+        )
 
 
 def _restore_displaced_card(
