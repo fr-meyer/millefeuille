@@ -65,7 +65,9 @@ def _receipt_payload(
     approved_at: str = APPROVED_AT,
     expires_at: str = EXPIRES_AT,
 ) -> dict[str, object]:
-    canonical_root = str(root.resolve())
+    # Match the contract's lexical absolute-root identity without expanding a
+    # Windows 8.3 alias into a different path spelling.
+    canonical_root = str(root.absolute())
     payload: dict[str, object] = {
         "schema_version": APPROVED_LIVE_RECEIPT_SCHEMA_VERSION,
         "receipt_id": "receipt-mf-100-001",
@@ -125,8 +127,8 @@ def _request(
             kind="paper-id",
             value=target_id if selector_value is None else selector_value,
         ),
-        output_root=str((output_root or root).resolve()),
-        source_pack_root=str((source_pack_root or root).resolve()),
+        output_root=str((output_root or root).absolute()),
+        source_pack_root=str((source_pack_root or root).absolute()),
         provider=provider,
         provider_call_limit=provider_call_limit,
         cost_limit_usd_micros=cost_limit_usd_micros,
@@ -177,6 +179,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                 receipt,
                 request,
                 now=EVALUATION_TIME,
+                replay_state=ReceiptReplayState(),
             )
             self.assertEqual(receipt.to_dict(), payload)
             self.assertEqual(
@@ -239,6 +242,26 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
             ):
                 load_approved_live_receipt(receipt_path)
 
+    def test_replay_state_omission_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            receipt = ApprovedLiveReceipt.from_dict(_receipt_payload(root))
+            request = _request(root)
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "explicit replay_state",
+            ):
+                validate_approved_live_receipt(
+                    receipt,
+                    request,
+                    now=EVALUATION_TIME,
+                )
+            with self.assertRaisesRegex(MillefeuilleContractError, "replay_state"):
+                build_approved_live_audit_record(
+                    receipt, request, evaluated_at=EVALUATION_TIME
+                )
+
     def test_expired_and_not_yet_active_receipts_are_rejected(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
@@ -250,12 +273,14 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                     receipt,
                     request,
                     now=datetime(2026, 8, 11, 11, 0, tzinfo=UTC),
+                    replay_state=ReceiptReplayState(),
                 )
             with self.assertRaisesRegex(MillefeuilleContractError, "not active"):
                 validate_approved_live_receipt(
                     receipt,
                     request,
                     now=datetime(2026, 8, 11, 9, 59, tzinfo=UTC),
+                    replay_state=ReceiptReplayState(),
                 )
 
     def test_validity_window_cannot_be_over_broad(self):
@@ -324,6 +349,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                         receipt,
                         request,
                         now=EVALUATION_TIME,
+                        replay_state=ReceiptReplayState(),
                     )
 
     def test_wrong_output_and_source_pack_roots_are_rejected(self):
@@ -345,6 +371,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                         receipt,
                         request,
                         now=EVALUATION_TIME,
+                        replay_state=ReceiptReplayState(),
                     )
 
     def test_provider_model_and_budget_are_exact(self):
@@ -369,6 +396,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                 receipt,
                 correct,
                 now=EVALUATION_TIME,
+                replay_state=ReceiptReplayState(),
             )
 
             for request, message in (
@@ -411,6 +439,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                         receipt,
                         request,
                         now=EVALUATION_TIME,
+                        replay_state=ReceiptReplayState(),
                     )
 
     def test_provider_operations_cannot_omit_provider_and_model(self):
@@ -481,6 +510,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                 receipt,
                 request,
                 evaluated_at=EVALUATION_TIME,
+                replay_state=ReceiptReplayState(),
             )
 
             self.assertEqual(
@@ -507,20 +537,24 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
             encoded = json.dumps(validated, sort_keys=True)
             for forbidden in ("api_key", "authorization", "raw_response"):
                 self.assertNotIn(forbidden, encoded.casefold())
-            self.assertEqual(
-                ReceiptReplayState.from_audit_records([validated]),
-                ReceiptReplayState(),
+            validated_replay = ReceiptReplayState.from_audit_records([validated])
+            self.assertIn(
+                receipt.receipt_id,
+                validated_replay.receipt_ids,
             )
+            self.assertIn(receipt.content_digest, validated_replay.content_digests)
 
             with self.assertRaisesRegex(MillefeuilleContractError, "run_id drift"):
                 build_approved_live_audit_record(
                     receipt,
                     _request(root, run_id="other-run"),
                     evaluated_at=EVALUATION_TIME,
+                    replay_state=ReceiptReplayState(),
                 )
 
             consumed = deepcopy(validated)
             consumed["status"] = "consumed"
+            # A status rewrite cannot remove the durable replay reservation.
             replay = ReceiptReplayState.from_audit_records([consumed])
             self.assertIn(receipt.receipt_id, replay.receipt_ids)
             self.assertIn(receipt.content_digest, replay.content_digests)
@@ -544,7 +578,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
             root = Path(tempdir)
             receipt = ApprovedLiveReceipt.from_dict(_receipt_payload(root))
             canonical_request = _request(root)
-            case_variant = str(root.resolve()).swapcase()
+            case_variant = str(root.absolute()).swapcase()
             request = replace(
                 canonical_request,
                 output_root=case_variant,
@@ -556,12 +590,14 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
                 canonical_request,
                 evaluated_at=EVALUATION_TIME,
                 status="consumed",
+                replay_state=ReceiptReplayState(),
             )
             variant_record = build_approved_live_audit_record(
                 receipt,
                 request,
                 evaluated_at=EVALUATION_TIME,
                 status="consumed",
+                replay_state=ReceiptReplayState(),
             )
 
             self.assertEqual(
@@ -598,6 +634,18 @@ class TestApprovedLiveReceiptCliGate(unittest.TestCase):
             str(receipt_path),
             "--writeback",
             "approved-live",
+            "--approved-live-pdf-disposal",
+            "not-applicable",
+            "--approved-live-provider-payload-disposal",
+            "not-applicable",
+            "--approved-live-temporary-file-disposal",
+            "not-applicable",
+            "--approved-live-stop-condition",
+            "approval-expired",
+            "--approved-live-stop-condition",
+            "first-error",
+            "--approved-live-stop-condition",
+            "scope-drift",
         ]
 
     def test_valid_receipt_still_stops_at_unsupported_live_gate(self):
@@ -648,6 +696,94 @@ class TestApprovedLiveReceiptCliGate(unittest.TestCase):
 
                 self.assertEqual(exit_code, 3)
                 self.assertIn(message, stderr.getvalue())
+
+    def test_cli_derives_disposal_and_stop_policy_independently(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            disposal_drift = self._live_receipt(root)
+            disposal_drift["scope"]["disposal_policy"]["pdfs"] = (
+                "retain-until-expiry"
+            )
+            _sign(disposal_drift)
+            stop_drift = self._live_receipt(root)
+            stop_drift["scope"]["stop_conditions"] = [
+                "approval-expired",
+                "scope-drift",
+            ]
+            _sign(stop_drift)
+            cases = (
+                (disposal_drift, "disposal_policy drift"),
+                (stop_drift, "stop_conditions drift"),
+            )
+            for index, (payload, message) in enumerate(cases):
+                receipt_path = root / f"policy-drift-{index}.json"
+                _write_receipt(receipt_path, payload)
+                stderr = StringIO()
+
+                exit_code = run_stage_cli(
+                    self._args(root, receipt_path),
+                    stderr=stderr,
+                )
+
+                self.assertEqual(exit_code, 3)
+                self.assertIn(message, stderr.getvalue())
+
+    def test_cli_requires_independent_disposal_and_stop_controls(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            receipt_path = root / "approval.json"
+            _write_receipt(receipt_path, self._live_receipt(root))
+            cases = (
+                ("--approved-live-pdf-disposal", "explicit disposal controls"),
+                ("--approved-live-stop-condition", "explicit stop conditions"),
+            )
+            for flag, message in cases:
+                args = self._args(root, receipt_path)
+                flag_index = args.index(flag)
+                del args[flag_index : flag_index + 2]
+                if flag == "--approved-live-stop-condition":
+                    while flag in args:
+                        flag_index = args.index(flag)
+                        del args[flag_index : flag_index + 2]
+                stderr = StringIO()
+
+                exit_code = run_stage_cli(args, stderr=stderr)
+
+                self.assertEqual(exit_code, 3)
+                self.assertIn(message, stderr.getvalue())
+
+    def test_cli_binds_distinct_artifact_output_root(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_root = Path(tempdir) / "source"
+            artifact_root = Path(tempdir) / "artifacts"
+            source_root.mkdir()
+            artifact_root.mkdir()
+            payload = self._live_receipt(source_root)
+            payload["scope"]["output_root"] = str(artifact_root.absolute())
+            _sign(payload)
+            receipt_path = source_root / "approval.json"
+            _write_receipt(receipt_path, payload)
+            args = self._args(source_root, receipt_path)
+            args.extend(("--artifact-root", str(artifact_root)))
+            stderr = StringIO()
+
+            exit_code = run_stage_cli(args, stderr=stderr)
+
+            self.assertEqual(exit_code, 3)
+            self.assertIn(payload["integrity"]["content_digest"], stderr.getvalue())
+            self.assertIn("not implemented", stderr.getvalue())
+
+            wrong_payload = self._live_receipt(source_root)
+            wrong_path = source_root / "wrong-output-root.json"
+            _write_receipt(wrong_path, wrong_payload)
+            wrong_args = self._args(source_root, wrong_path)
+            wrong_args.extend(("--artifact-root", str(artifact_root)))
+            wrong_stderr = StringIO()
+
+            exit_code = run_stage_cli(wrong_args, stderr=wrong_stderr)
+
+            self.assertEqual(exit_code, 3)
+            self.assertIn("output_root drift", wrong_stderr.getvalue())
 
     def test_live_writeback_flag_requires_explicit_live_mode(self):
         with tempfile.TemporaryDirectory() as tempdir:

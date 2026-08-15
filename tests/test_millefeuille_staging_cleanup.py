@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
+import stat
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -24,6 +25,7 @@ from millefeuille.domain import staging_cleanup as cleanup
 from millefeuille.domain.live_receipts import (
     APPROVED_LIVE_RECEIPT_SCHEMA_VERSION,
     ApprovedLiveReceipt,
+    ReceiptReplayState,
     compute_approved_live_receipt_digest,
     load_approved_live_receipt,
     validate_approved_live_receipt,
@@ -82,11 +84,7 @@ def _write_retrieval_generation(
     report_bytes: bytes = b"",
     extra_name: str | None = None,
 ) -> str:
-    relative = (
-        RETRIEVAL_BATCH_ROOT_REF
-        / batch_id
-        / f".retrieval.tmp-{suffix}"
-    )
+    relative = RETRIEVAL_BATCH_ROOT_REF / batch_id / f".retrieval.tmp-{suffix}"
     generation = source / relative
     generation.mkdir(parents=True)
     result = generation / RETRIEVAL_BATCH_RESULT_REF.name
@@ -249,13 +247,9 @@ def _legacy_receipt(root: Path) -> dict[str, object]:
         "run_id": "run-compatible",
         "approval": {
             "approver_id": "franck.meyer@kaist.ac.kr",
-            "approved_at": (now - timedelta(minutes=1)).strftime(
-                "%Y-%m-%dT%H:%M:%SZ"
-            ),
+            "approved_at": (now - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
         },
-        "expires_at": (now + timedelta(hours=1)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        ),
+        "expires_at": (now + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "scope": {
             "operations": ["zotero.writeback"],
             "targets": [{"kind": "paper-id", "id": "zotero-ITEM1"}],
@@ -383,11 +377,9 @@ class TestStagingCleanupInspectionAndPlan(StagingCleanupFixtureTestCase):
         self.assertNotIn(str(self.quarantine), serialized_plan)
 
         manifest = json.loads(
-            (
-                self.source
-                / bridge
-                / cleanup.BRIDGE_OWNERSHIP_MANIFEST
-            ).read_text(encoding="utf-8")
+            (self.source / bridge / cleanup.BRIDGE_OWNERSHIP_MANIFEST).read_text(
+                encoding="utf-8"
+            )
         )
         _validate_schema("temporary-bridge-ownership.schema.json", manifest)
         plan_path = self.base / "plan.json"
@@ -441,9 +433,7 @@ class TestStagingCleanupInspectionAndPlan(StagingCleanupFixtureTestCase):
         except OSError:
             symlink_generation = None
 
-        missing_manifest = (
-            self.source / f"{cleanup.BRIDGE_TEMP_PREFIX}0000000000000005"
-        )
+        missing_manifest = self.source / f"{cleanup.BRIDGE_TEMP_PREFIX}0000000000000005"
         missing_manifest.mkdir()
         (missing_manifest / "unowned.pdf").write_bytes(b"unowned")
         _make_read_only(missing_manifest / "unowned.pdf")
@@ -608,6 +598,7 @@ class TestStagingCleanupReceiptAndCli(StagingCleanupFixtureTestCase):
             receipt,
             request,
             now=evaluation_time,
+            replay_state=ReceiptReplayState(),
         )
         self.assertEqual(request.selector.kind, "maintenance-plan")
         self.assertEqual(
@@ -741,7 +732,7 @@ class TestStagingCleanupReceiptAndCli(StagingCleanupFixtureTestCase):
                 approval_receipt_path=self.base / "missing-receipt.json",
             )
 
-        self.assertTrue(self.source / retrieval)
+        self.assertTrue((self.source / retrieval).exists())
         self.assertEqual(list(self.quarantine.iterdir()), [])
 
 
@@ -806,6 +797,8 @@ class TestStagingCleanupPlatformPrimitives(unittest.TestCase):
         )
 
     def test_macos_pinned_rename_and_windows_rename_fail_closed(self):
+        windows_source = Path("C:/source/candidate")
+        windows_destination = Path("C:/quarantine/candidate")
         with (
             mock.patch.object(cleanup.os, "name", "posix"),
             mock.patch.object(cleanup.sys, "platform", "darwin"),
@@ -824,8 +817,8 @@ class TestStagingCleanupPlatformPrimitives(unittest.TestCase):
             self.assertRaisesRegex(MillefeuilleContractError, "unsupported"),
         ):
             cleanup._atomic_rename_noreplace(
-                Path("C:/source/candidate"),
-                Path("C:/quarantine/candidate"),
+                windows_source,
+                windows_destination,
             )
 
 
@@ -846,8 +839,8 @@ class TestStagingCleanupLinuxApply(StagingCleanupFixtureTestCase):
         preserved_quarantine = self.quarantine / "foreign-private-entry"
         preserved_quarantine.write_text(PRIVATE_MARKER, encoding="utf-8")
         plan = self.build_plan([retrieval, bridge])
-        plan_path, receipt_path, evaluation_time, expires = (
-            self.write_plan_and_receipt(plan)
+        plan_path, receipt_path, evaluation_time, expires = self.write_plan_and_receipt(
+            plan
         )
 
         disposition = cleanup.apply_staging_cleanup_plan(
@@ -862,9 +855,10 @@ class TestStagingCleanupLinuxApply(StagingCleanupFixtureTestCase):
         self.assertFalse(disposition["permanent_deletion_performed"])
         _validate_schema("staging-cleanup-disposition.schema.json", disposition)
         for candidate in plan["candidates"]:
-            self.assertFalse(self.source / candidate["relative_path"])
+            self.assertFalse((self.source / candidate["relative_path"]).exists())
             destination = self.quarantine / candidate["quarantine_name"]
             self.assertTrue(destination.is_dir())
+            self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o555)
             if candidate["kind"] == cleanup.TEMPORARY_BRIDGE_KIND:
                 self.assertEqual(
                     (destination / "private-paper.pdf").read_text(encoding="utf-8"),
@@ -940,10 +934,10 @@ class TestStagingCleanupLinuxApply(StagingCleanupFixtureTestCase):
 
         self.assertEqual(raised.exception.disposition["status"], "failed-rolled-back")
         self.assertEqual(calls, 3)
-        self.assertTrue(self.source / retrieval)
-        self.assertTrue(self.source / bridge)
+        self.assertTrue((self.source / retrieval).exists())
+        self.assertTrue((self.source / bridge).exists())
         self.assertEqual(len(tuple(self.quarantine.glob(".mf106-audit-*.json"))), 1)
-        self.assertTrue(self.quarantine / cleanup._LOCK_NAME)
+        self.assertTrue((self.quarantine / cleanup._LOCK_NAME).exists())
         with self.assertRaises(MillefeuilleContractError):
             cleanup.apply_staging_cleanup_plan(
                 plan_path=plan_path,
@@ -987,9 +981,9 @@ class TestStagingCleanupLinuxApply(StagingCleanupFixtureTestCase):
                 (self.source / "foreign-entry").read_bytes(),
                 replacement_marker,
             )
-            self.assertTrue(parked / retrieval)
+            self.assertTrue((parked / retrieval).exists())
             self.assertFalse(
-                self.quarantine / plan["candidates"][0]["quarantine_name"]
+                (self.quarantine / plan["candidates"][0]["quarantine_name"]).exists()
             )
         finally:
             if parked.exists():
@@ -1031,8 +1025,8 @@ class TestStagingCleanupLinuxApply(StagingCleanupFixtureTestCase):
                 (self.quarantine / "foreign-entry").read_bytes(),
                 replacement_marker,
             )
-            self.assertTrue(self.source / retrieval)
-            self.assertTrue(parked / cleanup._LOCK_NAME)
+            self.assertTrue((self.source / retrieval).exists())
+            self.assertTrue((parked / cleanup._LOCK_NAME).exists())
             self.assertEqual(len(tuple(parked.glob(".mf106-audit-*.json"))), 1)
         finally:
             if parked.exists():
@@ -1105,14 +1099,16 @@ class TestStagingCleanupLinuxApply(StagingCleanupFixtureTestCase):
                             (batch / generation.name / "foreign-entry").read_bytes(),
                             replacement_marker,
                         )
-                        self.assertTrue(parked / generation.name)
+                        self.assertTrue((parked / generation.name).exists())
                     else:
                         self.assertEqual(
                             (generation / "foreign-entry").read_bytes(),
                             replacement_marker,
                         )
                     self.assertFalse(
-                        self.quarantine / plan["candidates"][0]["quarantine_name"]
+                        (
+                            self.quarantine / plan["candidates"][0]["quarantine_name"]
+                        ).exists()
                     )
                 finally:
                     if parked.exists():
@@ -1151,7 +1147,7 @@ class TestStagingCleanupLinuxApply(StagingCleanupFixtureTestCase):
 
         self.assertEqual(raised.exception.disposition["status"], "failed-rolled-back")
         self.assertEqual((destination / "foreign-entry").read_bytes(), marker)
-        self.assertTrue(self.source / retrieval)
+        self.assertTrue((self.source / retrieval).exists())
         self.assertEqual(len(tuple(self.quarantine.glob(".mf106-audit-*.json"))), 1)
 
     def test_held_lock_name_replacement_is_detected_through_pinned_root(self):
@@ -1189,9 +1185,9 @@ class TestStagingCleanupLinuxApply(StagingCleanupFixtureTestCase):
             (self.quarantine / cleanup._LOCK_NAME).read_bytes(),
             b"0",
         )
-        self.assertTrue(self.source / retrieval)
+        self.assertTrue((self.source / retrieval).exists())
         self.assertFalse(
-            self.quarantine / plan["candidates"][0]["quarantine_name"]
+            (self.quarantine / plan["candidates"][0]["quarantine_name"]).exists()
         )
 
     def test_locked_namespace_scan_requires_reserved_lock_name(self):
@@ -1266,7 +1262,7 @@ class TestStagingCleanupLinuxApply(StagingCleanupFixtureTestCase):
             drifted_bytes,
         )
         self.assertFalse(
-            self.quarantine / plan["candidates"][0]["quarantine_name"]
+            (self.quarantine / plan["candidates"][0]["quarantine_name"]).exists()
         )
         self.assertEqual(len(tuple(self.quarantine.glob(".mf106-audit-*.json"))), 1)
 
@@ -1299,7 +1295,7 @@ class TestStagingCleanupLinuxApply(StagingCleanupFixtureTestCase):
         lock = self.quarantine / cleanup._LOCK_NAME
         self.assertEqual(lock.read_bytes(), b"0")
         self.assertEqual(tuple(self.quarantine.glob(".mf106-audit-*.json")), ())
-        self.assertTrue(self.source / retrieval)
+        self.assertTrue((self.source / retrieval).exists())
 
 
 if __name__ == "__main__":  # pragma: no cover

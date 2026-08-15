@@ -17,6 +17,10 @@ import unicodedata
 
 from millefeuille.domain.acceptance import ACCEPTANCE_SUMMARY_REF
 from millefeuille.domain.card_fixtures import CARD_JSON_REF
+from millefeuille.domain.card_index_contract import (
+    validate_canonical_card_index_contract,
+    validate_paper_card_identity,
+)
 from millefeuille.domain.classification import (
     CLASSIFICATION_PLAN_REF,
     WRITEBACK_PREVIEW_REF,
@@ -96,6 +100,8 @@ def retrieve_artifact_refs(
     section: str | None = None,
     page: int | None = None,
     evidence_need: str | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> dict[str, Any]:
     """Return ref-only metadata for one verified local artifact package."""
 
@@ -114,6 +120,8 @@ def retrieve_artifact_refs(
         page=page,
         evidence_need=evidence_need,
         strict_filters=False,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     ).payload
 
 
@@ -195,9 +203,7 @@ def write_retrieval_batch_result(
             "classification_plans": sum(
                 "classification_plan_ref" in run for run in runs
             ),
-            "writeback_previews": sum(
-                "writeback_preview_ref" in run for run in runs
-            ),
+            "writeback_previews": sum("writeback_preview_ref" in run for run in runs),
         }
         result: dict[str, Any] = {
             "schema_version": RETRIEVAL_BATCH_RESULT_SCHEMA,
@@ -254,6 +260,8 @@ def _prepare_retrieval(
     evidence_need: str | None,
     strict_filters: bool,
     artifact_reader: RootArtifactReader | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> _PreparedRetrieval:
     filters, normalized_section = _normalize_retrieval_filters(
         summary_scope=summary_scope,
@@ -278,10 +286,15 @@ def _prepare_retrieval(
         doi=doi,
         title=title,
         artifact_reader=artifact_reader,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
 
     _validate_resolved_package_paths(resolved, artifact_reader=artifact_reader)
-    _load_verified_paper_card(resolved, artifact_reader=artifact_reader)
+    card_payload = _load_verified_paper_card(
+        resolved,
+        artifact_reader=artifact_reader,
+    )
     summary_path = resolved.run_dir / SUMMARY_ARTIFACT_REF
     summary_payload = HierarchicalSummaryRecord.from_dict(
         _load_retrieval_json(
@@ -340,6 +353,7 @@ def _prepare_retrieval(
     )
     _validate_canonical_index_refs(
         resolved,
+        card_payload,
         index_payload,
         artifact_reader=artifact_reader,
     )
@@ -740,24 +754,15 @@ def _validate_resolved_package_paths(
             artifact_reader.verify_regular_file(paths[label], label)
         return
 
+    ensure_no_follow_directory(resolved.run_dir, "artifact run directory")
+    source_labels = {"source-pack manifest", "selected full text"}
     for label, target in paths.items():
-        try:
-            relative = target.relative_to(root)
-        except ValueError as exc:
-            raise MillefeuilleContractError(
-                "resolved artifact package escapes the source-pack root"
-            ) from exc
-        cursor = root
-        for part in relative.parts:
-            cursor = cursor / part
-            if cursor.is_symlink():
-                if cursor == target:
-                    raise MillefeuilleContractError(
-                        f"{label} must not be a symbolic link"
-                    )
-                raise MillefeuilleContractError(
-                    f"{label} path must not contain symbolic links"
-                )
+        boundary = root if label in source_labels else resolved.run_dir
+        probe_no_follow_regular_file(
+            target,
+            label,
+            root=boundary,
+        )
     _require_regular_artifact(
         resolved.source_pack_dir / "manifest.json",
         "source-pack manifest",
@@ -766,12 +771,12 @@ def _validate_resolved_package_paths(
     _require_regular_artifact(
         resolved.stage_manifest_path,
         "stage manifest",
-        root=root,
+        root=resolved.run_dir,
     )
     _require_regular_artifact(
         resolved.artifact_index_path,
         "artifact index",
-        root=root,
+        root=resolved.run_dir,
     )
 
 
@@ -1994,6 +1999,8 @@ def _resolve_retrieve_artifacts(
     doi: str | None,
     title: str | None,
     artifact_reader: RootArtifactReader | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> tuple[ResolvedRunArtifacts, str]:
     locators = {
         "paper_id": paper_id,
@@ -2014,6 +2021,8 @@ def _resolve_retrieve_artifacts(
             run_id=run_id,
             paper_id=locator_value if locator_type in {"paper_id", "slug"} else None,
             item_key=locator_value if locator_type == "item_key" else None,
+            artifact_root=artifact_root,
+            stage_manifest=stage_manifest,
             artifact_reader=artifact_reader,
         )
         return resolved, locator_type
@@ -2054,21 +2063,44 @@ def _resolve_retrieve_artifacts(
                 continue
         elif candidate.is_symlink() or not candidate.is_dir():
             continue
-        card_path = (
-            candidate / "analyses" / "millefeuille" / resolved_run_id / CARD_JSON_REF
-        )
-        if not _probe_retrieval_file(
-            card_path,
-            "paper card",
-            artifact_reader=artifact_reader,
-        ):
-            continue
-        resolved = resolve_run_artifacts(
-            source_pack_root=root,
-            run_id=run_id,
-            paper_id=candidate.name,
-            artifact_reader=artifact_reader,
-        )
+        if artifact_root is None and stage_manifest is None:
+            card_path = (
+                candidate
+                / "analyses"
+                / "millefeuille"
+                / resolved_run_id
+                / CARD_JSON_REF
+            )
+            if not _probe_retrieval_file(
+                card_path,
+                "paper card",
+                artifact_reader=artifact_reader,
+            ):
+                continue
+        try:
+            resolved = resolve_run_artifacts(
+                source_pack_root=root,
+                run_id=run_id,
+                paper_id=candidate.name,
+                artifact_root=artifact_root,
+                stage_manifest=stage_manifest,
+                artifact_reader=artifact_reader,
+            )
+        except MillefeuilleContractError as exc:
+            if artifact_root is not None or stage_manifest is not None:
+                message = str(exc)
+                if any(
+                    expected in message
+                    for expected in (
+                        "contains no complete run package",
+                        "stage manifest does not belong",
+                        "source-pack manifest paper_id drift",
+                        "artifact index paper_id drift",
+                        "artifact index source-pack ref drift",
+                    )
+                ):
+                    continue
+            raise
         _validate_resolved_package_paths(
             resolved,
             artifact_reader=artifact_reader,
@@ -2114,41 +2146,42 @@ def _load_verified_paper_card(
             artifact_reader=artifact_reader,
         )
     ).to_dict()
-    _require_identity(
-        payload=card_payload,
-        label="paper card",
+    validate_paper_card_identity(
+        card_payload,
         paper_id=resolved.paper_id,
-        run_id=None,
-        source_hash=None,
+        run_id=resolved.run_id,
+        source_hash=resolved.source_hash,
+        require_source_hash=True,
     )
     return card_payload
 
 
 def _validate_canonical_index_refs(
     resolved: ResolvedRunArtifacts,
+    card_payload: dict[str, Any],
     index_payload: dict[str, Any],
     *,
     artifact_reader: RootArtifactReader | None = None,
 ) -> None:
-    index_dir = resolved.run_dir / INDEX_STATUS_REF.parent
-    expected_paths = {
-        "selected_fulltext_ref": resolved.source_pack_dir / ROUTE_MARKDOWN_REF,
-        "summary_ref": resolved.run_dir / SUMMARY_ARTIFACT_REF,
-        "paper_card_ref": resolved.run_dir / CARD_JSON_REF,
-    }
-    for field_name, expected_path in expected_paths.items():
-        expected_ref = relative_ref(expected_path, index_dir)
-        actual_ref = index_payload.get(field_name)
-        if actual_ref != expected_ref:
-            raise MillefeuilleContractError(
-                f"retrieval index {field_name} drift: "
-                f"expected {expected_ref!r}, got {actual_ref!r}"
-            )
+    def verify_file(path: Path, label: str) -> None:
         _verify_retrieval_file(
-            expected_path,
-            field_name,
+            path,
+            label,
             artifact_reader=artifact_reader,
         )
+
+    validate_canonical_card_index_contract(
+        card_payload=card_payload,
+        index_payload=index_payload,
+        paper_id=resolved.paper_id,
+        run_id=resolved.run_id,
+        source_hash=resolved.source_hash,
+        index_dir=resolved.run_dir / INDEX_STATUS_REF.parent,
+        selected_fulltext_path=resolved.source_pack_dir / ROUTE_MARKDOWN_REF,
+        summary_path=resolved.run_dir / SUMMARY_ARTIFACT_REF,
+        card_path=resolved.run_dir / CARD_JSON_REF,
+        verify_file=verify_file,
+    )
 
 
 def _require_regular_artifact(

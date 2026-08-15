@@ -62,6 +62,6 @@
   "x-millefeuille-semantic-validation": [
     "Runtime construction must use the allowlisted receipt model and independently derived request digest; arbitrary receipt or request fields must never be copied into audit output.",
     "Consumers must reconstruct and verify both receipt_digest and request_digest, the approval/evaluation window, selected_item_count <= scope.max_items, and secret_material_persisted=false before audit records influence replay state.",
-    "Only status=consumed records enter replay state; status=validated records prove a no-effect gate check and do not consume authorization."
+    "Every verified durable record enters replay state; status is informational and cannot remove the single-use reservation."
   ]
 }

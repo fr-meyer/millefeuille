@@ -5,11 +5,18 @@ offline-first contract. It is safe to review and test without Zotero
 credentials, PDF bytes, OCR providers, OpenKB writes, source-pack writes,
 GitHub publication, releases, or package-index changes.
 
+Reusable packets for carrying this contract through feature delivery, bounded
+approval, adapter evidence, dogfood, maintenance handoff, migration, and
+release are indexed in the adjacent
+[`millefeuille-delivery`](../millefeuille-delivery/README.md) directory.
+
 Files:
 
 - `vision.md` - complete paper-processing product vision.
 - `remaining-work.md` - end-to-end work pipeline and manual gates.
 - `cli-contract.md` - intended command groups and run modes.
+- `legacy-migration.md` - operator migration and deprecation contract for the
+  original Hydra workflow and the source-pack lifecycle.
 - `stage-manifest.schema.json` - machine-readable stage manifest shape.
 - `artifact-storage.md` - artifact-root and source-pack storage contract.
 - `source-pack-manifest.schema.json` - source-pack source identity and hash
@@ -39,6 +46,12 @@ Files:
   recovery outcome evidence.
 - `staging-cleanup.md` - normative recognition, receipt, pinned transaction,
   rollback, and MF-197 disposal boundary.
+- `operator-preflight-packet.schema.json` - exact no-effect operator request,
+  readiness controls, and reserved receipt-scope binding.
+- `operator-preflight-result.schema.json` - deterministic sanitized readiness
+  result shape.
+- `operator-preflight.md` - normative packet, credential-reference,
+  authorization-context, output, and exit-code contract.
 - `hierarchical-summary.schema.json` - page/section/paper summary shape.
 - `paper-card.schema.json` - compact human/agent card shape.
 - `retrieval-index-status.schema.json` - retrieval/index lane status shape.
@@ -56,9 +69,18 @@ Files:
   adjudication action inputs.
 - `classification-action-record.schema.json` - immutable action lineage and
   final-decision refs.
+- `taxonomy-registry.schema.json` and `taxonomy-registry.example.json` -
+  content-addressed two-level registry contract and non-production draft.
+- `taxonomy-lock.schema.json` - immutable batch/pilot/run registry snapshot.
+- `taxonomy-change-proposal.schema.json` and
+  `taxonomy-change-review.schema.json` - exact candidate, impact, migration,
+  and independent approval contracts.
+- `taxonomy-application.schema.json` - governed forward apply/rollback record.
 - `retrieval-index-contract.md` - OpenKB/PageIndex and optional index lanes.
 - `classification-orchestration.md` - CLI-owned classification modes and
   multi-agent governance.
+- `taxonomy-registry.md` - locking, stable-ID, manual change, and rollback
+  rules.
 - `tag-state-machine.md` - Zotero tag lifecycle design.
 - `ocr-backend-contract.md` - native/OCR evidence adapter contract.
 - `release-version-policy.md` - Speculoos-governed release and version path.
@@ -72,6 +94,17 @@ as part of its fail-closed stage manual gate. The separate MF-106 maintenance
 executor uses one narrowly scoped receipt only for a same-filesystem local
 quarantine; it does not enable a provider call or external write. Presenting a
 receipt in preview or read-only mode remains rejected.
+
+Offline operator-packet validation lives in
+`millefeuille/domain/operator_preflight.py` and is exposed by
+`millefeuille operator-preflight`. It independently binds mode, adapter,
+selection and count, roots, operations, destination roles, provider/profile,
+budgets, disposal, stop, rollback, acceptance, allowlisted credential
+references, and the exact MF-100 receipt identity. Approved-live adds a
+reserved content-addressed receipt target so controls not represented directly
+by MF-100 cannot drift. The command checks only credential presence, never
+credential values, performs no external effect, and preserves the exit-3
+unsupported-live boundary after successful approval validation.
 
 Executable offline contract models live in
 `millefeuille/domain/millefeuille.py`. They cover stage manifests,
@@ -107,6 +140,12 @@ only strictly recognized zero-byte retrieval generations or manifest-owned
 abandoned bridge generations with descriptor-relative atomic no-replace
 renames. It never deletes; Windows/macOS apply and all permanent disposal remain
 unsupported.
+
+Taxonomy registry validation and pure artifact derivation live in
+`millefeuille/domain/taxonomy.py`. The `millefeuille taxonomy` command seals
+explicit drafts, validates registries/locks, and derives proposals, independent
+reviews, applications, and forward-only rollbacks as JSON without choosing
+labels, replacing files, or making live calls.
 
 Preview/read-only stage commands now live under `millefeuille/cli/stages.py`:
 `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,

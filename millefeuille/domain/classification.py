@@ -192,6 +192,8 @@ def write_classification_from_evidence(
     paper_id: str | None = None,
     item_key: str | None = None,
     default_profile: str | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> ClassificationWriteResult:
     prepared = _prepare_classification_from_evidence(
         evidence_path=evidence_path,
@@ -200,6 +202,8 @@ def write_classification_from_evidence(
         paper_id=paper_id,
         item_key=item_key,
         default_profile=default_profile,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
     return _persist_classification(prepared)
 
@@ -212,6 +216,8 @@ def write_classification_action_from_evidence(
     paper_id: str | None = None,
     item_key: str | None = None,
     default_profile: str | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> ClassificationActionWriteResult:
     """Materialize one deterministic offline review or adjudication action."""
 
@@ -222,6 +228,8 @@ def write_classification_action_from_evidence(
         paper_id=paper_id,
         item_key=item_key,
         default_profile=default_profile,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
     _preflight_existing_action(prepared)
     return _persist_classification_action(prepared)
@@ -346,12 +354,16 @@ def _prepare_classification_action_from_evidence(
     paper_id: str | None,
     item_key: str | None,
     default_profile: str | None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> _PreparedClassificationAction:
     resolved = resolve_run_artifacts(
         source_pack_root=source_pack_root,
         run_id=run_id,
         paper_id=paper_id,
         item_key=item_key,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
     _require_passing_acceptance(resolved)
     evidence = _load_classification_action_evidence(action_evidence_path)
@@ -616,12 +628,16 @@ def _prepare_classification_from_evidence(
     paper_id: str | None,
     item_key: str | None,
     default_profile: str | None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> _PreparedClassification:
     resolved = resolve_run_artifacts(
         source_pack_root=source_pack_root,
         run_id=run_id,
         paper_id=paper_id,
         item_key=item_key,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
     _require_passing_acceptance(resolved)
 

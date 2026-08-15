@@ -1,0 +1,9 @@
+fix: complete PR #101 card index state cycle
+
+Record the canonical MF-135 task and publication artifacts after integrating
+current dev, preserving external artifact-root verification, and validating
+the guarded card/index transaction.
+
+Task: pr-101-card-index-circularity
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

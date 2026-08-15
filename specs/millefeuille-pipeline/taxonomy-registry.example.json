@@ -1,0 +1,49 @@
+{
+  "schema_version": "millefeuille-taxonomy-registry/v0.1",
+  "registry_id": "millefeuille-research-example",
+  "taxonomy_version": "example-v0.1",
+  "previous_version": null,
+  "previous_content_identity": null,
+  "status": "draft",
+  "governing_basis": "primary intellectual contribution",
+  "owner_id": "example-taxonomy-owner",
+  "entries": [
+    {
+      "entry_id": "L1-METHODS",
+      "level": 1,
+      "parent_id": null,
+      "label": "Methods",
+      "definition": "Example collection for papers whose primary contribution is methodological.",
+      "include_when": [
+        "The reusable method is the paper's primary intellectual contribution."
+      ],
+      "exclude_when": [
+        "The method is incidental to an application-first contribution."
+      ],
+      "boundary_notes": [
+        "This example is not an approved production taxonomy."
+      ],
+      "status": "active",
+      "replacement_id": null
+    },
+    {
+      "entry_id": "L2-METHODS-TRAINING",
+      "level": 2,
+      "parent_id": "L1-METHODS",
+      "label": "Training",
+      "definition": "Example subcollection for reusable training methods.",
+      "include_when": [
+        "The principal novelty changes how models are trained."
+      ],
+      "exclude_when": [
+        "Training is standard and the application result is the primary contribution."
+      ],
+      "boundary_notes": [
+        "Compare against the nearest sibling before classification."
+      ],
+      "status": "active",
+      "replacement_id": null
+    }
+  ],
+  "content_identity": "sha256:e5659c32af1e780f631235abfc13c864720252cb93281798f22c90b759a9b909"
+}

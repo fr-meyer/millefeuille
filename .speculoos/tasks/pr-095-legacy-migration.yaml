@@ -1,0 +1,90 @@
+id: pr-095-legacy-migration
+roadmap_card: MF-005
+title: Define the legacy lifecycle migration contract
+status: in-progress
+branch: docs/pr-095-legacy-migration
+base_branch: dev
+github:
+  issue: null
+  pull_request: 95
+  issue_project_item: unavailable
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/95
+  head_sha: null
+  merge_commit: null
+write_paths:
+  - .speculoos/tasks/pr-095-legacy-migration.yaml
+  - README.md
+  - millefeuille/conf/ocr/pageindex.yaml
+  - millefeuille/domain/config.py
+  - specs/millefeuille-pipeline/README.md
+  - specs/millefeuille-pipeline/cli-contract.md
+  - specs/millefeuille-pipeline/legacy-migration.md
+  - specs/millefeuille-pipeline/release-version-policy.md
+  - specs/pr-095-legacy-migration/**
+  - tests/test_millefeuille_contract_artifacts.py
+scope:
+  - define the supported legacy Hydra and source-pack lifecycle command surfaces
+  - document operator migration for command/config, source-pack versions,
+    artifact roots, tags, safe stop, and rollback
+  - pin direct PageIndex HTTP/SDK integration to the legacy compatibility lane
+    and require MCP-only connectors for new lifecycle work
+  - require fail-closed private-PDF serving access with minimal expiry/use
+    limits, document/request binding, replay rejection, revocation, and redacted
+    logging
+  - add operator navigation and executable documentation-contract checks
+  - preserve the repository-wide hard-rename invariant while describing
+    historical predecessor-tag handling by role
+non_goals:
+  - removing, disabling, or changing working legacy runtime behavior
+  - implementing provider adapters, lifecycle stage commands, writeback,
+    reconciliation, or compensating actions
+  - credentials, provider/model/OCR calls, live Zotero reads or writes, private
+    paper access, PDF recovery, source-pack mutation, or OpenKB/PageIndex writes
+  - dev-to-main promotion, release tags, package publication, deployment, or
+    approval bypass
+acceptance:
+  - the migration contract distinguishes the legacy Hydra surface from the
+    lifecycle stage surface and covers v0.1/v0.2 source-pack compatibility
+  - release-based deprecation, exit criteria, safe stop, rollback, and follow-on
+    decisions are explicit and fail closed
+  - PageIndex direct HTTP/SDK stays legacy-only while new lifecycle ingestion is
+    MCP-only
+  - temporary private-PDF serving requires authenticated or narrowly scoped,
+    unguessable, short-lived, single-use access with expiry/replay enforcement,
+    revocation, cleanup, and secret-safe logging
+  - README and pipeline navigation link the migration contract
+  - no forbidden predecessor package or CLI identity is tracked
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check,
+    private-data scan, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_contract_artifacts tests.test_millefeuille_hard_rename -v"
+  - ".venv/bin/python -m unittest discover -s tests"
+  - ".venv/bin/ruff check ."
+  - "git diff --check"
+  - "speculoos validate --task pr-095-legacy-migration --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-095-legacy-migration --pr-body specs/pr-095-legacy-migration/pr-body.md --commit-message specs/pr-095-legacy-migration/commit-message.txt --json"
+publication_boundary:
+  statement: Offline configuration comments, operator contracts, navigation,
+    executable documentation tests, and repository-local metadata only. No
+    credential lookup, provider/model/OCR call, private paper read, live
+    Zotero/OpenKB/PageIndex/source-pack mutation, stable-branch promotion,
+    release, package publication, deployment, or approval bypass.
+documentation_impact:
+  status: updated
+  rationale: README and pipeline contracts add the user-facing migration,
+    compatibility, safe-stop, rollback, and release-boundary guidance.
+private_data_scan: required; public configuration comments, operator
+  documentation, synthetic contract tests, and repository-local metadata only,
+  with no credentials, private papers, provider payloads, or host-specific paths
+publish_authority: Active Millefeuille delivery-train supervisor; routine
+  feature-to-dev publication, exact-head Mergeguez review, policy-gated merge,
+  cleanup, and next-episode advancement are approved. Live operations,
+  dev-to-main promotion, release, and deployment remain excluded.
+notes:
+  - Supersedes closed PR 91; the docs/pr-095-legacy-migration branch satisfies
+    the repository actor policy.
+  - Refreshed without history rewriting by merging dev commit
+    eaf924d4ce4d973fcbefc9ff18e2650230a4d0bf before exact-head validation.

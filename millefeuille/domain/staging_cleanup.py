@@ -35,6 +35,7 @@ from millefeuille.domain.live_receipts import (
     build_approved_live_audit_record,
     load_approved_live_receipt,
     validate_approved_live_receipt,
+    validate_approved_live_receipt_for_no_effect,
 )
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.retrieve import (
@@ -396,9 +397,7 @@ def build_staging_cleanup_plan(
         if candidate.quarantine_name in state.quarantine_namespace
     }
     if colliding_names:
-        raise MillefeuilleContractError(
-            "cleanup quarantine destination already exists"
-        )
+        raise MillefeuilleContractError("cleanup quarantine destination already exists")
 
     payload: dict[str, Any] = {
         "schema_version": STAGING_CLEANUP_PLAN_SCHEMA_VERSION,
@@ -1306,15 +1305,16 @@ def apply_staging_cleanup_plan(
                 raise MillefeuilleContractError(
                     "cleanup quarantine destination appeared concurrently"
                 )
-            _atomic_rename_noreplace(
-                source,
-                destination,
-                source_dir_fd=pinned.parent_fd,
-                destination_dir_fd=pinned_roots.quarantine_fd,
-                source_name=pinned.source_name,
-                destination_name=candidate["quarantine_name"],
-            )
-            moved.append(candidate)
+            with _pinned_generation_rename_window(pinned.generation_fd):
+                _atomic_rename_noreplace(
+                    source,
+                    destination,
+                    source_dir_fd=pinned.parent_fd,
+                    destination_dir_fd=pinned_roots.quarantine_fd,
+                    source_name=pinned.source_name,
+                    destination_name=candidate["quarantine_name"],
+                )
+                moved.append(candidate)
             _fsync_directory_fd(pinned.parent_fd)
             _fsync_directory_fd(pinned_roots.quarantine_fd)
             _require_pinned_destination(pinned, pinned_roots.quarantine_fd)
@@ -1753,12 +1753,13 @@ def _matching_cleanup_audit(
     # original approval boundary without treating replay or later expiry as a
     # reason to mutate anything.
     approved_at = _parse_utc_timestamp(receipt.approval.approved_at)
-    validate_approved_live_receipt(receipt, request, now=approved_at)
+    validate_approved_live_receipt_for_no_effect(receipt, request, now=approved_at)
     expected = build_approved_live_audit_record(
         receipt,
         request,
         evaluated_at=approved_at,
         status="validated",
+        replay_state=ReceiptReplayState(),
     )
     if not hmac.compare_digest(match["request_digest"], expected["request_digest"]):
         raise MillefeuilleContractError(
@@ -2228,14 +2229,15 @@ def _rollback_moved_candidates(
                     "cleanup rollback source appeared concurrently"
                 )
             _require_pinned_destination(pinned, pinned_roots.quarantine_fd)
-            _atomic_rename_noreplace(
-                destination,
-                source,
-                source_dir_fd=pinned_roots.quarantine_fd,
-                destination_dir_fd=pinned.parent_fd,
-                source_name=candidate["quarantine_name"],
-                destination_name=pinned.source_name,
-            )
+            with _pinned_generation_rename_window(pinned.generation_fd):
+                _atomic_rename_noreplace(
+                    destination,
+                    source,
+                    source_dir_fd=pinned_roots.quarantine_fd,
+                    destination_dir_fd=pinned.parent_fd,
+                    source_name=candidate["quarantine_name"],
+                    destination_name=pinned.source_name,
+                )
             _fsync_directory_fd(pinned_roots.quarantine_fd)
             _fsync_directory_fd(pinned.parent_fd)
             restored_named = os.stat(
@@ -2257,8 +2259,7 @@ def _rollback_moved_candidates(
                     restored_snapshot.generation_identity,
                     candidate["generation_identity"],
                 )
-                or restored_snapshot.quarantine_name
-                != candidate["quarantine_name"]
+                or restored_snapshot.quarantine_name != candidate["quarantine_name"]
             ):
                 raise MillefeuilleContractError(
                     "cleanup rollback restored a drifted generation"
@@ -2426,6 +2427,70 @@ def _validate_held_persistent_lock(quarantine_fd: int, fd: int) -> None:
         raise MillefeuilleContractError(
             "cleanup persistent maintenance lock changed while held"
         )
+
+
+@contextmanager
+def _pinned_generation_rename_window(generation_fd: int) -> Iterator[None]:
+    """Make an immutable generation renameable without weakening its contents.
+
+    OverlayFS requires owner write and execute permission on a directory inode
+    before it can copy the inode up for a rename, even when both parent
+    directories are writable.  Bridge generations are deliberately mode 0555,
+    so open the smallest possible mutation window through the already-pinned
+    descriptor and restore the exact mode on either side of the atomic rename.
+    """
+
+    try:
+        before = os.fstat(generation_fd)
+    except OSError as exc:
+        raise MillefeuilleContractError(
+            "cleanup pinned generation could not be inspected before rename"
+        ) from exc
+    if not stat.S_ISDIR(before.st_mode):
+        raise MillefeuilleContractError(
+            "cleanup pinned generation changed before rename"
+        )
+    original_mode = stat.S_IMODE(before.st_mode)
+    rename_mode = original_mode | stat.S_IWUSR | stat.S_IXUSR
+    changed = rename_mode != original_mode
+    if changed:
+        try:
+            os.fchmod(generation_fd, rename_mode)
+            opened = os.fstat(generation_fd)
+        except OSError as exc:
+            raise MillefeuilleContractError(
+                "cleanup pinned generation mode could not be managed for rename"
+            ) from exc
+        try:
+            if (
+                _object_identity(opened) != _object_identity(before)
+                or stat.S_IMODE(opened.st_mode) != rename_mode
+            ):
+                raise MillefeuilleContractError(
+                    "cleanup pinned generation changed while preparing rename"
+                )
+        except Exception:
+            with suppress(OSError):
+                os.fchmod(generation_fd, original_mode)
+            raise
+    try:
+        yield
+    finally:
+        if changed:
+            try:
+                os.fchmod(generation_fd, original_mode)
+                restored = os.fstat(generation_fd)
+            except OSError as exc:
+                raise MillefeuilleContractError(
+                    "cleanup pinned generation mode could not be restored"
+                ) from exc
+            if (
+                _object_identity(restored) != _object_identity(before)
+                or stat.S_IMODE(restored.st_mode) != original_mode
+            ):
+                raise MillefeuilleContractError(
+                    "cleanup pinned generation mode was not restored"
+                )
 
 
 def _atomic_rename_noreplace(
