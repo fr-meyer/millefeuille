@@ -221,8 +221,8 @@ def _maintenance_receipt(
                 "kind": "maintenance-plan",
                 "value": plan["integrity"]["content_digest"],
             },
-            "output_root": str(quarantine.resolve()),
-            "source_pack_root": str(source.resolve()),
+            "output_root": str(quarantine),
+            "source_pack_root": str(source),
             "provider": None,
             "limits": {
                 "max_provider_calls": 0,
@@ -749,6 +749,8 @@ class TestStagingCleanupPlatformPrimitives(unittest.TestCase):
         self.assertFalse(capabilities["pinned_directory_mutation"])
 
     def test_darwin_renamex_np_uses_the_three_argument_signature(self):
+        source = PurePosixPath("/source/candidate")
+        destination = PurePosixPath("/quarantine/candidate")
         renamex_np = mock.Mock(return_value=0)
         library = SimpleNamespace(renamex_np=renamex_np)
         with (
@@ -762,8 +764,8 @@ class TestStagingCleanupPlatformPrimitives(unittest.TestCase):
             ),
         ):
             cleanup._atomic_rename_noreplace(
-                Path("/source/candidate"),
-                Path("/quarantine/candidate"),
+                source,
+                destination,
             )
 
         self.assertEqual(renamex_np.call_count, 1)
@@ -774,6 +776,8 @@ class TestStagingCleanupPlatformPrimitives(unittest.TestCase):
         self.assertEqual(args[2], 0x00000004)
 
     def test_linux_renameat2_uses_dirfds_and_five_arguments(self):
+        source = PurePosixPath("/ignored/source")
+        destination = PurePosixPath("/ignored/destination")
         renameat2 = mock.Mock(return_value=0)
         library = SimpleNamespace(renameat2=renameat2)
         with (
@@ -783,8 +787,8 @@ class TestStagingCleanupPlatformPrimitives(unittest.TestCase):
             mock.patch.object(cleanup, "_relative_entry_exists", return_value=False),
         ):
             cleanup._atomic_rename_noreplace(
-                Path("/ignored/source"),
-                Path("/ignored/destination"),
+                source,
+                destination,
                 source_dir_fd=11,
                 destination_dir_fd=12,
                 source_name="candidate",
@@ -797,6 +801,8 @@ class TestStagingCleanupPlatformPrimitives(unittest.TestCase):
         )
 
     def test_macos_pinned_rename_and_windows_rename_fail_closed(self):
+        darwin_source = PurePosixPath("/source/candidate")
+        darwin_destination = PurePosixPath("/quarantine/candidate")
         windows_source = Path("C:/source/candidate")
         windows_destination = Path("C:/quarantine/candidate")
         with (
@@ -805,8 +811,8 @@ class TestStagingCleanupPlatformPrimitives(unittest.TestCase):
             self.assertRaisesRegex(MillefeuilleContractError, "not supported on macOS"),
         ):
             cleanup._atomic_rename_noreplace(
-                Path("/source/candidate"),
-                Path("/quarantine/candidate"),
+                darwin_source,
+                darwin_destination,
                 source_dir_fd=3,
                 destination_dir_fd=4,
                 source_name="candidate",
