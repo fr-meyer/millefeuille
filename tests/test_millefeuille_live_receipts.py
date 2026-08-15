@@ -65,7 +65,9 @@ def _receipt_payload(
     approved_at: str = APPROVED_AT,
     expires_at: str = EXPIRES_AT,
 ) -> dict[str, object]:
-    canonical_root = str(root.resolve())
+    # Match the contract's lexical absolute-root identity without expanding a
+    # Windows 8.3 alias into a different path spelling.
+    canonical_root = str(root.absolute())
     payload: dict[str, object] = {
         "schema_version": APPROVED_LIVE_RECEIPT_SCHEMA_VERSION,
         "receipt_id": "receipt-mf-100-001",
@@ -125,8 +127,8 @@ def _request(
             kind="paper-id",
             value=target_id if selector_value is None else selector_value,
         ),
-        output_root=str((output_root or root).resolve()),
-        source_pack_root=str((source_pack_root or root).resolve()),
+        output_root=str((output_root or root).absolute()),
+        source_pack_root=str((source_pack_root or root).absolute()),
         provider=provider,
         provider_call_limit=provider_call_limit,
         cost_limit_usd_micros=cost_limit_usd_micros,
@@ -544,7 +546,7 @@ class TestApprovedLiveReceiptModel(unittest.TestCase):
             root = Path(tempdir)
             receipt = ApprovedLiveReceipt.from_dict(_receipt_payload(root))
             canonical_request = _request(root)
-            case_variant = str(root.resolve()).swapcase()
+            case_variant = str(root.absolute()).swapcase()
             request = replace(
                 canonical_request,
                 output_root=case_variant,
@@ -723,7 +725,7 @@ class TestApprovedLiveReceiptCliGate(unittest.TestCase):
             source_root.mkdir()
             artifact_root.mkdir()
             payload = self._live_receipt(source_root)
-            payload["scope"]["output_root"] = str(artifact_root.resolve())
+            payload["scope"]["output_root"] = str(artifact_root.absolute())
             _sign(payload)
             receipt_path = source_root / "approval.json"
             _write_receipt(receipt_path, payload)
