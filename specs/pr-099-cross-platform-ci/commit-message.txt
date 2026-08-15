@@ -1,0 +1,8 @@
+test: complete PR #99 cross-platform CI gates
+
+Record the canonical MF-004 task and publication artifacts after integrating
+current dev and validating the governed Ubuntu and Windows CI matrix.
+
+Task: pr-099-cross-platform-ci
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

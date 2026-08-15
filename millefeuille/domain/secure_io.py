@@ -406,6 +406,95 @@ def _portable_lstat_regular_file(path: Path, *, label: str) -> os.stat_result:
     return named_stat
 
 
+def _open_windows_locked_regular_file_fd(
+    path: Path,
+    *,
+    label: str,
+    expected_stat: os.stat_result,
+) -> tuple[int, os.stat_result]:
+    """Open a Windows read handle that excludes concurrent writers/deleters."""
+
+    import ctypes
+    from ctypes import wintypes
+    import msvcrt
+
+    generic_read = 0x80000000
+    file_share_read = 0x00000001
+    open_existing = 3
+    file_attribute_normal = 0x00000080
+    file_flag_open_reparse_point = 0x00200000
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel32.CreateFileW
+    create_file.argtypes = (
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    )
+    create_file.restype = wintypes.HANDLE
+    close_handle = kernel32.CloseHandle
+    close_handle.argtypes = (wintypes.HANDLE,)
+    close_handle.restype = wintypes.BOOL
+
+    handle = create_file(
+        os.fspath(path),
+        generic_read,
+        file_share_read,
+        None,
+        open_existing,
+        file_attribute_normal | file_flag_open_reparse_point,
+        None,
+    )
+    invalid_handle_value = ctypes.c_void_p(-1).value
+    if handle == invalid_handle_value:
+        error = ctypes.get_last_error()
+        detail = ctypes.FormatError(error).strip()
+        raise MillefeuilleContractError(
+            f"could not open {label} {path}: {detail}"
+        )
+
+    crt_flags = os.O_RDONLY
+    if hasattr(os, "O_BINARY"):
+        crt_flags |= os.O_BINARY
+    if hasattr(os, "O_NOINHERIT"):
+        crt_flags |= os.O_NOINHERIT
+    try:
+        fd = msvcrt.open_osfhandle(handle, crt_flags)
+    except OSError as exc:
+        close_handle(handle)
+        raise MillefeuilleContractError(
+            f"could not bind {label} handle {path}: {exc}"
+        ) from exc
+
+    try:
+        opened_stat = os.fstat(fd)
+        if not stat.S_ISREG(opened_stat.st_mode):
+            raise MillefeuilleContractError(f"{label} is not a regular file: {path}")
+        expected_identity = _stat_object_identity(expected_stat)
+        expected_snapshot = _stat_stability_snapshot(expected_stat)
+        if (
+            not _has_stable_object_identity(opened_stat)
+            or _stat_object_identity(opened_stat) != expected_identity
+            or _stat_stability_snapshot(opened_stat) != expected_snapshot
+        ):
+            raise MillefeuilleContractError(f"{label} changed while opening: {path}")
+        named_stat = _portable_lstat_regular_file(path, label=label)
+        if (
+            not _has_stable_object_identity(named_stat)
+            or _stat_object_identity(named_stat) != expected_identity
+            or _stat_stability_snapshot(named_stat) != expected_snapshot
+        ):
+            raise MillefeuilleContractError(f"{label} changed while opening: {path}")
+        return fd, opened_stat
+    except Exception:
+        os.close(fd)
+        raise
+
+
 def _open_portable_regular_file_fd(
     path: Path,
     *,
@@ -418,6 +507,12 @@ def _open_portable_regular_file_fd(
     if not _has_stable_object_identity(expected_stat):
         raise MillefeuilleContractError(
             f"{label} filesystem does not expose stable file identity: {target}"
+        )
+    if _WINDOWS:
+        return _open_windows_locked_regular_file_fd(
+            target,
+            label=label,
+            expected_stat=expected_stat,
         )
     flags = _regular_file_read_flags(no_follow=False)
     try:

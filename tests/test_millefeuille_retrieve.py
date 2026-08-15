@@ -196,6 +196,11 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
             with (
                 mock.patch.object(
                     secure_io,
+                    "_WINDOWS",
+                    False,
+                ),
+                mock.patch.object(
+                    secure_io,
                     "_supports_no_follow",
                     return_value=False,
                 ),
