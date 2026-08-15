@@ -1,16 +1,16 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: null
+canonical_task: pr-098-reconcile-delivery-ledgers
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: null
+  working_branch: chore/pr-098-ledger-reconciliation
 status:
-  phase: idle
-  pret_a_coder: idle
+  phase: implementation
+  pret_a_coder: ready
   blocker_summary: []
 release_policy:
   branch_model: feature-branch-to-dev
@@ -43,13 +43,16 @@ review_policy:
       Mergeguez review is unavailable.
 validation:
   unit_tests:
-    status: passed
+    status: not-current
     command: .venv/bin/python -m unittest discover -v
-    result: 320 passed, 0 failed
+    result: The historical 320-test result is not exact-head evidence; Windows
+      secure-read failures are tracked by MF-001 and every new branch must
+      record its own validation.
   lint:
-    status: passed
+    status: not-current
     command: .venv/bin/ruff check .
-    result: all checks passed
+    result: The historical lint result is not exact-head evidence; every new
+      branch must record its own validation.
   metadata:
     status: passed
     command: ruby -ryaml -rjson -e 'Dir[".speculoos/**/*.yaml", "specs/**/*.yaml"].flatten.sort.each { |p| Psych.parse_file(p) }; Dir[".speculoos/**/*.json", "specs/**/*.json"].flatten.sort.each { |p| JSON.parse(File.read(p)) }; puts "metadata ok"'
@@ -80,14 +83,14 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: none-active
-    number: 84
-    url: https://github.com/fr-meyer/millefeuille/pull/84
+    status: open
+    number: 98
+    url: https://github.com/fr-meyer/millefeuille/pull/98
     base_branch: dev
-    head_branch: null
+    head_branch: chore/pr-098-ledger-reconciliation
     head_sha: null
     merge_commit: null
-    project_status: In Progress
+    project_status: unavailable
   vibe_kanban:
     enabled: readback-only
     status: no-local-repo-mapping-yet
@@ -116,7 +119,7 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: null
+current_task: pr-098-reconcile-delivery-ledgers
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap
@@ -427,3 +430,113 @@ history:
       merged_by: mergeguez[bot]
       mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/69#pullrequestreview-4711191661
       mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87555055863
+    - id: pr-071-batch-acceptance
+      status: merged
+      branch: feat/pr-071-batch-acceptance
+      base_branch: dev
+      pull_request: 71
+      url: https://github.com/fr-meyer/millefeuille/pull/71
+      head_sha: af6af7470434ebdeea2c25c6b8ccf444014b7118
+      merge_commit: fd61dbcac385b886d477e1a72861c3db5b9d4279
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/71#pullrequestreview-4711463581
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87563190038
+    - id: pr-073-batch-classification
+      status: merged
+      branch: feat/pr-073-batch-classification
+      base_branch: dev
+      pull_request: 73
+      url: https://github.com/fr-meyer/millefeuille/pull/73
+      head_sha: f0999ace508c9902fd7800b143c9a0b619dc5376
+      merge_commit: 44b027c4b4e082df1747a3542909c4e070f9c6b2
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/73#pullrequestreview-4711747821
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87570745048
+    - id: pr-075-classification-review-adjudication
+      status: merged
+      branch: feat/pr-075-classification-review-adjudication
+      base_branch: dev
+      pull_request: 75
+      url: https://github.com/fr-meyer/millefeuille/pull/75
+      head_sha: 7aa88ca8785f723aba0dc1ae77fc384b68e53768
+      merge_commit: 5a153d2634c2679d3a72a057c22f773504dda73a
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/75#pullrequestreview-4712161582
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87580972882
+    - id: pr-077-retrieval-corpus-locators
+      status: merged
+      branch: feat/pr-077-retrieval-corpus-locators
+      base_branch: dev
+      pull_request: 77
+      url: https://github.com/fr-meyer/millefeuille/pull/77
+      head_sha: 640137ba7c3d0ba0d6137749d8515a4642101094
+      merge_commit: 1e8ba5849ba6abb67ad5b4677e83236b311a06d3
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/77#pullrequestreview-4712534915
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/87590611535
+    - id: pr-079-batch-retrieval
+      status: merged
+      branch: feat/pr-079-batch-retrieval
+      base_branch: dev
+      pull_request: 79
+      url: https://github.com/fr-meyer/millefeuille/pull/79
+      head_sha: c950bb07e6abadfd4d41426ecd0404e99eae49c3
+      merge_commit: 18c452bcd070d43ccd1e167164613e9262054f22
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/79#pullrequestreview-4728318466
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88071003328
+    - id: pr-080-ci-retire-broken-coderabbit
+      status: merged
+      branch: fix/pr-080-ci-retire-broken-coderabbit
+      base_branch: dev
+      pull_request: 80
+      url: https://github.com/fr-meyer/millefeuille/pull/80
+      head_sha: 0538e0a4574b24d193d5fa720cd08ca0ecd15484
+      merge_commit: 0e428db047a9bf81d087f5bafca03a9295527b98
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/80#pullrequestreview-4728221677
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88065960480
+    - id: pr-082-gpt56-summary-profiles
+      status: merged
+      branch: feat/pr-082-gpt56-summary-profiles
+      base_branch: dev
+      pull_request: 82
+      url: https://github.com/fr-meyer/millefeuille/pull/82
+      head_sha: 5f01b378d4c8c84b14bb3e41ada2cb6e9fd59d72
+      merge_commit: ba7ce07f48732a981be5de5751fa7e34380c84d6
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/82#pullrequestreview-4728585238
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88084819154
+    - id: pr-084-model-execution-plan
+      status: merged
+      branch: feat/pr-084-model-execution-plan
+      base_branch: dev
+      pull_request: 84
+      url: https://github.com/fr-meyer/millefeuille/pull/84
+      head_sha: 71273cfc48f4a8106592ee6feea89e842351a6e2
+      merge_commit: 969acda50aeba56e1a15106b8b1e49513e1f3570
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/84#pullrequestreview-4730250837
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88164488944
+    - id: pr-086-model-provenance-record
+      status: merged
+      branch: feat/pr-086-model-provenance-record
+      base_branch: dev
+      pull_request: 86
+      url: https://github.com/fr-meyer/millefeuille/pull/86
+      head_sha: 715af38e3cb6def668558356ebb5bb47ae1f3ea1
+      merge_commit: f41c8c2af77e0b1702c3d32d9489ef3ce2fb37d6
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/86#pullrequestreview-4732773210
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/88291725585
+    - id: pr-088-retire-remaining-coderabbit-workflows
+      status: merged
+      branch: chore/pr-088-retire-remaining-coderabbit-workflows
+      base_branch: dev
+      pull_request: 88
+      url: https://github.com/fr-meyer/millefeuille/pull/88
+      head_sha: 8c0fdb8cbcc9e3928f4baa89356fe64603fed7fa
+      merge_commit: 130aba5f962b190f7816347c41a5e4d07a17752e
+      merged_by: mergeguez[bot]
+      mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/88#pullrequestreview-4773052125
+      mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/89478145706
