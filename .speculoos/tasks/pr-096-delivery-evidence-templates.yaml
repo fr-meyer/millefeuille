@@ -12,7 +12,7 @@ github:
   pull_request_project_item: unavailable
   project_status: unavailable
   url: https://github.com/fr-meyer/millefeuille/pull/96
-  head_sha: null
+  head_sha: null  # Active-task exact-head binding is external; see notes.
   merge_commit: null
 write_paths:
   - .speculoos/README.md
@@ -81,6 +81,11 @@ publish_authority: Active Millefeuille delivery-train supervisor; routine
   dev-to-main promotion, release, tag, package publication, and deployment
   remain excluded.
 notes:
+  - The active task head field remains null while the PR is open because
+    embedding a
+    commit's own SHA creates a self-reference cycle. Exact pre-merge
+    binding is the immutable GitHub head referenced by the Mergeguez
+    review and check; closeout records head_sha and merge_commit after merge.
   - Supersedes closed PR 92; the docs/pr-096-delivery-evidence-templates branch
     satisfies the repository actor policy.
   - Refreshed without history rewriting by merging dev commit

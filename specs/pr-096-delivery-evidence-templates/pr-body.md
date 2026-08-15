@@ -55,4 +55,9 @@ Speculoos task: `pr-096-delivery-evidence-templates`
 
 Roadmap card: `MF-002`
 
+The active task head field remains null by design: a commit cannot
+embed its own SHA without changing it. The immutable Mergeguez review and check
+bind validation to GitHub's live exact head; closeout records the final head SHA
+and merge commit after merge.
+
 Supersedes closed PR #92; this branch name satisfies the repository actor policy.
