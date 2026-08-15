@@ -2,17 +2,19 @@ surface: vibe-kanban
 status: no-local-repo-mapping-yet
 authority: cockpit-only
 target: local-cockpit-sidecar
-last_checked_at: 2026-07-10T16:30:00Z
+last_checked_at: 2026-08-11T11:03:42Z
 health:
   service_http_ok: false
   service_http_note: local HTTP probe was unreachable during bootstrap
-  database_read_ok: true
+  database_read_ok: false
   repo_mapping: missing
 notes:
   - .speculoos remains canonical repo state.
   - Local Plancha/Vibe is status UI only.
   - No Vibe cloud or org API is configured for this repo.
   - Bootstrap should not depend on Vibe reachability.
+  - The configured local tunnel at 127.0.0.1:40141 was unreachable during the
+    2026-08-11 roadmap audit; no local card database was found.
 task:
   status: idle
   id: null

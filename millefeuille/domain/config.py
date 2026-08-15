@@ -355,9 +355,10 @@ class PageIndexOCRConfig(OCRProviderConfig):
     This is the default mode for backward compatibility with existing
     deployments.
 
-    Both modes provide identical functionality and performance. The choice
-    between SDK and HTTP API mode is a matter of preference and operational
-    requirements.
+    Both modes remain supported for the legacy Hydra OCR workflow during its
+    compatibility window. New lifecycle PageIndex ingestion is MCP-only and
+    must not route through this configuration; see the pipeline migration
+    contract.
 
     Requirements:
     - SDK mode requires the pageindex package to be installed
