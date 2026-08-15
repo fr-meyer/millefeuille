@@ -27,7 +27,8 @@ non_goals:
   - bypassing exact-head review, checks, or merge policy
 acceptance:
   - manifest and GitHub completed ledgers contain the same unique task IDs
-  - PRs 71 through 88 have exact merged head, merge, review, and check evidence
+  - recorded delivery PRs 71, 73, 75, 77, 79, 80, 82, 84, 86, and 88 have
+    exact merged head, merge, review, and check evidence
   - repository surfaces distinguish default main from integration dev
   - active PR and review evidence describe PR 98 without stale historical claims
   - YAML and JSON parse; ledger, branch-truth, and diff checks pass
@@ -40,6 +41,10 @@ publication_boundary:
   statement: Metadata-only reconciliation with no product behavior, credentials,
     provider calls, live writes, deployment, release, stable-branch mutation, or
     approval bypass.
+documentation_impact:
+  status: none
+  rationale: This repository-local delivery reconciliation changes no
+    user-facing product behavior or operator workflow.
 notes:
   - PR 98 supersedes PR 89 solely to satisfy the repository actor policy's
     chore/pr-* head-branch requirement.
