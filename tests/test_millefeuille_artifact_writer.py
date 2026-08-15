@@ -610,7 +610,10 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                 _make_discovery_stats(),
             )
 
-            with self.assertRaisesRegex(ValueError, "zotero-ITEM2/manifest.json"):
+            with self.assertRaisesRegex(
+                ValueError,
+                r"zotero-ITEM2[\\/]manifest\.json",
+            ):
                 dry_run_command(cfg, logger, mock_zotero)
 
             self.assertFalse((existing_source_pack_dir / "analyses").exists())
