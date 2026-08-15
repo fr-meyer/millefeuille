@@ -100,6 +100,8 @@ def retrieve_artifact_refs(
     section: str | None = None,
     page: int | None = None,
     evidence_need: str | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> dict[str, Any]:
     """Return ref-only metadata for one verified local artifact package."""
 
@@ -118,6 +120,8 @@ def retrieve_artifact_refs(
         page=page,
         evidence_need=evidence_need,
         strict_filters=False,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     ).payload
 
 
@@ -137,6 +141,17 @@ def write_retrieval_batch_result(
     batch_manifest_target = Path(batch_manifest_path)
     batch_id, locators, batch_manifest_bytes = _load_retrieval_batch_manifest(
         batch_manifest_target
+    )
+    # Keep argument validation portable and deterministic even when this host
+    # cannot provide the stronger filesystem primitives required to publish.
+    _normalize_retrieval_filters(
+        summary_scope=summary_scope,
+        grain=grain,
+        index_lane=index_lane,
+        section=section,
+        page=page,
+        evidence_need=evidence_need,
+        strict_choices=True,
     )
     root = Path(source_pack_root).absolute()
     with RootArtifactReader(root) as artifact_reader:
@@ -245,6 +260,8 @@ def _prepare_retrieval(
     evidence_need: str | None,
     strict_filters: bool,
     artifact_reader: RootArtifactReader | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> _PreparedRetrieval:
     filters, normalized_section = _normalize_retrieval_filters(
         summary_scope=summary_scope,
@@ -269,6 +286,8 @@ def _prepare_retrieval(
         doi=doi,
         title=title,
         artifact_reader=artifact_reader,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
 
     _validate_resolved_package_paths(resolved, artifact_reader=artifact_reader)
@@ -735,24 +754,15 @@ def _validate_resolved_package_paths(
             artifact_reader.verify_regular_file(paths[label], label)
         return
 
+    ensure_no_follow_directory(resolved.run_dir, "artifact run directory")
+    source_labels = {"source-pack manifest", "selected full text"}
     for label, target in paths.items():
-        try:
-            relative = target.relative_to(root)
-        except ValueError as exc:
-            raise MillefeuilleContractError(
-                "resolved artifact package escapes the source-pack root"
-            ) from exc
-        cursor = root
-        for part in relative.parts:
-            cursor = cursor / part
-            if cursor.is_symlink():
-                if cursor == target:
-                    raise MillefeuilleContractError(
-                        f"{label} must not be a symbolic link"
-                    )
-                raise MillefeuilleContractError(
-                    f"{label} path must not contain symbolic links"
-                )
+        boundary = root if label in source_labels else resolved.run_dir
+        probe_no_follow_regular_file(
+            target,
+            label,
+            root=boundary,
+        )
     _require_regular_artifact(
         resolved.source_pack_dir / "manifest.json",
         "source-pack manifest",
@@ -761,12 +771,12 @@ def _validate_resolved_package_paths(
     _require_regular_artifact(
         resolved.stage_manifest_path,
         "stage manifest",
-        root=root,
+        root=resolved.run_dir,
     )
     _require_regular_artifact(
         resolved.artifact_index_path,
         "artifact index",
-        root=root,
+        root=resolved.run_dir,
     )
 
 
@@ -1989,6 +1999,8 @@ def _resolve_retrieve_artifacts(
     doi: str | None,
     title: str | None,
     artifact_reader: RootArtifactReader | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> tuple[ResolvedRunArtifacts, str]:
     locators = {
         "paper_id": paper_id,
@@ -2009,6 +2021,8 @@ def _resolve_retrieve_artifacts(
             run_id=run_id,
             paper_id=locator_value if locator_type in {"paper_id", "slug"} else None,
             item_key=locator_value if locator_type == "item_key" else None,
+            artifact_root=artifact_root,
+            stage_manifest=stage_manifest,
             artifact_reader=artifact_reader,
         )
         return resolved, locator_type
@@ -2049,21 +2063,44 @@ def _resolve_retrieve_artifacts(
                 continue
         elif candidate.is_symlink() or not candidate.is_dir():
             continue
-        card_path = (
-            candidate / "analyses" / "millefeuille" / resolved_run_id / CARD_JSON_REF
-        )
-        if not _probe_retrieval_file(
-            card_path,
-            "paper card",
-            artifact_reader=artifact_reader,
-        ):
-            continue
-        resolved = resolve_run_artifacts(
-            source_pack_root=root,
-            run_id=run_id,
-            paper_id=candidate.name,
-            artifact_reader=artifact_reader,
-        )
+        if artifact_root is None and stage_manifest is None:
+            card_path = (
+                candidate
+                / "analyses"
+                / "millefeuille"
+                / resolved_run_id
+                / CARD_JSON_REF
+            )
+            if not _probe_retrieval_file(
+                card_path,
+                "paper card",
+                artifact_reader=artifact_reader,
+            ):
+                continue
+        try:
+            resolved = resolve_run_artifacts(
+                source_pack_root=root,
+                run_id=run_id,
+                paper_id=candidate.name,
+                artifact_root=artifact_root,
+                stage_manifest=stage_manifest,
+                artifact_reader=artifact_reader,
+            )
+        except MillefeuilleContractError as exc:
+            if artifact_root is not None or stage_manifest is not None:
+                message = str(exc)
+                if any(
+                    expected in message
+                    for expected in (
+                        "contains no complete run package",
+                        "stage manifest does not belong",
+                        "source-pack manifest paper_id drift",
+                        "artifact index paper_id drift",
+                        "artifact index source-pack ref drift",
+                    )
+                ):
+                    continue
+            raise
         _validate_resolved_package_paths(
             resolved,
             artifact_reader=artifact_reader,

@@ -22,6 +22,10 @@ from millefeuille.domain.model_execution import (
     validate_model_provenance_record,
 )
 from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
+from tests.platform_capabilities import (
+    requires_secure_nofollow_writes,
+    requires_unsupported_secure_nofollow_writes,
+)
 
 
 class ModelExecutionPlanTests(unittest.TestCase):
@@ -989,6 +993,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
             ["risk-assessment", "task-generated"],
         )
 
+    @requires_secure_nofollow_writes
     def test_models_cli_materializes_provenance_from_plan_and_evidence_files(self):
         plan = build_summary_execution_plan(
             profile="research-default",
@@ -1028,6 +1033,49 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 payload["schema_version"],
                 "millefeuille-model-provenance/v0.1",
             )
+
+    @requires_unsupported_secure_nofollow_writes
+    def test_models_cli_provenance_output_fails_closed_without_secure_writes(self):
+        plan = build_summary_execution_plan(
+            profile="research-default",
+            stage="summarize_full_paper",
+        )
+        evidence = self._research_execution_evidence()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan_path = root / "plan.json"
+            evidence_path = root / "evidence.json"
+            output_path = root / "provenance" / "model-provenance.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+            stdout = StringIO()
+            stderr = StringIO()
+
+            exit_code = run_stage_cli(
+                [
+                    "models",
+                    "--provenance",
+                    "--plan-file",
+                    str(plan_path),
+                    "--execution-evidence",
+                    str(evidence_path),
+                    "--output",
+                    str(output_path),
+                    "--json",
+                ],
+                stdout=stdout,
+                stderr=stderr,
+            )
+
+            self.assertEqual(exit_code, 2)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertIn(
+                "requires no-follow filesystem writes on this platform",
+                stderr.getvalue(),
+            )
+            self.assertFalse(output_path.exists())
+            self.assertFalse(output_path.parent.exists())
 
     def test_models_cli_rejects_credential_ref_without_reflection_or_output(self):
         secret_ref = f"summaries/texts/{self._credential_tokens()[0]}.md"
@@ -1071,7 +1119,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
             self.assertFalse(output_path.exists())
             self.assertFalse(output_path.parent.exists())
 
-    @unittest.skipUnless(hasattr(os, "O_NOFOLLOW"), "requires no-follow writes")
+    @requires_secure_nofollow_writes
     def test_model_provenance_output_rejects_symlinked_paths_and_existing_files(self):
         plan = build_summary_execution_plan(
             profile="research-default",
@@ -1119,7 +1167,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
                 )
             self.assertEqual(existing.read_text(encoding="utf-8"), "preserve me")
 
-    @unittest.skipUnless(hasattr(os, "O_NOFOLLOW"), "requires no-follow writes")
+    @requires_secure_nofollow_writes
     def test_model_provenance_output_detects_replacement_race_without_escape(self):
         plan = build_summary_execution_plan(
             profile="research-default",
@@ -1165,7 +1213,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
             self.assertEqual(outside.read_text(encoding="utf-8"), "preserve me")
             self.assertTrue(moved_path.is_file())
 
-    @unittest.skipUnless(hasattr(os, "O_NOFOLLOW"), "requires no-follow writes")
+    @requires_secure_nofollow_writes
     def test_model_provenance_output_rejects_run_package_destinations(self):
         plan = build_summary_execution_plan(
             profile="research-default",

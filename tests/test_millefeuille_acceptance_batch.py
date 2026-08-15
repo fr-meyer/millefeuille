@@ -45,6 +45,10 @@ def _clone_fixture_run(run_dir: Path, run_id: str) -> Path:
         payload = json.loads(target.read_text(encoding="utf-8"))
         payload["run_id"] = run_id
         _write_json(target, payload)
+    index_path = destination / "artifact-index.json"
+    index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+    index_payload["artifact_root"] = str(destination)
+    _write_json(index_path, index_payload)
     return destination
 
 

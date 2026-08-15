@@ -39,6 +39,10 @@ from millefeuille.domain.summary_fixtures import (
     SUMMARY_ARTIFACT_REF,
     load_hierarchical_summary,
 )
+from tests.platform_capabilities import (
+    requires_posix_batch_publication,
+    requires_unsupported_posix_batch_publication,
+)
 from tests.test_millefeuille_source_pack_writer import (
     _make_handoff_row,
     _write_recovered_pdf_bytes,
@@ -81,6 +85,10 @@ def _clone_fixture_run(run_dir: Path, run_id: str) -> Path:
         payload = json.loads(target.read_text(encoding="utf-8"))
         payload["run_id"] = run_id
         _write_json(target, payload)
+    index_path = destination / "artifact-index.json"
+    index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+    index_payload["artifact_root"] = str(destination)
+    _write_json(index_path, index_payload)
     return destination
 
 
@@ -93,6 +101,14 @@ def _clone_fixture_package(source_pack_root: Path, paper_id: str) -> Path:
         if payload.get("paper_id") == PAPER_ID:
             payload["paper_id"] = paper_id
             _write_json(path, payload)
+    for index_path in destination.rglob("artifact-index.json"):
+        payload = json.loads(index_path.read_text(encoding="utf-8"))
+        payload["artifact_root"] = str(index_path.parent)
+        payload["source_pack"]["ref"] = str(destination)
+        payload["source_pack"]["manifest_ref"] = str(
+            destination / "manifest.json"
+        )
+        _write_json(index_path, payload)
     return destination
 
 
@@ -291,10 +307,19 @@ def _prepare_multi_pdf_runtime_run(tempdir: str) -> tuple[Path, str, str]:
         if isinstance(source_pack, dict) and source_pack.get("source_hash") is not None:
             source_pack["source_hash"] = source_hash
         _write_json(target, payload)
+    index_path = destination / "artifact-index.json"
+    index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+    index_payload["artifact_root"] = str(destination)
+    index_payload["source_pack"]["ref"] = str(result.source_pack_dir)
+    index_payload["source_pack"]["manifest_ref"] = str(
+        result.source_pack_dir / "manifest.json"
+    )
+    _write_json(index_path, index_payload)
     return root, paper_id, run_id
 
 
 class TestMillefeuilleRetrievalBatch(unittest.TestCase):
+    @requires_posix_batch_publication
     def test_batch_retrieval_is_sorted_portable_filtered_and_byte_stable(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, first_run = _prepare_fixture_run(tempdir)
@@ -433,6 +458,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 first_bytes,
             )
 
+    @requires_posix_batch_publication
     def test_batch_omits_private_summary_and_index_metadata_from_json_and_markdown(
         self,
     ):
@@ -510,6 +536,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             ):
                 self.assertNotIn(sentinel, aggregate_text)
 
+    @requires_posix_batch_publication
     def test_descendant_directory_substitution_fails_before_aggregate_write(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -557,6 +584,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertNotIn("OUTSIDE_CONTENT_SENTINEL", stderr.getvalue())
             self.assertFalse((root / RETRIEVAL_BATCH_ROOT_REF).exists())
 
+    @requires_posix_batch_publication
     def test_preflighted_source_artifact_mutation_fails_before_atomic_commit(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, run_dir = _prepare_fixture_run(tempdir)
@@ -601,6 +629,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 ).exists()
             )
 
+    @requires_posix_batch_publication
     def test_missing_optional_input_appearing_after_preflight_fails_closed(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, run_dir = _prepare_fixture_run(tempdir)
@@ -632,6 +661,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertIn("appeared after batch preflight", stderr.getvalue())
             self.assertIn(optional_path.as_posix(), stderr.getvalue())
 
+    @requires_posix_batch_publication
     def test_non_regular_optional_input_fails_during_preflight(self):
         cases = ["directory"]
         if hasattr(os, "mkfifo"):
@@ -663,6 +693,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 self.assertIn(optional_path.as_posix(), stderr.getvalue())
                 self.assertFalse((root / RETRIEVAL_BATCH_ROOT_REF).exists())
 
+    @requires_posix_batch_publication
     def test_missing_optional_input_becoming_non_regular_fails_revalidation(self):
         cases = ["directory"]
         if hasattr(os, "mkfifo"):
@@ -712,6 +743,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 self.assertIn("changed after batch preflight", stderr.getvalue())
                 self.assertIn(optional_path.as_posix(), stderr.getvalue())
 
+    @requires_posix_batch_publication
     def test_corpus_enumeration_mutation_after_preflight_fails_closed(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, run_dir = _prepare_fixture_run(tempdir)
@@ -756,6 +788,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 ).exists()
             )
 
+    @requires_posix_batch_publication
     def test_batch_manifest_mutation_fails_before_atomic_commit(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -803,6 +836,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 ).exists()
             )
 
+    @requires_posix_batch_publication
     def test_staging_failure_leaves_only_scrubbed_owned_output(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -853,6 +887,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 (staging_dirs[0] / RETRIEVAL_BATCH_REPORT_REF.name).exists()
             )
 
+    @requires_posix_batch_publication
     def test_late_destination_creation_fails_closed_without_overwrite(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -894,6 +929,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 },
             )
 
+    @requires_posix_batch_publication
     def test_batch_relative_dot_source_pack_root_remains_supported(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -924,6 +960,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 (root / RETRIEVAL_BATCH_ROOT_REF / "retrieval-fixture").is_dir()
             )
 
+    @requires_posix_batch_publication
     def test_concurrent_same_batch_calls_publish_one_coherent_generation(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -957,6 +994,29 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 sorted(path.name for path in stable_dir.iterdir()),
                 [RETRIEVAL_BATCH_REPORT_REF.name, RETRIEVAL_BATCH_RESULT_REF.name],
             )
+
+    @requires_unsupported_posix_batch_publication
+    def test_batch_fails_closed_on_unsupported_publication_platform(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root, _run_dir = _prepare_fixture_run(tempdir)
+            manifest_path = Path(tempdir) / "retrieval-batch.json"
+            _write_batch_manifest(
+                manifest_path,
+                runs=[{"paper_id": PAPER_ID, "run_id": RUN_ID}],
+            )
+            stderr = StringIO()
+
+            exit_code = run_stage_cli(
+                _batch_args(source_pack_root=root, manifest_path=manifest_path),
+                stderr=stderr,
+            )
+
+            self.assertEqual(exit_code, 2)
+            self.assertRegex(
+                stderr.getvalue(),
+                r"requires no-follow filesystem reads|requires POSIX fd-relative",
+            )
+            self.assertFalse((root / RETRIEVAL_BATCH_ROOT_REF).exists())
 
     def test_batch_fails_closed_without_no_follow_platform_support(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -1021,6 +1081,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 ):
                     loader()
 
+    @requires_posix_batch_publication
     def test_missing_fcntl_support_fails_closed_before_publication(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -1054,6 +1115,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertIn("requires POSIX flock support", stderr.getvalue())
             self.assertFalse((batch_dir / RETRIEVAL_BATCH_RESULT_REF.parent).exists())
 
+    @requires_posix_batch_publication
     def test_legacy_lock_path_replacement_during_staging_does_not_break_publication(
         self,
     ):
@@ -1113,6 +1175,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 [],
             )
 
+    @requires_posix_batch_publication
     def test_batch_directory_substitution_before_commit_scrubs_staging(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -1165,6 +1228,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 },
             )
 
+    @requires_posix_batch_publication
     def test_batch_hierarchy_symlink_substitution_before_lock_fails_closed(self):
         for link_kind, link_relative in (
             ("parent", Path("batches")),
@@ -1196,6 +1260,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 self.assertIn("symbolic links", stderr.getvalue())
                 self.assertEqual(list(outside.iterdir()), [])
 
+    @requires_posix_batch_publication
     def test_source_root_ancestor_substitution_before_open_fails_closed(self):
         with tempfile.TemporaryDirectory() as tempdir:
             sandbox = Path(tempdir)
@@ -1244,6 +1309,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertIn("source-pack root path must not contain", stderr.getvalue())
             self.assertEqual(list((outside / "source-packs").iterdir()), [])
 
+    @requires_posix_batch_publication
     def test_source_root_identity_substitution_before_publish_fails_closed(self):
         with tempfile.TemporaryDirectory() as tempdir:
             sandbox = Path(tempdir)
@@ -1293,6 +1359,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 if displaced_workspace.exists():
                     os.replace(displaced_workspace, workspace)
 
+    @requires_posix_batch_publication
     def test_staging_hard_link_injection_fails_without_external_write(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -1402,6 +1469,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 },
             )
 
+    @requires_posix_batch_publication
     def test_staging_directory_substitution_scrubs_only_pinned_generation(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -1466,6 +1534,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 attacker_payload,
             )
 
+    @requires_posix_batch_publication
     def test_atomic_rename_commits_read_only_generation_before_parent_fsync(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -1508,6 +1577,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(fsync_calls, 2)
 
+    @requires_posix_batch_publication
     def test_new_generation_does_not_use_existing_generation_validator(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -1539,6 +1609,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 self.assertEqual(rerun_exit, 0)
                 validator.assert_called_once()
 
+    @requires_posix_batch_publication
     def test_late_staging_mutations_are_detected_before_atomic_commit(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -1678,6 +1749,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertEqual(external.stat().st_size, 0)
             self.assertFalse((batch_dir / RETRIEVAL_BATCH_RESULT_REF.parent).exists())
 
+    @requires_posix_batch_publication
     def test_displaced_staged_inode_is_scrubbed_through_retained_descriptor(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -1768,6 +1840,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 0,
             )
 
+    @requires_posix_batch_publication
     def test_staged_descriptors_are_read_only_before_final_verification(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -1836,6 +1909,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             )
             self.assertFalse(result_path.read_bytes().startswith(b"X"))
 
+    @requires_posix_batch_publication
     def test_existing_generation_hard_link_incomplete_and_drift_fail_closed(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -1893,6 +1967,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 ],
             )
 
+    @requires_posix_batch_publication
     def test_multi_pdf_batch_result_accepts_aggregate_source_hash(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, paper_id, run_id = _prepare_multi_pdf_runtime_run(tempdir)
@@ -1916,6 +1991,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 payload["runs"][0]["source_hash"].startswith("sha256-aggregate:")
             )
 
+    @requires_posix_batch_publication
     def test_batch_supports_every_single_run_locator(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, first_run = _prepare_fixture_run(tempdir)
@@ -1982,6 +2058,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 )
             )
 
+    @requires_posix_batch_publication
     def test_duplicate_resolved_run_fails_before_aggregate_write(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -2004,6 +2081,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertIn("unique paper_id/run_id", stderr.getvalue())
             self.assertFalse((root / RETRIEVAL_BATCH_ROOT_REF).exists())
 
+    @requires_posix_batch_publication
     def test_later_missing_or_ambiguous_locator_fails_before_write(self):
         cases = ("missing", "ambiguous")
         for case in cases:
@@ -2137,6 +2215,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             )
             self.assertFalse((root / RETRIEVAL_BATCH_ROOT_REF).exists())
 
+    @requires_posix_batch_publication
     def test_unsafe_summary_ref_fails_preflight_without_write(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, run_dir = _prepare_fixture_run(tempdir)
@@ -2160,6 +2239,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertIn("traversal-safe relative ref", stderr.getvalue())
             self.assertFalse((root / RETRIEVAL_BATCH_ROOT_REF).exists())
 
+    @requires_posix_batch_publication
     def test_batch_rejects_schema_valid_but_non_portable_summary_refs(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, run_dir = _prepare_fixture_run(tempdir)
@@ -2187,6 +2267,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertIn("artifact ref is not portable", stderr.getvalue())
             self.assertFalse((root / RETRIEVAL_BATCH_ROOT_REF).exists())
 
+    @requires_posix_batch_publication
     def test_symlinked_aggregate_output_is_rejected_without_partial_write(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
@@ -2214,6 +2295,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertEqual(outside.read_text(encoding="utf-8"), "sentinel\n")
             self.assertFalse(report_path.exists())
 
+    @requires_posix_batch_publication
     def test_symlinked_aggregate_parent_is_rejected_without_escape_write(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_fixture_run(tempdir)
