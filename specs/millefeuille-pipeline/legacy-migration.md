@@ -205,10 +205,12 @@ The lifecycle vocabulary is stage-specific, from
 `millefeuille-acceptance-passed`, and `millefeuille-classified`. The exact
 transition rules live in `tag-state-machine.md`.
 
-Historical `docai`, `docai-pageindex`, and `docai-error` tags belong to the
-external predecessor workflow and are not configured Millefeuille lifecycle
-states. A later writeback-policy card must decide their evidence-backed mapping
-and removal rules. Until then:
+Historical selection, PageIndex-success, and error tags from the external
+predecessor workflow are not configured Millefeuille lifecycle states. Their
+former spellings are intentionally not repeated in tracked repository content;
+operator-owned inventory snapshots remain the evidence source. A later
+writeback-policy card must decide their evidence-backed mapping and removal
+rules. Until then:
 
 - preserve all historical and legacy tags during intake;
 - never infer a lifecycle pass solely from one of those tags;
@@ -275,7 +277,7 @@ cards:
 - define and implement provider-to-OCR evidence adapters;
 - build the PageIndex MCP bridge, exact-duplicate checks, and durable ledger;
 - define canonical mappings for `millefeuille-processed` and historical
-  `docai-*` tags before approved-live writeback;
+  predecessor-workflow tags before approved-live writeback;
 - resolve external artifact-root support for all stage commands;
 - implement approved-live writeback and compensating-action records; and
 - collect the live parity and rollback evidence required before any removal
