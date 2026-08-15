@@ -1,6 +1,6 @@
 id: pr-088-retire-remaining-coderabbit-workflows
 title: Retire remaining CodeRabbit workflows and configuration
-status: local-implementation
+status: merged
 branch: chore/pr-088-retire-remaining-coderabbit-workflows
 base_branch: dev
 write_paths:
@@ -43,15 +43,26 @@ branch_plan: Create one isolated dev-target cleanup PR, obtain exact-head Mergeg
 executor: OpenClaw main session
 private_data_scan: required; workflow and metadata only, with no secrets or private payloads
 publish_authority: Active Speculoos feature-to-dev publication; stable-branch promotion and live operations remain excluded.
+notes:
+  - PR 88 retired the remaining CodeRabbit configuration and workflow entrypoints without changing application code.
+  - The exact merged head received a clean Mergeguez review and successful check.
+  - GitHub ProjectV2 remains unavailable to the current credential; repository-local closeout is authoritative.
+evidence:
+  - 'PR #88 merged with merge commit 130aba5f962b190f7816347c41a5e4d07a17752e'
+  - 'Mergeguez approved exact head 8c0fdb8cbcc9e3928f4baa89356fe64603fed7fa with zero findings: https://github.com/fr-meyer/millefeuille/pull/88#pullrequestreview-4773052125'
+  - 'Mergeguez check run passed: https://github.com/fr-meyer/millefeuille/runs/89478145706'
 github:
   issue: null
-  pull_request: null
+  pull_request: 88
   issue_project_item: null
   project_item: unavailable
-  project_status: In Progress
-  url: null
-  head_sha: null
-  merge_commit: null
+  pull_request_project_item: unavailable
+  project_status: Done
+  url: https://github.com/fr-meyer/millefeuille/pull/88
+  head_sha: 8c0fdb8cbcc9e3928f4baa89356fe64603fed7fa
+  merge_commit: 130aba5f962b190f7816347c41a5e4d07a17752e
+  mergeguez_review: https://github.com/fr-meyer/millefeuille/pull/88#pullrequestreview-4773052125
+  mergeguez_check_run: https://github.com/fr-meyer/millefeuille/runs/89478145706
 post_merge_expected:
   pull_request: 88
   base_branch: dev

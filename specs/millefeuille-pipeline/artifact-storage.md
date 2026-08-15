@@ -5,8 +5,12 @@ No important output should disappear into a hidden default directory.
 
 ## Artifact Roots
 
-The CLI should accept an explicit `--artifact-root` for commands that create or
-read derived artifacts.
+The lifecycle/stage CLI accepts an explicit `--artifact-root` for single-run
+commands that create or read derived run artifacts. Existing source-level
+extraction, route, and structure evidence remains anchored in the verified
+source pack; the selected artifact root owns the run manifest, artifact index,
+summaries, cards, index status, acceptance, classification, writeback preview,
+and release-preflight outputs.
 
 Supported root modes:
 
@@ -21,6 +25,10 @@ Supported root modes:
 - absolute or relative path
   - Store a project or batch bundle outside the source pack.
   - The artifact index must point back to the source pack and source hash.
+  - The discovery/dry-run writer creates `<root>/<paper-id>/<run-id>/`.
+  - Stage commands also accept an exact run directory or the declared legacy
+    container layouts documented in `cli-contract.md`, but exactly one complete
+    package may match.
 
 - `memory/...`
   - Store only lightweight, public-safe reports and summaries.
@@ -184,6 +192,15 @@ The artifact index should answer:
 ## Storage Rules
 
 - Artifacts must use relative refs inside a portable bundle when possible.
+- A selected run package contains one regular `artifact-index.json` and one
+  regular stage manifest. A custom stage-manifest filename is valid only when
+  every indexed stage and the stage-manifest artifact record reference it.
+- The artifact index's `artifact_root`, source-pack ref, paper id, run id,
+  source hash, source identity, stage set, and stage statuses must revalidate
+  against the selected package before reads, resume, or writes.
+- Explicit locator paths must not contain parent traversal or pass through a
+  symbolic link or Windows reparse point. A container matching more than one
+  declared run layout is ambiguous and rejected.
 - Artifacts may point to absolute source-pack paths when the source pack is the
   authority.
 - Provider payloads and raw PDF bytes must not be committed to the repository.

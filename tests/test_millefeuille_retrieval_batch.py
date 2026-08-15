@@ -78,12 +78,17 @@ def _clone_fixture_run(run_dir: Path, run_id: str) -> Path:
         Path("stage-manifest.json"),
         Path("artifact-index.json"),
         SUMMARY_ARTIFACT_REF,
+        Path("cards/paper-card.json"),
         INDEX_STATUS_REF,
     ):
         target = destination / relative_path
         payload = json.loads(target.read_text(encoding="utf-8"))
         payload["run_id"] = run_id
         _write_json(target, payload)
+    index_path = destination / "artifact-index.json"
+    index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+    index_payload["artifact_root"] = str(destination)
+    _write_json(index_path, index_payload)
     return destination
 
 
@@ -96,6 +101,14 @@ def _clone_fixture_package(source_pack_root: Path, paper_id: str) -> Path:
         if payload.get("paper_id") == PAPER_ID:
             payload["paper_id"] = paper_id
             _write_json(path, payload)
+    for index_path in destination.rglob("artifact-index.json"):
+        payload = json.loads(index_path.read_text(encoding="utf-8"))
+        payload["artifact_root"] = str(index_path.parent)
+        payload["source_pack"]["ref"] = str(destination)
+        payload["source_pack"]["manifest_ref"] = str(
+            destination / "manifest.json"
+        )
+        _write_json(index_path, payload)
     return destination
 
 
@@ -294,6 +307,14 @@ def _prepare_multi_pdf_runtime_run(tempdir: str) -> tuple[Path, str, str]:
         if isinstance(source_pack, dict) and source_pack.get("source_hash") is not None:
             source_pack["source_hash"] = source_hash
         _write_json(target, payload)
+    index_path = destination / "artifact-index.json"
+    index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+    index_payload["artifact_root"] = str(destination)
+    index_payload["source_pack"]["ref"] = str(result.source_pack_dir)
+    index_payload["source_pack"]["manifest_ref"] = str(
+        result.source_pack_dir / "manifest.json"
+    )
+    _write_json(index_path, index_payload)
     return root, paper_id, run_id
 
 
@@ -856,9 +877,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
                 stderr.getvalue(),
             )
             self.assertFalse((batch_dir / RETRIEVAL_BATCH_RESULT_REF.parent).exists())
-            staging_dirs = list(
-                batch_dir.glob(f"{_RETRIEVAL_BATCH_TEMP_PREFIX}*")
-            )
+            staging_dirs = list(batch_dir.glob(f"{_RETRIEVAL_BATCH_TEMP_PREFIX}*"))
             self.assertEqual(len(staging_dirs), 1)
             self.assertEqual(
                 (staging_dirs[0] / RETRIEVAL_BATCH_RESULT_REF.name).stat().st_size,
@@ -900,15 +919,10 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertIn("output appeared during publication", stderr.getvalue())
             self.assertTrue(stable_dir.is_dir())
             self.assertEqual(list(stable_dir.iterdir()), [])
-            staging_dirs = list(
-                batch_dir.glob(f"{_RETRIEVAL_BATCH_TEMP_PREFIX}*")
-            )
+            staging_dirs = list(batch_dir.glob(f"{_RETRIEVAL_BATCH_TEMP_PREFIX}*"))
             self.assertEqual(len(staging_dirs), 1)
             self.assertEqual(
-                {
-                    path.name: path.stat().st_size
-                    for path in staging_dirs[0].iterdir()
-                },
+                {path.name: path.stat().st_size for path in staging_dirs[0].iterdir()},
                 {
                     RETRIEVAL_BATCH_REPORT_REF.name: 0,
                     RETRIEVAL_BATCH_RESULT_REF.name: 0,
@@ -1207,10 +1221,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             )
             self.assertEqual(len(staging_dirs), 1)
             self.assertEqual(
-                {
-                    path.name: path.stat().st_size
-                    for path in staging_dirs[0].iterdir()
-                },
+                {path.name: path.stat().st_size for path in staging_dirs[0].iterdir()},
                 {
                     RETRIEVAL_BATCH_REPORT_REF.name: 0,
                     RETRIEVAL_BATCH_RESULT_REF.name: 0,
@@ -1396,9 +1407,7 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             )
             self.assertEqual(external.read_bytes(), b"sentinel\n")
             self.assertFalse((batch_dir / RETRIEVAL_BATCH_RESULT_REF.parent).exists())
-            staging_dirs = list(
-                batch_dir.glob(f"{_RETRIEVAL_BATCH_TEMP_PREFIX}*")
-            )
+            staging_dirs = list(batch_dir.glob(f"{_RETRIEVAL_BATCH_TEMP_PREFIX}*"))
             self.assertEqual(len(staging_dirs), 1)
             injected_name = staging_dirs[0] / RETRIEVAL_BATCH_RESULT_REF.name
             self.assertTrue(injected_name.exists())
@@ -1450,15 +1459,10 @@ class TestMillefeuilleRetrievalBatch(unittest.TestCase):
             self.assertTrue(external.exists())
             self.assertEqual(external.read_bytes(), b"")
             self.assertFalse((batch_dir / RETRIEVAL_BATCH_RESULT_REF.parent).exists())
-            staging_dirs = list(
-                batch_dir.glob(f"{_RETRIEVAL_BATCH_TEMP_PREFIX}*")
-            )
+            staging_dirs = list(batch_dir.glob(f"{_RETRIEVAL_BATCH_TEMP_PREFIX}*"))
             self.assertEqual(len(staging_dirs), 1)
             self.assertEqual(
-                {
-                    path.name: path.stat().st_size
-                    for path in staging_dirs[0].iterdir()
-                },
+                {path.name: path.stat().st_size for path in staging_dirs[0].iterdir()},
                 {
                     RETRIEVAL_BATCH_REPORT_REF.name: 0,
                     RETRIEVAL_BATCH_RESULT_REF.name: 0,

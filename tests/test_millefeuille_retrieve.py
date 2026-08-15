@@ -196,6 +196,11 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
             with (
                 mock.patch.object(
                     secure_io,
+                    "_WINDOWS",
+                    False,
+                ),
+                mock.patch.object(
+                    secure_io,
                     "_supports_no_follow",
                     return_value=False,
                 ),
@@ -708,6 +713,14 @@ def _clone_package(root: Path, source_paper_id: str, target_paper_id: str) -> No
         payload = _read_json(path)
         payload["paper_id"] = target_paper_id
         _write_json(path, payload)
+    index_path = run_dir / "artifact-index.json"
+    index_payload = _read_json(index_path)
+    index_payload["artifact_root"] = str(run_dir)
+    index_payload["source_pack"]["ref"] = str(target_dir)
+    index_payload["source_pack"]["manifest_ref"] = str(
+        target_dir / "manifest.json"
+    )
+    _write_json(index_path, index_payload)
 
 
 def _read_json(path: Path) -> dict[str, object]:

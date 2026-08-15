@@ -18,6 +18,14 @@ from millefeuille.domain.classification import (
     write_classification_batch_summary,
     write_classification_from_evidence,
 )
+from millefeuille.domain.live_receipts import (
+    ApprovedLiveRequest,
+    LiveDisposalPolicy,
+    LiveSelector,
+    LiveTarget,
+    load_approved_live_receipt,
+    validate_approved_live_receipt_for_no_effect,
+)
 from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
     RunMode,
@@ -65,6 +73,21 @@ FIXTURE_EVIDENCE_ARGS = {
     StageName.INDEX.value: "index_evidence",
 }
 
+_LIVE_OPERATION_BY_COMMAND = {
+    StageName.EXTRACT_NATIVE.value: "stage.extract-native",
+    StageName.EXTRACT_OCR.value: "ocr.execute",
+    StageName.ROUTE.value: "stage.route",
+    StageName.STRUCTURE.value: "stage.structure",
+    StageName.SUMMARIZE.value: "model.summarize",
+    StageName.CARD.value: "model.card",
+    StageName.INDEX.value: "index.write",
+    StageName.ACCEPTANCE.value: "stage.acceptance",
+    StageName.CLASSIFY.value: "model.classify",
+    StageName.WRITEBACK.value: "zotero.writeback",
+    "retrieve": "index.read",
+    "models": "model.execute",
+}
+
 
 def run_stage_cli(
     argv: Sequence[str],
@@ -88,6 +111,8 @@ def run_stage_cli(
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
             )
             payload = result.to_dict()
         elif args.command == "acceptance":
@@ -107,6 +132,8 @@ def run_stage_cli(
                     item_key=args.item_key,
                     handoff_path=args.handoff,
                     duplicate_scan_path=args.duplicate_scans,
+                    artifact_root=args.artifact_root,
+                    stage_manifest=args.stage_manifest,
                 )
             payload = result.to_dict()
         elif args.command == "classify":
@@ -125,6 +152,8 @@ def run_stage_cli(
                     paper_id=args.paper_id,
                     item_key=args.item_key,
                     default_profile=args.model_profile,
+                    artifact_root=args.artifact_root,
+                    stage_manifest=args.stage_manifest,
                 )
             else:
                 result = write_classification_from_evidence(
@@ -134,6 +163,8 @@ def run_stage_cli(
                     paper_id=args.paper_id,
                     item_key=args.item_key,
                     default_profile=args.model_profile,
+                    artifact_root=args.artifact_root,
+                    stage_manifest=args.stage_manifest,
                 )
             payload = result.to_dict()
         elif args.command == "writeback":
@@ -147,6 +178,8 @@ def run_stage_cli(
                 paper_id=args.paper_id,
                 item_key=args.item_key,
                 preview_path=args.preview_path,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
             )
             payload = result.to_dict()
         elif args.command == "retrieve":
@@ -177,6 +210,8 @@ def run_stage_cli(
                     section=args.section,
                     page=args.page,
                     evidence_need=args.evidence_need,
+                    artifact_root=args.artifact_root,
+                    stage_manifest=args.stage_manifest,
                 )
         elif args.command == "models":
             if args.provenance:
@@ -292,6 +327,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_mode_arg(acceptance)
     acceptance.add_argument("--source-pack-root", required=True)
+    _add_artifact_locator_args(acceptance)
     acceptance_source = acceptance.add_mutually_exclusive_group()
     acceptance_source.add_argument("--paper-id")
     acceptance_source.add_argument("--item-key")
@@ -323,6 +359,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_mode_arg(classify)
     classify.add_argument("--source-pack-root", required=True)
+    _add_artifact_locator_args(classify)
     classify_source = classify.add_mutually_exclusive_group()
     classify_source.add_argument("--paper-id")
     classify_source.add_argument("--item-key")
@@ -366,6 +403,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_mode_arg(retrieve)
     retrieve.add_argument("--source-pack-root", required=True)
+    _add_artifact_locator_args(retrieve)
     retrieve_source = retrieve.add_mutually_exclusive_group()
     retrieve_source.add_argument("--paper-id")
     retrieve_source.add_argument("--item-key")
@@ -467,10 +505,28 @@ def _build_parser() -> argparse.ArgumentParser:
 def _add_run_locator_args(parser: argparse.ArgumentParser) -> None:
     _add_mode_arg(parser)
     parser.add_argument("--source-pack-root", required=True)
+    _add_artifact_locator_args(parser)
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--paper-id")
     source.add_argument("--item-key")
     parser.add_argument("--run-id", required=True)
+
+
+def _add_artifact_locator_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--artifact-root",
+        help=(
+            "Run-package directory or declared container root. Defaults to the "
+            "verified source-pack run; 'source-pack' explicitly selects it."
+        ),
+    )
+    parser.add_argument(
+        "--stage-manifest",
+        help=(
+            "Exact stage-manifest file inside the selected run package. The "
+            "artifact index must reference the same file."
+        ),
+    )
 
 
 def _add_mode_arg(parser: argparse.ArgumentParser) -> None:
@@ -478,6 +534,48 @@ def _add_mode_arg(parser: argparse.ArgumentParser) -> None:
         "--mode",
         choices=tuple(sorted(RunMode.values())),
         default=RunMode.PREVIEW.value,
+    )
+    parser.add_argument(
+        "--approval-receipt",
+        help=(
+            "Path to an exact-scope approved-live receipt. A receipt never "
+            "promotes preview mode and current live execution remains unsupported."
+        ),
+    )
+    parser.add_argument(
+        "--approved-live-pdf-disposal",
+        choices=(
+            "delete-after-verification",
+            "delete-after-run",
+            "retain-until-expiry",
+            "not-applicable",
+        ),
+        help="Exact PDF disposal policy independently requested for approved-live.",
+    )
+    parser.add_argument(
+        "--approved-live-provider-payload-disposal",
+        choices=("never-persist", "delete-after-run", "not-applicable"),
+        help=(
+            "Exact provider-payload disposal policy independently requested "
+            "for approved-live."
+        ),
+    )
+    parser.add_argument(
+        "--approved-live-temporary-file-disposal",
+        choices=("delete-after-run", "delete-on-failure", "not-applicable"),
+        help=(
+            "Exact temporary-file disposal policy independently requested "
+            "for approved-live."
+        ),
+    )
+    parser.add_argument(
+        "--approved-live-stop-condition",
+        action="append",
+        dest="approved_live_stop_conditions",
+        help=(
+            "One exact approved-live stop-condition code; repeat for the "
+            "complete sorted request set."
+        ),
     )
 
 
@@ -493,6 +591,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
             )
             if can_resume_stage(resolved, stage):
                 results[stage] = {"status": "resumed"}
@@ -508,6 +608,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
             )
             results[stage] = result.to_dict()
         elif stage == StageName.ACCEPTANCE.value:
@@ -516,6 +618,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
                 handoff_path=args.handoff,
                 duplicate_scan_path=args.duplicate_scans,
             )
@@ -531,6 +635,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
                 default_profile=args.model_profile,
             )
             results["classify"] = result.to_dict()
@@ -544,6 +650,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 paper_id=args.paper_id,
                 item_key=args.item_key,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
             )
             results["writeback"] = result.to_dict()
 
@@ -555,6 +663,8 @@ def _run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
             item_key=args.item_key,
             repo_root=Path(__file__).resolve().parents[2],
             candidate_version=args.candidate_version,
+            artifact_root=args.artifact_root,
+            stage_manifest=args.stage_manifest,
         ).to_dict()
     return results
 
@@ -597,6 +707,8 @@ def _preflight_run_request(
                     run_id=args.run_id,
                     paper_id=args.paper_id,
                     item_key=args.item_key,
+                    artifact_root=args.artifact_root,
+                    stage_manifest=args.stage_manifest,
                 )
             if can_resume_stage(resolved_for_resume, stage):
                 continue
@@ -613,10 +725,65 @@ def _preflight_run_request(
 
 def _mode_gate(args: argparse.Namespace, err: TextIO) -> int | None:
     mode = getattr(args, "mode", RunMode.PREVIEW.value)
-    if mode == RunMode.APPROVED_LIVE.value:
+    receipt_path = getattr(args, "approval_receipt", None)
+    writeback_mode = getattr(args, "writeback_mode", "preview")
+    approved_live_policy_values = (
+        getattr(args, "approved_live_pdf_disposal", None),
+        getattr(args, "approved_live_provider_payload_disposal", None),
+        getattr(args, "approved_live_temporary_file_disposal", None),
+        getattr(args, "approved_live_stop_conditions", None),
+    )
+    if receipt_path is not None and mode != RunMode.APPROVED_LIVE.value:
         print(
-            f"millefeuille {args.command}: approved-live requires a separate "
-            "manual approval and is not implemented by this offline command",
+            f"millefeuille {args.command}: --approval-receipt requires explicit "
+            "--mode approved-live; a receipt cannot promote preview or "
+            "read-only-live execution",
+            file=err,
+        )
+        return 3
+    if writeback_mode == "approved-live" and mode != RunMode.APPROVED_LIVE.value:
+        print(
+            f"millefeuille {args.command}: --writeback approved-live requires "
+            "explicit --mode approved-live and a separate manual approval receipt",
+            file=err,
+        )
+        return 3
+    if (
+        any(value is not None for value in approved_live_policy_values)
+        and mode != RunMode.APPROVED_LIVE.value
+    ):
+        print(
+            f"millefeuille {args.command}: approved-live disposal and stop "
+            "controls require explicit --mode approved-live",
+            file=err,
+        )
+        return 3
+    if mode == RunMode.APPROVED_LIVE.value:
+        if receipt_path is None:
+            print(
+                f"millefeuille {args.command}: approved-live requires a separate "
+                "manual approval receipt via --approval-receipt",
+                file=err,
+            )
+            return 3
+        if _cli_requests_writeback(args) and writeback_mode != "approved-live":
+            print(
+                f"millefeuille {args.command}: approved-live writeback requires "
+                "explicit --writeback approved-live as well as the approval receipt",
+                file=err,
+            )
+            return 3
+        try:
+            receipt = load_approved_live_receipt(receipt_path)
+            request = _build_cli_approved_live_request(args)
+            validate_approved_live_receipt_for_no_effect(receipt, request)
+        except MillefeuilleContractError as exc:
+            print(f"millefeuille {args.command}: {exc}", file=err)
+            return 3
+        print(
+            f"millefeuille {args.command}: approved-live receipt "
+            f"{receipt.content_digest} validated, but live execution is not "
+            "implemented by this offline command",
             file=err,
         )
         return 3
@@ -630,20 +797,148 @@ def _mode_gate(args: argparse.Namespace, err: TextIO) -> int | None:
             file=err,
         )
         return 3
-    writeback_mode = getattr(args, "writeback_mode", "preview")
-    if writeback_mode == "approved-live":
-        print(
-            f"millefeuille {args.command}: approved-live Zotero writeback "
-            "requires a separate manual approval and is not implemented",
-            file=err,
-        )
-        return 3
     return None
+
+
+def _cli_requests_writeback(args: argparse.Namespace) -> bool:
+    if args.command == StageName.WRITEBACK.value:
+        return True
+    if args.command != "run":
+        return False
+    return StageName.WRITEBACK.value in {
+        stage.strip() for stage in args.stages.split(",") if stage.strip()
+    }
+
+
+def _build_cli_approved_live_request(
+    args: argparse.Namespace,
+) -> ApprovedLiveRequest:
+    """Bind only controls independently supplied by today's CLI request."""
+
+    operations = _cli_live_operations(args)
+    target, selector = _cli_live_target_and_selector(args)
+    run_id = getattr(args, "run_id", None)
+    if not isinstance(run_id, str) or not run_id:
+        raise MillefeuilleContractError(
+            "current approved-live gate cannot bind an exact run_id"
+        )
+    source_pack_root = getattr(args, "source_pack_root", None)
+    if not isinstance(source_pack_root, str) or not source_pack_root:
+        raise MillefeuilleContractError(
+            "current approved-live gate cannot bind an exact source-pack root"
+        )
+    canonical_source_root = str(Path(source_pack_root).absolute())
+    artifact_root = getattr(args, "artifact_root", None)
+    if artifact_root is None or artifact_root == "source-pack":
+        canonical_output_root = canonical_source_root
+    elif (
+        isinstance(artifact_root, str)
+        and artifact_root
+        and artifact_root == artifact_root.strip()
+    ):
+        canonical_output_root = str(Path(artifact_root).absolute())
+    else:
+        raise MillefeuilleContractError(
+            "current approved-live gate cannot bind an exact output root"
+        )
+    pdf_disposal = getattr(args, "approved_live_pdf_disposal", None)
+    provider_payload_disposal = getattr(
+        args,
+        "approved_live_provider_payload_disposal",
+        None,
+    )
+    temporary_file_disposal = getattr(
+        args,
+        "approved_live_temporary_file_disposal",
+        None,
+    )
+    if not all(
+        isinstance(value, str) and value
+        for value in (
+            pdf_disposal,
+            provider_payload_disposal,
+            temporary_file_disposal,
+        )
+    ):
+        raise MillefeuilleContractError(
+            "current approved-live gate requires all explicit disposal controls"
+        )
+    stop_conditions = getattr(args, "approved_live_stop_conditions", None)
+    if not isinstance(stop_conditions, list) or not stop_conditions:
+        raise MillefeuilleContractError(
+            "current approved-live gate requires explicit stop conditions"
+        )
+    return ApprovedLiveRequest(
+        run_id=run_id,
+        operations=operations,
+        targets=(target,),
+        item_cap=1,
+        selected_item_count=1,
+        selector=selector,
+        output_root=canonical_output_root,
+        source_pack_root=canonical_source_root,
+        provider=None,
+        provider_call_limit=0,
+        cost_limit_usd_micros=0,
+        disposal_policy=LiveDisposalPolicy(
+            pdfs=pdf_disposal,
+            provider_payloads=provider_payload_disposal,
+            temporary_files=temporary_file_disposal,
+        ),
+        stop_conditions=tuple(stop_conditions),
+    )
+
+
+def _cli_live_operations(args: argparse.Namespace) -> tuple[str, ...]:
+    if args.command == "run":
+        requested = [stage.strip() for stage in args.stages.split(",") if stage.strip()]
+        try:
+            operations = {_LIVE_OPERATION_BY_COMMAND[stage] for stage in requested}
+        except KeyError as exc:
+            raise MillefeuilleContractError(
+                "current approved-live gate cannot bind an unsupported run stage"
+            ) from exc
+        if not operations:
+            raise MillefeuilleContractError(
+                "current approved-live gate requires at least one exact operation"
+            )
+        return tuple(sorted(operations))
+    operation = _LIVE_OPERATION_BY_COMMAND.get(args.command)
+    if operation is None:
+        raise MillefeuilleContractError(
+            "current approved-live gate cannot bind an exact operation"
+        )
+    return (operation,)
+
+
+def _cli_live_target_and_selector(
+    args: argparse.Namespace,
+) -> tuple[LiveTarget, LiveSelector]:
+    locators = (
+        ("paper-id", "paper_id"),
+        ("zotero-item-key", "item_key"),
+        ("slug", "slug"),
+        ("doi", "doi"),
+        ("title", "title"),
+        ("source-pack", "source_pack"),
+    )
+    supplied = [
+        (kind, value)
+        for kind, attribute in locators
+        if isinstance(value := getattr(args, attribute, None), str) and value
+    ]
+    if len(supplied) != 1:
+        raise MillefeuilleContractError(
+            "current approved-live gate requires one exact source selector"
+        )
+    kind, value = supplied[0]
+    return LiveTarget(kind=kind, id=value), LiveSelector(kind=kind, value=value)
 
 
 def _validate_acceptance_args(args: argparse.Namespace) -> None:
     single_locator_supplied = bool(args.paper_id or args.item_key or args.run_id)
     if args.batch_manifest:
+        _reject_batch_artifact_overrides(args, "acceptance")
         if single_locator_supplied:
             raise MillefeuilleContractError(
                 "acceptance --batch-manifest cannot be combined with "
@@ -660,6 +955,7 @@ def _validate_acceptance_args(args: argparse.Namespace) -> None:
 def _validate_classify_args(args: argparse.Namespace) -> None:
     single_locator_supplied = bool(args.paper_id or args.item_key or args.run_id)
     if args.batch_manifest:
+        _reject_batch_artifact_overrides(args, "classify")
         if single_locator_supplied:
             raise MillefeuilleContractError(
                 "classify --batch-manifest cannot be combined with --paper-id, "
@@ -688,6 +984,7 @@ def _validate_retrieve_args(args: argparse.Namespace) -> None:
     single_locator_supplied = any(value is not None for value in locator_values)
     batch_manifest_supplied = args.batch_manifest is not None
     if batch_manifest_supplied:
+        _reject_batch_artifact_overrides(args, "retrieve")
         if not isinstance(args.batch_manifest, str) or not args.batch_manifest.strip():
             raise MillefeuilleContractError(
                 "retrieve --batch-manifest must not be empty"
@@ -708,6 +1005,18 @@ def _validate_retrieve_args(args: argparse.Namespace) -> None:
         raise MillefeuilleContractError(
             "retrieve requires --batch-manifest or a single-run locator "
             "(--paper-id|--item-key|--slug|--doi|--title plus --run-id)"
+        )
+
+
+def _reject_batch_artifact_overrides(
+    args: argparse.Namespace,
+    command: str,
+) -> None:
+    if args.artifact_root is not None or args.stage_manifest is not None:
+        raise MillefeuilleContractError(
+            f"{command} --batch-manifest cannot be combined with "
+            "--artifact-root or --stage-manifest; each batch entry resolves its "
+            "canonical source-pack run"
         )
 
 

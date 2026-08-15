@@ -302,8 +302,9 @@ def _write_card_fixture_json(tempdir: str) -> Path:
     card_path.write_text(
         json.dumps(
             {
-                "schema_version": "millefeuille-paper-card/v0.1",
+                "schema_version": "millefeuille-paper-card/v0.2",
                 "paper_id": "fixture-paper",
+                "run_id": "fixture-run",
                 "identity": {
                     "title": "Fixture Paper",
                     "authors": ["Alice Example", "Bob Example"],
@@ -315,7 +316,13 @@ def _write_card_fixture_json(tempdir: str) -> Path:
                 "limitations": "Fixture limitations.",
                 "classification_clues": ["benchmark", "vision"],
                 "evidence_refs": ["fixture-summary.json"],
-                "index_status": [{"lane": "openkb", "status": "skipped"}],
+                "index_state": {
+                    "phase": "planned",
+                    "lanes": [
+                        {"lane": "openkb", "status": "pending"},
+                        {"lane": "pageindex", "status": "pending"},
+                    ],
+                },
                 "model_provenance": {"profile_id": "fixture-card"},
             },
             indent=2,
