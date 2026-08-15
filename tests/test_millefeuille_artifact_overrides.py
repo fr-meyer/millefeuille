@@ -463,7 +463,7 @@ class TestMillefeuilleArtifactOverrides(unittest.TestCase):
 
             with self.assertRaisesRegex(
                 MillefeuilleContractError,
-                "symbolic links or reparse points",
+                "symbolic link or reparse point",
             ):
                 resolve_run_artifacts(
                     source_pack_root=source_pack_root,
