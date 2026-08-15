@@ -21,6 +21,12 @@ Implemented stage-command controls are:
 - `--approval-receipt <json>` for exact-scope gate validation only; it is
   rejected outside explicit `approved-live`, and valid receipts still stop at
   the current unsupported-live gate
+- `--approved-live-pdf-disposal`,
+  `--approved-live-provider-payload-disposal`, and
+  `--approved-live-temporary-file-disposal` for an independently requested
+  exact disposal policy; all three are required by the current live gate
+- repeated `--approved-live-stop-condition <code>` values for the complete,
+  sorted, independently requested stop-condition set
 - `--source-pack-root <path>` plus `--paper-id|--item-key` and `--run-id`
 - `--artifact-root source-pack|<path>` for an exact run package or declared
   package container layout

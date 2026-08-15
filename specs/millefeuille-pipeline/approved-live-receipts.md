@@ -128,12 +128,17 @@ All current stage commands accept `--approval-receipt <json>` alongside
 2. Live writeback requires both explicit `--mode approved-live` and explicit
    `--writeback approved-live`, plus a receipt. Neither flag implies the other.
 3. The present single-run gate derives one operation, one target/selector,
-   item cap `1`, run ID, and canonical source-pack root from CLI arguments.
-   Until an explicit artifact root exists, that same canonical root is the
-   bound output root.
-4. The present CLI has no provider execution controls, so its request binds a
+   item cap `1`, run ID, canonical source-pack root, and effective output root
+   from CLI arguments. The output root is the source-pack root only when
+   `--artifact-root` is omitted or explicitly set to `source-pack`; otherwise
+   it is the normalized path supplied by `--artifact-root`.
+4. The request independently requires all three explicit
+   `--approved-live-*-disposal` controls and one or more repeated
+   `--approved-live-stop-condition` values. Missing controls refuse
+   validation; receipt values are never copied into the request.
+5. The present CLI has no provider execution controls, so its request binds a
    null provider and zero provider limits.
-5. A missing, expired, replayed, tampered, secret-bearing, over-broad, or
+6. A missing, expired, replayed, tampered, secret-bearing, over-broad, or
    drifted receipt is rejected. A valid receipt is reported by content digest,
    then execution still exits as unsupported.
 

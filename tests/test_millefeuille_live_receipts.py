@@ -598,6 +598,18 @@ class TestApprovedLiveReceiptCliGate(unittest.TestCase):
             str(receipt_path),
             "--writeback",
             "approved-live",
+            "--approved-live-pdf-disposal",
+            "not-applicable",
+            "--approved-live-provider-payload-disposal",
+            "not-applicable",
+            "--approved-live-temporary-file-disposal",
+            "not-applicable",
+            "--approved-live-stop-condition",
+            "approval-expired",
+            "--approved-live-stop-condition",
+            "first-error",
+            "--approved-live-stop-condition",
+            "scope-drift",
         ]
 
     def test_valid_receipt_still_stops_at_unsupported_live_gate(self):
@@ -648,6 +660,94 @@ class TestApprovedLiveReceiptCliGate(unittest.TestCase):
 
                 self.assertEqual(exit_code, 3)
                 self.assertIn(message, stderr.getvalue())
+
+    def test_cli_derives_disposal_and_stop_policy_independently(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            disposal_drift = self._live_receipt(root)
+            disposal_drift["scope"]["disposal_policy"]["pdfs"] = (
+                "retain-until-expiry"
+            )
+            _sign(disposal_drift)
+            stop_drift = self._live_receipt(root)
+            stop_drift["scope"]["stop_conditions"] = [
+                "approval-expired",
+                "scope-drift",
+            ]
+            _sign(stop_drift)
+            cases = (
+                (disposal_drift, "disposal_policy drift"),
+                (stop_drift, "stop_conditions drift"),
+            )
+            for index, (payload, message) in enumerate(cases):
+                receipt_path = root / f"policy-drift-{index}.json"
+                _write_receipt(receipt_path, payload)
+                stderr = StringIO()
+
+                exit_code = run_stage_cli(
+                    self._args(root, receipt_path),
+                    stderr=stderr,
+                )
+
+                self.assertEqual(exit_code, 3)
+                self.assertIn(message, stderr.getvalue())
+
+    def test_cli_requires_independent_disposal_and_stop_controls(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            receipt_path = root / "approval.json"
+            _write_receipt(receipt_path, self._live_receipt(root))
+            cases = (
+                ("--approved-live-pdf-disposal", "explicit disposal controls"),
+                ("--approved-live-stop-condition", "explicit stop conditions"),
+            )
+            for flag, message in cases:
+                args = self._args(root, receipt_path)
+                flag_index = args.index(flag)
+                del args[flag_index : flag_index + 2]
+                if flag == "--approved-live-stop-condition":
+                    while flag in args:
+                        flag_index = args.index(flag)
+                        del args[flag_index : flag_index + 2]
+                stderr = StringIO()
+
+                exit_code = run_stage_cli(args, stderr=stderr)
+
+                self.assertEqual(exit_code, 3)
+                self.assertIn(message, stderr.getvalue())
+
+    def test_cli_binds_distinct_artifact_output_root(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_root = Path(tempdir) / "source"
+            artifact_root = Path(tempdir) / "artifacts"
+            source_root.mkdir()
+            artifact_root.mkdir()
+            payload = self._live_receipt(source_root)
+            payload["scope"]["output_root"] = str(artifact_root.resolve())
+            _sign(payload)
+            receipt_path = source_root / "approval.json"
+            _write_receipt(receipt_path, payload)
+            args = self._args(source_root, receipt_path)
+            args.extend(("--artifact-root", str(artifact_root)))
+            stderr = StringIO()
+
+            exit_code = run_stage_cli(args, stderr=stderr)
+
+            self.assertEqual(exit_code, 3)
+            self.assertIn(payload["integrity"]["content_digest"], stderr.getvalue())
+            self.assertIn("not implemented", stderr.getvalue())
+
+            wrong_payload = self._live_receipt(source_root)
+            wrong_path = source_root / "wrong-output-root.json"
+            _write_receipt(wrong_path, wrong_payload)
+            wrong_args = self._args(source_root, wrong_path)
+            wrong_args.extend(("--artifact-root", str(artifact_root)))
+            wrong_stderr = StringIO()
+
+            exit_code = run_stage_cli(wrong_args, stderr=wrong_stderr)
+
+            self.assertEqual(exit_code, 3)
+            self.assertIn("output_root drift", wrong_stderr.getvalue())
 
     def test_live_writeback_flag_requires_explicit_live_mode(self):
         with tempfile.TemporaryDirectory() as tempdir:
