@@ -82,8 +82,13 @@ def validate_paper_card_identity(
     paper_id: str,
     run_id: str,
     source_hash: str,
+    require_source_hash: bool = False,
 ) -> None:
-    """Validate exact v0.2 identity while retaining explicit v0.1 compatibility."""
+    """Validate card identity with explicit read-only v0.1 compatibility.
+
+    Strict card/index joins set require_source_hash so legacy cards cannot be
+    associated with a source pack unless they carry its exact hash.
+    """
 
     card = PaperCardRecord.from_dict(card_payload).to_dict()
     if card["paper_id"] != paper_id:
@@ -101,6 +106,10 @@ def validate_paper_card_identity(
     if card["schema_version"] != PAPER_CARD_SCHEMA_V1:
         raise MillefeuilleContractError(
             f"unsupported paper card schema_version {card['schema_version']!r}"
+        )
+    if require_source_hash and card_source_hash is None:
+        raise MillefeuilleContractError(
+            "legacy paper card source_hash is required for card/index join"
         )
     if card_source_hash not in (None, source_hash):
         raise MillefeuilleContractError("legacy paper card source_hash drift")
@@ -123,14 +132,15 @@ def validate_observed_card_index_state(
 
     card = PaperCardRecord.from_dict(card_payload).to_dict()
     index = RetrievalIndexRecord.from_dict(index_payload).to_dict()
-    if card["schema_version"] == PAPER_CARD_SCHEMA_V1:
-        return
     validate_paper_card_identity(
         card,
         paper_id=index["paper_id"],
         run_id=index["run_id"],
         source_hash=index["source_hash"],
+        require_source_hash=True,
     )
+    if card["schema_version"] == PAPER_CARD_SCHEMA_V1:
+        return
     if card["index_state"] != observed_index_state(index):
         raise MillefeuilleContractError(
             "paper card observed index_state conflicts with retrieval index status"
@@ -187,6 +197,7 @@ def validate_canonical_card_index_contract(
         paper_id=paper_id,
         run_id=run_id,
         source_hash=source_hash,
+        require_source_hash=True,
     )
     validate_observed_card_index_state(card_payload, index)
 

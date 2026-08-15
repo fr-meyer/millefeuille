@@ -734,6 +734,7 @@ def _load_run_scoped_card_check(
             paper_id=resolved.paper_id,
             run_id=resolved.run_id,
             source_hash=resolved.source_hash,
+            require_source_hash=True,
         )
     except MillefeuilleContractError as exc:
         identity_error = str(exc)

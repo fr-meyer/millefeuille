@@ -2021,7 +2021,35 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
 
             self.assertEqual(index_status_path.read_bytes(), original_index_bytes)
 
+    def test_index_fixture_rejects_legacy_card_without_source_hash(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            card_path = run_dir / "cards" / "paper-card.json"
+            legacy = load_paper_card(card_path)
+            legacy["schema_version"] = "millefeuille-paper-card/v0.1"
+            legacy.pop("run_id")
+            legacy.pop("index_state")
+            legacy["index_status"] = []
+            legacy["identity"]["source_hash"] = None
+            card_path.write_bytes(canonical_json_bytes(legacy))
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "source_hash is required for card/index join",
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertFalse((run_dir / "index" / "index-status.json").exists())
+            self.assertIsNone(load_paper_card(card_path)["identity"]["source_hash"])
+
     def test_observed_card_rerun_requires_exact_canonical_index_join(self):
+
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir, card_evidence, index_evidence = (
                 _prepare_card_index_fixture(tempdir)

@@ -825,6 +825,7 @@ def _resolve_card_refs(
             paper_id=paper_id,
             run_id=run_id,
             source_hash=expected_source_hash,
+            require_source_hash=True,
         )
     except MillefeuilleContractError as exc:
         raise ValueError(

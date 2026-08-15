@@ -1359,6 +1359,7 @@ def _validate_card_dependency(
         paper_id=paper_id,
         run_id=run_id,
         source_hash=source_hash,
+        require_source_hash=True,
     )
     return artifact
 

@@ -2151,6 +2151,7 @@ def _load_verified_paper_card(
         paper_id=resolved.paper_id,
         run_id=resolved.run_id,
         source_hash=resolved.source_hash,
+        require_source_hash=True,
     )
     return card_payload
 
