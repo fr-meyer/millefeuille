@@ -188,7 +188,6 @@ class TestMillefeuilleContractArtifacts(unittest.TestCase):
             "Lifecycle stage surface",
             "millefeuille-source-pack-manifest/v0.1",
             "millefeuille-source-pack-manifest/v0.2",
-            "PageIndex MCP-only",
             "millefeuille-processed",
             "millefeuille-acceptance-passed",
             "No earlier than `1.0.0`",
@@ -198,6 +197,58 @@ class TestMillefeuilleContractArtifacts(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, migration)
 
+        pageindex = migration.split("## PageIndex Boundary", 1)[1].split(
+            "## Output And Artifact Root Mapping",
+            1,
+        )[0]
+        normalized_pageindex = " ".join(pageindex.split())
+        pageindex_guarantees = [
+            "direct PageIndex HTTP API mode and a PageIndex SDK mode",
+            "All newly implemented lifecycle PageIndex ingestion and indexing "
+            "must follow the later **PageIndex MCP-only** policy.",
+            "Lifecycle code must not reuse the legacy direct HTTP client, SDK "
+            "client, or an ad-hoc multipart upload as its production connector.",
+            "fail-closed access control",
+            "an authenticated bridge request or a narrowly scoped, unguessable, "
+            "short-lived, single-use capability URL",
+            "reject expired, replayed, or mismatched access attempts",
+            "revoke the serving capability",
+            "must not enter handoff rows, source-pack manifests, committed "
+            "evidence, logs, or the bridge ledger",
+        ]
+        for guarantee in pageindex_guarantees:
+            with self.subTest(pageindex_guarantee=guarantee):
+                self.assertIn(guarantee, normalized_pageindex)
+
+        removal = migration.split(
+            "Legacy removal is not automatic at `1.0.0`. "
+            "It requires all of the following:",
+            1,
+        )[1].split("## Safe Stop And Rollback", 1)[0]
+        actual_exit_criteria: list[str] = []
+        current = ""
+        for raw_line in removal.splitlines():
+            if raw_line.startswith("- "):
+                if current:
+                    actual_exit_criteria.append(
+                        current.removesuffix("; and").rstrip(";.")
+                    )
+                current = raw_line[2:].strip()
+            elif current and raw_line.startswith("  "):
+                current += " " + raw_line.strip()
+        if current:
+            actual_exit_criteria.append(current.removesuffix("; and").rstrip(";."))
+
+        expected_exit_criteria = [
+            "staged discovery through writeback has bounded live evidence",
+            "v0.1 and v0.2 source packs remain readable or have a tested migration",
+            "PageIndex MCP bridge and ledger reconciliation are operational",
+            "legacy tag and output migrations have audit reports",
+            "a clean-install and upgrade test passes on supported platforms",
+            "release notes provide a rollback path",
+            "the incompatible CLI change receives explicit release approval",
+        ]
+        self.assertEqual(expected_exit_criteria, actual_exit_criteria)
         self.assertLess(
             migration.index("`0.4.x` (current)"),
             migration.index("No earlier than `1.0.0`"),

@@ -162,16 +162,24 @@ production connector. The planned MCP bridge must:
 1. resolve verified Zotero bytes only at runtime;
 2. expose them briefly over approved HTTPS with the exact canonical filename
    in the response metadata;
-3. ingest only through the PageIndex MCP capability;
-4. target the approved folder and reject exact duplicates globally and in that
+3. require fail-closed access control through either an authenticated bridge
+   request or a narrowly scoped, unguessable, short-lived, single-use
+   capability URL with minimal expiry and use limits;
+4. bind authorization to the intended document and request where feasible, and
+   reject expired, replayed, or mismatched access attempts;
+5. ingest only through the PageIndex MCP capability;
+6. target the approved folder and reject exact duplicates globally and in that
    folder rather than creating suffixed names such as `_1.pdf`;
-5. verify the final document ID, name, status, and folder;
-6. commit the Zotero-to-PageIndex ledger record transactionally; and
-7. shut down temporary serving and dispose of bytes under the approved policy.
+7. verify the final document ID, name, status, and folder;
+8. commit the Zotero-to-PageIndex ledger record transactionally; and
+9. revoke the serving capability, shut down temporary serving, and dispose of
+   bytes under the approved policy immediately after ingestion or failure.
 
-Temporary URLs, provider credentials, and private payloads must not enter
-handoff rows, source-pack manifests, committed evidence, logs, or the bridge
-ledger. Existing direct PageIndex results may be retained as legacy evidence,
+Capability URLs, authorization material, provider credentials, and private
+payloads must not enter handoff rows, source-pack manifests, committed
+evidence, logs, or the bridge ledger. Access failures must be logged only with
+redacted request/document identifiers and without the capability URL or private
+payload. Existing direct PageIndex results may be retained as legacy evidence,
 but they cannot satisfy the MCP bridge or live index stage by themselves.
 
 ## Output And Artifact Root Mapping

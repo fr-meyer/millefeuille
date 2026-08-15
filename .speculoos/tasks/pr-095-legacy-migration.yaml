@@ -31,6 +31,9 @@ scope:
     artifact roots, tags, safe stop, and rollback
   - pin direct PageIndex HTTP/SDK integration to the legacy compatibility lane
     and require MCP-only connectors for new lifecycle work
+  - require fail-closed private-PDF serving access with minimal expiry/use
+    limits, document/request binding, replay rejection, revocation, and redacted
+    logging
   - add operator navigation and executable documentation-contract checks
   - preserve the repository-wide hard-rename invariant while describing
     historical predecessor-tag handling by role
@@ -49,6 +52,9 @@ acceptance:
     decisions are explicit and fail closed
   - PageIndex direct HTTP/SDK stays legacy-only while new lifecycle ingestion is
     MCP-only
+  - temporary private-PDF serving requires authenticated or narrowly scoped,
+    unguessable, short-lived, single-use access with expiry/replay enforcement,
+    revocation, cleanup, and secret-safe logging
   - README and pipeline navigation link the migration contract
   - no forbidden predecessor package or CLI identity is tracked
   - focused tests, full unittest discovery, Ruff, metadata parse, diff check,

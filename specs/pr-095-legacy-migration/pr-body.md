@@ -3,6 +3,7 @@
 - define the supported legacy Hydra and source-pack lifecycle command surfaces
 - document operator migration for command/config, v0.1/v0.2 source packs, artifact roots, historical tags, safe stop, and rollback
 - pin direct PageIndex HTTP/SDK to legacy compatibility and require MCP-only connectors for new lifecycle work
+- require fail-closed, short-lived, single-use private-PDF serving access with expiry/replay enforcement, revocation, cleanup, and redacted logging
 - add release-based deprecation and removal exit criteria
 - add operator navigation, executable documentation-contract checks, and canonical Speculoos delivery gates for roadmap card MF-005
 - preserve the repository hard-rename invariant while describing predecessor tags by operational role
@@ -23,7 +24,7 @@
 
 ## Validation
 
-- focused contract-artifact and hard-rename tests passed
+- focused semantic contract-boundary and hard-rename tests passed
 - full unittest discovery passed
 - repository-wide Ruff passed
 - YAML and JSON metadata parsing passed
