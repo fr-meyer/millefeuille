@@ -2106,6 +2106,45 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                 "observed",
             )
 
+    def test_card_refresh_rejects_hardlinked_staged_replacement(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            card_path = run_dir / "cards" / "paper-card.json"
+            planned_bytes = card_path.read_bytes()
+            alias_path = run_dir / "aliased-card.json"
+
+            def hardlink_replacement_at_preexchange(_plan):
+                transaction_dirs = list(
+                    (run_dir / CARD_INDEX_TRANSACTION_ROOT_REF).iterdir()
+                )
+                self.assertEqual(len(transaction_dirs), 1)
+                os.link(
+                    transaction_dirs[0] / "card-exchange.json",
+                    alias_path,
+                )
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._before_card_exchange",
+                    side_effect=hardlink_replacement_at_preexchange,
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "card replacement must be singly linked",
+                ),
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertEqual(card_path.read_bytes(), planned_bytes)
+            self.assertTrue(alias_path.is_file())
+            self.assertTrue((run_dir / "index" / "index-status.json").is_file())
+
     def test_rollback_rejects_displaced_recovery_name_swap(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir, _card_evidence, index_evidence = (

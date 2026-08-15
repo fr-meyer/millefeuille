@@ -469,6 +469,15 @@ def _commit_card_refresh(plan: _PlannedIndexWrite) -> None:
     _require_unchanged_card(plan)
     _require_expected_index(plan)
     _before_card_exchange(plan)
+    replacement_snapshot = _capture_file_entry(
+        staged_path,
+        "card replacement",
+    )
+    if replacement_snapshot.raw_bytes != refreshed_bytes:
+        raise MillefeuilleContractError(
+            "card replacement changed immediately before the atomic "
+            "index-state commit boundary"
+        )
     displaced = _atomic_capture_replace(
         target=plan.card_json_path,
         replacement=staged_path,
@@ -484,10 +493,17 @@ def _commit_card_refresh(plan: _PlannedIndexWrite) -> None:
             raise MillefeuilleContractError(
                 "paper card changed at the atomic index-state commit boundary"
             )
-        current = load_paper_card_artifact(plan.card_json_path)
-        if current.payload != refreshed_payload or current.raw_bytes != refreshed_bytes:
+        current = _capture_file_entry(
+            plan.card_json_path,
+            "installed paper card",
+        )
+        if (
+            current.raw_bytes != refreshed_bytes
+            or current.file_key != replacement_snapshot.file_key
+        ):
             raise MillefeuilleContractError(
-                "paper card replacement changed at the atomic commit boundary"
+                "paper card replacement identity or bytes changed at the "
+                "atomic commit boundary"
             )
         _require_expected_index(plan)
     except Exception as exc:
