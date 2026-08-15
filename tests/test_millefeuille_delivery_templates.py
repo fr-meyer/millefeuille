@@ -106,7 +106,11 @@ class TestMillefeuilleDeliveryTemplates(unittest.TestCase):
             if "://" in target or target.startswith("#"):
                 continue
             with self.subTest(link=target):
-                self.assertTrue((TEMPLATE_ROOT / target).resolve().exists())
+                link_path = Path(target)
+                self.assertFalse(link_path.is_absolute())
+                resolved = (TEMPLATE_ROOT / link_path).resolve()
+                self.assertTrue(resolved.is_relative_to(REPO_ROOT))
+                self.assertTrue(resolved.exists())
 
     def test_approval_template_preserves_live_run_gate_fields(self):
         entry = next(item for item in self.entries if item["id"] == "approval")
