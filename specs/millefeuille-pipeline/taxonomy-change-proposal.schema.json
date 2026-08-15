@@ -53,6 +53,7 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
+      "maxItems": 512,
       "items": {"$ref": "#/$defs/entryId"}
     },
     "reason": {"$ref": "#/$defs/text"},
@@ -60,6 +61,7 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
+      "maxItems": 64,
       "items": {"$ref": "#/$defs/text"}
     },
     "impact": {

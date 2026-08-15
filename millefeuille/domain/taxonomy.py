@@ -11,6 +11,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from copy import deepcopy
 from datetime import datetime
 import hashlib
+from itertools import islice
 import json
 from pathlib import Path
 import re
@@ -28,6 +29,12 @@ TAXONOMY_APPLICATION_SCHEMA_VERSION = "millefeuille-taxonomy-application/v0.1"
 
 REQUIRED_REVIEW_ROLES = frozenset({"taxonomy-owner", "qa-lead", "operations-lead"})
 OPTIONAL_REVIEW_ROLES = frozenset({"subject-matter-reviewer"})
+
+MAX_TAXONOMY_ENTRIES = 512
+MAX_TAXONOMY_ENTRY_RULES = 32
+MAX_TAXONOMY_AFFECTED_ENTRY_IDS = MAX_TAXONOMY_ENTRIES
+MAX_TAXONOMY_EVIDENCE_REFS = 64
+MAX_TAXONOMY_REVIEWS = len(REQUIRED_REVIEW_ROLES | OPTIONAL_REVIEW_ROLES)
 
 _SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 _SAFE_ENTRY_ID = re.compile(r"[A-Za-z][A-Za-z0-9._-]{0,63}")
@@ -71,6 +78,11 @@ def seal_taxonomy_registry(payload: Mapping[str, Any]) -> dict[str, Any]:
     entries = draft.get("entries")
     if not isinstance(entries, list):
         raise MillefeuilleContractError("taxonomy registry entries must be an array")
+    if len(entries) > MAX_TAXONOMY_ENTRIES:
+        raise MillefeuilleContractError(
+            "taxonomy registry entries must contain at most "
+            f"{MAX_TAXONOMY_ENTRIES} entries"
+        )
     canonical_entries: list[dict[str, Any]] = []
     for index, value in enumerate(entries):
         entry = _mapping_copy(value, f"taxonomy entry {index}")
@@ -84,6 +96,7 @@ def seal_taxonomy_registry(payload: Mapping[str, Any]) -> dict[str, Any]:
                 entry[field_name] = _canonical_string_sequence(
                     field_value,
                     f"taxonomy entry {index} {field_name}",
+                    maximum=MAX_TAXONOMY_ENTRY_RULES,
                 )
         canonical_entries.append(entry)
     draft["entries"] = sorted(
@@ -152,6 +165,11 @@ def validate_taxonomy_registry(payload: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(raw_entries, list) or not raw_entries:
         raise MillefeuilleContractError(
             "taxonomy registry entries must be a non-empty array"
+        )
+    if len(raw_entries) > MAX_TAXONOMY_ENTRIES:
+        raise MillefeuilleContractError(
+            "taxonomy registry entries must contain at most "
+            f"{MAX_TAXONOMY_ENTRIES} entries"
         )
     entries = [
         _validate_taxonomy_entry(value, index=index)
@@ -397,10 +415,13 @@ def create_taxonomy_change_proposal(
             affected_entry_ids,
             "taxonomy change proposal affected_entry_ids",
             safe_entry_ids=True,
+            maximum=MAX_TAXONOMY_AFFECTED_ENTRY_IDS,
         ),
         "reason": reason,
         "evidence_refs": _canonical_string_sequence(
-            evidence_refs, "taxonomy change proposal evidence_refs"
+            evidence_refs,
+            "taxonomy change proposal evidence_refs",
+            maximum=MAX_TAXONOMY_EVIDENCE_REFS,
         ),
         "impact": {
             "risk": impact_risk,
@@ -514,12 +535,14 @@ def validate_taxonomy_change_proposal(
         "taxonomy change proposal affected_entry_ids",
         minimum=1,
         safe_entry_ids=True,
+        maximum=MAX_TAXONOMY_AFFECTED_ENTRY_IDS,
     )
     _require_string(proposal["reason"], "taxonomy change proposal reason")
     evidence_refs = _require_sorted_unique_strings(
         proposal["evidence_refs"],
         "taxonomy change proposal evidence_refs",
         minimum=1,
+        maximum=MAX_TAXONOMY_EVIDENCE_REFS,
     )
     impact = _mapping_copy(proposal["impact"], "taxonomy change proposal impact")
     _require_exact_fields(
@@ -750,9 +773,15 @@ def apply_taxonomy_change(
     base = validate_taxonomy_registry(base_registry)
     validated_proposal = validate_taxonomy_change_proposal(proposal, base_registry=base)
     candidate = validated_proposal["candidate_registry"]
+    review_inputs = list(islice(iter(reviews), MAX_TAXONOMY_REVIEWS + 1))
+    if len(review_inputs) > MAX_TAXONOMY_REVIEWS:
+        raise MillefeuilleContractError(
+            "taxonomy change application accepts at most "
+            f"{MAX_TAXONOMY_REVIEWS} governed reviews"
+        )
     validated_reviews = [
         validate_taxonomy_change_review(review, proposal=validated_proposal)
-        for review in reviews
+        for review in review_inputs
     ]
     _require_approved_reviews(
         validated_reviews,
@@ -904,6 +933,7 @@ def validate_taxonomy_application_record(
         "taxonomy application review_content_identities",
         minimum=len(REQUIRED_REVIEW_ROLES),
         identities=True,
+        maximum=MAX_TAXONOMY_REVIEWS,
     )
     _require_const(
         record["active_batch_policy"],
@@ -953,6 +983,7 @@ def _validate_taxonomy_entry(value: Any, *, index: int) -> dict[str, Any]:
             entry[field_name],
             f"taxonomy entry {index} {field_name}",
             minimum=minimum,
+            maximum=MAX_TAXONOMY_ENTRY_RULES,
         )
     if entry["status"] not in {"active", "deprecated"}:
         raise MillefeuilleContractError(f"taxonomy entry {index} status is unsupported")
@@ -1343,12 +1374,17 @@ def _require_sorted_unique_strings(
     label: str,
     *,
     minimum: int,
+    maximum: int,
     safe_entry_ids: bool = False,
     identities: bool = False,
 ) -> list[str]:
     if not isinstance(value, list) or len(value) < minimum:
         raise MillefeuilleContractError(
             f"{label} must be an array with at least {minimum} entries"
+        )
+    if len(value) > maximum:
+        raise MillefeuilleContractError(
+            f"{label} must contain at most {maximum} entries"
         )
     normalized: list[str] = []
     for entry in value:
@@ -1370,9 +1406,14 @@ def _canonical_string_sequence(
     label: str,
     *,
     safe_entry_ids: bool = False,
+    maximum: int,
 ) -> list[str]:
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
         raise MillefeuilleContractError(f"{label} must be an array")
+    if len(value) > maximum:
+        raise MillefeuilleContractError(
+            f"{label} must contain at most {maximum} entries"
+        )
     normalized = [
         (
             _require_entry_id(entry, f"{label} entry")

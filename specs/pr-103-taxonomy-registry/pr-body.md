@@ -11,6 +11,9 @@
 - enforce the declared add, clarify, rename, deprecate, split, or merge
   operation against the candidate's exact registry diff
 - enforce requester, reviewer, and applier separation
+- bound registry entries, entry rules, affected IDs, evidence references, and
+  review collections consistently in runtime validation and JSON Schemas before
+  expensive canonical sorting, hashing, or repeated validation
 - add five strict JSON Schemas, a deliberately non-authoritative draft example,
   governance documentation, and regression coverage
 
@@ -39,8 +42,8 @@
 
 ## Validation
 
-- 24 focused taxonomy and contract-artifact tests passed
-- all 442 repository tests passed with 7 capability skips
+- 25 focused taxonomy and contract-artifact tests passed
+- all 443 repository tests passed with 7 capability skips
 - repository-wide Ruff, changed-Python-file format, and diff checks passed
 - taxonomy JSON Schemas, tracked JSON/YAML metadata, Speculoos validation, and
   publication checks passed

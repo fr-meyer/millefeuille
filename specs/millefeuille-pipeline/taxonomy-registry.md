@@ -33,6 +33,14 @@ Loading fails closed on malformed JSON, unknown or missing fields, padded or
 non-NFC/control-bearing strings, malformed hashes, duplicate IDs or sibling labels,
 invalid parent/replacement links, non-canonical order, and any hash drift.
 
+Collection sizes are bounded before canonical sorting, hashing, or repeated
+validation work: a registry contains at most 512 entries; each entry contains
+at most 32 include rules, exclude rules, and boundary notes; a proposal names
+at most 512 affected entry IDs and 64 evidence references; and an application
+accepts at most four reviews, matching the three required roles plus the one
+optional subject-matter-reviewer role. Runtime validation and the JSON Schemas
+enforce the same limits.
+
 Stable IDs are never recycled. A later version may revise a label, definition,
 or boundary rule, but it cannot move an existing ID to another level or parent
 and cannot delete an ID. Retirement preserves the node with `status:

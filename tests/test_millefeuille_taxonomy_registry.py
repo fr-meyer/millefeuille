@@ -13,6 +13,11 @@ from referencing import Registry, Resource
 from millefeuille.cli.taxonomy import run_taxonomy_cli
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.taxonomy import (
+    MAX_TAXONOMY_AFFECTED_ENTRY_IDS,
+    MAX_TAXONOMY_ENTRIES,
+    MAX_TAXONOMY_ENTRY_RULES,
+    MAX_TAXONOMY_EVIDENCE_REFS,
+    MAX_TAXONOMY_REVIEWS,
     REQUIRED_REVIEW_ROLES,
     TAXONOMY_REGISTRY_SCHEMA_VERSION,
     apply_taxonomy_change,
@@ -259,6 +264,146 @@ class TaxonomyRegistryTests(unittest.TestCase):
         _rehash(unsorted)
         with self.assertRaisesRegex(MillefeuilleContractError, "sorted by entry_id"):
             validate_taxonomy_registry(unsorted)
+
+    def test_taxonomy_collection_limits_accept_boundary_and_reject_overflow(self):
+        bounded_entries = [
+            _entry(
+                "L1-ROOT",
+                level=1,
+                parent_id=None,
+                label="Root category",
+            ),
+            *[
+                _entry(
+                    f"L2-{index:04d}",
+                    level=2,
+                    parent_id="L1-ROOT",
+                    label=f"Category {index:04d}",
+                )
+                for index in range(MAX_TAXONOMY_ENTRIES - 1)
+            ],
+        ]
+        bounded_base = _registry("bounded-v1", entries=bounded_entries)
+        self.assertEqual(len(bounded_base["entries"]), MAX_TAXONOMY_ENTRIES)
+
+        with self.assertRaisesRegex(MillefeuilleContractError, "at most 512"):
+            _registry(
+                "overflow-v1",
+                status="draft",
+                entries=[
+                    *bounded_entries,
+                    _entry(
+                        "L2-OVERFLOW",
+                        level=2,
+                        parent_id="L1-ROOT",
+                        label="Overflow category",
+                    ),
+                ],
+            )
+
+        for field_name in ("include_when", "exclude_when", "boundary_notes"):
+            with self.subTest(bounded_entry_collection=field_name):
+                bounded_registry = deepcopy(self.base)
+                bounded_registry.pop("content_identity")
+                bounded_registry["entries"][0][field_name] = [
+                    f"Rule {index:02d}." for index in range(MAX_TAXONOMY_ENTRY_RULES)
+                ]
+                sealed = seal_taxonomy_registry(bounded_registry)
+                self.assertEqual(
+                    len(sealed["entries"][0][field_name]),
+                    MAX_TAXONOMY_ENTRY_RULES,
+                )
+
+                overflow_registry = deepcopy(bounded_registry)
+                overflow_registry["entries"][0][field_name].append("Rule overflow.")
+                with self.assertRaisesRegex(MillefeuilleContractError, "at most 32"):
+                    seal_taxonomy_registry(overflow_registry)
+
+        changed_entries = deepcopy(bounded_base["entries"])
+        for entry in changed_entries:
+            entry["definition"] = f"{entry['definition']} Revised."
+        bounded_candidate = _registry(
+            "bounded-v2",
+            previous_registry=bounded_base,
+            entries=changed_entries,
+        )
+        affected_ids = [entry["entry_id"] for entry in bounded_candidate["entries"]]
+        bounded_proposal = _proposal(
+            bounded_base,
+            bounded_candidate,
+            operation="mixed",
+            affected_entry_ids=affected_ids,
+        )
+        self.assertEqual(
+            len(bounded_proposal["affected_entry_ids"]),
+            MAX_TAXONOMY_AFFECTED_ENTRY_IDS,
+        )
+
+        overflow_affected = deepcopy(self.proposal)
+        overflow_affected["affected_entry_ids"] = [
+            f"L2-{index:04d}" for index in range(MAX_TAXONOMY_AFFECTED_ENTRY_IDS + 1)
+        ]
+        _rehash(overflow_affected)
+        with self.assertRaisesRegex(MillefeuilleContractError, "at most 512"):
+            validate_taxonomy_change_proposal(
+                overflow_affected, base_registry=self.base
+            )
+
+        for count in (
+            MAX_TAXONOMY_EVIDENCE_REFS,
+            MAX_TAXONOMY_EVIDENCE_REFS + 1,
+        ):
+            evidence_proposal = deepcopy(self.proposal)
+            evidence_proposal["evidence_refs"] = [
+                f"evidence/{index:03d}.md" for index in range(count)
+            ]
+            _rehash(evidence_proposal)
+            if count == MAX_TAXONOMY_EVIDENCE_REFS:
+                self.assertEqual(
+                    len(
+                        validate_taxonomy_change_proposal(
+                            evidence_proposal, base_registry=self.base
+                        )["evidence_refs"]
+                    ),
+                    MAX_TAXONOMY_EVIDENCE_REFS,
+                )
+            else:
+                with self.assertRaisesRegex(MillefeuilleContractError, "at most 64"):
+                    validate_taxonomy_change_proposal(
+                        evidence_proposal, base_registry=self.base
+                    )
+
+        optional_review = create_taxonomy_change_review(
+            self.proposal,
+            base_registry=self.base,
+            review_id="REVIEW-OPTIONAL-BOUNDS",
+            role="subject-matter-reviewer",
+            decision="approve",
+            reviewer_id="reviewer-optional-bounds",
+            reviewed_at="2026-08-11T12:10:00Z",
+            notes="Optional bounded review.",
+        )
+        _, bounded_application = apply_taxonomy_change(
+            base_registry=self.base,
+            proposal=self.proposal,
+            reviews=[*self.reviews, optional_review],
+            application_id="APPLY-BOUNDED-REVIEWS",
+            applied_by="release-owner",
+            applied_at="2026-08-11T13:00:00Z",
+        )
+        self.assertEqual(
+            len(bounded_application["review_content_identities"]),
+            MAX_TAXONOMY_REVIEWS,
+        )
+        with self.assertRaisesRegex(MillefeuilleContractError, "at most 4"):
+            apply_taxonomy_change(
+                base_registry=self.base,
+                proposal=self.proposal,
+                reviews=[*self.reviews, optional_review, deepcopy(optional_review)],
+                application_id="APPLY-OVERFLOW-REVIEWS",
+                applied_by="release-owner",
+                applied_at="2026-08-11T13:00:00Z",
+            )
 
     def test_lock_embeds_exact_snapshot_and_rejects_registry_or_snapshot_drift(self):
         lock = create_taxonomy_lock(
@@ -1053,6 +1198,36 @@ class TaxonomyRegistryTests(unittest.TestCase):
         self.assertIn("operation", proposal_semantics)
         self.assertIn("distinct from proposal requested_by", review_semantics)
         self.assertIn("distinct from requested_by", application_semantics)
+        self.assertEqual(
+            schemas["taxonomy-registry.schema.json"]["properties"]["entries"][
+                "maxItems"
+            ],
+            MAX_TAXONOMY_ENTRIES,
+        )
+        self.assertEqual(
+            schemas["taxonomy-registry.schema.json"]["$defs"]["sortedTextArray"][
+                "maxItems"
+            ],
+            MAX_TAXONOMY_ENTRY_RULES,
+        )
+        self.assertEqual(
+            schemas["taxonomy-change-proposal.schema.json"]["properties"][
+                "affected_entry_ids"
+            ]["maxItems"],
+            MAX_TAXONOMY_AFFECTED_ENTRY_IDS,
+        )
+        self.assertEqual(
+            schemas["taxonomy-change-proposal.schema.json"]["properties"][
+                "evidence_refs"
+            ]["maxItems"],
+            MAX_TAXONOMY_EVIDENCE_REFS,
+        )
+        self.assertEqual(
+            schemas["taxonomy-application.schema.json"]["properties"][
+                "review_content_identities"
+            ]["maxItems"],
+            MAX_TAXONOMY_REVIEWS,
+        )
 
     def test_cli_derives_lock_proposal_reviews_apply_and_rollback_json(self):
         with tempfile.TemporaryDirectory() as tempdir:
