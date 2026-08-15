@@ -3,7 +3,7 @@
 - add a machine-readable catalog and navigation for reusable delivery evidence
 - provide copy-ready feature, approval, adapter-evidence, dogfood, maintenance-handoff, migration, and release packets
 - keep approvals exact and non-transitive, dogfood no-write by default, handoffs non-authorizing, and promotion, tag, and package gates independent
-- enforce safe local paths, required headings and placeholders, policy markers, and public-safe evidence through semantic contract tests
+- enforce safe local paths, required headings and placeholders, policy markers, and detectable credential, authenticated-URL, private-root, and raw-PDF signatures across every added public documentation and metadata artifact
 - add canonical Speculoos delivery gates for roadmap card MF-002
 
 ## Changed Files
@@ -26,8 +26,8 @@
 
 ## Validation
 
-- 16 focused delivery-template, contract, and hard-rename tests passed
-- all 347 repository tests passed
+- 17 focused delivery-template, contract, and hard-rename tests passed
+- all 348 repository tests passed
 - repository-wide Ruff passed
 - changed catalog JSON parsing passed
 - `git diff --check`, privacy/manual-gate contract checks, Speculoos validation, and publication checks passed

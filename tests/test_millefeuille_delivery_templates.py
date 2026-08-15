@@ -23,11 +23,73 @@ EXPECTED_TEMPLATE_IDS = {
 PLACEHOLDER_RE = re.compile(r"\{\{([a-z][a-z0-9_]*)\}\}")
 LOCAL_LINK_RE = re.compile(r"\[[^]]+\]\(([^)]+)\)")
 FORBIDDEN_PUBLIC_MARKERS = (
-    re.compile(r"authorization:\s*(bearer|basic)\s+", re.IGNORECASE),
-    re.compile(r"\bbearer\s+[A-Za-z0-9._~+/-]{8,}", re.IGNORECASE),
-    re.compile(r"data:application/pdf", re.IGNORECASE),
-    re.compile("%" + "PDF-"),
+    (
+        "authorization-header",
+        re.compile(r"authorization:\s*(bearer|basic)\s+", re.IGNORECASE),
+    ),
+    (
+        "bearer-token",
+        re.compile(r"\bbearer\s+[A-Za-z0-9._~+/-]{8,}", re.IGNORECASE),
+    ),
+    (
+        "credential-assignment",
+        re.compile(
+            r"\b(?:api[_-]?key|access[_-]?token|password|client[_-]?secret|"
+            r"private[_-]?key)\s*[:=]\s*"
+            r"(?!\{\{|not-applicable\b|none\b|redacted\b)"
+            r"[\"']?[A-Za-z0-9+/_.=-]{12,}",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "provider-key",
+        re.compile(
+            r"\b(?:sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|"
+            r"gh[pousr]_[A-Za-z0-9]{20,})\b"
+        ),
+    ),
+    (
+        "authenticated-url-userinfo",
+        re.compile(r"https?://[^/\s:@]+:[^/\s@]+@", re.IGNORECASE),
+    ),
+    (
+        "authenticated-url-query-secret",
+        re.compile(
+            r"https?://[^\s)>\]]+[?&]"
+            r"(?:access_token|api_key|key|sig|signature|token)="
+            r"(?!\{\{)[^&\s)<\]]+",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "private-unix-root",
+        re.compile(
+            r"(?<![\w.])/(?:home|Users|private|root)/[^\s`\"')\]]+"
+        ),
+    ),
+    (
+        "private-windows-root",
+        re.compile(r"\b[A-Za-z]:\\(?:Users|Documents and Settings)\\", re.IGNORECASE),
+    ),
+    ("pdf-data-url", re.compile(r"data:application/pdf", re.IGNORECASE)),
+    ("raw-pdf-signature", re.compile("%" + "PDF-")),
 )
+
+PUBLIC_ARTIFACT_PATHS = (
+    REPO_ROOT / ".speculoos" / "README.md",
+    REPO_ROOT
+    / ".speculoos"
+    / "tasks"
+    / "pr-096-delivery-evidence-templates.yaml",
+    TEMPLATE_ROOT / "README.md",
+    CATALOG_PATH,
+    REPO_ROOT / "specs" / "millefeuille-pipeline" / "README.md",
+    REPO_ROOT
+    / "specs"
+    / "pr-096-delivery-evidence-templates"
+    / "commit-message.txt",
+    REPO_ROOT / "specs" / "pr-096-delivery-evidence-templates" / "pr-body.md",
+) + tuple(sorted((TEMPLATE_ROOT / "templates").glob("*.md")))
 
 
 class TestMillefeuilleDeliveryTemplates(unittest.TestCase):
@@ -93,8 +155,22 @@ class TestMillefeuilleDeliveryTemplates(unittest.TestCase):
                 text = self._template_text(entry)
                 self.assertIn("## Publication Boundary", text)
                 self.assertIn("credential", text.casefold())
-                for pattern in FORBIDDEN_PUBLIC_MARKERS:
-                    self.assertIsNone(pattern.search(text))
+                for marker, pattern in FORBIDDEN_PUBLIC_MARKERS:
+                    self.assertIsNone(
+                        pattern.search(text),
+                        f"{entry['id']}: forbidden {marker}",
+                    )
+
+    def test_all_public_docs_and_metadata_reject_detectable_markers(self):
+        for path in PUBLIC_ARTIFACT_PATHS:
+            with self.subTest(path=path.relative_to(REPO_ROOT)):
+                self.assertTrue(path.is_file())
+                text = path.read_text(encoding="utf-8")
+                for marker, pattern in FORBIDDEN_PUBLIC_MARKERS:
+                    self.assertIsNone(
+                        pattern.search(text),
+                        f"{path.relative_to(REPO_ROOT)}: forbidden {marker}",
+                    )
 
     def test_readme_links_every_template_and_local_contract(self):
         text = README_PATH.read_text(encoding="utf-8")

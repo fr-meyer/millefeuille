@@ -45,8 +45,9 @@ acceptance:
   - approval packets keep live-run gate fields and deny unlisted operations
   - dogfood, feature, and release packets preserve their distinct authority and
     branch boundaries
-  - public templates exclude credentials, authenticated URLs, raw PDFs, private
-    paper text, provider payloads, and private filesystem paths
+  - every public documentation and metadata artifact added by this PR is scanned
+    for common credential assignments, provider-key shapes, authenticated URL
+    forms, private filesystem roots, and raw PDF signatures
   - focused tests, full unittest discovery, Ruff, metadata parse, diff check,
     private-data scan, Speculoos validation, and publication checks pass
 validation:
@@ -69,9 +70,11 @@ documentation_impact:
   rationale: The public surfaces are repository-native templates and
     specification metadata; this PR does not change runtime behavior or
     top-level README/docs requiring separate user-facing synchronization.
-private_data_scan: required; public documentation, templates, synthetic tests,
-  and repository-local metadata only, with no credentials, authenticated URLs,
-  private papers, provider payloads, raw PDFs, or host-specific private paths
+private_data_scan: required; scan every added public documentation and metadata
+  artifact for common credential assignments, provider-key shapes, authenticated
+  URL forms, private filesystem roots, and raw PDF signatures. Private papers and
+  provider payloads remain forbidden by publication scope rather than overclaimed
+  content recognition.
 publish_authority: Active Millefeuille delivery-train supervisor; routine
   feature-to-dev publication, exact-head Mergeguez review, policy-gated merge,
   cleanup, and next-episode advancement are approved. Live operations,
