@@ -2312,7 +2312,7 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
 
             with (
                 patch(
-                    "millefeuille.domain.index_fixtures._move_file_no_replace",
+                    "millefeuille.domain.index_fixtures._publish_index_no_replace",
                     side_effect=create_concurrent_destination,
                 ),
                 self.assertRaises(MillefeuilleContractError),
@@ -2353,6 +2353,80 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
             recovery_path.write_bytes(b'{"mutated":"recovery"}\n')
 
             self.assertEqual(index_path.read_bytes(), canonical_bytes)
+            self.assertEqual(
+                load_paper_card(run_dir / "cards" / "paper-card.json")[
+                    "index_state"
+                ]["phase"],
+                "observed",
+            )
+
+    def test_partial_staged_write_can_retry_successfully(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+
+            def write_partial_then_fail(fd, payload, **_kwargs):
+                os.write(fd, payload[: max(1, len(payload) // 2)])
+                raise OSError("simulated partial staged write")
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._write_staged_bytes",
+                    side_effect=write_partial_then_fail,
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "incomplete temporary retained",
+                ),
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            result = write_indexes_from_evidence(
+                evidence_path=index_evidence,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )[0]
+            self.assertEqual(result.status, "created")
+            self.assertEqual(
+                load_paper_card(run_dir / "cards" / "paper-card.json")[
+                    "index_state"
+                ]["phase"],
+                "observed",
+            )
+
+    def test_staged_fsync_failure_can_retry_successfully(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._fsync_staged_file",
+                    side_effect=OSError("simulated staged fsync failure"),
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "incomplete temporary retained",
+                ),
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            result = write_indexes_from_evidence(
+                evidence_path=index_evidence,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )[0]
+            self.assertEqual(result.status, "created")
             self.assertEqual(
                 load_paper_card(run_dir / "cards" / "paper-card.json")[
                     "index_state"

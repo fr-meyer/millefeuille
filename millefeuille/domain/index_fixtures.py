@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 import stat
 import sys
+import tempfile
 from typing import Any
 
 from millefeuille.domain.card_fixtures import CARD_JSON_REF
@@ -420,7 +421,7 @@ def _ensure_expected_index(plan: _PlannedIndexWrite) -> str:
     )
     status = "created"
     try:
-        _move_file_no_replace(
+        _publish_index_no_replace(
             staged_path,
             plan.index_status_output_path,
         )
@@ -653,55 +654,87 @@ def _require_same_regular_entry(
     return opened
 
 
+def _publish_index_no_replace(source: Path, destination: Path) -> None:
+    _move_file_no_replace(source, destination)
+
+
 def _stage_exact_bytes(staged_path: Path, payload: bytes, *, label: str) -> Path:
     parent_identity = _require_real_directory(
         staged_path.parent,
         f"{label} transaction parent",
     )
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    if hasattr(os, "O_BINARY"):
-        flags |= os.O_BINARY
-    try:
-        fd = os.open(staged_path, flags, 0o600)
-    except FileExistsError:
-        staged = (
-            load_paper_card_artifact(staged_path)
-            if label == "observed paper card"
-            else load_retrieval_index_artifact(staged_path)
-        )
+    if staged_path.exists():
+        staged = _capture_file_entry(staged_path, f"staged {label}")
         if staged.raw_bytes != payload:
             raise MillefeuilleContractError(
                 f"existing staged {label} bytes drifted: {staged_path}"
-            ) from None
+            )
         return staged_path
+
     try:
-        offset = 0
-        while offset < len(payload):
-            written = os.write(fd, payload[offset:])
-            if written <= 0:
-                raise MillefeuilleContractError(
-                    f"could not stage complete {label}: {staged_path}"
-                )
-            offset += written
-        os.fsync(fd)
-    except Exception:
+        fd, temporary_name = tempfile.mkstemp(
+            prefix=f".{staged_path.name}.",
+            suffix=".tmp",
+            dir=staged_path.parent,
+        )
+    except OSError as exc:
+        raise MillefeuilleContractError(
+            f"could not create temporary staged {label}: {staged_path}"
+        ) from exc
+    temporary_path = Path(temporary_name)
+    try:
+        _require_same_regular_entry(
+            temporary_path,
+            fd,
+            f"temporary staged {label}",
+        )
+        _write_staged_bytes(fd, payload, label=label, path=temporary_path)
+        _fsync_staged_file(fd)
+        _require_same_regular_entry(
+            temporary_path,
+            fd,
+            f"temporary staged {label}",
+        )
+    except Exception as exc:
+        raise MillefeuilleContractError(
+            f"could not stage complete {label}; incomplete temporary retained "
+            f"at {temporary_path}"
+        ) from exc
+    finally:
         os.close(fd)
-        raise
-    else:
-        os.close(fd)
+
     _require_unchanged_directory(
         staged_path.parent,
         parent_identity,
         f"{label} transaction parent",
     )
-    staged = (
-        load_paper_card_artifact(staged_path)
-        if label == "observed paper card"
-        else load_retrieval_index_artifact(staged_path)
-    )
+    with suppress(FileExistsError):
+        _move_file_no_replace(temporary_path, staged_path)
+    staged = _capture_file_entry(staged_path, f"staged {label}")
     if staged.raw_bytes != payload:
         raise MillefeuilleContractError(f"staged {label} bytes changed: {staged_path}")
     return staged_path
+
+
+def _write_staged_bytes(
+    fd: int,
+    payload: bytes,
+    *,
+    label: str,
+    path: Path,
+) -> None:
+    offset = 0
+    while offset < len(payload):
+        written = os.write(fd, payload[offset:])
+        if written <= 0:
+            raise MillefeuilleContractError(
+                f"could not write complete staged {label}: {path}"
+            )
+        offset += written
+
+
+def _fsync_staged_file(fd: int) -> None:
+    os.fsync(fd)
 
 
 def _ensure_real_directory(path: Path, label: str) -> os.stat_result:

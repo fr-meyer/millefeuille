@@ -993,16 +993,12 @@ def _validate_v2_paper_card_values(record: PaperCardRecord) -> None:
             "model_provenance.provenance_ref",
         )
     _require_exact_string_list(record.evidence_refs, "evidence_refs")
-    _require_exact_string_list(
-        record.classification_clues,
-        "classification_clues",
-        allow_empty=True,
-    )
-    _require_exact_string_list(
-        record.quality_warnings,
-        "quality_warnings",
-        allow_empty=True,
-    )
+    # Empty normalized lists represent omitted optional fields. Explicit empty
+    # arrays are rejected by the v0.2 canonical round-trip in from_dict().
+    for field_name in ("classification_clues", "quality_warnings"):
+        values = getattr(record, field_name)
+        if values:
+            _require_exact_string_list(values, field_name)
 
 
 def _require_exact_nonempty_string(value: Any, field_name: str) -> str:

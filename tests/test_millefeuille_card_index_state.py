@@ -116,6 +116,20 @@ class TestPaperCardIndexStateContract(unittest.TestCase):
                     payload,
                 )
 
+    def test_v02_empty_clues_and_warnings_are_rejected_by_both_contracts(self):
+        for field_name in ("classification_clues", "quality_warnings"):
+            payload = copy.deepcopy(_v02_planned_payload())
+            payload[field_name] = []
+
+            with self.subTest(field=field_name):
+                with self.assertRaises(ValidationError):
+                    self.validator.validate(payload)
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "canonical fields and values",
+                ):
+                    PaperCardRecord.from_dict(payload)
+
     def test_v02_cannot_embed_final_status_in_planned_state(self):
         payload = _v02_planned_payload()
         payload["index_state"]["lanes"][0]["status"] = "written"

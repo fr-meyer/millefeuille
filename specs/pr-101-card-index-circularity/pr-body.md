@@ -42,9 +42,9 @@
 
 ## Validation
 
-- 157 focused card/index and affected-flow tests passed with 4 capability skips
+- 160 focused card/index and affected-flow tests passed with 4 capability skips
 - the focused external artifact-package regression passed
-- all 395 repository tests passed with 6 capability skips
+- all 398 repository tests passed with 6 capability skips
 - repository-wide Ruff and diff checks passed
 - schema parsing, privacy/manual-gate contract checks, Speculoos validation,
   and publication checks passed
