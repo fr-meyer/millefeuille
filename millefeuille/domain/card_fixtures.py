@@ -2,17 +2,28 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
 from typing import Any
 
+from millefeuille.domain.card_index_contract import (
+    canonical_json_bytes,
+    load_and_validate_canonical_card_index,
+    load_paper_card_artifact,
+)
 from millefeuille.domain.millefeuille import (
+    PAPER_CARD_SCHEMA_V2,
     MillefeuilleContractError,
     PaperCardRecord,
 )
-from millefeuille.domain.secure_io import load_json_object_no_follow
+from millefeuille.domain.route_fixtures import ROUTE_MARKDOWN_REF
+from millefeuille.domain.secure_io import (
+    load_json_object_no_follow,
+    read_text_no_follow,
+)
 from millefeuille.domain.source_packs import (
     load_source_pack_manifest,
     paper_id_for_zotero_item_key,
@@ -27,7 +38,7 @@ from millefeuille.domain.summary_fixtures import (
 )
 
 CARD_FIXTURE_SCHEMA_VERSION = "millefeuille-card-fixture-evidence/v0.1"
-PAPER_CARD_SCHEMA_VERSION = "millefeuille-paper-card/v0.1"
+PAPER_CARD_SCHEMA_VERSION = PAPER_CARD_SCHEMA_V2
 CARD_JSON_REF = Path("cards/paper-card.json")
 CARD_MARKDOWN_REF = Path("cards/paper-card.md")
 
@@ -217,9 +228,7 @@ def write_cards_from_evidence(
 
 
 def load_paper_card(path: str | Path) -> dict[str, Any]:
-    payload = _load_json_object(path, "paper card")
-    record = PaperCardRecord.from_dict(payload)
-    return record.to_dict()
+    return load_paper_card_artifact(path).payload
 
 
 def _plan_card(
@@ -257,6 +266,7 @@ def _plan_card(
         item_key=evidence.item_key,
         canonical_filename=evidence.canonical_filename,
         paper_id=paper_id,
+        run_id=run_id,
         source_hash=source_hash,
     )
     expected_markdown = _read_text_fixture(
@@ -289,38 +299,31 @@ def _materialize_card_payload(
     item_key: str,
     canonical_filename: str,
     paper_id: str,
+    run_id: str,
     source_hash: str,
 ) -> dict[str, Any]:
-    record = PaperCardRecord.from_dict(fixture_payload)
-    identity = dict(record.identity)
+    normalized = copy.deepcopy(fixture_payload)
+    identity = dict(normalized["identity"])
     identity["zotero_item_key"] = item_key
     identity["canonical_filename"] = canonical_filename
     identity["source_hash"] = source_hash
-    evidence_refs = [
+    normalized["paper_id"] = paper_id
+    normalized["identity"] = identity
+    normalized["evidence_refs"] = [
         "../summaries/hierarchical-summary.json",
         "../../../structure/structure.json",
     ]
-    normalized = PaperCardRecord(
-        paper_id=paper_id,
-        identity=identity,
-        one_line_thesis=record.one_line_thesis,
-        primary_contribution=record.primary_contribution,
-        evidence_refs=evidence_refs,
-        index_status=record.index_status,
-        model_provenance=record.model_provenance,
-        problem_addressed=record.problem_addressed,
-        method_or_approach=record.method_or_approach,
-        data_modality_domain=record.data_modality_domain,
-        main_results=record.main_results,
-        limitations=record.limitations,
-        classification_clues=record.classification_clues,
-        strongest_rejected_classification_path=(
-            record.strongest_rejected_classification_path
-        ),
-        quality_warnings=record.quality_warnings,
-        zotero_lifecycle_tag_state=record.zotero_lifecycle_tag_state,
-    )
-    return normalized.to_dict()
+    if normalized["schema_version"] == PAPER_CARD_SCHEMA_V2:
+        normalized["run_id"] = run_id
+    record = PaperCardRecord.from_dict(normalized)
+    if (
+        record.schema_version == PAPER_CARD_SCHEMA_V2
+        and record.index_state.get("phase") != "planned"
+    ):
+        raise MillefeuilleContractError(
+            "v0.2 paper card fixture index_state must be planned"
+        )
+    return record.to_dict()
 
 
 def _validate_summary_dependency(
@@ -369,16 +372,15 @@ def _existing_card_status(
         )
     existing_payload = load_paper_card(card_json_output_path)
     if existing_payload != expected_payload:
-        raise MillefeuilleContractError(
-            f"existing paper card drift: {card_json_output_path}"
+        _require_observed_card_matches_planned_card(
+            existing_payload=existing_payload,
+            expected_payload=expected_payload,
+            card_json_output_path=card_json_output_path,
         )
-    try:
-        existing_markdown = card_markdown_output_path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise MillefeuilleContractError(
-            f"could not read existing paper card markdown {card_markdown_output_path}: "
-            f"{exc}"
-        ) from exc
+    existing_markdown = read_text_no_follow(
+        card_markdown_output_path,
+        "paper card markdown",
+    )
     if existing_markdown != expected_markdown:
         raise MillefeuilleContractError(
             f"existing paper card markdown drift: {card_markdown_output_path}"
@@ -386,18 +388,72 @@ def _existing_card_status(
     return "existing"
 
 
+def _require_observed_card_matches_planned_card(
+    *,
+    existing_payload: dict[str, Any],
+    expected_payload: dict[str, Any],
+    card_json_output_path: Path,
+) -> None:
+    if (
+        existing_payload.get("schema_version") != PAPER_CARD_SCHEMA_V2
+        or expected_payload.get("schema_version") != PAPER_CARD_SCHEMA_V2
+    ):
+        raise MillefeuilleContractError(
+            f"existing paper card drift: {card_json_output_path}"
+        )
+    existing_state = existing_payload.get("index_state")
+    expected_state = expected_payload.get("index_state")
+    if not isinstance(existing_state, dict) or not isinstance(expected_state, dict):
+        raise MillefeuilleContractError(
+            f"existing paper card drift: {card_json_output_path}"
+        )
+    if existing_state.get("phase") != "observed":
+        raise MillefeuilleContractError(
+            f"existing paper card drift: {card_json_output_path}"
+        )
+    if expected_state.get("phase") != "planned":
+        raise MillefeuilleContractError(
+            f"existing paper card drift: {card_json_output_path}"
+        )
+    existing_lanes = [entry.get("lane") for entry in existing_state.get("lanes", [])]
+    expected_lanes = [entry.get("lane") for entry in expected_state.get("lanes", [])]
+    if existing_lanes != expected_lanes:
+        raise MillefeuilleContractError(
+            f"existing paper card drift: {card_json_output_path}"
+        )
+    existing_without_state = dict(existing_payload)
+    expected_without_state = dict(expected_payload)
+    existing_without_state.pop("index_state", None)
+    expected_without_state.pop("index_state", None)
+    if existing_without_state != expected_without_state:
+        raise MillefeuilleContractError(
+            f"existing paper card drift: {card_json_output_path}"
+        )
+
+    run_dir = card_json_output_path.parent.parent
+    source_pack_dir = run_dir.parents[2]
+    identity = existing_payload["identity"]
+    load_and_validate_canonical_card_index(
+        card_path=card_json_output_path,
+        index_path=run_dir / "index" / "index-status.json",
+        paper_id=existing_payload["paper_id"],
+        run_id=existing_payload["run_id"],
+        source_hash=identity["source_hash"],
+        selected_fulltext_path=source_pack_dir / ROUTE_MARKDOWN_REF,
+        summary_path=run_dir / SUMMARY_ARTIFACT_REF,
+    )
+
+
 def _apply_planned_card_write(
     planned: _PlannedCardWrite,
 ) -> CardFixtureWriteResult:
     if planned.status == "created":
         planned.card_json_output_path.parent.mkdir(parents=True, exist_ok=True)
-        planned.card_json_output_path.write_text(
-            json.dumps(planned.expected_payload, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        planned.card_json_output_path.write_bytes(
+            canonical_json_bytes(planned.expected_payload)
         )
-        planned.card_markdown_output_path.write_text(
-            planned.expected_markdown,
-            encoding="utf-8",
+        planned.card_markdown_output_path.write_bytes(
+            planned.expected_markdown.encode("utf-8")
         )
     return CardFixtureWriteResult(
         paper_id=planned.paper_id,
@@ -411,8 +467,18 @@ def _apply_planned_card_write(
 
 def _load_paper_card_fixture(path: str | Path) -> dict[str, Any]:
     payload = _load_json_object(path, "paper card fixture")
-    record = PaperCardRecord.from_dict(payload)
-    return record.to_dict()
+    if payload.get("schema_version") == PAPER_CARD_SCHEMA_V2:
+        identity = payload.get("identity")
+        if isinstance(identity, dict) and "source_hash" not in identity:
+            # Fixture templates precede source-pack identity binding. Inject a
+            # syntactically valid sentinel only for strict template validation;
+            # materialization replaces it with the verified manifest hash.
+            candidate = copy.deepcopy(payload)
+            candidate["identity"]["source_hash"] = "sha256:" + ("0" * 64)
+            normalized = PaperCardRecord.from_dict(candidate).to_dict()
+            normalized["identity"].pop("source_hash")
+            return normalized
+    return PaperCardRecord.from_dict(payload).to_dict()
 
 
 def _resolve_source_pack_dir(

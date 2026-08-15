@@ -15,6 +15,10 @@ from millefeuille.domain.card_fixtures import (
     load_paper_card,
     write_cards_from_evidence,
 )
+from millefeuille.domain.card_index_contract import (
+    load_and_validate_canonical_card_index,
+    validate_paper_card_identity,
+)
 from millefeuille.domain.classification import (
     CLASSIFICATION_PLAN_REF,
     DECISION_DIR_REF,
@@ -235,16 +239,23 @@ def can_resume_stage(resolved: ResolvedRunArtifacts, stage: str | StageName) -> 
         _require_paper_run(payload, resolved, "hierarchical summary")
     elif stage_name == StageName.CARD:
         payload = load_paper_card(resolved.run_dir / CARD_JSON_REF)
-        if payload.get("paper_id") != resolved.paper_id:
-            raise MillefeuilleContractError("paper card paper_id drift")
-        card_source_hash = payload.get("identity", {}).get("source_hash")
-        if card_source_hash not in (None, resolved.source_hash):
-            raise MillefeuilleContractError("paper card source_hash drift")
+        validate_paper_card_identity(
+            payload,
+            paper_id=resolved.paper_id,
+            run_id=resolved.run_id,
+            source_hash=resolved.source_hash,
+        )
         _require_file(resolved.run_dir / CARD_MARKDOWN_REF)
     elif stage_name == StageName.INDEX:
-        payload = load_retrieval_index_status(resolved.run_dir / INDEX_STATUS_REF)
-        _require_paper_run(payload, resolved, "retrieval index status")
-        _require_source_hash(payload, resolved, "retrieval index status")
+        load_and_validate_canonical_card_index(
+            card_path=resolved.run_dir / CARD_JSON_REF,
+            index_path=resolved.run_dir / INDEX_STATUS_REF,
+            paper_id=resolved.paper_id,
+            run_id=resolved.run_id,
+            source_hash=resolved.source_hash,
+            selected_fulltext_path=resolved.source_pack_dir / ROUTE_MARKDOWN_REF,
+            summary_path=resolved.run_dir / SUMMARY_ARTIFACT_REF,
+        )
     elif stage_name == StageName.ACCEPTANCE:
         payload = load_json_object(
             resolved.run_dir / ACCEPTANCE_SUMMARY_REF,

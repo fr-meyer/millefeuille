@@ -648,6 +648,57 @@ class HierarchicalSummaryRecord:
         }
 
 
+PAPER_CARD_SCHEMA_V1 = "millefeuille-paper-card/v0.1"
+PAPER_CARD_SCHEMA_V2 = "millefeuille-paper-card/v0.2"
+PAPER_CARD_INDEX_STATUS_REF = "../index/index-status.json"
+INDEX_LANE_VALUES = frozenset({"openkb", "pageindex", "condb", "chatindex", "other"})
+INDEX_STATUS_VALUES = frozenset(
+    {
+        "skipped",
+        "previewed",
+        "written",
+        "failed",
+        "needs-review",
+    }
+)
+PAPER_CARD_V2_FIELDS = frozenset(
+    {
+        "schema_version",
+        "paper_id",
+        "run_id",
+        "identity",
+        "one_line_thesis",
+        "primary_contribution",
+        "problem_addressed",
+        "method_or_approach",
+        "data_modality_domain",
+        "main_results",
+        "limitations",
+        "classification_clues",
+        "strongest_rejected_classification_path",
+        "quality_warnings",
+        "evidence_refs",
+        "index_state",
+        "model_provenance",
+        "zotero_lifecycle_tag_state",
+    }
+)
+PAPER_CARD_V2_IDENTITY_FIELDS = frozenset(
+    {
+        "title",
+        "authors",
+        "year",
+        "doi",
+        "url",
+        "zotero_item_key",
+        "canonical_filename",
+        "source_hash",
+    }
+)
+PAPER_CARD_V2_PROVENANCE_FIELDS = frozenset({"profile_id", "provenance_ref"})
+PAPER_CARD_SOURCE_HASH_PATTERN = re.compile(r"sha256(?:-aggregate)?:[0-9a-f]{64}")
+
+
 @dataclass
 class PaperCardRecord:
     paper_id: str
@@ -655,8 +706,10 @@ class PaperCardRecord:
     one_line_thesis: str
     primary_contribution: str
     evidence_refs: list[str]
-    index_status: list[dict[str, Any]]
     model_provenance: dict[str, Any]
+    index_status: list[dict[str, Any]] | None = None
+    index_state: dict[str, Any] | None = None
+    run_id: str | None = None
     problem_addressed: str | None = None
     method_or_approach: str | None = None
     data_modality_domain: str | None = None
@@ -666,14 +719,14 @@ class PaperCardRecord:
     strongest_rejected_classification_path: str | None = None
     quality_warnings: list[str] = field(default_factory=list)
     zotero_lifecycle_tag_state: str | None = None
-    schema_version: str = "millefeuille-paper-card/v0.1"
+    schema_version: str = PAPER_CARD_SCHEMA_V1
 
     def __post_init__(self) -> None:
-        if self.schema_version != "millefeuille-paper-card/v0.1":
+        if self.schema_version not in {PAPER_CARD_SCHEMA_V1, PAPER_CARD_SCHEMA_V2}:
             raise MillefeuilleContractError(
                 f"unsupported schema_version {self.schema_version!r}"
             )
-        if not self.paper_id.strip():
+        if not isinstance(self.paper_id, str) or not self.paper_id.strip():
             raise MillefeuilleContractError("paper_id must not be empty")
         for field_name in ("one_line_thesis", "primary_contribution"):
             value = getattr(self, field_name)
@@ -700,21 +753,19 @@ class PaperCardRecord:
                 raise MillefeuilleContractError(
                     "evidence_refs must contain non-empty strings"
                 )
-        if not isinstance(self.index_status, list):
-            raise MillefeuilleContractError("index_status must be an array")
-        for entry in self.index_status:
-            if not isinstance(entry, dict):
-                raise MillefeuilleContractError("index_status entries must be objects")
-            lane = entry.get("lane")
-            status = entry.get("status")
-            if not isinstance(lane, str) or not lane.strip():
+        if self.schema_version == PAPER_CARD_SCHEMA_V1:
+            if self.run_id is not None or self.index_state is not None:
                 raise MillefeuilleContractError(
-                    "index_status.lane must be a non-empty string"
+                    "v0.1 paper cards cannot contain run_id or index_state"
                 )
-            if not isinstance(status, str) or not status.strip():
+            self.index_status = _normalize_legacy_card_index_status(self.index_status)
+        else:
+            if self.index_status is not None:
                 raise MillefeuilleContractError(
-                    "index_status.status must be a non-empty string"
+                    "v0.2 paper cards use index_state instead of index_status"
                 )
+            _validate_v2_paper_card_values(self)
+            self.index_state = _normalize_card_index_state(self.index_state)
         for field_name in ("classification_clues", "quality_warnings"):
             value = getattr(self, field_name)
             if not isinstance(value, list):
@@ -729,20 +780,58 @@ class PaperCardRecord:
     def from_dict(cls, payload: dict[str, Any]) -> PaperCardRecord:
         if not isinstance(payload, dict):
             raise MillefeuilleContractError("paper card must be an object")
+        schema_version = payload.get("schema_version")
+        if not isinstance(schema_version, str):
+            raise MillefeuilleContractError("schema_version must be a string")
+        if schema_version == PAPER_CARD_SCHEMA_V2 and "index_status" in payload:
+            raise MillefeuilleContractError(
+                "v0.2 paper cards use index_state instead of index_status"
+            )
+        if schema_version == PAPER_CARD_SCHEMA_V2:
+            _validate_v2_paper_card_shape(payload)
         evidence_refs = payload.get("evidence_refs")
-        index_status = payload.get("index_status")
         if not isinstance(evidence_refs, list):
             raise MillefeuilleContractError("evidence_refs must be an array")
-        if not isinstance(index_status, list):
-            raise MillefeuilleContractError("index_status must be an array")
-        return cls(
-            paper_id=str(payload.get("paper_id", "")).strip(),
+        if schema_version == PAPER_CARD_SCHEMA_V1 and (
+            "run_id" in payload or "index_state" in payload
+        ):
+            raise MillefeuilleContractError(
+                "v0.1 paper cards cannot contain run_id or index_state"
+            )
+        record = cls(
+            paper_id=(
+                payload.get("paper_id")
+                if schema_version == PAPER_CARD_SCHEMA_V2
+                else str(payload.get("paper_id", "")).strip()
+            ),
             identity=dict(payload.get("identity", {})),
-            one_line_thesis=str(payload.get("one_line_thesis", "")).strip(),
-            primary_contribution=str(payload.get("primary_contribution", "")).strip(),
+            one_line_thesis=(
+                payload.get("one_line_thesis")
+                if schema_version == PAPER_CARD_SCHEMA_V2
+                else str(payload.get("one_line_thesis", "")).strip()
+            ),
+            primary_contribution=(
+                payload.get("primary_contribution")
+                if schema_version == PAPER_CARD_SCHEMA_V2
+                else str(payload.get("primary_contribution", "")).strip()
+            ),
             evidence_refs=list(evidence_refs),
-            index_status=[dict(entry) for entry in index_status],
             model_provenance=dict(payload.get("model_provenance", {})),
+            index_status=(
+                payload.get("index_status")
+                if schema_version == PAPER_CARD_SCHEMA_V1
+                else None
+            ),
+            index_state=(
+                payload.get("index_state")
+                if schema_version == PAPER_CARD_SCHEMA_V2
+                else None
+            ),
+            run_id=(
+                payload.get("run_id")
+                if schema_version == PAPER_CARD_SCHEMA_V2
+                else None
+            ),
             problem_addressed=payload.get("problem_addressed"),
             method_or_approach=payload.get("method_or_approach"),
             data_modality_domain=payload.get("data_modality_domain"),
@@ -754,8 +843,13 @@ class PaperCardRecord:
             ),
             quality_warnings=list(payload.get("quality_warnings", [])),
             zotero_lifecycle_tag_state=payload.get("zotero_lifecycle_tag_state"),
-            schema_version=str(payload.get("schema_version", "")).strip(),
+            schema_version=schema_version,
         )
+        if schema_version == PAPER_CARD_SCHEMA_V2 and record.to_dict() != payload:
+            raise MillefeuilleContractError(
+                "v0.2 paper card must use canonical fields and values"
+            )
+        return record
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -765,9 +859,18 @@ class PaperCardRecord:
             "one_line_thesis": self.one_line_thesis,
             "primary_contribution": self.primary_contribution,
             "evidence_refs": list(self.evidence_refs),
-            "index_status": [dict(entry) for entry in self.index_status],
             "model_provenance": dict(self.model_provenance),
         }
+        if self.schema_version == PAPER_CARD_SCHEMA_V1:
+            payload["index_status"] = [dict(entry) for entry in self.index_status or []]
+        else:
+            payload["run_id"] = self.run_id
+            payload["index_state"] = {
+                **dict(self.index_state or {}),
+                "lanes": [
+                    dict(entry) for entry in (self.index_state or {}).get("lanes", [])
+                ],
+            }
         optional_string_fields = {
             "problem_addressed": self.problem_addressed,
             "method_or_approach": self.method_or_approach,
@@ -789,16 +892,222 @@ class PaperCardRecord:
         return payload
 
 
-INDEX_LANE_VALUES = frozenset({"openkb", "pageindex", "condb", "chatindex", "other"})
-INDEX_STATUS_VALUES = frozenset(
-    {
-        "skipped",
-        "previewed",
-        "written",
-        "failed",
-        "needs-review",
-    }
-)
+def _validate_v2_paper_card_shape(payload: dict[str, Any]) -> None:
+    unexpected_fields = sorted(set(payload) - PAPER_CARD_V2_FIELDS)
+    if unexpected_fields:
+        raise MillefeuilleContractError(
+            "v0.2 paper card has unsupported fields: " + ", ".join(unexpected_fields)
+        )
+    identity = payload.get("identity")
+    if not isinstance(identity, dict):
+        raise MillefeuilleContractError("identity must be an object")
+    unexpected_identity_fields = sorted(set(identity) - PAPER_CARD_V2_IDENTITY_FIELDS)
+    if unexpected_identity_fields:
+        raise MillefeuilleContractError(
+            "v0.2 paper card identity has unsupported fields: "
+            + ", ".join(unexpected_identity_fields)
+        )
+    provenance = payload.get("model_provenance")
+    if not isinstance(provenance, dict):
+        raise MillefeuilleContractError("model_provenance must be an object")
+    unexpected_provenance_fields = sorted(
+        set(provenance) - PAPER_CARD_V2_PROVENANCE_FIELDS
+    )
+    if unexpected_provenance_fields:
+        raise MillefeuilleContractError(
+            "v0.2 paper card model_provenance has unsupported fields: "
+            + ", ".join(unexpected_provenance_fields)
+        )
+
+
+def _validate_v2_paper_card_values(record: PaperCardRecord) -> None:
+    if not isinstance(record.identity, dict):
+        raise MillefeuilleContractError("identity must be an object")
+    unexpected_identity_fields = sorted(
+        set(record.identity) - PAPER_CARD_V2_IDENTITY_FIELDS
+    )
+    if unexpected_identity_fields:
+        raise MillefeuilleContractError(
+            "v0.2 paper card identity has unsupported fields: "
+            + ", ".join(unexpected_identity_fields)
+        )
+    if not isinstance(record.model_provenance, dict):
+        raise MillefeuilleContractError("model_provenance must be an object")
+    unexpected_provenance_fields = sorted(
+        set(record.model_provenance) - PAPER_CARD_V2_PROVENANCE_FIELDS
+    )
+    if unexpected_provenance_fields:
+        raise MillefeuilleContractError(
+            "v0.2 paper card model_provenance has unsupported fields: "
+            + ", ".join(unexpected_provenance_fields)
+        )
+    for field_name in (
+        "paper_id",
+        "run_id",
+        "one_line_thesis",
+        "primary_contribution",
+    ):
+        _require_exact_nonempty_string(getattr(record, field_name), field_name)
+    for field_name in (
+        "problem_addressed",
+        "method_or_approach",
+        "data_modality_domain",
+        "main_results",
+        "limitations",
+        "strongest_rejected_classification_path",
+        "zotero_lifecycle_tag_state",
+    ):
+        value = getattr(record, field_name)
+        if value is not None:
+            _require_exact_nonempty_string(value, field_name)
+
+    identity = record.identity
+    _require_exact_nonempty_string(identity.get("title"), "identity.title")
+    source_hash = _require_exact_nonempty_string(
+        identity.get("source_hash"),
+        "identity.source_hash",
+    )
+    if PAPER_CARD_SOURCE_HASH_PATTERN.fullmatch(source_hash) is None:
+        raise MillefeuilleContractError(
+            "identity.source_hash must use sha256:<hex> or sha256-aggregate:<hex> form"
+        )
+    authors = identity.get("authors")
+    if authors is not None:
+        _require_exact_string_list(authors, "identity.authors", allow_empty=True)
+    year = identity.get("year")
+    if year is not None and (isinstance(year, bool) or not isinstance(year, int)):
+        raise MillefeuilleContractError("identity.year must be an integer or null")
+    for field_name in ("doi", "url", "zotero_item_key", "canonical_filename"):
+        value = identity.get(field_name)
+        if value is not None:
+            _require_exact_nonempty_string(value, f"identity.{field_name}")
+
+    _require_exact_nonempty_string(
+        record.model_provenance.get("profile_id"),
+        "model_provenance.profile_id",
+    )
+    provenance_ref = record.model_provenance.get("provenance_ref")
+    if provenance_ref is not None:
+        _require_exact_nonempty_string(
+            provenance_ref,
+            "model_provenance.provenance_ref",
+        )
+    _require_exact_string_list(record.evidence_refs, "evidence_refs")
+    # Empty normalized lists represent omitted optional fields. Explicit empty
+    # arrays are rejected by the v0.2 canonical round-trip in from_dict().
+    for field_name in ("classification_clues", "quality_warnings"):
+        values = getattr(record, field_name)
+        if values:
+            _require_exact_string_list(values, field_name)
+
+
+def _require_exact_nonempty_string(value: Any, field_name: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise MillefeuilleContractError(f"{field_name} must be a non-empty string")
+    if value != value.strip():
+        raise MillefeuilleContractError(
+            f"{field_name} must not contain boundary whitespace"
+        )
+    return value
+
+
+def _require_exact_string_list(
+    value: Any,
+    field_name: str,
+    *,
+    allow_empty: bool = False,
+) -> None:
+    if not isinstance(value, list) or (not value and not allow_empty):
+        qualifier = "an array" if allow_empty else "a non-empty array"
+        raise MillefeuilleContractError(f"{field_name} must be {qualifier}")
+    for entry in value:
+        _require_exact_nonempty_string(entry, field_name)
+
+
+def _normalize_legacy_card_index_status(
+    value: Any,
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise MillefeuilleContractError("index_status must be an array")
+    normalized: list[dict[str, Any]] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise MillefeuilleContractError("index_status entries must be objects")
+        lane = entry.get("lane")
+        status = entry.get("status")
+        if not isinstance(lane, str) or not lane.strip():
+            raise MillefeuilleContractError(
+                "index_status.lane must be a non-empty string"
+            )
+        if not isinstance(status, str) or not status.strip():
+            raise MillefeuilleContractError(
+                "index_status.status must be a non-empty string"
+            )
+        normalized.append(dict(entry))
+    return normalized
+
+
+def _normalize_card_index_state(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise MillefeuilleContractError("index_state must be an object")
+    phase = value.get("phase")
+    if phase not in {"planned", "observed"}:
+        raise MillefeuilleContractError(
+            "index_state.phase must be 'planned' or 'observed'"
+        )
+    allowed_fields = {"phase", "lanes"}
+    if phase == "observed":
+        allowed_fields.add("status_ref")
+        if value.get("status_ref") != PAPER_CARD_INDEX_STATUS_REF:
+            raise MillefeuilleContractError(
+                "observed index_state.status_ref must be "
+                f"{PAPER_CARD_INDEX_STATUS_REF!r}"
+            )
+    elif "status_ref" in value:
+        raise MillefeuilleContractError("planned index_state cannot contain status_ref")
+    unexpected = sorted(set(value) - allowed_fields)
+    if unexpected:
+        raise MillefeuilleContractError(
+            "index_state has unsupported fields: " + ", ".join(unexpected)
+        )
+    lanes = value.get("lanes")
+    if not isinstance(lanes, list) or not lanes:
+        raise MillefeuilleContractError("index_state.lanes must be a non-empty array")
+    normalized_lanes: list[dict[str, str]] = []
+    for entry in lanes:
+        if not isinstance(entry, dict):
+            raise MillefeuilleContractError("index_state lanes must be objects")
+        unexpected_lane_fields = sorted(set(entry) - {"lane", "status"})
+        if unexpected_lane_fields:
+            raise MillefeuilleContractError(
+                "index_state lane has unsupported fields: "
+                + ", ".join(unexpected_lane_fields)
+            )
+        lane = entry.get("lane")
+        status = entry.get("status")
+        if lane not in INDEX_LANE_VALUES:
+            raise MillefeuilleContractError(
+                f"index_state lane must be one of {sorted(INDEX_LANE_VALUES)!r}"
+            )
+        allowed_statuses = {"pending"} if phase == "planned" else INDEX_STATUS_VALUES
+        if status not in allowed_statuses:
+            raise MillefeuilleContractError(
+                f"index_state {phase} status must be one of "
+                f"{sorted(allowed_statuses)!r}"
+            )
+        normalized_lanes.append({"lane": lane, "status": status})
+    lane_names = [entry["lane"] for entry in normalized_lanes]
+    if len(lane_names) != len(set(lane_names)):
+        raise MillefeuilleContractError("index_state lane values must be unique")
+    missing_lanes = {"openkb", "pageindex"} - set(lane_names)
+    if missing_lanes:
+        raise MillefeuilleContractError(
+            f"index_state lanes missing required entries: {sorted(missing_lanes)!r}"
+        )
+    normalized: dict[str, Any] = {"phase": phase, "lanes": normalized_lanes}
+    if phase == "observed":
+        normalized["status_ref"] = PAPER_CARD_INDEX_STATUS_REF
+    return normalized
 
 
 @dataclass
@@ -914,13 +1223,15 @@ class RetrievalIndexRecord:
                 raise MillefeuilleContractError(
                     f"{field_name} must be a non-empty string"
                 )
-        if re.fullmatch(
-            r"sha256(?:-aggregate)?:[0-9a-f]{64}",
-            self.source_hash,
-        ) is None:
+        if (
+            re.fullmatch(
+                r"sha256(?:-aggregate)?:[0-9a-f]{64}",
+                self.source_hash,
+            )
+            is None
+        ):
             raise MillefeuilleContractError(
-                "source_hash must use sha256:<hex> or "
-                "sha256-aggregate:<hex> form"
+                "source_hash must use sha256:<hex> or sha256-aggregate:<hex> form"
             )
         if self.duplicate_scan is not None and not isinstance(
             self.duplicate_scan, dict
@@ -1532,23 +1843,19 @@ class ClassificationActionRecord:
         for ref in self.evidence_refs:
             if not isinstance(ref, str) or not ref.strip():
                 raise MillefeuilleContractError(
-                    "classification action evidence_refs must contain "
-                    "non-empty strings"
+                    "classification action evidence_refs must contain non-empty strings"
                 )
         if self.taxonomy_change_request_ref is not None and (
             not isinstance(self.taxonomy_change_request_ref, str)
             or not self.taxonomy_change_request_ref.strip()
         ):
             raise MillefeuilleContractError(
-                "taxonomy_change_request_ref must be a non-empty string when "
-                "provided"
+                "taxonomy_change_request_ref must be a non-empty string when provided"
             )
         requires_taxonomy_request = (
             self.outcome == ClassificationActionOutcome.TAXONOMY_CHANGE_REQUESTED
         )
-        if requires_taxonomy_request != (
-            self.taxonomy_change_request_ref is not None
-        ):
+        if requires_taxonomy_request != (self.taxonomy_change_request_ref is not None):
             raise MillefeuilleContractError(
                 "taxonomy-change-requested actions require exactly one "
                 "taxonomy_change_request_ref"
@@ -1557,9 +1864,7 @@ class ClassificationActionRecord:
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> ClassificationActionRecord:
         if not isinstance(payload, dict):
-            raise MillefeuilleContractError(
-                "classification action must be an object"
-            )
+            raise MillefeuilleContractError("classification action must be an object")
         return cls(
             action_id=str(payload.get("action_id", "")).strip(),
             paper_id=str(payload.get("paper_id", "")).strip(),
@@ -1572,13 +1877,9 @@ class ClassificationActionRecord:
             summary=str(payload.get("summary", "")).strip(),
             prior_decision_ref=str(payload.get("prior_decision_ref", "")).strip(),
             final_decision_ref=str(payload.get("final_decision_ref", "")).strip(),
-            writeback_preview_ref=str(
-                payload.get("writeback_preview_ref", "")
-            ).strip(),
+            writeback_preview_ref=str(payload.get("writeback_preview_ref", "")).strip(),
             evidence_refs=list(payload.get("evidence_refs", [])),
-            taxonomy_change_request_ref=payload.get(
-                "taxonomy_change_request_ref"
-            ),
+            taxonomy_change_request_ref=payload.get("taxonomy_change_request_ref"),
             schema_version=str(payload.get("schema_version", "")).strip(),
         )
 
@@ -1600,9 +1901,7 @@ class ClassificationActionRecord:
             "evidence_refs": list(self.evidence_refs),
         }
         if self.taxonomy_change_request_ref is not None:
-            payload["taxonomy_change_request_ref"] = (
-                self.taxonomy_change_request_ref
-            )
+            payload["taxonomy_change_request_ref"] = self.taxonomy_change_request_ref
         return payload
 
 
@@ -1656,9 +1955,7 @@ class ClassificationBatchRunRecord:
             status=str(payload.get("status", "")).strip(),
             primary_path=str(payload.get("primary_path", "")).strip(),
             decision_ref=str(payload.get("decision_ref", "")).strip(),
-            writeback_preview_ref=str(
-                payload.get("writeback_preview_ref", "")
-            ).strip(),
+            writeback_preview_ref=str(payload.get("writeback_preview_ref", "")).strip(),
             review_reasons=list(payload.get("review_reasons", [])),
         )
 
@@ -1787,9 +2084,7 @@ class ClassificationBatchSummaryRecord:
                 )
             route_paths.add(primary_path)
             if not isinstance(route_runs, list) or not route_runs:
-                raise MillefeuilleContractError(
-                    "routes.runs must be a non-empty array"
-                )
+                raise MillefeuilleContractError("routes.runs must be a non-empty array")
             if count != len(route_runs):
                 raise MillefeuilleContractError(
                     "routes.count must equal the number of routed runs"

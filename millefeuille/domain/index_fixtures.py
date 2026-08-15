@@ -2,16 +2,40 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager, suppress
+import copy
+import ctypes
 from dataclasses import dataclass
+import errno
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import stat
+import sys
+import tempfile
 from typing import Any
 
-from millefeuille.domain.card_fixtures import CARD_JSON_REF, load_paper_card
+from millefeuille.domain.card_fixtures import CARD_JSON_REF
+from millefeuille.domain.card_index_contract import (
+    LoadedJsonArtifact,
+    canonical_json_bytes,
+    load_and_validate_canonical_card_index,
+    load_paper_card_artifact,
+    load_retrieval_index_artifact,
+    observed_index_state,
+    validate_canonical_card_index_contract,
+    validate_paper_card_identity,
+)
+from millefeuille.domain.card_index_contract import (
+    validate_observed_card_index_state as _validate_observed_card_index_state,
+)
 from millefeuille.domain.millefeuille import (
+    PAPER_CARD_SCHEMA_V1,
+    PAPER_CARD_SCHEMA_V2,
     MillefeuilleContractError,
+    PaperCardRecord,
     RetrievalIndexRecord,
 )
 from millefeuille.domain.route_fixtures import (
@@ -32,6 +56,8 @@ from millefeuille.domain.summary_fixtures import (
 INDEX_FIXTURE_SCHEMA_VERSION = "millefeuille-index-fixture-evidence/v0.1"
 RETRIEVAL_INDEX_STATUS_SCHEMA_VERSION = "millefeuille-retrieval-index-status/v0.1"
 INDEX_STATUS_REF = Path("index/index-status.json")
+CARD_INDEX_TRANSACTION_ROOT_REF = Path("recovery/card-index")
+CARD_INDEX_TRANSACTION_MAX_CARD_BYTES = 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -132,9 +158,29 @@ class _PlannedIndexWrite:
     paper_id: str
     run_id: str
     status: str
+    source_pack_dir: Path
     run_dir: Path
     index_status_output_path: Path
     expected_payload: dict[str, Any]
+    card_json_path: Path
+    original_card_payload: dict[str, Any]
+    original_card_bytes: bytes
+    refreshed_card_payload: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class _DisplacedCardEntry:
+    path: Path
+    mechanism: str
+    rejected_path: Path
+
+
+@dataclass(frozen=True)
+class _CapturedFileEntry:
+    path: Path
+    raw_bytes: bytes
+    identity: tuple[int, ...]
+    file_key: tuple[int, int]
 
 
 def load_index_fixture_evidence_batch(path: str | Path) -> list[IndexFixtureEvidence]:
@@ -243,9 +289,10 @@ def _plan_index(
         paper_id=paper_id,
         run_id=run_id,
     )
-    _validate_card_dependency(
+    card_artifact = _validate_card_dependency(
         run_dir=run_dir,
         paper_id=paper_id,
+        run_id=run_id,
         source_hash=source_hash,
     )
     fixture_payload = load_retrieval_index_status(evidence.index_status_path)
@@ -259,42 +306,873 @@ def _plan_index(
         source_hash=source_hash,
         index_dir=index_status_output_path.parent,
     )
+    refreshed_card_payload = _plan_card_index_refresh(
+        card_payload=card_artifact.payload,
+        index_payload=expected_payload,
+    )
     status = _existing_index_status(
         index_status_output_path=index_status_output_path,
         expected_payload=expected_payload,
     )
+    if card_artifact.payload["schema_version"] == PAPER_CARD_SCHEMA_V2:
+        card_state = card_artifact.payload["index_state"]
+        if card_state["phase"] == "observed":
+            if status != "existing":
+                raise MillefeuilleContractError(
+                    "observed paper card requires its canonical retrieval index status"
+                )
+            validate_canonical_card_index_contract(
+                card_payload=card_artifact.payload,
+                index_payload=expected_payload,
+                paper_id=paper_id,
+                run_id=run_id,
+                source_hash=source_hash,
+                index_dir=index_status_output_path.parent,
+                selected_fulltext_path=source_pack_dir / ROUTE_MARKDOWN_REF,
+                summary_path=run_dir / SUMMARY_ARTIFACT_REF,
+                card_path=run_dir / CARD_JSON_REF,
+            )
     return _PlannedIndexWrite(
         paper_id=paper_id,
         run_id=run_id,
         status=status or "created",
+        source_pack_dir=source_pack_dir,
         run_dir=run_dir,
         index_status_output_path=index_status_output_path,
         expected_payload=expected_payload,
+        card_json_path=run_dir / CARD_JSON_REF,
+        original_card_payload=card_artifact.payload,
+        original_card_bytes=card_artifact.raw_bytes,
+        refreshed_card_payload=refreshed_card_payload,
     )
 
 
 def _apply_planned_index_write(plan: _PlannedIndexWrite) -> IndexFixtureWriteResult:
-    if plan.status == "existing":
-        return IndexFixtureWriteResult(
-            paper_id=plan.paper_id,
-            run_id=plan.run_id,
-            status=plan.status,
-            run_dir=plan.run_dir,
-            index_status_path=plan.index_status_output_path,
-        )
-
-    plan.index_status_output_path.parent.mkdir(parents=True, exist_ok=True)
-    plan.index_status_output_path.write_text(
-        json.dumps(plan.expected_payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    with _exclusive_card_index_lock(plan.run_dir):
+        _require_unchanged_card(plan)
+        status = _ensure_expected_index(plan)
+        if plan.refreshed_card_payload is not None:
+            _commit_card_refresh(plan)
+        _load_and_validate_final_join(plan)
     return IndexFixtureWriteResult(
         paper_id=plan.paper_id,
         run_id=plan.run_id,
-        status=plan.status,
+        status=status,
         run_dir=plan.run_dir,
         index_status_path=plan.index_status_output_path,
     )
+
+
+def _require_unchanged_card(plan: _PlannedIndexWrite) -> None:
+    current = load_paper_card_artifact(plan.card_json_path)
+    if (
+        current.payload != plan.original_card_payload
+        or current.raw_bytes != plan.original_card_bytes
+    ):
+        raise MillefeuilleContractError(
+            f"paper card changed before index commit: {plan.card_json_path}"
+        )
+
+
+def _card_index_transaction_dir(plan: _PlannedIndexWrite) -> Path:
+    digest = hashlib.sha256()
+    for label, payload in (
+        (b"paper-id", plan.paper_id.encode("utf-8")),
+        (b"run-id", plan.run_id.encode("utf-8")),
+        (b"planned-card", plan.original_card_bytes),
+        (b"index-status", canonical_json_bytes(plan.expected_payload)),
+        (
+            b"observed-card",
+            (
+                b""
+                if plan.refreshed_card_payload is None
+                else canonical_json_bytes(plan.refreshed_card_payload)
+            ),
+        ),
+    ):
+        digest.update(len(label).to_bytes(2, "big"))
+        digest.update(label)
+        digest.update(len(payload).to_bytes(8, "big"))
+        digest.update(payload)
+    return plan.run_dir / CARD_INDEX_TRANSACTION_ROOT_REF / digest.hexdigest()
+
+
+def _ensure_expected_index(plan: _PlannedIndexWrite) -> str:
+    expected_bytes = canonical_json_bytes(plan.expected_payload)
+    if plan.index_status_output_path.exists():
+        _capture_expected_index(
+            plan.index_status_output_path,
+            expected_bytes,
+            "existing retrieval index status",
+        )
+        return "existing"
+
+    transaction_dir = _card_index_transaction_dir(plan)
+    _ensure_real_directory(transaction_dir, "card/index transaction directory")
+    _ensure_real_directory(
+        plan.index_status_output_path.parent,
+        "retrieval index status parent",
+    )
+    staged_path = transaction_dir / "index-status.json"
+    staged_path = _stage_exact_bytes(
+        staged_path,
+        expected_bytes,
+        label="retrieval index status",
+    )
+    status = "created"
+    try:
+        _publish_index_no_replace(
+            staged_path,
+            plan.index_status_output_path,
+        )
+    except FileExistsError:
+        status = "existing"
+
+    current = _capture_expected_index(
+        plan.index_status_output_path,
+        expected_bytes,
+        "retrieval index status after publication",
+    )
+    _ensure_independent_index_evidence(
+        staged_path=staged_path,
+        expected_bytes=expected_bytes,
+        canonical=current,
+    )
+    return status
+
+
+def _capture_expected_index(
+    path: Path,
+    expected_bytes: bytes,
+    label: str,
+) -> _CapturedFileEntry:
+    current = _capture_file_entry(path, label)
+    if current.raw_bytes != expected_bytes:
+        raise MillefeuilleContractError(f"{label} bytes drifted: {path}")
+    return current
+
+
+def _ensure_independent_index_evidence(
+    *,
+    staged_path: Path,
+    expected_bytes: bytes,
+    canonical: _CapturedFileEntry,
+) -> None:
+    evidence_path = _stage_exact_bytes(
+        staged_path,
+        expected_bytes,
+        label="retrieval index status",
+    )
+    evidence = _capture_expected_index(
+        evidence_path,
+        expected_bytes,
+        "retrieval index transaction evidence",
+    )
+    if evidence.file_key == canonical.file_key:
+        raise MillefeuilleContractError(
+            "retrieval index transaction evidence must not alias the canonical "
+            f"index: {evidence_path}"
+        )
+
+
+def _commit_card_refresh(plan: _PlannedIndexWrite) -> None:
+    refreshed_payload = plan.refreshed_card_payload
+    if refreshed_payload is None:
+        return
+    refreshed_bytes = canonical_json_bytes(refreshed_payload)
+    transaction_dir = _card_index_transaction_dir(plan)
+    _ensure_real_directory(transaction_dir, "card/index transaction directory")
+    staged_path = _stage_exact_bytes(
+        transaction_dir / "card-exchange.json",
+        refreshed_bytes,
+        label="observed paper card",
+    )
+    # These are deliberately the final pre-commit reads. The atomic capture
+    # below validates the entry actually displaced at the linearization point.
+    _require_unchanged_card(plan)
+    _require_expected_index(plan)
+    _before_card_exchange(plan)
+    replacement_snapshot = _capture_file_entry(
+        staged_path,
+        "card replacement",
+    )
+    if replacement_snapshot.raw_bytes != refreshed_bytes:
+        raise MillefeuilleContractError(
+            "card replacement changed immediately before the atomic "
+            "index-state commit boundary"
+        )
+    displaced = _atomic_capture_replace(
+        target=plan.card_json_path,
+        replacement=staged_path,
+        displaced_path=transaction_dir / "displaced-card.json",
+    )
+    displaced_snapshot: _CapturedFileEntry | None = None
+    try:
+        displaced_snapshot = _capture_file_entry(
+            displaced.path,
+            "displaced paper card",
+        )
+        if displaced_snapshot.raw_bytes != plan.original_card_bytes:
+            raise MillefeuilleContractError(
+                "paper card changed at the atomic index-state commit boundary"
+            )
+        current = _capture_file_entry(
+            plan.card_json_path,
+            "installed paper card",
+        )
+        if (
+            current.raw_bytes != refreshed_bytes
+            or current.file_key != replacement_snapshot.file_key
+        ):
+            raise MillefeuilleContractError(
+                "paper card replacement identity or bytes changed at the "
+                "atomic commit boundary"
+            )
+        _require_expected_index(plan)
+    except Exception as exc:
+        if displaced_snapshot is None:
+            raise MillefeuilleContractError(
+                "could not securely capture the paper card displaced at the "
+                "atomic index-state commit boundary; transaction evidence was "
+                f"retained at {transaction_dir}"
+            ) from exc
+        _restore_displaced_card(
+            target=plan.card_json_path,
+            displaced=displaced,
+            displaced_snapshot=displaced_snapshot,
+            expected_replacement_bytes=refreshed_bytes,
+        )
+        raise
+
+
+def _require_expected_index(plan: _PlannedIndexWrite) -> None:
+    expected_bytes = canonical_json_bytes(plan.expected_payload)
+    _capture_expected_index(
+        plan.index_status_output_path,
+        expected_bytes,
+        "retrieval index status before card refresh",
+    )
+
+
+def _load_and_validate_final_join(plan: _PlannedIndexWrite) -> None:
+    load_and_validate_canonical_card_index(
+        card_path=plan.card_json_path,
+        index_path=plan.index_status_output_path,
+        paper_id=plan.paper_id,
+        run_id=plan.run_id,
+        source_hash=plan.expected_payload["source_hash"],
+        selected_fulltext_path=plan.source_pack_dir / ROUTE_MARKDOWN_REF,
+        summary_path=plan.run_dir / SUMMARY_ARTIFACT_REF,
+    )
+
+
+def _before_card_exchange(_plan: _PlannedIndexWrite) -> None:
+    """Test seam immediately before the atomic capture-and-replace operation."""
+
+
+@contextmanager
+def _exclusive_card_index_lock(run_dir: Path):
+    _require_real_directory(run_dir, "card/index run directory")
+    lock_path = run_dir / ".card-index.lock"
+    created = False
+    flags = os.O_RDWR | os.O_CREAT
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    try:
+        fd = os.open(lock_path, flags | os.O_EXCL, 0o600)
+        created = True
+    except FileExistsError:
+        fd = os.open(lock_path, flags, 0o600)
+    try:
+        opened_stat = _require_same_regular_entry(lock_path, fd, "card/index lock")
+        if created:
+            os.write(fd, b"\0")
+            os.fsync(fd)
+        elif opened_stat.st_size < 1:
+            raise MillefeuilleContractError(
+                f"card/index lock is incomplete: {lock_path}"
+            )
+        _lock_fd_nonblocking(fd, lock_path)
+        try:
+            _require_same_regular_entry(lock_path, fd, "card/index lock")
+            yield
+        finally:
+            _unlock_fd(fd)
+    finally:
+        os.close(fd)
+
+
+def _lock_fd_nonblocking(fd: int, lock_path: Path) -> None:
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as exc:
+        raise MillefeuilleContractError(
+            f"card/index commit is already locked: {lock_path}"
+        ) from exc
+
+
+def _unlock_fd(fd: int) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        os.lseek(fd, 0, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+def _require_same_regular_entry(
+    path: Path,
+    fd: int,
+    label: str,
+) -> os.stat_result:
+    opened = os.fstat(fd)
+    try:
+        named = os.lstat(path)
+    except OSError as exc:
+        raise MillefeuilleContractError(f"{label} changed: {path}") from exc
+    if (
+        not stat.S_ISREG(opened.st_mode)
+        or not stat.S_ISREG(named.st_mode)
+        or opened.st_nlink != 1
+        or named.st_nlink != 1
+        or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+    ):
+        raise MillefeuilleContractError(
+            f"{label} must be one singly linked regular file: {path}"
+        )
+    return opened
+
+
+def _publish_index_no_replace(source: Path, destination: Path) -> None:
+    _move_file_no_replace(source, destination)
+
+
+def _stage_exact_bytes(staged_path: Path, payload: bytes, *, label: str) -> Path:
+    parent_identity = _require_real_directory(
+        staged_path.parent,
+        f"{label} transaction parent",
+    )
+    if staged_path.exists():
+        staged = _capture_file_entry(staged_path, f"staged {label}")
+        if staged.raw_bytes != payload:
+            raise MillefeuilleContractError(
+                f"existing staged {label} bytes drifted: {staged_path}"
+            )
+        return staged_path
+
+    try:
+        fd, temporary_name = tempfile.mkstemp(
+            prefix=f".{staged_path.name}.",
+            suffix=".tmp",
+            dir=staged_path.parent,
+        )
+    except OSError as exc:
+        raise MillefeuilleContractError(
+            f"could not create temporary staged {label}: {staged_path}"
+        ) from exc
+    temporary_path = Path(temporary_name)
+    try:
+        _require_same_regular_entry(
+            temporary_path,
+            fd,
+            f"temporary staged {label}",
+        )
+        _write_staged_bytes(fd, payload, label=label, path=temporary_path)
+        _fsync_staged_file(fd)
+        _require_same_regular_entry(
+            temporary_path,
+            fd,
+            f"temporary staged {label}",
+        )
+    except Exception as exc:
+        raise MillefeuilleContractError(
+            f"could not stage complete {label}; incomplete temporary retained "
+            f"at {temporary_path}"
+        ) from exc
+    finally:
+        os.close(fd)
+
+    _require_unchanged_directory(
+        staged_path.parent,
+        parent_identity,
+        f"{label} transaction parent",
+    )
+    with suppress(FileExistsError):
+        _move_file_no_replace(temporary_path, staged_path)
+    staged = _capture_file_entry(staged_path, f"staged {label}")
+    if staged.raw_bytes != payload:
+        raise MillefeuilleContractError(f"staged {label} bytes changed: {staged_path}")
+    return staged_path
+
+
+def _write_staged_bytes(
+    fd: int,
+    payload: bytes,
+    *,
+    label: str,
+    path: Path,
+) -> None:
+    offset = 0
+    while offset < len(payload):
+        written = os.write(fd, payload[offset:])
+        if written <= 0:
+            raise MillefeuilleContractError(
+                f"could not write complete staged {label}: {path}"
+            )
+        offset += written
+
+
+def _fsync_staged_file(fd: int) -> None:
+    os.fsync(fd)
+
+
+def _ensure_real_directory(path: Path, label: str) -> os.stat_result:
+    target = path.absolute()
+    anchor = Path(target.anchor)
+    current = anchor
+    for part in target.parts[1:]:
+        current /= part
+        try:
+            identity = os.lstat(current)
+        except FileNotFoundError:
+            with suppress(FileExistsError):
+                os.mkdir(current, mode=0o700)
+            try:
+                identity = os.lstat(current)
+            except OSError as exc:
+                raise MillefeuilleContractError(
+                    f"could not create or inspect {label}: {path}"
+                ) from exc
+        except OSError as exc:
+            raise MillefeuilleContractError(
+                f"could not inspect {label}: {path}"
+            ) from exc
+        if (
+            stat.S_ISLNK(identity.st_mode)
+            or _is_windows_reparse_point(identity)
+            or not stat.S_ISDIR(identity.st_mode)
+        ):
+            raise MillefeuilleContractError(
+                f"{label} must not contain symbolic links, reparse points, "
+                f"or non-directories: {path}"
+            )
+    return _require_real_directory(target, label)
+
+
+def _require_real_directory(path: Path, label: str) -> os.stat_result:
+    target = path.absolute()
+    anchor = Path(target.anchor)
+    current = anchor
+    identity: os.stat_result | None = None
+    for part in target.parts[1:]:
+        current /= part
+        try:
+            identity = os.lstat(current)
+        except OSError as exc:
+            raise MillefeuilleContractError(
+                f"could not inspect {label}: {path}"
+            ) from exc
+        if (
+            stat.S_ISLNK(identity.st_mode)
+            or _is_windows_reparse_point(identity)
+            or not stat.S_ISDIR(identity.st_mode)
+        ):
+            raise MillefeuilleContractError(
+                f"{label} must not contain symbolic links, reparse points, "
+                f"or non-directories: {path}"
+            )
+    if identity is None:
+        identity = os.lstat(anchor)
+    return identity
+
+
+def _is_windows_reparse_point(value: os.stat_result) -> bool:
+    if os.name != "nt":
+        return False
+    reparse_attribute = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x0400)
+    attributes = getattr(value, "st_file_attributes", 0)
+    reparse_tag = getattr(value, "st_reparse_tag", 0)
+    return bool(attributes & reparse_attribute) or bool(reparse_tag)
+
+
+def _require_unchanged_directory(
+    path: Path,
+    expected: os.stat_result,
+    label: str,
+) -> None:
+    current = _require_real_directory(path, label)
+    if (current.st_dev, current.st_ino) != (expected.st_dev, expected.st_ino):
+        raise MillefeuilleContractError(f"{label} changed: {path}")
+
+
+def _atomic_capture_replace(
+    *,
+    target: Path,
+    replacement: Path,
+    displaced_path: Path,
+) -> _DisplacedCardEntry:
+    _require_real_directory(target.parent, "paper card parent")
+    _require_real_directory(replacement.parent, "card/index transaction directory")
+    if os.name == "nt":
+        _require_non_reparse_regular_entry(target, "paper card")
+        _require_non_reparse_regular_entry(replacement, "card replacement")
+        _require_missing_entry(displaced_path, "displaced paper card")
+        _windows_replace_file(target, replacement, displaced_path)
+        return _DisplacedCardEntry(
+            path=displaced_path,
+            mechanism="windows-replace",
+            rejected_path=replacement,
+        )
+    if sys.platform.startswith("linux"):
+        _linux_exchange(target, replacement)
+        return _DisplacedCardEntry(
+            path=replacement,
+            mechanism="exchange",
+            rejected_path=replacement,
+        )
+    if sys.platform == "darwin":
+        _darwin_exchange(target, replacement)
+        return _DisplacedCardEntry(
+            path=replacement,
+            mechanism="exchange",
+            rejected_path=replacement,
+        )
+    raise MillefeuilleContractError(
+        "atomic card/index state exchange is unavailable on this platform"
+    )
+
+
+def _move_file_no_replace(source: Path, destination: Path) -> None:
+    if os.name == "nt":
+        try:
+            os.rename(source, destination)
+        except FileExistsError:
+            raise
+        except OSError as exc:
+            raise MillefeuilleContractError(
+                "could not atomically publish retrieval index status "
+                f"{destination}: {exc}"
+            ) from exc
+        return
+    if sys.platform.startswith("linux"):
+        _linux_move_no_replace(source, destination)
+        return
+    if sys.platform == "darwin":
+        _darwin_move_no_replace(source, destination)
+        return
+    raise MillefeuilleContractError(
+        "atomic no-replace index publication is unavailable on this platform"
+    )
+
+
+def _linux_move_no_replace(source: Path, destination: Path) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    renameat2 = getattr(libc, "renameat2", None)
+    if renameat2 is None:
+        raise MillefeuilleContractError(
+            "atomic no-replace index publication requires renameat2 on Linux"
+        )
+    renameat2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    if renameat2(-100, os.fsencode(source), -100, os.fsencode(destination), 1) != 0:
+        error = ctypes.get_errno()
+        if error == errno.EEXIST:
+            raise FileExistsError(error, os.strerror(error), destination)
+        raise MillefeuilleContractError(
+            "could not atomically publish retrieval index status "
+            f"{destination}: errno {error}"
+        )
+
+
+def _darwin_move_no_replace(source: Path, destination: Path) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    renamex_np = getattr(libc, "renamex_np", None)
+    if renamex_np is None:
+        raise MillefeuilleContractError(
+            "atomic no-replace index publication requires renamex_np on macOS"
+        )
+    renamex_np.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+    renamex_np.restype = ctypes.c_int
+    if renamex_np(os.fsencode(source), os.fsencode(destination), 4) != 0:
+        error = ctypes.get_errno()
+        if error == errno.EEXIST:
+            raise FileExistsError(error, os.strerror(error), destination)
+        raise MillefeuilleContractError(
+            "could not atomically publish retrieval index status "
+            f"{destination}: errno {error}"
+        )
+
+
+def _restore_displaced_card(
+    *,
+    target: Path,
+    displaced: _DisplacedCardEntry,
+    displaced_snapshot: _CapturedFileEntry,
+    expected_replacement_bytes: bytes,
+) -> None:
+    _before_card_rollback(displaced)
+    _require_captured_file_entry(
+        displaced_snapshot,
+        "displaced paper card",
+    )
+    if displaced.mechanism == "windows-replace":
+        _require_missing_entry(displaced.rejected_path, "rejected paper card")
+        _windows_replace_file(target, displaced.path, displaced.rejected_path)
+    else:
+        _exchange_paths(target, displaced.path)
+    _after_card_rollback(displaced)
+    restored = _capture_file_entry(target, "restored paper card")
+    rejected = _capture_file_entry(
+        displaced.rejected_path,
+        "rejected paper card",
+    )
+    if (
+        restored.raw_bytes != displaced_snapshot.raw_bytes
+        or restored.file_key != displaced_snapshot.file_key
+    ):
+        raise MillefeuilleContractError(
+            "paper card rollback did not restore the exact displaced entry; "
+            "transaction evidence was preserved at "
+            f"{displaced.rejected_path.parent}"
+        )
+    if rejected.raw_bytes != expected_replacement_bytes:
+        raise MillefeuilleContractError(
+            "paper card changed again during rollback; unexpected bytes were "
+            f"preserved at {displaced.rejected_path}"
+        )
+
+
+def _before_card_rollback(_displaced: _DisplacedCardEntry) -> None:
+    """Test seam after displaced capture and immediately before rollback."""
+
+
+def _after_card_rollback(_displaced: _DisplacedCardEntry) -> None:
+    """Test seam after rollback exchange and before restored-entry validation."""
+
+
+def _require_missing_entry(path: Path, label: str) -> None:
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise MillefeuilleContractError(f"could not inspect {label}: {path}") from exc
+    raise MillefeuilleContractError(f"{label} already exists: {path}")
+
+
+def _require_non_reparse_regular_entry(path: Path, label: str) -> os.stat_result:
+    try:
+        value = os.lstat(path)
+    except OSError as exc:
+        raise MillefeuilleContractError(f"could not inspect {label}: {path}") from exc
+    if (
+        stat.S_ISLNK(value.st_mode)
+        or _is_windows_reparse_point(value)
+        or not stat.S_ISREG(value.st_mode)
+    ):
+        raise MillefeuilleContractError(
+            f"{label} must be a non-reparse regular file: {path}"
+        )
+    return value
+
+
+def _capture_file_entry(path: Path, label: str) -> _CapturedFileEntry:
+    _require_real_directory(path.parent, f"{label} parent")
+    flags = os.O_RDONLY
+    for flag_name in ("O_BINARY", "O_CLOEXEC", "O_NOFOLLOW", "O_NONBLOCK"):
+        flags |= getattr(os, flag_name, 0)
+    try:
+        named_before = os.lstat(path)
+        if (
+            stat.S_ISLNK(named_before.st_mode)
+            or _is_windows_reparse_point(named_before)
+            or not stat.S_ISREG(named_before.st_mode)
+        ):
+            raise MillefeuilleContractError(
+                f"{label} must be a non-reparse regular file: {path}"
+            )
+        if named_before.st_nlink != 1:
+            raise MillefeuilleContractError(f"{label} must be singly linked: {path}")
+        if named_before.st_size > CARD_INDEX_TRANSACTION_MAX_CARD_BYTES:
+            raise MillefeuilleContractError(
+                f"{label} exceeds the "
+                f"{CARD_INDEX_TRANSACTION_MAX_CARD_BYTES}-byte card transaction "
+                f"limit: {path}"
+            )
+        fd = os.open(path, flags)
+    except MillefeuilleContractError:
+        raise
+    except OSError as exc:
+        raise MillefeuilleContractError(f"could not open {label}: {path}") from exc
+    try:
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
+            raise MillefeuilleContractError(f"{label} is not a regular file: {path}")
+        if opened.st_nlink != 1:
+            raise MillefeuilleContractError(f"{label} must be singly linked: {path}")
+        if opened.st_size > CARD_INDEX_TRANSACTION_MAX_CARD_BYTES:
+            raise MillefeuilleContractError(
+                f"{label} exceeds the "
+                f"{CARD_INDEX_TRANSACTION_MAX_CARD_BYTES}-byte card transaction "
+                f"limit: {path}"
+            )
+        chunks: list[bytes] = []
+        total_bytes = 0
+        while True:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            total_bytes += len(chunk)
+            if total_bytes > CARD_INDEX_TRANSACTION_MAX_CARD_BYTES:
+                raise MillefeuilleContractError(
+                    f"{label} exceeded the "
+                    f"{CARD_INDEX_TRANSACTION_MAX_CARD_BYTES}-byte card "
+                    f"transaction limit while read: {path}"
+                )
+            chunks.append(chunk)
+        raw_bytes = b"".join(chunks)
+        final_opened = os.fstat(fd)
+        named_after = os.lstat(path)
+        expected_identity = _file_entry_identity(named_before)
+        if (
+            _file_entry_identity(opened) != expected_identity
+            or _file_entry_identity(final_opened) != expected_identity
+            or _file_entry_identity(named_after) != expected_identity
+            or total_bytes != opened.st_size
+            or len(raw_bytes) != total_bytes
+        ):
+            raise MillefeuilleContractError(
+                f"{label} changed while read: {path}; "
+                f"named-before={expected_identity!r}, "
+                f"opened={_file_entry_identity(opened)!r}, "
+                f"final-opened={_file_entry_identity(final_opened)!r}, "
+                f"named-after={_file_entry_identity(named_after)!r}"
+            )
+        return _CapturedFileEntry(
+            path=path,
+            raw_bytes=raw_bytes,
+            identity=expected_identity,
+            file_key=(opened.st_dev, opened.st_ino),
+        )
+    except OSError as exc:
+        raise MillefeuilleContractError(f"could not read {label}: {path}") from exc
+    finally:
+        os.close(fd)
+
+
+def _require_captured_file_entry(
+    expected: _CapturedFileEntry,
+    label: str,
+) -> None:
+    current = _capture_file_entry(expected.path, label)
+    if current.identity != expected.identity or current.raw_bytes != expected.raw_bytes:
+        raise MillefeuilleContractError(
+            f"captured {label} changed before rollback: {expected.path}"
+        )
+
+
+def _file_entry_identity(value: os.stat_result) -> tuple[int, ...]:
+    return (
+        value.st_dev,
+        value.st_ino,
+        stat.S_IFMT(value.st_mode),
+        value.st_nlink,
+        value.st_size,
+        value.st_mtime_ns,
+    )
+
+
+def _exchange_paths(first: Path, second: Path) -> None:
+    if sys.platform.startswith("linux"):
+        _linux_exchange(first, second)
+    elif sys.platform == "darwin":
+        _darwin_exchange(first, second)
+    else:
+        raise MillefeuilleContractError(
+            "atomic card/index state exchange is unavailable on this platform"
+        )
+
+
+def _windows_replace_file(target: Path, replacement: Path, backup: Path) -> None:
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    replace_file = kernel32.ReplaceFileW
+    replace_file.argtypes = [
+        ctypes.c_wchar_p,
+        ctypes.c_wchar_p,
+        ctypes.c_wchar_p,
+        ctypes.c_uint32,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+    ]
+    replace_file.restype = ctypes.c_int
+    ctypes.set_last_error(0)
+    if not replace_file(str(target), str(replacement), str(backup), 1, None, None):
+        error = ctypes.get_last_error()
+        raise MillefeuilleContractError(
+            f"atomic paper card replacement failed with Windows error {error}: {target}"
+        )
+
+
+def _linux_exchange(first: Path, second: Path) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    renameat2 = getattr(libc, "renameat2", None)
+    if renameat2 is None:
+        raise MillefeuilleContractError(
+            "atomic paper card exchange requires renameat2 on Linux"
+        )
+    renameat2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    result = renameat2(
+        -100,
+        os.fsencode(first),
+        -100,
+        os.fsencode(second),
+        2,
+    )
+    if result != 0:
+        error = ctypes.get_errno()
+        raise MillefeuilleContractError(
+            f"atomic paper card exchange failed with errno {error}: {first}"
+        )
+
+
+def _darwin_exchange(first: Path, second: Path) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    renamex_np = getattr(libc, "renamex_np", None)
+    if renamex_np is None:
+        raise MillefeuilleContractError(
+            "atomic paper card exchange requires renamex_np on macOS"
+        )
+    renamex_np.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+    renamex_np.restype = ctypes.c_int
+    if renamex_np(os.fsencode(first), os.fsencode(second), 2) != 0:
+        error = ctypes.get_errno()
+        raise MillefeuilleContractError(
+            f"atomic paper card exchange failed with errno {error}: {first}"
+        )
 
 
 def _materialize_index_payload(
@@ -321,6 +1199,46 @@ def _materialize_index_payload(
     return payload
 
 
+def _plan_card_index_refresh(
+    *,
+    card_payload: dict[str, Any],
+    index_payload: dict[str, Any],
+) -> dict[str, Any] | None:
+    if card_payload["schema_version"] == PAPER_CARD_SCHEMA_V1:
+        return None
+    if card_payload["schema_version"] != PAPER_CARD_SCHEMA_V2:
+        raise MillefeuilleContractError(
+            f"unsupported paper card schema_version {card_payload['schema_version']!r}"
+        )
+    desired_state = observed_index_state(index_payload)
+    current_state = card_payload["index_state"]
+    if current_state["phase"] == "observed":
+        if current_state != desired_state:
+            raise MillefeuilleContractError(
+                "paper card observed index_state conflicts with retrieval index status"
+            )
+        return None
+    planned_lanes = [entry["lane"] for entry in current_state["lanes"]]
+    observed_lanes = [entry["lane"] for entry in desired_state["lanes"]]
+    if planned_lanes != observed_lanes:
+        raise MillefeuilleContractError(
+            "paper card planned index lanes conflict with retrieval index status"
+        )
+    refreshed_payload = copy.deepcopy(card_payload)
+    refreshed_payload["index_state"] = desired_state
+    PaperCardRecord.from_dict(refreshed_payload)
+    return refreshed_payload
+
+
+def validate_observed_card_index_state(
+    card_payload: dict[str, Any],
+    index_payload: dict[str, Any],
+) -> None:
+    """Validate the v0.2 card's observed state against its canonical index result."""
+
+    _validate_observed_card_index_state(card_payload, index_payload)
+
+
 def _existing_index_status(
     *,
     index_status_output_path: Path,
@@ -328,12 +1246,11 @@ def _existing_index_status(
 ) -> str | None:
     if not index_status_output_path.exists():
         return None
-    if not index_status_output_path.is_file():
-        raise MillefeuilleContractError(
-            f"existing retrieval index status is not a file: {index_status_output_path}"
-        )
-    existing_payload = load_retrieval_index_status(index_status_output_path)
-    if existing_payload != expected_payload:
+    existing = load_retrieval_index_artifact(index_status_output_path)
+    if (
+        existing.payload != expected_payload
+        or existing.raw_bytes != canonical_json_bytes(expected_payload)
+    ):
         raise MillefeuilleContractError(
             f"existing retrieval index status drift for {index_status_output_path}"
         )
@@ -432,23 +1349,19 @@ def _validate_card_dependency(
     *,
     run_dir: Path,
     paper_id: str,
+    run_id: str,
     source_hash: str,
-) -> None:
+) -> LoadedJsonArtifact:
     card_json_path = run_dir / CARD_JSON_REF
-    payload = load_paper_card(card_json_path)
-    if payload["paper_id"] != paper_id:
-        raise MillefeuilleContractError(
-            f"paper card paper_id drift at {card_json_path}"
-        )
-    identity = payload.get("identity")
-    if not isinstance(identity, dict):
-        raise MillefeuilleContractError(
-            f"paper card identity must be an object: {card_json_path}"
-        )
-    if identity.get("source_hash") != source_hash:
-        raise MillefeuilleContractError(
-            f"paper card source_hash drift at {card_json_path}"
-        )
+    artifact = load_paper_card_artifact(card_json_path)
+    validate_paper_card_identity(
+        artifact.payload,
+        paper_id=paper_id,
+        run_id=run_id,
+        source_hash=source_hash,
+        require_source_hash=True,
+    )
+    return artifact
 
 
 def _reject_duplicate_records(records: list[IndexFixtureEvidence]) -> None:

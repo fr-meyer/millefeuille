@@ -1,0 +1,105 @@
+id: pr-101-card-index-circularity
+roadmap_card: MF-135
+title: Resolve the paper-card index state cycle
+status: in-progress
+branch: fix/pr-mf-135-card-index-circularity
+base_branch: dev
+github:
+  issue: null
+  pull_request: 101
+  issue_project_item: unavailable
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/101
+  head_sha: null  # Active-task exact-head binding is external; see notes.
+  merge_commit: null
+write_paths:
+  - .speculoos/tasks/pr-101-card-index-circularity.yaml
+  - README.md
+  - millefeuille/domain/acceptance.py
+  - millefeuille/domain/artifact_writer.py
+  - millefeuille/domain/card_fixtures.py
+  - millefeuille/domain/card_index_contract.py
+  - millefeuille/domain/index_fixtures.py
+  - millefeuille/domain/millefeuille.py
+  - millefeuille/domain/offline_stages.py
+  - millefeuille/domain/retrieve.py
+  - specs/millefeuille-pipeline/paper-card.schema.json
+  - specs/millefeuille-pipeline/remaining-work.md
+  - specs/millefeuille-pipeline/retrieval-index-contract.md
+  - specs/pr-101-card-index-circularity/**
+  - tests/test_millefeuille_acceptance_batch.py
+  - tests/test_millefeuille_artifact_writer.py
+  - tests/test_millefeuille_card_index_state.py
+  - tests/test_millefeuille_classification_batch.py
+  - tests/test_millefeuille_retrieval_batch.py
+  - tests/test_millefeuille_source_pack_writer.py
+  - tests/test_millefeuille_stage_cli.py
+scope:
+  - introduce paper-card v0.2 with explicit planned index state and ordered
+    pending lanes while preserving v0.1 read compatibility
+  - publish canonical retrieval index status before guarded planned-to-observed
+    card refresh with exact paper, run, source, ref, lane, and output joins
+  - enforce the joined card/index contract in acceptance, INDEX resume,
+    artifact exposure, retrieval, and exact reruns
+  - reject duplicate lanes, malformed values, stale observed cards, missing
+    canonical index state, identity drift, and aggregate-hash drift
+  - use a per-run lock, no-follow/reparse guards, bounded single-link capture,
+    deterministic transaction evidence, and atomic recovery
+  - preserve concurrent or displaced bytes and fail closed on mutation, swaps,
+    hard links, oversized entries, interrupted writes, or rollback drift
+  - retain the resolved source-pack directory when an external artifact package
+    is selected so final card/index verification uses the canonical source
+non_goals:
+  - live OpenKB, PageIndex, ConDB, or ChatIndex writes
+  - provider/model/OCR calls, credential access, live Zotero reads or writes,
+    private paper access, PDF recovery, or source-pack mutation
+  - multi-source fixture execution beyond accepting aggregate identity at the
+    card/index boundary
+  - dev-to-main promotion, release tags, package publication, deployment, or
+    approval bypass
+acceptance:
+  - v0.2 cards declare planned lanes and refresh exactly once to canonical
+    observed lane outcomes while v0.1 cards remain readable and unchanged
+  - all card/index consumers require exact identity and canonical references
+  - transaction recovery preserves exact displaced bytes and rejects hostile
+    races, links, oversized data, interrupted writes, and rollback drift
+  - external artifact packages verify against their resolved source pack
+  - focused tests, full unittest discovery, schema parsing, Ruff, diff check,
+    private-data scan, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_card_index_state tests.test_millefeuille_source_pack_writer tests.test_millefeuille_stage_cli tests.test_millefeuille_acceptance_batch tests.test_millefeuille_artifact_writer tests.test_millefeuille_classification_batch tests.test_millefeuille_retrieval_batch tests.test_millefeuille_retrieve"
+  - ".venv/bin/python -m unittest tests.test_millefeuille_artifact_overrides.TestMillefeuilleArtifactOverrides.test_external_root_and_custom_manifest_route_run_scoped_writes"
+  - ".venv/bin/python -m unittest discover -s tests"
+  - ".venv/bin/ruff check ."
+  - "git diff --check"
+  - "speculoos validate --task pr-101-card-index-circularity --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-101-card-index-circularity --pr-body specs/pr-101-card-index-circularity/pr-body.md --commit-message specs/pr-101-card-index-circularity/commit-message.txt --json"
+publication_boundary:
+  statement: Repository-local card/index contract code, offline transaction
+    safety, schemas, documentation, synthetic tests, and Speculoos metadata
+    only. No credentials, provider/model/OCR calls, private papers, live
+    Zotero/OpenKB/PageIndex writes, stable-branch promotion, release, tag,
+    package publication, deployment, or approval bypass.
+documentation_impact:
+  status: updated
+  rationale: README, remaining-work, the paper-card schema, and the retrieval
+    index contract document v0.2 state transitions and recovery boundaries.
+private_data_scan: required; public source, documentation, synthetic tests, and
+  repository-local Speculoos artifacts only, with no credentials, private
+  papers, provider payloads, or host-specific paths
+publish_authority: Active Millefeuille delivery-train supervisor; routine
+  feature-to-dev publication, exact-head Mergeguez review, policy-gated merge,
+  dependent-PR retargeting, cleanup, and next-episode advancement are approved.
+  Live operations, dev-to-main promotion, release, and deployment remain
+  excluded.
+notes:
+  - The active task head field remains null while the PR is open because
+    embedding a commit's own SHA creates a self-reference cycle. Exact pre-merge
+    review and check evidence bind validation to GitHub's live head.
+  - Current dev was integrated before validation; the original pull request 94
+    stack wording is obsolete and pull request 101 now targets dev directly.
+delivery:
+  mode: inherit_branch_policy
+  continue_after_review: true

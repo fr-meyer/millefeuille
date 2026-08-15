@@ -10,15 +10,21 @@
     "one_line_thesis",
     "primary_contribution",
     "evidence_refs",
-    "index_status",
     "model_provenance"
   ],
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": "millefeuille-paper-card/v0.1"
+      "enum": [
+        "millefeuille-paper-card/v0.1",
+        "millefeuille-paper-card/v0.2"
+      ]
     },
     "paper_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
       "type": "string",
       "minLength": 1
     },
@@ -62,6 +68,132 @@
       "minItems": 1
     },
     "index_status": {
+      "$ref": "#/$defs/legacyIndexStatus"
+    },
+    "index_state": {
+      "$ref": "#/$defs/indexState"
+    },
+    "model_provenance": {
+      "type": "object",
+      "required": ["profile_id"],
+      "additionalProperties": true,
+      "properties": {
+        "profile_id": {"type": "string", "minLength": 1},
+        "provenance_ref": {"type": "string"}
+      }
+    },
+    "zotero_lifecycle_tag_state": {"type": ["string", "null"]}
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "schema_version": {"const": "millefeuille-paper-card/v0.1"}
+      },
+      "required": ["index_status"],
+      "not": {
+        "anyOf": [
+          {"required": ["run_id"]},
+          {"required": ["index_state"]}
+        ]
+      }
+    },
+    {
+      "properties": {
+        "schema_version": {"const": "millefeuille-paper-card/v0.2"},
+        "paper_id": {"$ref": "#/$defs/canonicalNonEmptyString"},
+        "run_id": {"$ref": "#/$defs/canonicalNonEmptyString"},
+        "identity": {"$ref": "#/$defs/v02Identity"},
+        "one_line_thesis": {"$ref": "#/$defs/canonicalNonEmptyString"},
+        "primary_contribution": {"$ref": "#/$defs/canonicalNonEmptyString"},
+        "problem_addressed": {"$ref": "#/$defs/canonicalNonEmptyString"},
+        "method_or_approach": {"$ref": "#/$defs/canonicalNonEmptyString"},
+        "data_modality_domain": {"$ref": "#/$defs/canonicalNonEmptyString"},
+        "main_results": {"$ref": "#/$defs/canonicalNonEmptyString"},
+        "limitations": {"$ref": "#/$defs/canonicalNonEmptyString"},
+        "classification_clues": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/canonicalNonEmptyString"}
+        },
+        "strongest_rejected_classification_path": {
+          "$ref": "#/$defs/canonicalNonEmptyString"
+        },
+        "quality_warnings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/canonicalNonEmptyString"}
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/canonicalNonEmptyString"}
+        },
+        "model_provenance": {"$ref": "#/$defs/v02ModelProvenance"},
+        "zotero_lifecycle_tag_state": {
+          "$ref": "#/$defs/canonicalNonEmptyString"
+        }
+      },
+      "required": ["run_id", "index_state"],
+      "not": {"required": ["index_status"]}
+    }
+  ],
+  "$defs": {
+    "canonicalNonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+    },
+    "v02Identity": {
+      "type": "object",
+      "required": ["title", "source_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "title": {"$ref": "#/$defs/canonicalNonEmptyString"},
+        "authors": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/canonicalNonEmptyString"}
+        },
+        "year": {"type": ["integer", "null"]},
+        "doi": {
+          "oneOf": [
+            {"$ref": "#/$defs/canonicalNonEmptyString"},
+            {"type": "null"}
+          ]
+        },
+        "url": {
+          "oneOf": [
+            {"$ref": "#/$defs/canonicalNonEmptyString"},
+            {"type": "null"}
+          ]
+        },
+        "zotero_item_key": {
+          "oneOf": [
+            {"$ref": "#/$defs/canonicalNonEmptyString"},
+            {"type": "null"}
+          ]
+        },
+        "canonical_filename": {
+          "oneOf": [
+            {"$ref": "#/$defs/canonicalNonEmptyString"},
+            {"type": "null"}
+          ]
+        },
+        "source_hash": {
+          "type": "string",
+          "pattern": "^sha256(?:-aggregate)?:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "v02ModelProvenance": {
+      "type": "object",
+      "required": ["profile_id"],
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": {"$ref": "#/$defs/canonicalNonEmptyString"},
+        "provenance_ref": {"$ref": "#/$defs/canonicalNonEmptyString"}
+      }
+    },
+    "legacyIndexStatus": {
       "type": "array",
       "items": {
         "type": "object",
@@ -74,15 +206,117 @@
         }
       }
     },
-    "model_provenance": {
+    "plannedLane": {
       "type": "object",
-      "required": ["profile_id"],
-      "additionalProperties": true,
+      "required": ["lane", "status"],
+      "additionalProperties": false,
       "properties": {
-        "profile_id": {"type": "string", "minLength": 1},
-        "provenance_ref": {"type": "string"}
+        "lane": {
+          "enum": ["openkb", "pageindex", "condb", "chatindex", "other"]
+        },
+        "status": {"const": "pending"}
       }
     },
-    "zotero_lifecycle_tag_state": {"type": ["string", "null"]}
+    "observedLane": {
+      "type": "object",
+      "required": ["lane", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "lane": {
+          "enum": ["openkb", "pageindex", "condb", "chatindex", "other"]
+        },
+        "status": {
+          "enum": [
+            "skipped",
+            "previewed",
+            "written",
+            "failed",
+            "needs-review"
+          ]
+        }
+      }
+    },
+    "indexState": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["phase", "lanes"],
+          "additionalProperties": false,
+          "properties": {
+            "phase": {"const": "planned"},
+            "lanes": {
+              "type": "array",
+              "minItems": 2,
+              "items": {"$ref": "#/$defs/plannedLane"},
+              "allOf": [{"$ref": "#/$defs/uniqueLaneNames"}]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["phase", "status_ref", "lanes"],
+          "additionalProperties": false,
+          "properties": {
+            "phase": {"const": "observed"},
+            "status_ref": {"const": "../index/index-status.json"},
+            "lanes": {
+              "type": "array",
+              "minItems": 2,
+              "items": {"$ref": "#/$defs/observedLane"},
+              "allOf": [{"$ref": "#/$defs/uniqueLaneNames"}]
+            }
+          }
+        }
+      ]
+    },
+    "uniqueLaneNames": {
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"lane": {"const": "openkb"}},
+            "required": ["lane"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"lane": {"const": "pageindex"}},
+            "required": ["lane"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"lane": {"const": "condb"}},
+            "required": ["lane"]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"lane": {"const": "chatindex"}},
+            "required": ["lane"]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"lane": {"const": "other"}},
+            "required": ["lane"]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        }
+      ]
+    }
   }
 }

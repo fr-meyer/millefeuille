@@ -744,13 +744,15 @@ millefeuille --artifact-root source-pack \
   processing.dry_run=true
 ```
 
-Paper-card fixture evidence points to a local
-`millefeuille-paper-card/v0.1` JSON file plus Markdown card content. The
+Paper-card fixture evidence points to a local JSON file plus Markdown card
+content. New fixtures should use `millefeuille-paper-card/v0.2`: they bind the
+run id and declare the intended index lanes as `planned`/`pending`. The
 dry-run path preflights the source-pack manifest and existing hierarchical
 summary bundle, then writes `cards/paper-card.json` and `cards/paper-card.md`
 under `analyses/millefeuille/<run-id>/`. The artifact index marks `card`
 passed and exposes both refs without calling model providers or writing
-OpenKB/index lanes.
+OpenKB/index lanes. Legacy v0.1 cards remain readable and are never rewritten
+by the index stage.
 
 Once the paper-card bundle exists, the same dry-run path can stage retrieval
 and index fixture evidence:
@@ -770,6 +772,33 @@ preflights the source-pack manifest, selected fulltext, hierarchical summary,
 and paper card, then writes `index/index-status.json` under
 `analyses/millefeuille/<run-id>/`. The artifact index marks `index` passed and
 surfaces the lane statuses without writing OpenKB/PageIndex/ConDB/ChatIndex.
+For a v0.2 card, the same commit refreshes only `index_state` to `observed`,
+copies the canonical lane outcomes, and records
+`../index/index-status.json`. Identity, prose, evidence, and provenance must
+remain value-for-value identical; lane or identity conflicts fail closed, and
+an exact rerun is a no-op.
+
+The fixture transaction holds one per-run card/index lock for cooperating
+writers. Index publication is create-only. One content-addressed transaction
+directory under `recovery/card-index/<digest>/` retains the exact staged index
+hardlink and card exchange history; exact retries reuse and validate that
+deterministic location instead of accumulating random files in `cards/` or
+`index/`. Card refresh uses an atomic capture-and-replace operation: the exact
+bytes and stable file identity displaced at the commit point are captured,
+revalidated immediately before rollback, and checked again at the restored
+canonical path. Rejected replacement bytes remain in the same transaction
+directory for operator recovery. The lock serializes Millefeuille writers,
+while the atomic capture detects an out-of-band mutation immediately before
+commit. A hostile same-owner process can still swap a parent or transaction
+name after its last binding check, or keep mutating canonical files after
+commit; those observed races fail without reporting success, but preventing
+them requires trusted ownership, cooperative writers, or stronger immutable
+storage.
+
+The v0.2 card schema and runtime accept both `sha256:<hex>` and
+`sha256-aggregate:<hex>` identities. This slice does not make the single-source
+card/index fixture evidence resolvers multi-source aware: downstream
+materialization from v0.2 multi-PDF packs remains roadmap item MF-114.
 
 ### Command-Line Configuration
 

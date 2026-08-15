@@ -24,6 +24,54 @@ The offline fixture-first status shape is
 source-pack identity: `sha256:<hex>` for v0.1 single-PDF packs and
 `sha256-aggregate:<hex>` for v0.2 multi-PDF packs.
 
+## Paper-Card Index Lifecycle
+
+`millefeuille-paper-card/v0.2` removes the pre-index/final-state cycle. Card
+creation is deterministic and happens before any index mutation. The initial
+card binds `paper_id`, `run_id`, and the source hash, then records each intended
+lane under `index_state.phase=planned` with `status=pending`; it cannot point to
+an index result that does not exist yet.
+
+After the canonical `index/index-status.json` has been materialized, the index
+stage performs one controlled card refresh. It revalidates paper, run, and
+source identity, requires the planned lane order to match the result, preserves
+every non-index card value, and replaces only `index_state` with
+`phase=observed`, the canonical `../index/index-status.json` ref, and the
+observed lane statuses. An already-observed exact match is a no-op. A changed
+card, mismatched lane plan, or conflicting observed state fails closed. The
+acceptance, artifact-index, resume, and retrieval joins revalidate the same
+card/index relationship, including the exact canonical selected-fulltext,
+summary, and paper-card refs and their resolved regular files.
+
+The fixture transaction holds a per-run lock for cooperating writers. It
+publishes a missing index create-only, stages complete bytes before changing a
+card, and atomically captures the card entry displaced at the refresh commit
+point. Normal transaction evidence lives under the deterministic,
+content-addressed `recovery/card-index/<digest>/` directory: its staged index
+hardlink and card-exchange entries are reused and verified by exact retries, so
+random hidden files do not accumulate in canonical `cards/` or `index/`
+directories. The displaced card's exact bytes and stable file identity are
+captured after the exchange, revalidated immediately before rollback, and
+verified again at the restored canonical path. Rejected replacement bytes stay
+in the same transaction directory for explicit operator recovery. This detects
+the specified pre-commit race and prevents interrupted writes from truncating
+the canonical card. The lock cannot prevent a hostile same-owner process from
+swapping a parent or recovery name after its last binding check or continuing
+to mutate artifacts after commit. Such observed drift fails without reporting
+success; trusted ownership, cooperative writers, or stronger immutable storage
+remains the boundary.
+
+The v0.2 card identity accepts `sha256:<hex>` and
+`sha256-aggregate:<hex>`. Card/index fixture evidence resolution is still
+single-source: propagation from v0.2 multi-PDF packs through downstream
+fixture materialization is roadmap MF-114, not part of this lifecycle repair.
+
+`millefeuille-paper-card/v0.1` remains readable for existing run packages. Its
+legacy `index_status` is treated as opaque historical card content and is never
+refreshed. Materializing v0.2 in a new run, or using an explicit future
+migration operation, is the upgrade path; consumers must not silently
+reinterpret or rewrite an existing v0.1 artifact.
+
 ## Optional Lanes
 
 ConDB may be used for hierarchy or tree experiments. A ConDB run must emit a
