@@ -1,0 +1,92 @@
+id: pr-096-delivery-evidence-templates
+roadmap_card: MF-002
+title: Add reusable delivery and evidence packet templates
+status: in-progress
+branch: docs/pr-096-delivery-evidence-templates
+base_branch: dev
+github:
+  issue: null
+  pull_request: 96
+  issue_project_item: unavailable
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/96
+  head_sha: null  # Active-task exact-head binding is external; see notes.
+  merge_commit: null
+write_paths:
+  - .speculoos/README.md
+  - .speculoos/tasks/pr-096-delivery-evidence-templates.yaml
+  - specs/millefeuille-delivery/**
+  - specs/millefeuille-pipeline/README.md
+  - specs/pr-096-delivery-evidence-templates/**
+  - tests/test_millefeuille_delivery_templates.py
+scope:
+  - add a machine-readable catalog for reusable delivery and evidence packets
+  - provide feature, approval, adapter-evidence, dogfood, maintenance-handoff,
+    migration, and release templates
+  - document copy, placeholder, evidence-reference, and navigation conventions
+  - keep exact approvals, no-write dogfood, non-authorizing handoffs, privacy,
+    promotion, tag, and package boundaries explicit
+  - enforce catalog completeness, safe local paths, required sections,
+    placeholders, policy markers, and public-safe content through contract tests
+non_goals:
+  - executing a live operation, dogfood run, migration, release, promotion, tag,
+    package publication, deployment, or external write
+  - granting or widening approval, treating plans or previews as execution
+    evidence, or replacing canonical Speculoos task and review records
+  - credentials, provider/model/OCR calls, live Zotero reads or writes, private
+    paper access, PDF recovery, source-pack mutation, or OpenKB/PageIndex writes
+  - changing runtime code, schemas, adapters, storage, or lifecycle behavior
+acceptance:
+  - catalog entries resolve only to the seven expected repository-local templates
+  - every template preserves its required headings, placeholders, and markers
+  - documentation links every template and the applicable local contracts
+  - approval packets keep live-run gate fields and deny unlisted operations
+  - dogfood, feature, and release packets preserve their distinct authority and
+    branch boundaries
+  - every public documentation and metadata artifact added by this PR is scanned
+    for common credential assignments, provider-key shapes, authenticated URL
+    forms, private filesystem roots, and raw PDF signatures
+  - focused tests, full unittest discovery, Ruff, metadata parse, diff check,
+    private-data scan, Speculoos validation, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_delivery_templates tests.test_millefeuille_contract_artifacts tests.test_millefeuille_hard_rename -v"
+  - ".venv/bin/python -m unittest discover -s tests"
+  - ".venv/bin/ruff check ."
+  - ".venv/bin/python -m json.tool specs/millefeuille-delivery/catalog.json"
+  - "git diff --check"
+  - "speculoos validate --task pr-096-delivery-evidence-templates --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-096-delivery-evidence-templates --pr-body specs/pr-096-delivery-evidence-templates/pr-body.md --commit-message specs/pr-096-delivery-evidence-templates/commit-message.txt --json"
+publication_boundary:
+  statement: Repository-local documentation, reusable public-safe templates,
+    machine-readable catalog metadata, synthetic contract tests, and Speculoos
+    publication metadata only. No credential lookup, provider/model/OCR call,
+    private paper read, live Zotero/OpenKB/PageIndex/source-pack mutation,
+    stable-branch promotion, release, tag, package publication, deployment, or
+    approval bypass.
+documentation_impact:
+  status: none
+  rationale: The public surfaces are repository-native templates and
+    specification metadata; this PR does not change runtime behavior or
+    top-level README/docs requiring separate user-facing synchronization.
+private_data_scan: required; scan every added public documentation and metadata
+  artifact for common credential assignments, provider-key shapes, authenticated
+  URL forms, private filesystem roots, and raw PDF signatures. Private papers and
+  provider payloads remain forbidden by publication scope rather than overclaimed
+  content recognition.
+publish_authority: Active Millefeuille delivery-train supervisor; routine
+  feature-to-dev publication, exact-head Mergeguez review, policy-gated merge,
+  cleanup, and next-episode advancement are approved. Live operations,
+  dev-to-main promotion, release, tag, package publication, and deployment
+  remain excluded.
+notes:
+  - The active task head field remains null while the PR is open because
+    embedding a
+    commit's own SHA creates a self-reference cycle. Exact pre-merge
+    binding is the immutable GitHub head referenced by the Mergeguez
+    review and check; closeout records head_sha and merge_commit after merge.
+  - Supersedes closed PR 92; the docs/pr-096-delivery-evidence-templates branch
+    satisfies the repository actor policy.
+  - Refreshed without history rewriting by merging dev commit
+    038806a74fce3815664cb605e15e2de2351c8354 before exact-head validation.
