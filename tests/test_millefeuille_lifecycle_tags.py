@@ -699,6 +699,8 @@ class TestLifecycleTagMigrationSemantics(LifecycleTagFixture):
         wrong_version["taxonomy_version"] = "taxonomy-other"
         wrong_paper = deepcopy(self.classification_plan)
         wrong_paper["papers"][0]["paper_id"] = "zotero-ITEM2"
+        empty_plan = deepcopy(self.classification_plan)
+        empty_plan["papers"] = []
         batch_lock = create_taxonomy_lock(
             self.taxonomy_registry,
             lock_id="LOCK-BATCH",
@@ -713,6 +715,7 @@ class TestLifecycleTagMigrationSemantics(LifecycleTagFixture):
             {"classification_decision_payload": wrong_mode},
             {"classification_plan_payload": wrong_version},
             {"classification_plan_payload": wrong_paper},
+            {"classification_plan_payload": empty_plan},
             {"taxonomy_lock": batch_lock},
             {"taxonomy_lock": None},
         )
@@ -1021,6 +1024,52 @@ class TestLifecycleTagsCli(LifecycleTagFixture):
             self.assertEqual(validation["status"], "valid")
             self.assertEqual(validation["plan_id"], "PLAN-CLI")
             self.assertFalse(validation["external_effects_performed"])
+
+    def test_cli_rejects_empty_classification_plan_without_traceback(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            paths = self._write_bundle(root)
+            empty_plan = deepcopy(self.classification_plan)
+            empty_plan["papers"] = []
+            paths["classification_plan"].write_text(
+                json.dumps(empty_plan),
+                encoding="utf-8",
+            )
+            output = StringIO()
+            error = StringIO()
+            self.assertEqual(
+                run_lifecycle_tags_cli(
+                    [
+                        "plan",
+                        "--registry",
+                        str(paths["registry"]),
+                        "--plan-id",
+                        "PLAN-EMPTY-CLASSIFICATION",
+                        "--item-key",
+                        ITEM_KEY,
+                        "--zotero-version",
+                        "42",
+                        "--stage-manifest",
+                        str(paths["stage"]),
+                        "--artifact-index",
+                        str(paths["index"]),
+                        "--acceptance-summary",
+                        str(paths["acceptance"]),
+                        "--classification-plan",
+                        str(paths["classification_plan"]),
+                        "--classification-decision",
+                        str(paths["classification_decision"]),
+                        "--taxonomy-lock",
+                        str(paths["lock"]),
+                    ],
+                    stdout=output,
+                    stderr=error,
+                ),
+                2,
+            )
+            self.assertEqual(output.getvalue(), "")
+            self.assertIn("papers must be a non-empty array", error.getvalue())
+            self.assertNotIn("Traceback", error.getvalue())
 
     def test_cli_fails_closed_without_echoing_malformed_payload(self):
         synthetic_marker = "SYNTHETIC-MF161-SENTINEL-7X9Q"

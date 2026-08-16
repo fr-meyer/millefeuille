@@ -182,6 +182,9 @@ evidence, repeats every stage/acceptance/classification/taxonomy derivation, and
 requires the rebuilt canonical plan to match exactly. Errors identify the
 failed contract and do not echo artifact content. Exit code `0` means the requested
 offline operation succeeded and `2` means contract validation failed.
+Classification-plan evidence must contain exactly one paper entry; empty or
+multi-paper evidence fails through the same contract-error boundary and must
+never escape as a CLI traceback.
 
 ## Stop Conditions And Non-Goals
 

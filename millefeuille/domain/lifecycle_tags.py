@@ -1076,6 +1076,10 @@ def _validate_classification_evidence(
         raise MillefeuilleContractError(
             "classification decision is not an exact wire record"
         )
+    if len(plan.papers) != 1:
+        raise MillefeuilleContractError(
+            "classification plan must bind exactly the migration paper"
+        )
     paper_entry = plan.papers[0]
     required_paper_fields = {
         "paper_id",
@@ -1106,10 +1110,7 @@ def _validate_classification_evidence(
         raise MillefeuilleContractError("classification plan and decision status drift")
     if plan.run_id != artifact_index.run_id:
         raise MillefeuilleContractError("classification plan run_id drift")
-    if (
-        len(plan.papers) != 1
-        or plan.papers[0].get("paper_id") != artifact_index.paper_id
-    ):
+    if paper_entry.get("paper_id") != artifact_index.paper_id:
         raise MillefeuilleContractError(
             "classification plan must bind exactly the migration paper"
         )
