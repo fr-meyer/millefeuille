@@ -727,15 +727,20 @@ class TestStatusObservationJoins(unittest.TestCase):
             self.assertFalse(joined["authority"]["authoritative"])
             self.assertNotIn("live-complete", json.dumps(joined))
 
-            for state_name in ("tag_state", "note_state"):
-                with self.subTest(drifted_state=state_name):
+            for state_name, substate in (
+                ("tag_state", "drifted"),
+                ("note_state", "drifted"),
+                ("tag_state", "not-observed"),
+                ("note_state", "not-observed"),
+            ):
+                with self.subTest(state_name=state_name, substate=substate):
                     drifted_summary = {
                         "status": "consistent",
                         "item_version": 8,
                         "tag_state": "consistent",
                         "note_state": "consistent",
                     }
-                    drifted_summary[state_name] = "drifted"
+                    drifted_summary[state_name] = substate
                     drifted_zotero = self._write_envelope(
                         tempdir,
                         run_dir=run_dir,
@@ -752,7 +757,7 @@ class TestStatusObservationJoins(unittest.TestCase):
                     self.assertEqual(drifted["status"]["state"], "needs-review")
                     self.assertFalse(drifted["status"]["observationally_ready"])
                     self.assertIn(
-                        f"zotero-live-state observation {state_name}: drifted",
+                        f"zotero-live-state observation {state_name}: {substate}",
                         drifted["status"]["blocking_items"],
                     )
 
