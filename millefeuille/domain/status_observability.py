@@ -1299,9 +1299,15 @@ def _join_observations(
             if is_required:
                 blockers.append(f"{kind} observation: not-observed")
             continue
-        status = str(payload["summary"]["status"])
+        summary = _required_object(payload["summary"], "observation summary")
+        status = str(summary["status"])
         if _observation_status_blocks(kind, status):
             blockers.append(f"{kind} observation: {status}")
+        if kind == "zotero-live-state":
+            for state_name in ("tag_state", "note_state"):
+                state = str(summary[state_name])
+                if state != "consistent":
+                    blockers.append(f"{kind} observation {state_name}: {state}")
         joined[kind] = {
             "state": "observed",
             "required": is_required,

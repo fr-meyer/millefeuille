@@ -93,6 +93,11 @@ claim exists or any claimed value drifts. Absence is shown as `not-observed`
 and is nonblocking unless a canonical passed stage or approved-live mode
 requires that kind.
 
+A supplied Zotero live-state observation is ready only when its aggregate
+status, tag state, and note state are all `consistent`. A `drifted` or
+`not-observed` substate remains an explicit blocker even if the aggregate
+status is `consistent`.
+
 ## Output and Exit Semantics
 
 JSON output is deterministic, content-addressed, and excludes absolute local
