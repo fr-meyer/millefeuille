@@ -761,6 +761,8 @@ Offline taxonomy governance commands:
 Offline lifecycle-tag migration commands:
   millefeuille lifecycle-tags registry
   millefeuille lifecycle-tags validate --registry /path/to/lifecycle-registry.json
+    --plan /path/to/plan.json --stage-manifest /path/to/stage-manifest.json
+    --artifact-index /path/to/artifact-index.json
   millefeuille lifecycle-tags plan --registry /path/to/lifecycle-registry.json ...
 
 Artifact-writer source-pack fixture flags:

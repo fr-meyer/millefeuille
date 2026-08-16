@@ -53,7 +53,31 @@ def _run_command(args: argparse.Namespace) -> dict[str, Any]:
             "external_effects_performed": False,
         }
         if args.plan is not None:
-            plan = load_lifecycle_tag_migration_plan(args.plan)
+            if args.stage_manifest is None or args.artifact_index is None:
+                raise MillefeuilleContractError(
+                    "plan validation requires --stage-manifest and --artifact-index"
+                )
+            plan = load_lifecycle_tag_migration_plan(
+                args.plan,
+                stage_manifest_payload=load_lifecycle_tag_json(
+                    args.stage_manifest,
+                    "stage manifest",
+                ),
+                artifact_index_payload=load_lifecycle_tag_json(
+                    args.artifact_index,
+                    "artifact index",
+                ),
+                acceptance_payload=_optional_json(
+                    args.acceptance_summary, "acceptance summary"
+                ),
+                classification_plan_payload=_optional_json(
+                    args.classification_plan, "classification plan"
+                ),
+                classification_decision_payload=_optional_json(
+                    args.classification_decision, "classification decision"
+                ),
+                taxonomy_lock=_optional_json(args.taxonomy_lock, "taxonomy lock"),
+            )
             expected_registry = {
                 "registry_id": registry["registry_id"],
                 "registry_version": registry["registry_version"],
@@ -133,6 +157,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     validate.add_argument("--registry", required=True)
     validate.add_argument("--plan")
+    validate.add_argument("--stage-manifest")
+    validate.add_argument("--artifact-index")
+    validate.add_argument("--acceptance-summary")
+    validate.add_argument("--classification-plan")
+    validate.add_argument("--classification-decision")
+    validate.add_argument("--taxonomy-lock")
 
     plan = commands.add_parser(
         "plan",

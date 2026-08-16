@@ -141,12 +141,19 @@ Print the canonical registry:
 millefeuille lifecycle-tags registry
 ```
 
-Validate the exact checked-in registry and optionally one plan:
+Validate the exact checked-in registry and optionally rederive one plan from its
+complete local evidence bundle:
 
 ```bash
 millefeuille lifecycle-tags validate \
   --registry lifecycle-tag-registry.v0.1.json \
-  --plan migration-plan.json
+  --plan migration-plan.json \
+  --stage-manifest stage-manifest.json \
+  --artifact-index artifact-index.json \
+  --acceptance-summary reports/acceptance-summary.json \
+  --classification-plan classification/classification-plan.json \
+  --classification-decision classification/decisions/ITEM1.json \
+  --taxonomy-lock taxonomy-lock.json
 ```
 
 Derive one terminal-success preview from local evidence:
@@ -170,8 +177,10 @@ millefeuille lifecycle-tags plan \
 
 All successful commands write sanitized JSON to standard output only. They do
 not create the plan file named in the validation example; an operator may
-capture reviewed output separately. Validation errors identify the failed
-contract and do not echo artifact content. Exit code `0` means the requested
+capture reviewed output separately. Plan validation reloads the supplied local
+evidence, repeats every stage/acceptance/classification/taxonomy derivation, and
+requires the rebuilt canonical plan to match exactly. Errors identify the
+failed contract and do not echo artifact content. Exit code `0` means the requested
 offline operation succeeded and `2` means contract validation failed.
 
 ## Stop Conditions And Non-Goals

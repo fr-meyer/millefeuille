@@ -311,6 +311,16 @@ class LifecycleTagFixture(unittest.TestCase):
         arguments.update(overrides)
         return build_lifecycle_tag_migration_plan(**arguments)  # type: ignore[arg-type]
 
+    def validation_evidence(self) -> dict[str, object]:
+        return {
+            "stage_manifest_payload": deepcopy(self.stage_manifest),
+            "artifact_index_payload": deepcopy(self.artifact_index),
+            "acceptance_payload": deepcopy(self.acceptance),
+            "classification_plan_payload": deepcopy(self.classification_plan),
+            "classification_decision_payload": deepcopy(self.classification_decision),
+            "taxonomy_lock": deepcopy(self.taxonomy_lock),
+        }
+
 
 class TestLifecycleTagRegistry(LifecycleTagFixture):
     def test_checked_in_registry_is_exact_content_addressed_tagstate_policy(self):
@@ -457,7 +467,10 @@ class TestLifecycleTagRegistry(LifecycleTagFixture):
 class TestLifecycleTagMigrationSemantics(LifecycleTagFixture):
     def test_plan_binds_item_version_tags_run_source_and_every_evidence_identity(self):
         plan = self.build()
-        validate_lifecycle_tag_migration_plan(plan)
+        validate_lifecycle_tag_migration_plan(
+            plan,
+            **self.validation_evidence(),  # type: ignore[arg-type]
+        )
 
         self.assertEqual(plan["item"]["zotero_version"], 42)
         self.assertEqual(
@@ -812,12 +825,29 @@ class TestLifecycleTagMigrationSemantics(LifecycleTagFixture):
             with self.subTest(payload=payload):
                 _rehash(payload)
                 with self.assertRaises(MillefeuilleContractError):
-                    validate_lifecycle_tag_migration_plan(payload)
+                    validate_lifecycle_tag_migration_plan(
+                        payload,
+                        **self.validation_evidence(),  # type: ignore[arg-type]
+                    )
+
+        fabricated = deepcopy(original)
+        fabricated["evidence"]["classification_decision"]["content_identity"] = (
+            "sha256:" + ("f" * 64)
+        )
+        _rehash(fabricated)
+        with self.assertRaisesRegex(MillefeuilleContractError, "rederived evidence"):
+            validate_lifecycle_tag_migration_plan(
+                fabricated,
+                **self.validation_evidence(),  # type: ignore[arg-type]
+            )
 
         tampered = deepcopy(original)
         tampered["plan_id"] = "PLAN-TAMPERED"
         with self.assertRaisesRegex(MillefeuilleContractError, "identity mismatch"):
-            validate_lifecycle_tag_migration_plan(tampered)
+            validate_lifecycle_tag_migration_plan(
+                tampered,
+                **self.validation_evidence(),  # type: ignore[arg-type]
+            )
 
     def test_plan_loader_rejects_unknown_duplicate_and_tampered_content(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -825,14 +855,23 @@ class TestLifecycleTagMigrationSemantics(LifecycleTagFixture):
             plan = self.build()
             valid = root / "plan.json"
             valid.write_text(json.dumps(plan), encoding="utf-8")
-            self.assertEqual(load_lifecycle_tag_migration_plan(valid), plan)
+            self.assertEqual(
+                load_lifecycle_tag_migration_plan(
+                    valid,
+                    **self.validation_evidence(),  # type: ignore[arg-type]
+                ),
+                plan,
+            )
 
             unknown = deepcopy(plan)
             unknown["unknown"] = True
             unknown_path = root / "unknown.json"
             unknown_path.write_text(json.dumps(unknown), encoding="utf-8")
             with self.assertRaises(MillefeuilleContractError):
-                load_lifecycle_tag_migration_plan(unknown_path)
+                load_lifecycle_tag_migration_plan(
+                    unknown_path,
+                    **self.validation_evidence(),  # type: ignore[arg-type]
+                )
 
             duplicate = root / "duplicate.json"
             duplicate.write_text(
@@ -840,7 +879,10 @@ class TestLifecycleTagMigrationSemantics(LifecycleTagFixture):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(MillefeuilleContractError, "duplicate"):
-                load_lifecycle_tag_migration_plan(duplicate)
+                load_lifecycle_tag_migration_plan(
+                    duplicate,
+                    **self.validation_evidence(),  # type: ignore[arg-type]
+                )
 
 
 class TestLifecycleTagsCli(LifecycleTagFixture):
@@ -915,7 +957,10 @@ class TestLifecycleTagsCli(LifecycleTagFixture):
             )
             self.assertEqual(exit_code, 0, error.getvalue())
             plan = json.loads(output.getvalue())
-            validate_lifecycle_tag_migration_plan(plan)
+            validate_lifecycle_tag_migration_plan(
+                plan,
+                **self.validation_evidence(),  # type: ignore[arg-type]
+            )
             self.assertFalse(plan["writeback"]["external_effects_performed"])
             self.assertEqual(
                 sorted(path.name for path in root.iterdir()),
@@ -924,6 +969,27 @@ class TestLifecycleTagsCli(LifecycleTagFixture):
 
             plan_path = root / "plan.json"
             plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            missing_evidence_out = StringIO()
+            missing_evidence_error = StringIO()
+            self.assertEqual(
+                run_lifecycle_tags_cli(
+                    [
+                        "validate",
+                        "--registry",
+                        str(paths["registry"]),
+                        "--plan",
+                        str(plan_path),
+                    ],
+                    stdout=missing_evidence_out,
+                    stderr=missing_evidence_error,
+                ),
+                2,
+            )
+            self.assertEqual(missing_evidence_out.getvalue(), "")
+            self.assertIn(
+                "requires --stage-manifest", missing_evidence_error.getvalue()
+            )
+
             validation_out = StringIO()
             self.assertEqual(
                 run_lifecycle_tags_cli(
@@ -933,6 +999,18 @@ class TestLifecycleTagsCli(LifecycleTagFixture):
                         str(paths["registry"]),
                         "--plan",
                         str(plan_path),
+                        "--stage-manifest",
+                        str(paths["stage"]),
+                        "--artifact-index",
+                        str(paths["index"]),
+                        "--acceptance-summary",
+                        str(paths["acceptance"]),
+                        "--classification-plan",
+                        str(paths["classification_plan"]),
+                        "--classification-decision",
+                        str(paths["classification_decision"]),
+                        "--taxonomy-lock",
+                        str(paths["lock"]),
                     ],
                     stdout=validation_out,
                     stderr=error,

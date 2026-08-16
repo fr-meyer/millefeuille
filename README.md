@@ -306,7 +306,7 @@ millefeuille models --plan --profile research-default --stage summarize_full_pap
 millefeuille models --provenance --plan-file model-plan.json --execution-evidence model-execution-evidence.json --output model-provenance.json --json
 millefeuille taxonomy validate --registry taxonomy-registry.json
 millefeuille lifecycle-tags registry
-millefeuille lifecycle-tags validate --registry lifecycle-tag-registry.v0.1.json --plan migration-plan.json
+millefeuille lifecycle-tags validate --registry lifecycle-tag-registry.v0.1.json --plan migration-plan.json --stage-manifest stage-manifest.json --artifact-index artifact-index.json --acceptance-summary reports/acceptance-summary.json --classification-plan classification/classification-plan.json --classification-decision classification/decisions/ITEM1.json --taxonomy-lock taxonomy-lock.json
 millefeuille run --source-pack-root ./source-packs --paper-id zotero-ITEM1 --run-id run-001 --stages acceptance,classify,writeback --handoff handoff.jsonl --classification-evidence classification-evidence.json --release-preflight
 ```
 

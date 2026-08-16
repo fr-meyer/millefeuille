@@ -548,17 +548,68 @@ def build_lifecycle_tag_migration_plan(
         },
     }
     payload["content_identity"] = _content_identity(payload)
-    validate_lifecycle_tag_migration_plan(payload)
+    _validate_lifecycle_tag_migration_plan_structure(payload)
     return payload
 
 
-def load_lifecycle_tag_migration_plan(path: str | Path) -> dict[str, Any]:
+def load_lifecycle_tag_migration_plan(
+    path: str | Path,
+    *,
+    stage_manifest_payload: dict[str, Any],
+    artifact_index_payload: dict[str, Any],
+    acceptance_payload: dict[str, Any] | None = None,
+    classification_plan_payload: dict[str, Any] | None = None,
+    classification_decision_payload: dict[str, Any] | None = None,
+    taxonomy_lock: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     payload = load_lifecycle_tag_json(path, "lifecycle tag migration plan")
-    validate_lifecycle_tag_migration_plan(payload)
+    validate_lifecycle_tag_migration_plan(
+        payload,
+        stage_manifest_payload=stage_manifest_payload,
+        artifact_index_payload=artifact_index_payload,
+        acceptance_payload=acceptance_payload,
+        classification_plan_payload=classification_plan_payload,
+        classification_decision_payload=classification_decision_payload,
+        taxonomy_lock=taxonomy_lock,
+    )
     return payload
 
 
-def validate_lifecycle_tag_migration_plan(payload: dict[str, Any]) -> None:
+def validate_lifecycle_tag_migration_plan(
+    payload: dict[str, Any],
+    *,
+    stage_manifest_payload: dict[str, Any],
+    artifact_index_payload: dict[str, Any],
+    acceptance_payload: dict[str, Any] | None = None,
+    classification_plan_payload: dict[str, Any] | None = None,
+    classification_decision_payload: dict[str, Any] | None = None,
+    taxonomy_lock: dict[str, Any] | None = None,
+) -> None:
+    """Validate a plan by rebuilding it from the supplied evidence bundle."""
+
+    _validate_lifecycle_tag_migration_plan_structure(payload)
+    item = payload["item"]
+    expected = build_lifecycle_tag_migration_plan(
+        registry=canonical_lifecycle_tag_registry(),
+        plan_id=payload["plan_id"],
+        item_key=item["item_key"],
+        zotero_version=item["zotero_version"],
+        current_tags=item["current_tags"],
+        stage_manifest_payload=stage_manifest_payload,
+        artifact_index_payload=artifact_index_payload,
+        acceptance_payload=acceptance_payload,
+        classification_plan_payload=classification_plan_payload,
+        classification_decision_payload=classification_decision_payload,
+        taxonomy_lock=taxonomy_lock,
+        remove_selection_after_terminal_success=bool(payload["proposed_removes"]),
+    )
+    if payload != expected:
+        raise MillefeuilleContractError(
+            "lifecycle tag migration plan drifts from rederived evidence"
+        )
+
+
+def _validate_lifecycle_tag_migration_plan_structure(payload: dict[str, Any]) -> None:
     """Validate strict shape, deterministic ordering, and content identity."""
 
     if type(payload) is not dict:
