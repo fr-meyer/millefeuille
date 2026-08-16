@@ -24,6 +24,11 @@ APPROVED_LIVE_RECEIPT_SCHEMA_VERSION = "millefeuille-approved-live-receipt/v0.1"
 APPROVED_LIVE_AUDIT_SCHEMA_VERSION = "millefeuille-approved-live-audit/v0.1"
 APPROVED_LIVE_RECEIPT_MAX_BYTES = 65_536
 APPROVED_LIVE_RECEIPT_MAX_VALIDITY = timedelta(hours=24)
+STAGING_CLEANUP_MAINTENANCE_OPERATION = (
+    "maintenance.quarantine-abandoned-retrieval-staging-and-bridge-assets"
+)
+STAGING_CLEANUP_MAINTENANCE_SELECTOR = "maintenance-plan"
+STAGING_CLEANUP_MAINTENANCE_DISPOSAL = "quarantine-until-mf-197"
 
 _JSON_SAFE_INTEGER_MAX = (1 << 53) - 1
 _RECEIPT_FIELDS = frozenset(
@@ -85,6 +90,7 @@ _SELECTOR_KINDS = frozenset(
         "doi",
         "title",
         "slug",
+        STAGING_CLEANUP_MAINTENANCE_SELECTOR,
     }
 )
 _PDF_DISPOSITIONS = frozenset(
@@ -100,7 +106,12 @@ _PROVIDER_PAYLOAD_DISPOSITIONS = frozenset(
 )
 _PROVIDER_OPERATION_PREFIXES = ("model.", "ocr.")
 _TEMPORARY_FILE_DISPOSITIONS = frozenset(
-    {"delete-after-run", "delete-on-failure", "not-applicable"}
+    {
+        "delete-after-run",
+        "delete-on-failure",
+        "not-applicable",
+        STAGING_CLEANUP_MAINTENANCE_DISPOSAL,
+    }
 )
 _TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
 _SAFE_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@/+\-]{0,255}\Z")
@@ -362,6 +373,7 @@ class ApprovedLiveScope:
             minimum=0,
         )
         _validate_stop_conditions(self.stop_conditions)
+        self._validate_staging_cleanup_scope()
         if _operations_require_provider(self.operations) and self.provider is None:
             raise MillefeuilleContractError(
                 "model and OCR operations require an exact provider and model"
@@ -385,6 +397,40 @@ class ApprovedLiveScope:
                 raise MillefeuilleContractError(
                     "provider payload disposal is required when a provider is bound"
                 )
+
+    def _validate_staging_cleanup_scope(self) -> None:
+        uses_operation = STAGING_CLEANUP_MAINTENANCE_OPERATION in self.operations
+        uses_selector = (
+            self.selector.kind == STAGING_CLEANUP_MAINTENANCE_SELECTOR
+        )
+        uses_disposal = (
+            self.disposal_policy.temporary_files
+            == STAGING_CLEANUP_MAINTENANCE_DISPOSAL
+        )
+        if not (uses_operation or uses_selector or uses_disposal):
+            return
+        if self.operations != (STAGING_CLEANUP_MAINTENANCE_OPERATION,):
+            raise MillefeuilleContractError(
+                "staging cleanup approval must bind its exact maintenance operation"
+            )
+        if not uses_selector or _DIGEST_RE.fullmatch(self.selector.value) is None:
+            raise MillefeuilleContractError(
+                "staging cleanup approval must select an exact maintenance plan digest"
+            )
+        if not uses_disposal:
+            raise MillefeuilleContractError(
+                "staging cleanup approval must use its quarantine disposition"
+            )
+        if (
+            self.disposal_policy.pdfs != "not-applicable"
+            or self.disposal_policy.provider_payloads != "not-applicable"
+            or self.provider is not None
+            or self.max_provider_calls != 0
+            or self.max_cost_usd_micros != 0
+        ):
+            raise MillefeuilleContractError(
+                "staging cleanup approval cannot bind provider or PDF work"
+            )
 
     @classmethod
     def from_dict(cls, payload: object) -> ApprovedLiveScope:

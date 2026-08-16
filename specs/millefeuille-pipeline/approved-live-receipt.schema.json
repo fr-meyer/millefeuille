@@ -106,7 +106,8 @@
                 "batch-manifest",
                 "doi",
                 "title",
-                "slug"
+                "slug",
+                "maintenance-plan"
               ]
             },
             "value": {
@@ -181,7 +182,8 @@
               "enum": [
                 "delete-after-run",
                 "delete-on-failure",
-                "not-applicable"
+                "not-applicable",
+                "quarantine-until-mf-197"
               ]
             }
           }
@@ -197,7 +199,69 @@
             "maxLength": 256
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "operations": {
+                    "contains": {
+                      "const": "maintenance.quarantine-abandoned-retrieval-staging-and-bridge-assets"
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "selector": {
+                    "properties": {"kind": {"const": "maintenance-plan"}}
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "disposal_policy": {
+                    "properties": {
+                      "temporary_files": {"const": "quarantine-until-mf-197"}
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "operations": {
+                "const": [
+                  "maintenance.quarantine-abandoned-retrieval-staging-and-bridge-assets"
+                ]
+              },
+              "selector": {
+                "properties": {
+                  "kind": {"const": "maintenance-plan"},
+                  "value": {"pattern": "^sha256:[0-9a-f]{64}$"}
+                }
+              },
+              "provider": {"type": "null"},
+              "limits": {
+                "properties": {
+                  "max_provider_calls": {"const": 0},
+                  "max_cost_usd_micros": {"const": 0}
+                }
+              },
+              "disposal_policy": {
+                "properties": {
+                  "pdfs": {"const": "not-applicable"},
+                  "provider_payloads": {"const": "not-applicable"},
+                  "temporary_files": {"const": "quarantine-until-mf-197"}
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "integrity": {
       "type": "object",
@@ -259,6 +323,7 @@
     "output_root and source_pack_root must be absolute normalized paths without dot or parent-traversal components.",
     "expires_at must be later than approval.approved_at and no more than 24 hours later; authorization also requires approved_at <= evaluation_time < expires_at.",
     "Operations beginning model. or ocr. require an exact provider/model binding. Otherwise provider must be null exactly when both provider limits are zero; a bound provider requires max_provider_calls >= 1 and an applicable provider-payload disposal policy.",
+    "The maintenance-plan selector, quarantine-until-mf-197 temporary disposition, and staging-cleanup maintenance operation are an inseparable exact scope: operations must contain only that operation, selector.value must be one SHA-256 plan digest, provider/PDF work must be inapplicable, and both provider limits must be zero.",
     "Unknown or secret-bearing fields and credential, private-PDF, authenticated-URL, or provider-payload markers anywhere in the receipt must be rejected without reflecting supplied values.",
     "A live request must independently derive and exactly match run_id, operations, targets, item cap, selector, roots, provider/model, limits, disposal policy, and stop conditions; selected item count must not exceed max_items.",
     "A durable consumed-receipt index must reject either a previously consumed receipt_id or content_digest before any external effect."

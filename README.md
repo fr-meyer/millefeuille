@@ -491,6 +491,40 @@ paper-card prose, PDFs, or provider payloads, and does not read live Zotero,
 recover PDFs, call OCR/models/providers, write OpenKB or an index, or grant
 approval for publication or release operations.
 
+### Evidence-safe abandoned staging quarantine
+
+MF-106 provides a separate offline maintenance surface for the zero-byte
+unpublished retrieval generations left by the failure path above and for a
+forward-compatible, explicitly owned temporary bridge namespace. Inspection
+and content-addressed planning are read-only:
+
+```bash
+millefeuille maintenance staging inspect \
+  --source-root /exact/source-pack-root \
+  --quarantine-root /exact/quarantine-root \
+  --json
+```
+
+Only exact `.retrieval.tmp-<16hex>` generations with the two expected
+single-link, read-only, zero-byte files are eligible. Future bridge cleanup
+requires an exact direct-child `.millefeuille-bridge.tmp-<16hex>` directory and
+a content-addressed `ownership.json` proving `unpublished`/`abandoned` state and
+the type, size, and SHA-256 of every private file. Current unmarked bridges,
+canonical retrieval, source packs, evidence, nonzero bytes, extra entries,
+links/reparse points, hard links, drift, and unknown names are preserved.
+
+Apply requires explicit `--mode approved-live`, a strict plan, and an exact
+MF-100 receipt binding the maintenance operation, roots, candidate kind/paths,
+count, plan-digest selector, `quarantine-until-mf-197` disposition, and complete
+stop set. The v0.1 mutation path is Linux-only: it pins roots and candidate
+parents, takes persistent advisory locks, reserves consumed audit evidence, and
+uses descriptor-relative atomic no-replace renames. Windows and macOS support
+inspection/planning but refuse apply before reservation. Failure rolls moved
+generations back when the original names remain free; unresolved state requires
+a new plan and receipt. Exact completed reruns are no-effect. Nothing is ever
+deleted; permanent disposal remains MF-197. See
+[`staging-cleanup.md`](specs/millefeuille-pipeline/staging-cleanup.md).
+
 ### Offline Batch Acceptance
 
 To validate several existing source-pack runs in one deterministic offline

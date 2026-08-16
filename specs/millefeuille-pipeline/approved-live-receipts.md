@@ -5,7 +5,10 @@ Millefeuille action. A receipt records approval; it is not a credential, a
 transferable capability, a provider adapter, or permission to widen the requested
 work. The current stage CLI validates receipts only to prove that its manual
 gate fails closed. It still performs no provider call, Zotero/OpenKB/index
-mutation, PDF recovery, or live source-pack write.
+mutation, PDF recovery, or live source-pack write. The separate MF-106 local
+maintenance executor is the first receipt consumer: it can only atomically
+quarantine strictly proven abandoned unpublished staging on supported Linux
+filesystems and never performs permanent disposal or an external write.
 
 ## Normative Artifacts
 
@@ -27,7 +30,7 @@ One receipt binds all of the following:
 - a sorted, unique list of exact operation IDs;
 - a sorted, unique list of target kind/ID pairs;
 - one exact Zotero tag/query, paper/item identity, source pack, DOI, title,
-  slug, or batch-manifest selector;
+  slug, batch-manifest, or content-addressed maintenance-plan selector;
 - the execution item cap and, at authorization time, a selected count no
   greater than that cap;
 - normalized absolute output and source-pack roots;
@@ -49,6 +52,12 @@ at least one permitted call and a real disposal policy. Monetary limits are
 integer millionths of one US dollar so accounting never depends on floating
 point. `model.*` and `ocr.*` operations always require an exact provider/model
 binding; they cannot be authorized with a null provider.
+
+`maintenance-plan` and temporary-file disposal
+`quarantine-until-mf-197` are narrow backward-compatible enum extensions. A
+maintenance request must bind the selector value to its exact cleanup-plan
+digest and use the quarantine disposition; accepting either enum does not
+widen any other operation or an older receipt.
 
 ## Time and Single Use
 
@@ -76,9 +85,12 @@ replay state, including a `validated` no-effect record. The
 reservation. This conservative rule means changing that mutable status cannot
 make a single-use receipt reusable.
 
-The current CLI never records consumption because it cannot execute live work.
+The stage CLI never records consumption because it cannot execute live work.
 After successful receipt validation it still exits through the unsupported-live
-gate.
+gate. MF-106 instead reserves a sanitized `consumed` maintenance audit before
+its first local move. The reservation remains consumed after any failure or
+rollback. An exact completed rerun may no-op against the matching audit; every
+other retry or recovery requires a new plan and separately approved receipt.
 
 ## Content Identity and Approval Authenticity
 
@@ -128,7 +140,7 @@ non-reserving diagnostic must not append it to the replay ledger. It cannot manu
 It never serializes credentials, request headers, private bytes, prompts,
 provider responses, authenticated URLs, or arbitrary caller fields.
 
-## Current CLI Gate
+## Current CLI Gates
 
 All current stage commands accept `--approval-receipt <json>` alongside `--mode`.
 They use the explicitly no-effect receipt validator, never the live-authorization
@@ -152,6 +164,18 @@ primitive. The rules are:
 6. A missing, expired, replayed, tampered, secret-bearing, over-broad, or
    drifted receipt is rejected. A valid receipt is reported by content digest,
    then execution still exits as unsupported.
+
+The independent `maintenance staging` surface adds these rules:
+
+1. `inspect` and `plan` are read-only and do not accept a receipt.
+2. `apply` defaults to a no-effect preview refusal and requires explicit
+   `--mode approved-live` plus `--approval-receipt`.
+3. Its request is derived from the loaded content-addressed plan and canonical
+   roots, including every exact candidate kind/path, count, disposal, and stop
+   condition. Scope is never copied from the receipt.
+4. Apply is limited to the Linux pinned-directory, advisory-lock, same-device,
+   atomic no-replace boundary described in `staging-cleanup.md`. Windows and
+   macOS refuse before audit reservation or mutation.
 
 Batch and commands without an exact current run/target/root binding remain
 fail-closed. Future live adapters must independently derive every request

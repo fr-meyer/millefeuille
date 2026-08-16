@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/staging-cleanup-inspection.schema.json",
+  "title": "Millefeuille Staging Cleanup Inspection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation",
+    "roots",
+    "source_namespace_identity",
+    "quarantine_namespace_identity",
+    "capabilities",
+    "eligible_candidates",
+    "unverified_candidates",
+    "counts",
+    "default_action",
+    "private_bytes_serialized",
+    "secret_material_persisted"
+  ],
+  "properties": {
+    "schema_version": {"const": "millefeuille-staging-cleanup-inspection/v0.1"},
+    "operation": {"const": "maintenance.quarantine-abandoned-retrieval-staging-and-bridge-assets"},
+    "roots": {"$ref": "staging-cleanup-plan.schema.json#/$defs/rootIdentities"},
+    "source_namespace_identity": {"$ref": "#/$defs/digest"},
+    "quarantine_namespace_identity": {"$ref": "#/$defs/digest"},
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "atomic_no_replace_quarantine",
+        "pinned_directory_mutation",
+        "same_device_stable_roots",
+        "apply_supported",
+        "posix_batch_lock",
+        "reparse_point_detection"
+      ],
+      "properties": {
+        "platform": {"enum": ["windows", "posix", "unsupported"]},
+        "atomic_no_replace_quarantine": {"type": "boolean"},
+        "pinned_directory_mutation": {"type": "boolean"},
+        "same_device_stable_roots": {"type": "boolean"},
+        "apply_supported": {"type": "boolean"},
+        "posix_batch_lock": {"type": "boolean"},
+        "reparse_point_detection": {"type": "boolean"}
+      }
+    },
+    "eligible_candidates": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "relative_path", "generation_identity"],
+        "properties": {
+          "kind": {"$ref": "staging-cleanup-plan.schema.json#/$defs/candidateKind"},
+          "relative_path": {"$ref": "staging-cleanup-plan.schema.json#/$defs/relativeCandidate"},
+          "generation_identity": {"$ref": "#/$defs/digest"}
+        }
+      }
+    },
+    "unverified_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["namespace", "opaque_identity", "reason_codes"],
+        "properties": {
+          "namespace": {"enum": ["retrieval", "bridge"]},
+          "opaque_identity": {"$ref": "#/$defs/digest"},
+          "reason_codes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
+          }
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eligible", "unverified"],
+      "properties": {
+        "eligible": {"type": "integer", "minimum": 0},
+        "unverified": {"type": "integer", "minimum": 0}
+      }
+    },
+    "default_action": {"const": "inspect-only"},
+    "private_bytes_serialized": {"const": false},
+    "secret_material_persisted": {"const": false}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "x-millefeuille-semantic-validation": [
+    "same_device_stable_roots reports only the observed device equality and nonzero root identities; it is not a claim that the filesystem is local.",
+    "apply_supported is true only when the exact roots also pass the Linux pinned-directory executor boundary. Windows and macOS v0.1 inspection and planning remain read-only even if a platform exposes some unrelated rename primitive.",
+    "atomic_no_replace_quarantine and pinned_directory_mutation describe the complete descriptor-relative executor boundary, not the presence of a similarly named platform API alone."
+  ]
+}
