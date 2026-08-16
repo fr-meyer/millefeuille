@@ -9,12 +9,14 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from jsonschema import Draft202012Validator
 
 from millefeuille.cli.artifacts import run_artifact_cli
 from millefeuille.cli.stages import run_stage_cli
 from millefeuille.domain.millefeuille import MillefeuilleContractError
+import millefeuille.domain.status_observability as status_observability
 from millefeuille.domain.status_observability import (
     STATUS_OBSERVATION_SCHEMA_VERSION,
     STATUS_OBSERVATION_SOURCE,
@@ -219,6 +221,51 @@ class TestStatusCanonicalJoin(unittest.TestCase):
                 "https://",
             ):
                 self.assertNotIn(marker, serialized)
+
+    def test_progressive_join_rejects_mutated_inputs_and_artifacts(self):
+        for relative_target in (
+            "artifact-index.json",
+            "stage-manifest.json",
+            "reports/acceptance-summary.json",
+        ):
+            with (
+                self.subTest(relative_target=relative_target),
+                tempfile.TemporaryDirectory() as tempdir,
+            ):
+                _root, run_dir = _prepare_complete_preview(tempdir)
+                index_path = run_dir / "artifact-index.json"
+                artifact_index = _read_json(index_path)
+                artifact_index["artifacts"].pop("retrieval_index_status")
+                _write_json(index_path, artifact_index)
+                target = run_dir / relative_target
+                original_join = status_observability._join_status
+
+                def mutate_after_join(
+                    *args,
+                    _original_join=original_join,
+                    _target=target,
+                    _relative_target=relative_target,
+                    **kwargs,
+                ):
+                    report = _original_join(*args, **kwargs)
+                    payload = _read_json(_target)
+                    payload["mutation_during_status_read"] = _relative_target
+                    _write_json(_target, payload)
+                    return report
+
+                with patch.object(
+                    status_observability,
+                    "_join_status",
+                    side_effect=mutate_after_join,
+                ), self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "changed after batch preflight",
+                ):
+                    build_status_report(
+                        index_path=index_path,
+                        paper_id=PAPER_ID,
+                        run_id=RUN_ID,
+                    )
 
     def test_internal_parent_traversal_is_rejected_before_normalization(self):
         with tempfile.TemporaryDirectory() as tempdir:

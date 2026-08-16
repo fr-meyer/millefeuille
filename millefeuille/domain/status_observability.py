@@ -460,7 +460,74 @@ def _build_progressive_index_status(
     evidence_paths: Sequence[str | Path],
 ) -> dict[str, Any]:
     target = _validated_operator_path(index_path, label="artifact index")
+    run_dir = target.parent
+    stage_path = run_dir / "stage-manifest.json"
+    if hasattr(os, "O_NOFOLLOW"):
+        with RootArtifactReader(run_dir) as reader:
+            index_payload = _load_reader_json(reader, target, "artifact index")
+            stage_payload = _probe_reader_json(reader, stage_path, "stage manifest")
+            context = _progressive_status_context(
+                index_payload=index_payload,
+                stage_payload=stage_payload,
+                run_dir=run_dir,
+                paper_id=paper_id,
+                run_id=run_id,
+                reader=reader,
+            )
+            report = _join_status(context, evidence_paths=evidence_paths)
+            reader.revalidate_snapshot()
+            return report
+
+    run_snapshot = _portable_directory_snapshot(
+        run_dir,
+        label="artifact index run directory",
+    )
     index_payload = _load_path_json(target, "artifact index")
+    stage_payload = _probe_path_json(stage_path, "stage manifest")
+    context = _progressive_status_context(
+        index_payload=index_payload,
+        stage_payload=stage_payload,
+        run_dir=run_dir,
+        paper_id=paper_id,
+        run_id=run_id,
+        portable_snapshots={},
+    )
+    report = _join_status(context, evidence_paths=evidence_paths)
+    refreshed_stage = _probe_path_json(stage_path, "stage manifest")
+    if (
+        _digest_object(_load_path_json(target, "artifact index"))
+        != _digest_object(index_payload)
+        or (refreshed_stage is None) != (stage_payload is None)
+        or (
+            refreshed_stage is not None
+            and stage_payload is not None
+            and _digest_object(refreshed_stage) != _digest_object(stage_payload)
+        )
+    ):
+        raise MillefeuilleContractError(
+            "progressive status inputs changed during observation"
+        )
+    _revalidate_portable_artifacts(context)
+    if run_snapshot != _portable_directory_snapshot(
+        run_dir,
+        label="artifact index run directory",
+    ):
+        raise MillefeuilleContractError(
+            "artifact index run directory changed during observation"
+        )
+    return report
+
+
+def _progressive_status_context(
+    *,
+    index_payload: dict[str, Any],
+    stage_payload: dict[str, Any] | None,
+    run_dir: Path,
+    paper_id: str | None,
+    run_id: str | None,
+    reader: RootArtifactReader | None = None,
+    portable_snapshots: dict[Path, str] | None = None,
+) -> _StatusContext:
     _validate_artifact_index_payload(index_payload)
     artifact_index = ArtifactIndex.from_dict(index_payload)
     if paper_id is not None and artifact_index.paper_id != paper_id:
@@ -475,15 +542,12 @@ def _build_progressive_index_status(
     ):
         raise MillefeuilleContractError("artifact index source_hash is invalid")
 
-    run_dir = target.absolute().parent
-    stage_path = run_dir / "stage-manifest.json"
-    stage_payload = _probe_path_json(stage_path, "stage manifest")
     stage_manifest: StageManifest | None = None
     if stage_payload is not None:
         _validate_stage_manifest_payload(stage_payload)
         stage_manifest = StageManifest.from_dict(stage_payload)
         _require_stage_index_match(stage_manifest, artifact_index)
-    context = _StatusContext(
+    return _StatusContext(
         artifact_index=artifact_index,
         artifact_index_payload=index_payload,
         run_dir=run_dir,
@@ -493,8 +557,9 @@ def _build_progressive_index_status(
         source_pack_payload=None,
         source_pack_dir=None,
         scope="artifact-index-progressive",
+        reader=reader,
+        portable_snapshots=portable_snapshots,
     )
-    return _join_status(context, evidence_paths=evidence_paths)
 
 
 def _join_status(
@@ -2455,6 +2520,16 @@ def _load_reader_json(
         reader.read_bytes(path, label, max_bytes=_CANONICAL_JSON_MAX_BYTES),
         label,
     )
+
+
+def _probe_reader_json(
+    reader: RootArtifactReader,
+    path: Path,
+    label: str,
+) -> dict[str, Any] | None:
+    if not reader.probe_regular_file(path, label):
+        return None
+    return _load_reader_json(reader, path, label)
 
 
 def _load_path_json(path: str | Path, label: str) -> dict[str, Any]:
