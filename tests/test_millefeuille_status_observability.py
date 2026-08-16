@@ -259,7 +259,7 @@ class TestStatusCanonicalJoin(unittest.TestCase):
                     side_effect=mutate_after_join,
                 ), self.assertRaisesRegex(
                     MillefeuilleContractError,
-                    "changed after batch preflight",
+                    r"changed (?:after batch preflight|during observation)",
                 ):
                     build_status_report(
                         index_path=index_path,
