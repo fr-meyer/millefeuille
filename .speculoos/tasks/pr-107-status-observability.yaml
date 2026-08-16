@@ -1,0 +1,97 @@
+id: pr-107-status-observability
+roadmap_card: MF-141
+title: Add strict status observability joins
+status: in-progress
+branch: feat/pr-mf-141-status-observability
+base_branch: dev
+github:
+  issue: null
+  pull_request: 107
+  issue_project_item: unavailable
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/107
+  head_sha: null  # Active-task exact-head binding is external; see notes.
+  merge_commit: null
+write_paths:
+  - .speculoos/tasks/pr-107-status-observability.yaml
+  - README.md
+  - millefeuille/cli/artifacts.py
+  - millefeuille/domain/status_observability.py
+  - specs/millefeuille-pipeline/README.md
+  - specs/millefeuille-pipeline/artifact-storage.md
+  - specs/millefeuille-pipeline/cli-contract.md
+  - specs/millefeuille-pipeline/completion-gate-result.schema.json
+  - specs/millefeuille-pipeline/status-observability.md
+  - specs/millefeuille-pipeline/status-observation.schema.json
+  - specs/millefeuille-pipeline/status.schema.json
+  - specs/millefeuille-pipeline/vision.md
+  - specs/millefeuille-pipeline/zotero-writeback-result.schema.json
+  - tests/test_millefeuille_artifact_commands.py
+  - tests/test_millefeuille_contract_artifacts.py
+  - tests/test_millefeuille_status_observability.py
+scope:
+  - add a strict read-only status surface joining canonical source-pack,
+    stage-manifest, artifact-index, and progressively supplied observations
+  - require exact identities, references, lane sets, stage outputs, content
+    digests, and canonical Zotero source and post-write versions
+  - expose deterministic sanitized blockers and explicitly non-authoritative
+    observational readiness through the status CLI
+  - add strict JSON Schemas, operator documentation, compatibility coverage,
+    hostile-input regressions, and repository-governance metadata
+non_goals:
+  - credential access, provider/model/OCR calls, private-paper reads, source-pack
+    mutation, or live Zotero/OpenKB/PageIndex operations
+  - treating supplied observations as authoritative proof of a live effect
+  - weakening exact identity, secure-read, bounded-input, or manual-gate rules
+  - dev-to-main promotion, release tags, package publication, deployment, or
+    approval bypass
+acceptance:
+  - canonical joins fail closed on identity, reference, digest, lane, stage,
+    version, schema, or observation drift
+  - output remains deterministic, sanitized, bounded, read-only, and explicit
+    about authority and every blocking condition
+  - legacy index-only status remains compatible while canonical source-pack
+    status exposes the complete joined surface
+  - approved-live output can become observational-live-ready but never claim
+    authoritative or unqualified live completion
+  - focused tests, full unittest discovery, schema parsing, Ruff, changed-file
+    format, diff, private-data, Speculoos, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_status_observability tests.test_millefeuille_artifact_commands tests.test_millefeuille_contract_artifacts"
+  - ".venv/bin/python -m unittest discover -s tests"
+  - ".venv/bin/ruff check ."
+  - ".venv/bin/ruff format --check millefeuille/cli/artifacts.py millefeuille/domain/status_observability.py tests/test_millefeuille_artifact_commands.py tests/test_millefeuille_contract_artifacts.py tests/test_millefeuille_status_observability.py"
+  - "git diff --check"
+  - "speculoos validate --task pr-107-status-observability --validation \"git diff --check\" --json"
+publication_boundary:
+  statement: Repository-local read-only status joins, sanitized observation
+    envelopes, CLI reporting, schemas, documentation, synthetic tests, and
+    Speculoos metadata only. No credential access, provider/model/OCR call,
+    private-paper read, source-pack mutation, live Zotero/OpenKB/PageIndex
+    write, stable-branch promotion, release, tag, package publication,
+    deployment, or approval bypass.
+documentation_impact:
+  status: none
+  rationale: The feature diff already updates the top-level README, pipeline
+    navigation, artifact-storage contract, CLI contract, vision, and dedicated
+    status-observability contract. This follow-up adds governance metadata only.
+private_data_scan: required; public source, documentation, schemas, synthetic
+  tests, and repository-local Speculoos metadata only, with no credentials,
+  private papers, provider payloads, or host-specific paths
+publish_authority: Active Millefeuille delivery-train supervisor; routine
+  feature-to-dev publication, exact-head Mergeguez review, policy-gated merge,
+  dependent-PR retargeting, cleanup, and next-episode advancement are approved.
+  Live operations, dev-to-main promotion, release, and deployment remain
+  excluded.
+notes:
+  - The active task head field remains null while the PR is open because
+    embedding a commit's own SHA creates a self-reference cycle. Exact pre-merge
+    review and check evidence bind validation to GitHub's live head.
+  - Current dev was integrated before validation. The earlier stacked-head
+    evidence in the original PR body has been replaced by current-head GCP
+    validation evidence.
+delivery:
+  mode: inherit_branch_policy
+  continue_after_review: true
