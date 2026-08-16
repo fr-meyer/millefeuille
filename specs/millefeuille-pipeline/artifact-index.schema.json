@@ -103,7 +103,7 @@
             "enum": ["openkb", "pageindex", "condb", "chatindex", "other"]
           },
           "status": {
-            "enum": ["skipped", "previewed", "written", "failed", "needs-review"]
+            "enum": ["skipped", "previewed", "written", "failed", "needs-review", "not-started"]
           },
           "result_ref": {"type": "string"},
           "skip_reason": {"type": "string"}
@@ -116,7 +116,7 @@
       "additionalProperties": false,
       "properties": {
         "mode": {"enum": ["none", "preview", "approved-live"]},
-        "status": {"enum": ["not-planned", "previewed", "written", "skipped"]},
+        "status": {"enum": ["not-planned", "previewed", "written", "skipped", "failed", "needs-review", "manual-gate", "not-started"]},
         "plan_ref": {"type": "string"},
         "result_ref": {"type": "string"}
       }

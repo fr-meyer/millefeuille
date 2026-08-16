@@ -49,7 +49,7 @@
       "additionalProperties": false,
       "properties": {
         "lane": {"enum": ["openkb", "pageindex", "condb", "chatindex", "other"]},
-        "status": {"enum": ["skipped", "previewed", "written", "failed", "needs-review"]}
+        "status": {"enum": ["skipped", "previewed", "written", "failed", "needs-review", "not-started"]}
       }
     },
     "writtenLane": {
@@ -227,7 +227,7 @@
       "properties": {
         "state": {"enum": ["observed", "indexed-preview", "not-observed"]},
         "mode": {"enum": ["none", "preview", "approved-live"]},
-        "status": {"enum": ["not-planned", "previewed", "written", "skipped"]},
+        "status": {"enum": ["not-planned", "previewed", "written", "skipped", "failed", "needs-review", "manual-gate", "not-started"]},
         "completion": {"enum": ["live-result-required", "preview-complete", "not-applicable", "incomplete"]},
         "content_digest": {"$ref": "#/$defs/nullableDigest"},
         "result_content_digest": {"$ref": "#/$defs/nullableDigest"}

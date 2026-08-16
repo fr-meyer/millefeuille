@@ -86,6 +86,53 @@ class TestArtifactCli(unittest.TestCase):
         self.assertIn("Millefeuille status: needs-review", stdout.getvalue())
         self.assertIn("stage route: not-started", stdout.getvalue())
 
+    def test_incomplete_writeback_states_remain_valid_status_blockers(self):
+        for writeback_status in (
+            "failed",
+            "manual-gate",
+            "needs-review",
+            "not-started",
+        ):
+            with self.subTest(writeback_status=writeback_status):
+                payload = json.loads(BLOCKED_INDEX.read_text(encoding="utf-8"))
+                payload["zotero_writeback"] = {
+                    "mode": "preview",
+                    "status": writeback_status,
+                }
+                with tempfile.TemporaryDirectory() as tempdir:
+                    index_path = Path(tempdir) / "artifact-index.json"
+                    index_path.write_text(
+                        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8",
+                    )
+                    stdout = StringIO()
+                    stderr = StringIO()
+                    exit_code = run_artifact_cli(
+                        ["status", "--index", str(index_path), "--json"],
+                        stdout=stdout,
+                        stderr=stderr,
+                    )
+                    report = json.loads(stdout.getvalue())
+                    self.assertEqual(exit_code, 0, stderr.getvalue())
+                    self.assertEqual(
+                        report["zotero_writeback"]["status"], writeback_status
+                    )
+                    self.assertEqual(
+                        report["zotero_writeback"]["completion"], "incomplete"
+                    )
+                    self.assertIn(
+                        f"zotero_writeback preview: {writeback_status}",
+                        report["status"]["blocking_items"],
+                    )
+                    self.assertEqual(
+                        run_artifact_cli(
+                            ["status", "--index", str(index_path), "--strict"],
+                            stdout=StringIO(),
+                            stderr=StringIO(),
+                        ),
+                        2,
+                    )
+
     def test_status_command_does_not_require_zotero_environment(self):
         env = os.environ.copy()
         for name in ("ZOTERO_LIBRARY_ID", "ZOTERO_READ_KEY", "ZOTERO_WRITE_KEY"):

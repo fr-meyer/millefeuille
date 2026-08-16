@@ -24,10 +24,22 @@ INDEX_STATUSES = frozenset(
         "written",
         "failed",
         "needs-review",
+        "not-started",
     }
 )
 WRITEBACK_MODES = frozenset({"none", "preview", "approved-live"})
-WRITEBACK_STATUSES = frozenset({"not-planned", "previewed", "written", "skipped"})
+WRITEBACK_INCOMPLETE_STATUSES = frozenset(
+    {
+        "failed",
+        "manual-gate",
+        "needs-review",
+        "not-started",
+    }
+)
+WRITEBACK_STATUSES = (
+    frozenset({"not-planned", "previewed", "written", "skipped"})
+    | WRITEBACK_INCOMPLETE_STATUSES
+)
 
 BLOCKING_STAGE_STATUSES = frozenset(
     {
@@ -37,7 +49,8 @@ BLOCKING_STAGE_STATUSES = frozenset(
         StageStatus.MANUAL_GATE.value,
     }
 )
-BLOCKING_INDEX_STATUSES = frozenset({"failed", "needs-review"})
+BLOCKING_INDEX_STATUSES = frozenset({"failed", "needs-review", "not-started"})
+BLOCKING_WRITEBACK_STATUSES = WRITEBACK_INCOMPLETE_STATUSES
 
 
 def _require_mapping(value: Any, field_name: str) -> dict[str, Any]:
@@ -148,7 +161,11 @@ class ArtifactIndex:
 
         writeback_mode = str(self.zotero_writeback["mode"])
         writeback_status = str(self.zotero_writeback["status"])
-        if writeback_mode == "approved-live" and writeback_status != "written":
+        if (
+            writeback_status in BLOCKING_WRITEBACK_STATUSES
+            or writeback_mode == "approved-live"
+            and writeback_status != "written"
+        ):
             blocking_items.append(
                 f"zotero_writeback {writeback_mode}: {writeback_status}"
             )

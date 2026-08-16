@@ -101,6 +101,13 @@ the same object. A preview run can be `preview-complete`. An approved-live run
 can only be `observational-live-ready`; it is never reported as an unqualified
 or authoritative live completion.
 
+Recognized incomplete workflow states remain valid status observations rather
+than contract failures. Index lanes may report `not-started`; writeback may
+report `not-started`, `manual-gate`, `needs-review`, or `failed` for any mode.
+Each is emitted unchanged and added to `blocking_items`, so non-strict status
+returns the report and `--strict` returns `2`. Structurally incompatible
+terminal mode/status pairs still fail with exit code `3`.
+
 Exit codes are `0` for a valid observation, `2` with `--strict` when joined
 blockers remain, and `3` for a contract or safety failure. Repeated inspection
 has no filesystem effect.

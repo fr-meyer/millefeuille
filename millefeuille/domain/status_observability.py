@@ -14,7 +14,10 @@ import re
 import stat
 from typing import Any
 
-from millefeuille.domain.artifacts import ArtifactIndex
+from millefeuille.domain.artifacts import (
+    WRITEBACK_INCOMPLETE_STATUSES,
+    ArtifactIndex,
+)
 from millefeuille.domain.millefeuille import (
     AcceptanceSummaryRecord,
     ClassificationDecisionRecord,
@@ -890,15 +893,20 @@ def _join_writeback(
     status = str(indexed["status"])
     plan_ref = indexed.get("plan_ref")
     result_ref = indexed.get("result_ref")
-    if mode == "none" and status not in {"not-planned", "skipped"}:
-        raise MillefeuilleContractError("writeback none mode has invalid status")
-    if mode == "preview" and status != "previewed":
-        raise MillefeuilleContractError("writeback preview mode must be previewed")
-    if mode == "approved-live" and status not in {"written", "skipped"}:
-        raise MillefeuilleContractError(
-            "writeback approved-live mode has invalid status"
-        )
-    if mode in {"preview", "approved-live"} and not isinstance(plan_ref, str):
+    if status not in WRITEBACK_INCOMPLETE_STATUSES:
+        if mode == "none" and status not in {"not-planned", "skipped"}:
+            raise MillefeuilleContractError("writeback none mode has invalid status")
+        if mode == "preview" and status != "previewed":
+            raise MillefeuilleContractError("writeback preview mode must be previewed")
+        if mode == "approved-live" and status not in {"written", "skipped"}:
+            raise MillefeuilleContractError(
+                "writeback approved-live mode has invalid status"
+            )
+    if (
+        mode in {"preview", "approved-live"}
+        and status not in WRITEBACK_INCOMPLETE_STATUSES
+        and not isinstance(plan_ref, str)
+    ):
         raise MillefeuilleContractError("writeback mode must bind exact plan_ref")
     if status == "written" and not isinstance(result_ref, str):
         raise MillefeuilleContractError("written writeback must bind exact result_ref")
@@ -906,6 +914,8 @@ def _join_writeback(
         raise MillefeuilleContractError(
             "only approved-live writeback may bind result_ref"
         )
+    if status in WRITEBACK_INCOMPLETE_STATUSES:
+        blockers.append(f"zotero_writeback {mode}: {status}")
 
     record = _joined_artifact_record(
         context,

@@ -33,6 +33,10 @@ from tests.test_millefeuille_stage_cli import (
 )
 
 _SPEC_DIR = Path(__file__).resolve().parents[1] / "specs/millefeuille-pipeline"
+_BLOCKED_INDEX = (
+    Path(__file__).resolve().parents[1]
+    / "tests/fixtures/millefeuille_artifact_index/blocked/artifact-index.json"
+)
 
 _STATUS_ARTIFACTS = frozenset(
     {
@@ -923,6 +927,24 @@ class TestStatusSchemas(unittest.TestCase):
                 run_id=RUN_ID,
             )
             Draft202012Validator(schemas["status.schema.json"]).validate(status)
+
+            incomplete_index = _read_json(_BLOCKED_INDEX)
+            incomplete_index["indexes"][0]["status"] = "not-started"
+            incomplete_path = Path(tempdir) / "incomplete-artifact-index.json"
+            _write_json(incomplete_path, incomplete_index)
+            incomplete_status = build_status_report(index_path=incomplete_path)
+            self.assertIn(
+                "index openkb: not-started",
+                incomplete_status["status"]["blocking_items"],
+            )
+            self.assertEqual(
+                incomplete_status["index"]["lanes"],
+                [{"lane": "openkb", "status": "not-started"}],
+            )
+            Draft202012Validator(schemas["status.schema.json"]).validate(
+                incomplete_status
+            )
+
             observation = _observation_payload(
                 kind="zotero-live-state",
                 source_hash=str(

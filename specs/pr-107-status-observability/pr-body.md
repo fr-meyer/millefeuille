@@ -18,8 +18,10 @@
 - `.speculoos/tasks/pr-107-status-observability.yaml`
 - `README.md`
 - `millefeuille/cli/artifacts.py`
+- `millefeuille/domain/artifacts.py`
 - `millefeuille/domain/status_observability.py`
 - `specs/millefeuille-pipeline/README.md`
+- `specs/millefeuille-pipeline/artifact-index.schema.json`
 - `specs/millefeuille-pipeline/artifact-storage.md`
 - `specs/millefeuille-pipeline/cli-contract.md`
 - `specs/millefeuille-pipeline/completion-gate-result.schema.json`
@@ -36,9 +38,9 @@
 
 ## Validation
 
-- 31 focused status, artifact-command, and contract-artifact tests passed
-- all 534 repository tests passed with 8 expected platform skips
-- Ruff lint and format checks on the five changed Python files passed
+- 32 focused status, artifact-command, and contract-artifact tests passed
+- all 535 repository tests passed with 8 expected platform skips
+- Ruff lint and format checks on the six changed Python files passed
 - diff, private-data, task metadata, delivery-policy, and all commit-identity
   checks passed
 - Speculoos exact-task validation and publication checks passed

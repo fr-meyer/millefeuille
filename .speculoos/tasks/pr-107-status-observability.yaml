@@ -18,8 +18,10 @@ write_paths:
   - .speculoos/tasks/pr-107-status-observability.yaml
   - README.md
   - millefeuille/cli/artifacts.py
+  - millefeuille/domain/artifacts.py
   - millefeuille/domain/status_observability.py
   - specs/millefeuille-pipeline/README.md
+  - specs/millefeuille-pipeline/artifact-index.schema.json
   - specs/millefeuille-pipeline/artifact-storage.md
   - specs/millefeuille-pipeline/cli-contract.md
   - specs/millefeuille-pipeline/completion-gate-result.schema.json
@@ -63,7 +65,7 @@ validation:
   - ".venv/bin/python -m unittest tests.test_millefeuille_status_observability tests.test_millefeuille_artifact_commands tests.test_millefeuille_contract_artifacts"
   - ".venv/bin/python -m unittest discover -s tests"
   - ".venv/bin/ruff check ."
-  - ".venv/bin/ruff format --check millefeuille/cli/artifacts.py millefeuille/domain/status_observability.py tests/test_millefeuille_artifact_commands.py tests/test_millefeuille_contract_artifacts.py tests/test_millefeuille_status_observability.py"
+  - ".venv/bin/ruff format --check millefeuille/cli/artifacts.py millefeuille/domain/artifacts.py millefeuille/domain/status_observability.py tests/test_millefeuille_artifact_commands.py tests/test_millefeuille_contract_artifacts.py tests/test_millefeuille_status_observability.py"
   - "git diff --check"
   - "speculoos validate --task pr-107-status-observability --validation \"git diff --check\" --json"
   - "speculoos publish-check --task pr-107-status-observability --pr-body specs/pr-107-status-observability/pr-body.md --commit-message specs/pr-107-status-observability/commit-message.txt --json"
