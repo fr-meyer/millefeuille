@@ -11,6 +11,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from copy import deepcopy
 from datetime import datetime
 import hashlib
+from itertools import islice
 import json
 from pathlib import Path
 import re
@@ -28,6 +29,12 @@ TAXONOMY_APPLICATION_SCHEMA_VERSION = "millefeuille-taxonomy-application/v0.1"
 
 REQUIRED_REVIEW_ROLES = frozenset({"taxonomy-owner", "qa-lead", "operations-lead"})
 OPTIONAL_REVIEW_ROLES = frozenset({"subject-matter-reviewer"})
+
+MAX_TAXONOMY_ENTRIES = 512
+MAX_TAXONOMY_ENTRY_RULES = 32
+MAX_TAXONOMY_AFFECTED_ENTRY_IDS = MAX_TAXONOMY_ENTRIES
+MAX_TAXONOMY_EVIDENCE_REFS = 64
+MAX_TAXONOMY_REVIEWS = len(REQUIRED_REVIEW_ROLES | OPTIONAL_REVIEW_ROLES)
 
 _SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 _SAFE_ENTRY_ID = re.compile(r"[A-Za-z][A-Za-z0-9._-]{0,63}")
@@ -71,6 +78,11 @@ def seal_taxonomy_registry(payload: Mapping[str, Any]) -> dict[str, Any]:
     entries = draft.get("entries")
     if not isinstance(entries, list):
         raise MillefeuilleContractError("taxonomy registry entries must be an array")
+    if len(entries) > MAX_TAXONOMY_ENTRIES:
+        raise MillefeuilleContractError(
+            "taxonomy registry entries must contain at most "
+            f"{MAX_TAXONOMY_ENTRIES} entries"
+        )
     canonical_entries: list[dict[str, Any]] = []
     for index, value in enumerate(entries):
         entry = _mapping_copy(value, f"taxonomy entry {index}")
@@ -84,6 +96,7 @@ def seal_taxonomy_registry(payload: Mapping[str, Any]) -> dict[str, Any]:
                 entry[field_name] = _canonical_string_sequence(
                     field_value,
                     f"taxonomy entry {index} {field_name}",
+                    maximum=MAX_TAXONOMY_ENTRY_RULES,
                 )
         canonical_entries.append(entry)
     draft["entries"] = sorted(
@@ -105,6 +118,7 @@ def validate_taxonomy_registry(payload: Mapping[str, Any]) -> dict[str, Any]:
             "registry_id",
             "taxonomy_version",
             "previous_version",
+            "previous_content_identity",
             "status",
             "governing_basis",
             "owner_id",
@@ -127,6 +141,21 @@ def validate_taxonomy_registry(payload: Mapping[str, Any]) -> dict[str, Any]:
             raise MillefeuilleContractError(
                 "taxonomy registry previous_version must differ from taxonomy_version"
             )
+    previous_content_identity = registry["previous_content_identity"]
+    if previous_version is None:
+        if previous_content_identity is not None:
+            raise MillefeuilleContractError(
+                "root taxonomy registry previous_content_identity must be null"
+            )
+    else:
+        if previous_content_identity is None:
+            raise MillefeuilleContractError(
+                "non-root taxonomy registry requires previous_content_identity"
+            )
+        _require_identity(
+            previous_content_identity,
+            "taxonomy registry previous_content_identity",
+        )
     if registry["status"] not in {"draft", "released", "deprecated", "archived"}:
         raise MillefeuilleContractError("taxonomy registry status is unsupported")
     _require_string(registry["governing_basis"], "taxonomy registry governing_basis")
@@ -136,6 +165,11 @@ def validate_taxonomy_registry(payload: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(raw_entries, list) or not raw_entries:
         raise MillefeuilleContractError(
             "taxonomy registry entries must be a non-empty array"
+        )
+    if len(raw_entries) > MAX_TAXONOMY_ENTRIES:
+        raise MillefeuilleContractError(
+            "taxonomy registry entries must contain at most "
+            f"{MAX_TAXONOMY_ENTRIES} entries"
         )
     entries = [
         _validate_taxonomy_entry(value, index=index)
@@ -381,10 +415,13 @@ def create_taxonomy_change_proposal(
             affected_entry_ids,
             "taxonomy change proposal affected_entry_ids",
             safe_entry_ids=True,
+            maximum=MAX_TAXONOMY_AFFECTED_ENTRY_IDS,
         ),
         "reason": reason,
         "evidence_refs": _canonical_string_sequence(
-            evidence_refs, "taxonomy change proposal evidence_refs"
+            evidence_refs,
+            "taxonomy change proposal evidence_refs",
+            maximum=MAX_TAXONOMY_EVIDENCE_REFS,
         ),
         "impact": {
             "risk": impact_risk,
@@ -463,6 +500,17 @@ def validate_taxonomy_change_proposal(
     base_binding = _validate_registry_binding(
         proposal["base_registry"], "taxonomy change proposal base_registry"
     )
+    validated_base: dict[str, Any] | None = None
+    if base_registry is not None:
+        validated_base = validate_taxonomy_registry(base_registry)
+        if validated_base["status"] != "released":
+            raise MillefeuilleContractError(
+                "taxonomy change base registry must be released"
+            )
+        if _registry_binding(validated_base) != base_binding:
+            raise MillefeuilleContractError(
+                "taxonomy change proposal base registry identity drift"
+            )
     candidate = validate_taxonomy_registry(proposal["candidate_registry"])
     if candidate["status"] != "released":
         raise MillefeuilleContractError(
@@ -478,17 +526,23 @@ def validate_taxonomy_change_proposal(
         raise MillefeuilleContractError(
             "taxonomy change candidate previous_version must equal the base version"
         )
+    if candidate["previous_content_identity"] != base_binding["content_identity"]:
+        raise MillefeuilleContractError(
+            "taxonomy change candidate must bind the exact base content identity"
+        )
     affected_entry_ids = _require_sorted_unique_strings(
         proposal["affected_entry_ids"],
         "taxonomy change proposal affected_entry_ids",
         minimum=1,
         safe_entry_ids=True,
+        maximum=MAX_TAXONOMY_AFFECTED_ENTRY_IDS,
     )
     _require_string(proposal["reason"], "taxonomy change proposal reason")
     evidence_refs = _require_sorted_unique_strings(
         proposal["evidence_refs"],
         "taxonomy change proposal evidence_refs",
         minimum=1,
+        maximum=MAX_TAXONOMY_EVIDENCE_REFS,
     )
     impact = _mapping_copy(proposal["impact"], "taxonomy change proposal impact")
     _require_exact_fields(
@@ -558,20 +612,12 @@ def validate_taxonomy_change_proposal(
     )
     _require_content_identity(proposal, "taxonomy change proposal")
 
-    if base_registry is not None:
-        base = validate_taxonomy_registry(base_registry)
-        if base["status"] != "released":
-            raise MillefeuilleContractError(
-                "taxonomy change base registry must be released"
-            )
-        if _registry_binding(base) != base_binding:
-            raise MillefeuilleContractError(
-                "taxonomy change proposal base registry identity drift"
-            )
+    if validated_base is not None:
         _validate_registry_transition(
-            base=base,
+            base=validated_base,
             candidate=candidate,
             affected_entry_ids=affected_entry_ids,
+            operation=str(proposal["operation"]),
         )
 
     proposal["base_registry"] = base_binding
@@ -727,9 +773,15 @@ def apply_taxonomy_change(
     base = validate_taxonomy_registry(base_registry)
     validated_proposal = validate_taxonomy_change_proposal(proposal, base_registry=base)
     candidate = validated_proposal["candidate_registry"]
+    review_inputs = list(islice(iter(reviews), MAX_TAXONOMY_REVIEWS + 1))
+    if len(review_inputs) > MAX_TAXONOMY_REVIEWS:
+        raise MillefeuilleContractError(
+            "taxonomy change application accepts at most "
+            f"{MAX_TAXONOMY_REVIEWS} governed reviews"
+        )
     validated_reviews = [
         validate_taxonomy_change_review(review, proposal=validated_proposal)
-        for review in reviews
+        for review in review_inputs
     ]
     _require_approved_reviews(
         validated_reviews,
@@ -881,6 +933,7 @@ def validate_taxonomy_application_record(
         "taxonomy application review_content_identities",
         minimum=len(REQUIRED_REVIEW_ROLES),
         identities=True,
+        maximum=MAX_TAXONOMY_REVIEWS,
     )
     _require_const(
         record["active_batch_policy"],
@@ -930,6 +983,7 @@ def _validate_taxonomy_entry(value: Any, *, index: int) -> dict[str, Any]:
             entry[field_name],
             f"taxonomy entry {index} {field_name}",
             minimum=minimum,
+            maximum=MAX_TAXONOMY_ENTRY_RULES,
         )
     if entry["status"] not in {"active", "deprecated"}:
         raise MillefeuilleContractError(f"taxonomy entry {index} status is unsupported")
@@ -950,8 +1004,14 @@ def _validate_registry_transition(
     base: Mapping[str, Any],
     candidate: Mapping[str, Any],
     affected_entry_ids: Sequence[str],
+    operation: str,
 ) -> None:
-    for field_name in ("registry_id", "governing_basis", "owner_id"):
+    immutable_fields = (
+        ("registry_id",)
+        if operation == "rollback"
+        else ("registry_id", "governing_basis", "owner_id")
+    )
+    for field_name in immutable_fields:
         if base[field_name] != candidate[field_name]:
             raise MillefeuilleContractError(
                 f"taxonomy change cannot mutate registry {field_name}"
@@ -983,6 +1043,106 @@ def _validate_registry_transition(
         )
     if not actual_affected:
         raise MillefeuilleContractError("taxonomy change candidate is a no-op")
+    _validate_operation_semantics(
+        operation=operation,
+        base_entries=base_entries,
+        candidate_entries=candidate_entries,
+    )
+
+
+def _validate_operation_semantics(
+    *,
+    operation: str,
+    base_entries: Mapping[str, Mapping[str, Any]],
+    candidate_entries: Mapping[str, Mapping[str, Any]],
+) -> None:
+    """Bind each specific operation name to an enforceable registry diff shape."""
+
+    if operation in {"mixed", "rollback"}:
+        return
+    added_ids = set(candidate_entries) - set(base_entries)
+    changed_existing = {
+        entry_id: _changed_entry_fields(
+            base_entries[entry_id], candidate_entries[entry_id]
+        )
+        for entry_id in set(base_entries) & set(candidate_entries)
+        if base_entries[entry_id] != candidate_entries[entry_id]
+    }
+
+    def is_deprecation_only(entry_id: str) -> bool:
+        before = base_entries[entry_id]
+        after = candidate_entries[entry_id]
+        fields = changed_existing[entry_id]
+        return (
+            before["status"] == "active"
+            and after["status"] == "deprecated"
+            and fields <= {"status", "replacement_id"}
+        )
+
+    if operation == "add":
+        valid = bool(added_ids) and not changed_existing
+    elif operation == "rename":
+        valid = (
+            not added_ids
+            and bool(changed_existing)
+            and all(fields == {"label"} for fields in changed_existing.values())
+        )
+    elif operation == "clarify":
+        clarification_fields = {
+            "definition",
+            "include_when",
+            "exclude_when",
+            "boundary_notes",
+        }
+        valid = (
+            not added_ids
+            and bool(changed_existing)
+            and all(
+                bool(fields) and fields <= clarification_fields
+                for fields in changed_existing.values()
+            )
+        )
+    elif operation == "deprecate":
+        valid = (
+            not added_ids
+            and bool(changed_existing)
+            and all(is_deprecation_only(entry_id) for entry_id in changed_existing)
+        )
+    elif operation == "split":
+        valid = (
+            len(added_ids) >= 2
+            and bool(changed_existing)
+            and all(is_deprecation_only(entry_id) for entry_id in changed_existing)
+        )
+    elif operation == "merge":
+        valid = len(changed_existing) >= 2 and all(
+            is_deprecation_only(entry_id) for entry_id in changed_existing
+        )
+        if valid:
+            replacement_ids = {
+                candidate_entries[entry_id]["replacement_id"]
+                for entry_id in changed_existing
+            }
+            valid = (
+                len(replacement_ids) == 1
+                and None not in replacement_ids
+                and added_ids <= replacement_ids
+            )
+    else:  # The public validator rejects unknown operations before this point.
+        return
+    if not valid:
+        raise MillefeuilleContractError(
+            f"taxonomy change operation {operation} does not match the exact "
+            "registry diff"
+        )
+
+
+def _changed_entry_fields(
+    before: Mapping[str, Any], after: Mapping[str, Any]
+) -> set[str]:
+    return {
+        field_name for field_name in before if before[field_name] != after[field_name]
+    }
 
 
 def _validate_rollback_candidate(
@@ -996,6 +1156,13 @@ def _validate_rollback_candidate(
         or base["registry_id"] != source["registry_id"]
     ):
         raise MillefeuilleContractError("rollback candidate registry_id drift")
+    if (
+        base["previous_version"] != source["taxonomy_version"]
+        or base["previous_content_identity"] != source["content_identity"]
+    ):
+        raise MillefeuilleContractError(
+            "rollback source is not the exact content-addressed predecessor of the base"
+        )
     for field_name in ("governing_basis", "owner_id"):
         if candidate[field_name] != source[field_name]:
             raise MillefeuilleContractError(
@@ -1212,12 +1379,17 @@ def _require_sorted_unique_strings(
     label: str,
     *,
     minimum: int,
+    maximum: int,
     safe_entry_ids: bool = False,
     identities: bool = False,
 ) -> list[str]:
     if not isinstance(value, list) or len(value) < minimum:
         raise MillefeuilleContractError(
             f"{label} must be an array with at least {minimum} entries"
+        )
+    if len(value) > maximum:
+        raise MillefeuilleContractError(
+            f"{label} must contain at most {maximum} entries"
         )
     normalized: list[str] = []
     for entry in value:
@@ -1239,9 +1411,14 @@ def _canonical_string_sequence(
     label: str,
     *,
     safe_entry_ids: bool = False,
+    maximum: int,
 ) -> list[str]:
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
         raise MillefeuilleContractError(f"{label} must be an array")
+    if len(value) > maximum:
+        raise MillefeuilleContractError(
+            f"{label} must contain at most {maximum} entries"
+        )
     normalized = [
         (
             _require_entry_id(entry, f"{label} entry")

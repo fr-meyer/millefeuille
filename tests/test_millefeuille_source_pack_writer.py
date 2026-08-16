@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from millefeuille.cli.source_pack import run_source_pack_cli
 from millefeuille.domain.artifact_writer import write_dry_run_artifacts
@@ -19,6 +20,7 @@ from millefeuille.domain.card_fixtures import (
     load_paper_card,
     write_cards_from_evidence,
 )
+from millefeuille.domain.card_index_contract import canonical_json_bytes
 from millefeuille.domain.config import ArtifactExportConfig
 from millefeuille.domain.extraction_fixtures import (
     load_native_extraction_sidecar,
@@ -27,6 +29,8 @@ from millefeuille.domain.extraction_fixtures import (
     write_ocr_extractions_from_evidence,
 )
 from millefeuille.domain.index_fixtures import (
+    CARD_INDEX_TRANSACTION_MAX_CARD_BYTES,
+    CARD_INDEX_TRANSACTION_ROOT_REF,
     load_retrieval_index_status,
     write_indexes_from_evidence,
 )
@@ -376,8 +380,9 @@ def _write_card_fixture_json(tempdir: str) -> Path:
     card_path.write_text(
         json.dumps(
             {
-                "schema_version": "millefeuille-paper-card/v0.1",
+                "schema_version": "millefeuille-paper-card/v0.2",
                 "paper_id": "fixture-paper",
+                "run_id": "fixture-run",
                 "identity": {
                     "title": "Fixture Paper",
                     "authors": ["Alice Example", "Bob Example"],
@@ -391,7 +396,13 @@ def _write_card_fixture_json(tempdir: str) -> Path:
                 "limitations": "Fixture limitations.",
                 "classification_clues": ["benchmark", "vision"],
                 "evidence_refs": ["fixture-summary.json"],
-                "index_status": [{"lane": "openkb", "status": "skipped"}],
+                "index_state": {
+                    "phase": "planned",
+                    "lanes": [
+                        {"lane": "openkb", "status": "pending"},
+                        {"lane": "pageindex", "status": "pending"},
+                    ],
+                },
                 "model_provenance": {"profile_id": "fixture-card"},
             },
             indent=2,
@@ -492,6 +503,80 @@ def _write_index_evidence_json(tempdir: str, index_status_path: Path) -> Path:
         encoding="utf-8",
     )
     return evidence_path
+
+
+def _prepare_card_index_fixture(
+    tempdir: str,
+) -> tuple[Path, Path, Path, Path]:
+    source_path = _write_recovered_pdf(tempdir)
+    source_pack_root = Path(tempdir) / "source-packs"
+    result = write_source_pack_from_recovered_pdf(
+        evidence=_evidence(source_path),
+        source_pack_root=source_pack_root,
+        created_at="2026-07-13T12:00:00+00:00",
+    )
+    write_native_extractions_from_evidence(
+        evidence_path=_write_native_extraction_evidence_json(
+            tempdir,
+            _write_markdown(tempdir, "native-fulltext.md", "Native fixture page 1\n"),
+        ),
+        source_pack_root=source_pack_root,
+    )
+    write_ocr_extractions_from_evidence(
+        evidence_path=_write_ocr_extraction_evidence_json(
+            tempdir,
+            _write_markdown(tempdir, "ocr-fulltext.md", "OCR fixture page 1\n"),
+        ),
+        source_pack_root=source_pack_root,
+    )
+    write_route_selections_from_evidence(
+        evidence_path=_write_route_selection_evidence_json(
+            tempdir,
+            _write_markdown(
+                tempdir,
+                "selected-fulltext.md",
+                "Merged fixture page 1\n",
+            ),
+        ),
+        source_pack_root=source_pack_root,
+    )
+    write_structures_from_evidence(
+        evidence_path=_write_structure_evidence_json(
+            tempdir,
+            _write_structure_payload_json(tempdir),
+        ),
+        source_pack_root=source_pack_root,
+    )
+    _write_markdown(tempdir, "page-1.md", "Page 1 summary.\n")
+    _write_markdown(tempdir, "full-paper.md", "Full paper summary.\n")
+    write_summaries_from_evidence(
+        evidence_path=_write_summary_evidence_json(
+            tempdir,
+            _write_summary_fixture_json(tempdir),
+        ),
+        source_pack_root=source_pack_root,
+        run_id="run-fixture",
+    )
+    card_evidence_path = _write_card_evidence_json(
+        tempdir,
+        _write_card_fixture_json(tempdir),
+        _write_markdown(
+            tempdir,
+            "paper-card.md",
+            "# Fixture Paper Card\n\nA concise thesis.\n",
+        ),
+    )
+    write_cards_from_evidence(
+        evidence_path=card_evidence_path,
+        source_pack_root=source_pack_root,
+        run_id="run-fixture",
+    )
+    index_evidence_path = _write_index_evidence_json(
+        tempdir,
+        _write_index_fixture_json(tempdir),
+    )
+    run_dir = result.source_pack_dir / "analyses" / "millefeuille" / "run-fixture"
+    return source_pack_root, run_dir, card_evidence_path, index_evidence_path
 
 
 def _make_item() -> DiscoveredItem:
@@ -1811,14 +1896,34 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                 tempdir,
                 _write_index_fixture_json(tempdir),
             )
+            card_path = (
+                result.source_pack_dir
+                / "analyses"
+                / "millefeuille"
+                / "run-fixture"
+                / "cards"
+                / "paper-card.json"
+            )
+            planned_card_payload = load_paper_card(card_path)
+            planned_card_bytes = card_path.read_bytes()
 
             write_results = write_indexes_from_evidence(
                 evidence_path=index_evidence_path,
                 source_pack_root=source_pack_root,
                 run_id="run-fixture",
             )
+            observed_card_bytes = card_path.read_bytes()
             rerun_results = write_indexes_from_evidence(
                 evidence_path=index_evidence_path,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )
+            card_rerun_results = write_cards_from_evidence(
+                evidence_path=_write_card_evidence_json(
+                    tempdir,
+                    _write_card_fixture_json(tempdir),
+                    Path(tempdir) / "paper-card.md",
+                ),
                 source_pack_root=source_pack_root,
                 run_id="run-fixture",
             )
@@ -1826,6 +1931,24 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
             self.assertEqual(len(write_results), 1)
             self.assertEqual(write_results[0].status, "created")
             self.assertEqual(rerun_results[0].status, "existing")
+            self.assertEqual(card_rerun_results[0].status, "existing")
+            self.assertEqual(card_path.read_bytes(), observed_card_bytes)
+            run_dir = card_path.parents[1]
+            transaction_root = run_dir / CARD_INDEX_TRANSACTION_ROOT_REF
+            transaction_dirs = [
+                path for path in transaction_root.iterdir() if path.is_dir()
+            ]
+            self.assertEqual(len(transaction_dirs), 1)
+            transaction_dir = transaction_dirs[0]
+            displaced_name = (
+                "displaced-card.json" if os.name == "nt" else "card-exchange.json"
+            )
+            self.assertEqual(
+                (transaction_dir / displaced_name).read_bytes(),
+                planned_card_bytes,
+            )
+            self.assertFalse(list((run_dir / "cards").glob(".paper-card.json.*")))
+            self.assertFalse(list((run_dir / "index").glob(".index-status.json.*")))
             index_status_path = (
                 result.source_pack_dir
                 / "analyses"
@@ -1835,6 +1958,10 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                 / "index-status.json"
             )
             payload = load_retrieval_index_status(index_status_path)
+            self.assertEqual(
+                (transaction_dir / "index-status.json").read_bytes(),
+                index_status_path.read_bytes(),
+            )
             self.assertEqual(payload["paper_id"], result.paper_id)
             self.assertEqual(payload["run_id"], "run-fixture")
             self.assertEqual(payload["source_hash"], f"sha256:{FIXTURE_SHA256}")
@@ -1852,6 +1979,534 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                 payload["lanes"][1]["chunking_profile"]["strategy"],
                 "section",
             )
+            card_payload = load_paper_card(card_path)
+            planned_without_state = dict(planned_card_payload)
+            observed_without_state = dict(card_payload)
+            planned_without_state.pop("index_state")
+            observed_without_state.pop("index_state")
+            self.assertEqual(observed_without_state, planned_without_state)
+            self.assertEqual(card_payload["identity"]["title"], "Fixture Paper")
+            self.assertEqual(card_payload["run_id"], "run-fixture")
+            self.assertEqual(
+                card_payload["index_state"],
+                {
+                    "phase": "observed",
+                    "status_ref": "../index/index-status.json",
+                    "lanes": [
+                        {"lane": "openkb", "status": "skipped"},
+                        {"lane": "pageindex", "status": "previewed"},
+                    ],
+                },
+            )
+            original_index_bytes = index_status_path.read_bytes()
+            conflicting_card = dict(card_payload)
+            conflicting_card["index_state"] = {
+                **card_payload["index_state"],
+                "lanes": [
+                    {"lane": "openkb", "status": "written"},
+                    {"lane": "pageindex", "status": "previewed"},
+                ],
+            }
+            card_path.write_bytes(canonical_json_bytes(conflicting_card))
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "observed index_state conflicts",
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence_path,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertEqual(index_status_path.read_bytes(), original_index_bytes)
+
+    def test_index_fixture_rejects_legacy_card_without_source_hash(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            card_path = run_dir / "cards" / "paper-card.json"
+            legacy = load_paper_card(card_path)
+            legacy["schema_version"] = "millefeuille-paper-card/v0.1"
+            legacy.pop("run_id")
+            legacy.pop("index_state")
+            legacy["index_status"] = []
+            legacy["identity"]["source_hash"] = None
+            card_path.write_bytes(canonical_json_bytes(legacy))
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "source_hash is required for card/index join",
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertFalse((run_dir / "index" / "index-status.json").exists())
+            self.assertIsNone(load_paper_card(card_path)["identity"]["source_hash"])
+
+    def test_observed_card_rerun_requires_exact_canonical_index_join(self):
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            write_indexes_from_evidence(
+                evidence_path=index_evidence,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )
+            card_path = run_dir / "cards" / "paper-card.json"
+            index_path = run_dir / "index" / "index-status.json"
+            observed_bytes = card_path.read_bytes()
+            tampered = json.loads(observed_bytes)
+            tampered["index_state"]["lanes"][0]["status"] = "written"
+            card_path.write_bytes(canonical_json_bytes(tampered))
+
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "observed index_state conflicts",
+            ):
+                write_cards_from_evidence(
+                    evidence_path=card_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            card_path.write_bytes(observed_bytes)
+            index_path.unlink()
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "retrieval index status",
+            ):
+                write_cards_from_evidence(
+                    evidence_path=card_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+    def test_card_refresh_detects_mutation_after_last_precommit_read(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            card_path = run_dir / "cards" / "paper-card.json"
+            concurrent = json.loads(card_path.read_bytes())
+            concurrent["one_line_thesis"] = "Concurrent writer value."
+            concurrent_bytes = (
+                json.dumps(concurrent, indent=2, sort_keys=True) + "\n"
+            ).encode("utf-8")
+
+            def mutate_after_last_read(_plan):
+                card_path.write_bytes(concurrent_bytes)
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._before_card_exchange",
+                    side_effect=mutate_after_last_read,
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "atomic index-state commit boundary",
+                ),
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertEqual(card_path.read_bytes(), concurrent_bytes)
+            self.assertTrue((run_dir / "index" / "index-status.json").is_file())
+            transaction_dirs = list(
+                (run_dir / CARD_INDEX_TRANSACTION_ROOT_REF).iterdir()
+            )
+            self.assertEqual(len(transaction_dirs), 1)
+            rejected = transaction_dirs[0] / "card-exchange.json"
+            self.assertTrue(rejected.is_file())
+            self.assertEqual(
+                json.loads(rejected.read_text(encoding="utf-8"))["index_state"][
+                    "phase"
+                ],
+                "observed",
+            )
+
+    def test_card_refresh_rejects_hardlinked_staged_replacement(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            card_path = run_dir / "cards" / "paper-card.json"
+            planned_bytes = card_path.read_bytes()
+            alias_path = run_dir / "aliased-card.json"
+
+            def hardlink_replacement_at_preexchange(_plan):
+                transaction_dirs = list(
+                    (run_dir / CARD_INDEX_TRANSACTION_ROOT_REF).iterdir()
+                )
+                self.assertEqual(len(transaction_dirs), 1)
+                os.link(
+                    transaction_dirs[0] / "card-exchange.json",
+                    alias_path,
+                )
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._before_card_exchange",
+                    side_effect=hardlink_replacement_at_preexchange,
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "card replacement must be singly linked",
+                ),
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertEqual(card_path.read_bytes(), planned_bytes)
+            self.assertTrue(alias_path.is_file())
+            self.assertTrue((run_dir / "index" / "index-status.json").is_file())
+
+    def test_rollback_rejects_displaced_recovery_name_swap(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            card_path = run_dir / "cards" / "paper-card.json"
+            concurrent = json.loads(card_path.read_bytes())
+            concurrent["one_line_thesis"] = "Concurrent writer value."
+            concurrent_bytes = canonical_json_bytes(concurrent)
+            attacker_bytes = b"attacker replacement at displaced name\n"
+            preserved_paths: list[Path] = []
+
+            def mutate_after_last_read(_plan):
+                card_path.write_bytes(concurrent_bytes)
+
+            def swap_displaced_name(displaced):
+                preserved_path = displaced.path.with_name(
+                    "operator-preserved-card.json"
+                )
+                os.replace(displaced.path, preserved_path)
+                displaced.path.write_bytes(attacker_bytes)
+                preserved_paths.append(preserved_path)
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._before_card_exchange",
+                    side_effect=mutate_after_last_read,
+                ),
+                patch(
+                    "millefeuille.domain.index_fixtures._before_card_rollback",
+                    side_effect=swap_displaced_name,
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "captured displaced paper card changed before rollback",
+                ),
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertEqual(len(preserved_paths), 1)
+            self.assertEqual(preserved_paths[0].read_bytes(), concurrent_bytes)
+            displaced_path = preserved_paths[0].with_name("displaced-card.json")
+            if os.name != "nt":
+                displaced_path = preserved_paths[0].with_name("card-exchange.json")
+            self.assertEqual(displaced_path.read_bytes(), attacker_bytes)
+            self.assertEqual(
+                load_paper_card(card_path)["index_state"]["phase"],
+                "observed",
+            )
+
+    def test_oversized_displaced_card_fails_bounded_capture(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            card_path = run_dir / "cards" / "paper-card.json"
+            oversized_bytes = b"x" * (CARD_INDEX_TRANSACTION_MAX_CARD_BYTES + 1)
+
+            def grow_after_last_read(_plan):
+                card_path.write_bytes(oversized_bytes)
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._before_card_exchange",
+                    side_effect=grow_after_last_read,
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "could not securely capture",
+                ) as raised,
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertIsNotNone(raised.exception.__cause__)
+            self.assertIn(
+                "byte card transaction limit",
+                str(raised.exception.__cause__),
+            )
+            transaction_dirs = list(
+                (run_dir / CARD_INDEX_TRANSACTION_ROOT_REF).iterdir()
+            )
+            self.assertEqual(len(transaction_dirs), 1)
+            displaced_name = (
+                "displaced-card.json" if os.name == "nt" else "card-exchange.json"
+            )
+            self.assertEqual(
+                (transaction_dirs[0] / displaced_name).stat().st_size,
+                len(oversized_bytes),
+            )
+            self.assertEqual(
+                load_paper_card(card_path)["index_state"]["phase"],
+                "observed",
+            )
+
+    def test_rollback_validates_restored_card_after_atomic_restore(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            card_path = run_dir / "cards" / "paper-card.json"
+            concurrent = json.loads(card_path.read_bytes())
+            concurrent["one_line_thesis"] = "Concurrent writer value."
+            concurrent_bytes = canonical_json_bytes(concurrent)
+            post_restore_bytes = b"hostile post-restore mutation\n"
+
+            def mutate_after_last_read(_plan):
+                card_path.write_bytes(concurrent_bytes)
+
+            def mutate_after_restore(_displaced):
+                card_path.write_bytes(post_restore_bytes)
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._before_card_exchange",
+                    side_effect=mutate_after_last_read,
+                ),
+                patch(
+                    "millefeuille.domain.index_fixtures._after_card_rollback",
+                    side_effect=mutate_after_restore,
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "rollback did not restore the exact displaced entry",
+                ),
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertEqual(card_path.read_bytes(), post_restore_bytes)
+            transaction_dirs = list(
+                (run_dir / CARD_INDEX_TRANSACTION_ROOT_REF).iterdir()
+            )
+            self.assertEqual(len(transaction_dirs), 1)
+            self.assertEqual(
+                json.loads((transaction_dirs[0] / "card-exchange.json").read_bytes())[
+                    "index_state"
+                ]["phase"],
+                "observed",
+            )
+
+    def test_concurrent_index_creation_is_never_overwritten(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            card_path = run_dir / "cards" / "paper-card.json"
+            planned_bytes = card_path.read_bytes()
+            index_path = run_dir / "index" / "index-status.json"
+            concurrent_bytes = b'{"concurrent":"index"}\n'
+
+            def create_concurrent_destination(_src, dst):
+                Path(dst).write_bytes(concurrent_bytes)
+                raise FileExistsError
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._publish_index_no_replace",
+                    side_effect=create_concurrent_destination,
+                ),
+                self.assertRaises(MillefeuilleContractError),
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertEqual(index_path.read_bytes(), concurrent_bytes)
+            self.assertEqual(card_path.read_bytes(), planned_bytes)
+
+    def test_index_recovery_mutation_cannot_change_canonical_index(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            write_indexes_from_evidence(
+                evidence_path=index_evidence,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )
+
+            index_path = run_dir / "index" / "index-status.json"
+            canonical_bytes = index_path.read_bytes()
+            transaction_dirs = list(
+                (run_dir / CARD_INDEX_TRANSACTION_ROOT_REF).iterdir()
+            )
+            self.assertEqual(len(transaction_dirs), 1)
+            recovery_path = transaction_dirs[0] / "index-status.json"
+            self.assertEqual(recovery_path.read_bytes(), canonical_bytes)
+            self.assertNotEqual(
+                (recovery_path.stat().st_dev, recovery_path.stat().st_ino),
+                (index_path.stat().st_dev, index_path.stat().st_ino),
+            )
+
+            recovery_path.write_bytes(b'{"mutated":"recovery"}\n')
+
+            self.assertEqual(index_path.read_bytes(), canonical_bytes)
+            self.assertEqual(
+                load_paper_card(run_dir / "cards" / "paper-card.json")[
+                    "index_state"
+                ]["phase"],
+                "observed",
+            )
+
+    def test_partial_staged_write_can_retry_successfully(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+
+            def write_partial_then_fail(fd, payload, **_kwargs):
+                os.write(fd, payload[: max(1, len(payload) // 2)])
+                raise OSError("simulated partial staged write")
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._write_staged_bytes",
+                    side_effect=write_partial_then_fail,
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "incomplete temporary retained",
+                ),
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            result = write_indexes_from_evidence(
+                evidence_path=index_evidence,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )[0]
+            self.assertEqual(result.status, "created")
+            self.assertEqual(
+                load_paper_card(run_dir / "cards" / "paper-card.json")[
+                    "index_state"
+                ]["phase"],
+                "observed",
+            )
+
+    def test_staged_fsync_failure_can_retry_successfully(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._fsync_staged_file",
+                    side_effect=OSError("simulated staged fsync failure"),
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "incomplete temporary retained",
+                ),
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            result = write_indexes_from_evidence(
+                evidence_path=index_evidence,
+                source_pack_root=source_pack_root,
+                run_id="run-fixture",
+            )[0]
+            self.assertEqual(result.status, "created")
+            self.assertEqual(
+                load_paper_card(run_dir / "cards" / "paper-card.json")[
+                    "index_state"
+                ]["phase"],
+                "observed",
+            )
+
+    def test_interrupted_exchange_preserves_card_and_drifted_transaction_entry(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            source_pack_root, run_dir, _card_evidence, index_evidence = (
+                _prepare_card_index_fixture(tempdir)
+            )
+            card_path = run_dir / "cards" / "paper-card.json"
+            planned_bytes = card_path.read_bytes()
+
+            with (
+                patch(
+                    "millefeuille.domain.index_fixtures._atomic_capture_replace",
+                    side_effect=MillefeuilleContractError(
+                        "simulated interrupted exchange"
+                    ),
+                ),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "simulated interrupted exchange",
+                ),
+            ):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertEqual(card_path.read_bytes(), planned_bytes)
+            transaction_dirs = list(
+                (run_dir / CARD_INDEX_TRANSACTION_ROOT_REF).iterdir()
+            )
+            self.assertEqual(len(transaction_dirs), 1)
+            recovery_entry = transaction_dirs[0] / "card-exchange.json"
+            self.assertTrue(recovery_entry.is_file())
+            external_bytes = b"external replacement at recovery name\n"
+            recovery_entry.write_bytes(external_bytes)
+
+            with self.assertRaises(MillefeuilleContractError):
+                write_indexes_from_evidence(
+                    evidence_path=index_evidence,
+                    source_pack_root=source_pack_root,
+                    run_id="run-fixture",
+                )
+
+            self.assertEqual(recovery_entry.read_bytes(), external_bytes)
+            self.assertEqual(card_path.read_bytes(), planned_bytes)
 
     def test_index_fixture_requires_paper_card(self):
         with tempfile.TemporaryDirectory() as tempdir:

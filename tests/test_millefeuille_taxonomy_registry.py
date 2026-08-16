@@ -13,6 +13,11 @@ from referencing import Registry, Resource
 from millefeuille.cli.taxonomy import run_taxonomy_cli
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.taxonomy import (
+    MAX_TAXONOMY_AFFECTED_ENTRY_IDS,
+    MAX_TAXONOMY_ENTRIES,
+    MAX_TAXONOMY_ENTRY_RULES,
+    MAX_TAXONOMY_EVIDENCE_REFS,
+    MAX_TAXONOMY_REVIEWS,
     REQUIRED_REVIEW_ROLES,
     TAXONOMY_REGISTRY_SCHEMA_VERSION,
     apply_taxonomy_change,
@@ -59,20 +64,35 @@ def _entry(
 def _registry(
     version: str,
     *,
-    previous_version: str | None,
+    previous_version: str | None = None,
+    previous_registry: dict[str, object] | None = None,
     training_label: str = "Training",
     status: str = "released",
+    governing_basis: str = "primary intellectual contribution",
+    owner_id: str = "taxonomy-owner",
     entries: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
+    if previous_registry is not None:
+        if previous_version is not None:
+            raise AssertionError("pass previous_registry or previous_version, not both")
+        previous_version = str(previous_registry["taxonomy_version"])
+        previous_content_identity = str(previous_registry["content_identity"])
+    else:
+        if previous_version is not None:
+            raise AssertionError(
+                "non-root test registries must supply their exact previous_registry"
+            )
+        previous_content_identity = None
     return seal_taxonomy_registry(
         {
             "schema_version": TAXONOMY_REGISTRY_SCHEMA_VERSION,
             "registry_id": "research-papers",
             "taxonomy_version": version,
             "previous_version": previous_version,
+            "previous_content_identity": previous_content_identity,
             "status": status,
-            "governing_basis": "primary intellectual contribution",
-            "owner_id": "taxonomy-owner",
+            "governing_basis": governing_basis,
+            "owner_id": owner_id,
             "entries": entries
             or [
                 _entry(
@@ -157,10 +177,15 @@ def _rehash(payload: dict[str, object]) -> dict[str, object]:
 class TaxonomyRegistryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.base = _registry("v19", previous_version=None)
+        renamed_training = deepcopy(self.base["entries"][1])
+        renamed_training["label"] = "Training methods"
         self.candidate = _registry(
             "v20",
-            previous_version="v19",
-            training_label="Training methods",
+            previous_registry=self.base,
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                renamed_training,
+            ],
         )
         self.proposal = _proposal(self.base, self.candidate)
         self.reviews = _reviews(self.proposal, self.base)
@@ -241,6 +266,146 @@ class TaxonomyRegistryTests(unittest.TestCase):
         _rehash(unsorted)
         with self.assertRaisesRegex(MillefeuilleContractError, "sorted by entry_id"):
             validate_taxonomy_registry(unsorted)
+
+    def test_taxonomy_collection_limits_accept_boundary_and_reject_overflow(self):
+        bounded_entries = [
+            _entry(
+                "L1-ROOT",
+                level=1,
+                parent_id=None,
+                label="Root category",
+            ),
+            *[
+                _entry(
+                    f"L2-{index:04d}",
+                    level=2,
+                    parent_id="L1-ROOT",
+                    label=f"Category {index:04d}",
+                )
+                for index in range(MAX_TAXONOMY_ENTRIES - 1)
+            ],
+        ]
+        bounded_base = _registry("bounded-v1", entries=bounded_entries)
+        self.assertEqual(len(bounded_base["entries"]), MAX_TAXONOMY_ENTRIES)
+
+        with self.assertRaisesRegex(MillefeuilleContractError, "at most 512"):
+            _registry(
+                "overflow-v1",
+                status="draft",
+                entries=[
+                    *bounded_entries,
+                    _entry(
+                        "L2-OVERFLOW",
+                        level=2,
+                        parent_id="L1-ROOT",
+                        label="Overflow category",
+                    ),
+                ],
+            )
+
+        for field_name in ("include_when", "exclude_when", "boundary_notes"):
+            with self.subTest(bounded_entry_collection=field_name):
+                bounded_registry = deepcopy(self.base)
+                bounded_registry.pop("content_identity")
+                bounded_registry["entries"][0][field_name] = [
+                    f"Rule {index:02d}." for index in range(MAX_TAXONOMY_ENTRY_RULES)
+                ]
+                sealed = seal_taxonomy_registry(bounded_registry)
+                self.assertEqual(
+                    len(sealed["entries"][0][field_name]),
+                    MAX_TAXONOMY_ENTRY_RULES,
+                )
+
+                overflow_registry = deepcopy(bounded_registry)
+                overflow_registry["entries"][0][field_name].append("Rule overflow.")
+                with self.assertRaisesRegex(MillefeuilleContractError, "at most 32"):
+                    seal_taxonomy_registry(overflow_registry)
+
+        changed_entries = deepcopy(bounded_base["entries"])
+        for entry in changed_entries:
+            entry["definition"] = f"{entry['definition']} Revised."
+        bounded_candidate = _registry(
+            "bounded-v2",
+            previous_registry=bounded_base,
+            entries=changed_entries,
+        )
+        affected_ids = [entry["entry_id"] for entry in bounded_candidate["entries"]]
+        bounded_proposal = _proposal(
+            bounded_base,
+            bounded_candidate,
+            operation="mixed",
+            affected_entry_ids=affected_ids,
+        )
+        self.assertEqual(
+            len(bounded_proposal["affected_entry_ids"]),
+            MAX_TAXONOMY_AFFECTED_ENTRY_IDS,
+        )
+
+        overflow_affected = deepcopy(self.proposal)
+        overflow_affected["affected_entry_ids"] = [
+            f"L2-{index:04d}" for index in range(MAX_TAXONOMY_AFFECTED_ENTRY_IDS + 1)
+        ]
+        _rehash(overflow_affected)
+        with self.assertRaisesRegex(MillefeuilleContractError, "at most 512"):
+            validate_taxonomy_change_proposal(
+                overflow_affected, base_registry=self.base
+            )
+
+        for count in (
+            MAX_TAXONOMY_EVIDENCE_REFS,
+            MAX_TAXONOMY_EVIDENCE_REFS + 1,
+        ):
+            evidence_proposal = deepcopy(self.proposal)
+            evidence_proposal["evidence_refs"] = [
+                f"evidence/{index:03d}.md" for index in range(count)
+            ]
+            _rehash(evidence_proposal)
+            if count == MAX_TAXONOMY_EVIDENCE_REFS:
+                self.assertEqual(
+                    len(
+                        validate_taxonomy_change_proposal(
+                            evidence_proposal, base_registry=self.base
+                        )["evidence_refs"]
+                    ),
+                    MAX_TAXONOMY_EVIDENCE_REFS,
+                )
+            else:
+                with self.assertRaisesRegex(MillefeuilleContractError, "at most 64"):
+                    validate_taxonomy_change_proposal(
+                        evidence_proposal, base_registry=self.base
+                    )
+
+        optional_review = create_taxonomy_change_review(
+            self.proposal,
+            base_registry=self.base,
+            review_id="REVIEW-OPTIONAL-BOUNDS",
+            role="subject-matter-reviewer",
+            decision="approve",
+            reviewer_id="reviewer-optional-bounds",
+            reviewed_at="2026-08-11T12:10:00Z",
+            notes="Optional bounded review.",
+        )
+        _, bounded_application = apply_taxonomy_change(
+            base_registry=self.base,
+            proposal=self.proposal,
+            reviews=[*self.reviews, optional_review],
+            application_id="APPLY-BOUNDED-REVIEWS",
+            applied_by="release-owner",
+            applied_at="2026-08-11T13:00:00Z",
+        )
+        self.assertEqual(
+            len(bounded_application["review_content_identities"]),
+            MAX_TAXONOMY_REVIEWS,
+        )
+        with self.assertRaisesRegex(MillefeuilleContractError, "at most 4"):
+            apply_taxonomy_change(
+                base_registry=self.base,
+                proposal=self.proposal,
+                reviews=[*self.reviews, optional_review, deepcopy(optional_review)],
+                application_id="APPLY-OVERFLOW-REVIEWS",
+                applied_by="release-owner",
+                applied_at="2026-08-11T13:00:00Z",
+            )
 
     def test_lock_embeds_exact_snapshot_and_rejects_registry_or_snapshot_drift(self):
         lock = create_taxonomy_lock(
@@ -343,7 +508,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         ]
         deleted_candidate = _registry(
             "v20",
-            previous_version="v19",
+            previous_registry=self.base,
             entries=deleted_entries,
         )
         with self.assertRaisesRegex(MillefeuilleContractError, "cannot delete"):
@@ -368,7 +533,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         moved_training["parent_id"] = "L1-OTHER"
         moved = _registry(
             "v20",
-            previous_version="v19",
+            previous_registry=self.base,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 _entry(
@@ -407,6 +572,148 @@ class TaxonomyRegistryTests(unittest.TestCase):
                 requested_by="requester-a",
                 requested_at="2026-08-11T12:00:00Z",
             )
+
+    def test_specific_proposal_operations_match_their_exact_diff_shapes(self):
+        clarified_training = deepcopy(self.base["entries"][1])
+        clarified_training["definition"] = "A clarified training definition."
+        clarify_candidate = _registry(
+            "v20",
+            previous_registry=self.base,
+            entries=[deepcopy(self.base["entries"][0]), clarified_training],
+        )
+        added_entry = _entry(
+            "L2-EVALUATION",
+            level=2,
+            parent_id="L1-METHODS",
+            label="Evaluation methods",
+        )
+        add_candidate = _registry(
+            "v20",
+            previous_registry=self.base,
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                added_entry,
+                deepcopy(self.base["entries"][1]),
+            ],
+        )
+        deprecate_base = _registry(
+            "deprecate-v1",
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                deepcopy(added_entry),
+                deepcopy(self.base["entries"][1]),
+            ],
+        )
+        deprecated_training = deepcopy(deprecate_base["entries"][2])
+        deprecated_training["status"] = "deprecated"
+        deprecate_candidate = _registry(
+            "deprecate-v2",
+            previous_registry=deprecate_base,
+            entries=[
+                deepcopy(deprecate_base["entries"][0]),
+                deepcopy(deprecate_base["entries"][1]),
+                deprecated_training,
+            ],
+        )
+        split_candidate = _registry(
+            "v20",
+            previous_registry=self.base,
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                deprecated_training,
+                _entry(
+                    "L2-TRAINING-SUPERVISED",
+                    level=2,
+                    parent_id="L1-METHODS",
+                    label="Supervised training",
+                ),
+                _entry(
+                    "L2-TRAINING-UNSUPERVISED",
+                    level=2,
+                    parent_id="L1-METHODS",
+                    label="Unsupervised training",
+                ),
+            ],
+        )
+        merge_base = _registry(
+            "merge-v1",
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                _entry(
+                    "L2-TRAINING-A", level=2, parent_id="L1-METHODS", label="Training A"
+                ),
+                _entry(
+                    "L2-TRAINING-B", level=2, parent_id="L1-METHODS", label="Training B"
+                ),
+            ],
+        )
+        merged_entries = deepcopy(merge_base["entries"])
+        for entry in merged_entries[1:]:
+            entry["status"] = "deprecated"
+            entry["replacement_id"] = "L2-TRAINING-COMBINED"
+        merged_entries.append(
+            _entry(
+                "L2-TRAINING-COMBINED",
+                level=2,
+                parent_id="L1-METHODS",
+                label="Combined training",
+            )
+        )
+        merge_candidate = _registry(
+            "merge-v2", previous_registry=merge_base, entries=merged_entries
+        )
+
+        valid_cases = [
+            ("add", self.base, add_candidate, ["L2-EVALUATION"]),
+            ("clarify", self.base, clarify_candidate, ["L2-TRAINING"]),
+            ("rename", self.base, self.candidate, ["L2-TRAINING"]),
+            ("deprecate", deprecate_base, deprecate_candidate, ["L2-TRAINING"]),
+            (
+                "split",
+                self.base,
+                split_candidate,
+                ["L2-TRAINING", "L2-TRAINING-SUPERVISED", "L2-TRAINING-UNSUPERVISED"],
+            ),
+            (
+                "merge",
+                merge_base,
+                merge_candidate,
+                ["L2-TRAINING-A", "L2-TRAINING-B", "L2-TRAINING-COMBINED"],
+            ),
+            ("mixed", self.base, add_candidate, ["L2-EVALUATION"]),
+        ]
+        for operation, base, candidate, affected in valid_cases:
+            with self.subTest(valid_operation=operation):
+                _proposal(
+                    base, candidate, operation=operation, affected_entry_ids=affected
+                )
+
+        base_entries = {item["entry_id"]: item for item in self.base["entries"]}
+        mismatched_cases = [
+            ("add", self.candidate),
+            ("clarify", add_candidate),
+            ("rename", clarify_candidate),
+            ("deprecate", self.candidate),
+            ("split", add_candidate),
+            ("merge", split_candidate),
+        ]
+        for operation, candidate in mismatched_cases:
+            affected = sorted(
+                entry["entry_id"]
+                for entry in candidate["entries"]
+                if entry["entry_id"] not in base_entries
+                or entry != base_entries.get(entry["entry_id"])
+            )
+            with (
+                self.subTest(mismatched_operation=operation),
+                self.assertRaisesRegex(MillefeuilleContractError, "does not match"),
+            ):
+                _proposal(
+                    self.base,
+                    candidate,
+                    operation=operation,
+                    affected_entry_ids=affected,
+                )
 
     def test_application_requires_exact_three_role_approval_and_separation(self):
         for role in sorted(REQUIRED_REVIEW_ROLES):
@@ -545,7 +852,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
     def test_rollback_restores_exact_source_as_new_forward_version(self):
         rollback_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=self.candidate,
             training_label="Training",
         )
         proposal = _proposal(
@@ -587,7 +894,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
 
         bad_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=self.candidate,
             training_label="Not the historical definition",
         )
         with self.assertRaisesRegex(MillefeuilleContractError, "source entry exactly"):
@@ -607,6 +914,45 @@ class TaxonomyRegistryTests(unittest.TestCase):
                 applied_at="2026-08-11T14:00:00Z",
             )
 
+    def test_rollback_restores_historical_governance_metadata(self):
+        current = _registry(
+            "v20",
+            previous_registry=self.base,
+            training_label="Training methods",
+            governing_basis="operational deployment stage",
+            owner_id="successor-taxonomy-owner",
+        )
+        rollback_candidate = _registry(
+            "v21",
+            previous_registry=current,
+            training_label="Training",
+            governing_basis=str(self.base["governing_basis"]),
+            owner_id=str(self.base["owner_id"]),
+        )
+        proposal = _proposal(
+            current,
+            rollback_candidate,
+            operation="rollback",
+            rollback_source=self.base,
+        )
+
+        result, application = rollback_taxonomy_change(
+            base_registry=current,
+            rollback_source_registry=self.base,
+            proposal=proposal,
+            reviews=_reviews(proposal, current),
+            application_id="ROLLBACK-GOVERNANCE-METADATA",
+            applied_by="release-owner",
+            applied_at="2026-08-11T14:00:00Z",
+        )
+
+        self.assertEqual(result["governing_basis"], self.base["governing_basis"])
+        self.assertEqual(result["owner_id"], self.base["owner_id"])
+        self.assertNotEqual(result["governing_basis"], current["governing_basis"])
+        self.assertNotEqual(result["owner_id"], current["owner_id"])
+        self.assertEqual(result["entries"], self.base["entries"])
+        self.assertEqual(application["status"], "rolled-back")
+
     def test_forward_rollback_deprecates_nodes_added_after_historical_source(self):
         changed_training = deepcopy(self.base["entries"][1])
         changed_training["label"] = "Training methods"
@@ -618,7 +964,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         )
         current = _registry(
             "v20",
-            previous_version="v19",
+            previous_registry=self.base,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 added_entry,
@@ -629,7 +975,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         deprecated_added_entry["status"] = "deprecated"
         rollback_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=current,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 deprecated_added_entry,
@@ -662,16 +1008,25 @@ class TaxonomyRegistryTests(unittest.TestCase):
 
         already_deprecated_current = _registry(
             "v20",
-            previous_version="v19",
+            previous_registry=self.base,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 deepcopy(deprecated_added_entry),
                 deepcopy(changed_training),
             ],
         )
+        already_deprecated_rollback_candidate = _registry(
+            "v21",
+            previous_registry=already_deprecated_current,
+            entries=[
+                deepcopy(self.base["entries"][0]),
+                deepcopy(deprecated_added_entry),
+                deepcopy(self.base["entries"][1]),
+            ],
+        )
         already_deprecated_proposal = _proposal(
             already_deprecated_current,
-            rollback_candidate,
+            already_deprecated_rollback_candidate,
             operation="rollback",
             rollback_source=self.base,
             affected_entry_ids=["L2-TRAINING"],
@@ -695,7 +1050,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
 
         active_later_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=current,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 deepcopy(added_entry),
@@ -717,7 +1072,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         edited_later_entry["definition"] = "Unrelated prose smuggled into rollback."
         edited_later_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=current,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 edited_later_entry,
@@ -751,7 +1106,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
         )
         unrelated_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=current,
             entries=[
                 deepcopy(unrelated_source["entries"][0]),
                 deepcopy(deprecated_added_entry),
@@ -759,7 +1114,9 @@ class TaxonomyRegistryTests(unittest.TestCase):
                 deepcopy(unrelated_source["entries"][2]),
             ],
         )
-        with self.assertRaisesRegex(MillefeuilleContractError, "not an ancestor"):
+        with self.assertRaisesRegex(
+            MillefeuilleContractError, "content-addressed predecessor"
+        ):
             _proposal(
                 current,
                 unrelated_candidate,
@@ -774,7 +1131,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
 
         extra_candidate = _registry(
             "v21",
-            previous_version="v20",
+            previous_registry=current,
             entries=[
                 deepcopy(self.base["entries"][0]),
                 deepcopy(deprecated_added_entry),
@@ -798,6 +1155,27 @@ class TaxonomyRegistryTests(unittest.TestCase):
                     "L2-INTRUDER",
                     "L2-TRAINING",
                 ],
+            )
+
+    def test_rollback_rejects_fabricated_structurally_compatible_source(self):
+        fabricated_source = deepcopy(self.base)
+        fabricated_source["entries"][1]["label"] = "Fabricated historical label"
+        fabricated_source["entries"][1]["definition"] = "Fabricated history."
+        _rehash(fabricated_source)
+        fabricated_candidate = _registry(
+            "v21",
+            previous_registry=self.candidate,
+            entries=deepcopy(fabricated_source["entries"]),
+        )
+        with self.assertRaisesRegex(
+            MillefeuilleContractError, "exact content-addressed predecessor"
+        ):
+            _proposal(
+                self.candidate,
+                fabricated_candidate,
+                operation="rollback",
+                rollback_source=fabricated_source,
+                affected_entry_ids=["L2-TRAINING"],
             )
 
     def test_generated_artifacts_match_all_json_schemas(self):
@@ -857,8 +1235,40 @@ class TaxonomyRegistryTests(unittest.TestCase):
             ]
         )
         self.assertIn("base/source union", proposal_semantics)
+        self.assertIn("content-addressed immediate predecessor", proposal_semantics)
+        self.assertIn("operation", proposal_semantics)
         self.assertIn("distinct from proposal requested_by", review_semantics)
         self.assertIn("distinct from requested_by", application_semantics)
+        self.assertEqual(
+            schemas["taxonomy-registry.schema.json"]["properties"]["entries"][
+                "maxItems"
+            ],
+            MAX_TAXONOMY_ENTRIES,
+        )
+        self.assertEqual(
+            schemas["taxonomy-registry.schema.json"]["$defs"]["sortedTextArray"][
+                "maxItems"
+            ],
+            MAX_TAXONOMY_ENTRY_RULES,
+        )
+        self.assertEqual(
+            schemas["taxonomy-change-proposal.schema.json"]["properties"][
+                "affected_entry_ids"
+            ]["maxItems"],
+            MAX_TAXONOMY_AFFECTED_ENTRY_IDS,
+        )
+        self.assertEqual(
+            schemas["taxonomy-change-proposal.schema.json"]["properties"][
+                "evidence_refs"
+            ]["maxItems"],
+            MAX_TAXONOMY_EVIDENCE_REFS,
+        )
+        self.assertEqual(
+            schemas["taxonomy-application.schema.json"]["properties"][
+                "review_content_identities"
+            ]["maxItems"],
+            MAX_TAXONOMY_REVIEWS,
+        )
 
     def test_cli_derives_lock_proposal_reviews_apply_and_rollback_json(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -1004,7 +1414,7 @@ class TaxonomyRegistryTests(unittest.TestCase):
             )
 
             rollback_candidate = _registry(
-                "v21", previous_version="v20", training_label="Training"
+                "v21", previous_registry=self.candidate, training_label="Training"
             )
             rollback_candidate_path = root / "v21.json"
             _write_json(rollback_candidate_path, rollback_candidate)

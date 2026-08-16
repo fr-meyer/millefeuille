@@ -1,10 +1,16 @@
 # CLI Contract
 
+The command router currently preserves both the original Hydra-configured
+workflow and the named source-pack stage commands. Their ownership,
+compatibility window, PageIndex connector boundary, and rollback rules are
+normative in [Legacy-to-Lifecycle Migration And Deprecation Contract](legacy-migration.md).
+
 The CLI now exposes preview/read-only stage commands for `extract-native`,
 `extract-ocr`, `route`, `structure`, `summarize`, `card`, `index`,
 `acceptance`, `classify`, `writeback`, `retrieve`, `models`, and `run`,
-alongside `taxonomy`, `lifecycle-tags`, and the older `artifacts`, `status`,
-and `source-pack` helpers. The
+plus the no-effect `operator-preflight`, alongside offline `taxonomy` and
+`lifecycle-tags`, evidence-safe `maintenance`, and the older `artifacts`,
+`status`, and `source-pack` helpers. The
 remaining command-surface goal is to make discovery, handoff, recovery,
 source-pack intake, OpenKB addition, and approved-live execution equally
 explicit without weakening their manual gates.
@@ -14,7 +20,20 @@ explicit without weakening their manual gates.
 Implemented stage-command controls are:
 
 - `--mode preview|read-only-live|approved-live`
+- `--approval-receipt <json>` for exact-scope gate validation only; it is
+  rejected outside explicit `approved-live`, and valid receipts still stop at
+  the current unsupported-live gate
+- `--approved-live-pdf-disposal`,
+  `--approved-live-provider-payload-disposal`, and
+  `--approved-live-temporary-file-disposal` for an independently requested
+  exact disposal policy; all three are required by the current live gate
+- repeated `--approved-live-stop-condition <code>` values for the complete,
+  sorted, independently requested stop-condition set
 - `--source-pack-root <path>` plus `--paper-id|--item-key` and `--run-id`
+- `--artifact-root source-pack|<path>` for an exact run package or declared
+  package container layout
+- `--stage-manifest <path>` for an exact manifest inside the selected run
+  package
 - `retrieve --batch-manifest <path>` as the locator source for deterministic
   multi-run preview output
 - `--model-profile <profile-id-or-file>` for model-using stages
@@ -22,13 +41,52 @@ Implemented stage-command controls are:
 - `run --resume`, which skips only passed stages after their expected outputs
   and paper/run/source identity revalidate
 
-Arbitrary `--artifact-root <path>` selection and an explicit
-`--stage-manifest <path>` override remain contract work. The current stage
-surface deliberately resolves the canonical run directory from the verified
-source-pack root and rejects cross-wired manifest/index identity before any
-derived artifact write.
+Without either override, stage commands preserve the canonical source-pack
+default at
+`<source-pack-root>/zotero/<paper-id>/analyses/millefeuille/<run-id>/`.
+`--artifact-root source-pack` selects that default explicitly. A path-valued
+artifact root may be the run directory itself or a container holding exactly
+one matching package at `<paper-id>/<run-id>/`, `<run-id>/`,
+`analyses/millefeuille/<run-id>/`,
+`<paper-id>/analyses/millefeuille/<run-id>/`, or
+`zotero/<paper-id>/analyses/millefeuille/<run-id>/`. Multiple complete matches
+are an error; search order never decides identity.
+
+`--stage-manifest` selects one existing regular file whose parent is the run
+directory. When an artifact root is also supplied, the manifest parent must be
+one of that root's declared layouts. The sibling `artifact-index.json` must
+name the same paper, run, source pack, source hash, artifact root, stage set,
+stage statuses, and manifest ref. Custom manifest filenames are preserved on
+every stage update. Parent traversal, whitespace-padded paths, symbolic links,
+Windows reparse points, non-regular files, cross-wired roots, and mismatched
+identities fail before derived writes. Batch manifests cannot use single-run
+artifact or manifest overrides; each batch entry retains canonical resolution.
 
 ## Current Preview Surface
+
+- `operator-preflight`
+  - Requires `--packet <json>` and an explicit
+    `--mode preview|read-only-live|approved-live`; packet and invocation modes
+    must match exactly.
+  - Validates exact source adapter/selector/count, run and roots, operations,
+    targets and destination roles, provider/model/profile and budgets,
+    disposal, stop and rollback controls, acceptance, credential-reference
+    readiness, and packet content identity.
+  - Operation names and their destination, provider, credential, and acceptance
+    requirements are frozen by the v0.1 matrix; unknown aliases and prefix or
+    suffix variants fail closed.
+  - Approved-live also requires `--approval-receipt <json>`. A reserved
+    content-addressed MF-100 target binds packet-only controls, and every
+    normal receipt field is derived independently from the packet.
+  - Checks only whether each allowlisted environment reference is non-empty;
+    values never enter hashes, JSON, Markdown, logs, or errors.
+  - `--format json|markdown` emits a deterministic allowlisted result to
+    standard output. It creates no file and performs no source/provider/store
+    operation.
+  - Ready preview/read-only returns `0`, blocked non-approved validation returns
+    `2`, and every approved-live path returns `3`, including exact valid scope,
+    because external execution remains unsupported.
+  - The complete manual approval contract is `operator-preflight.md`.
 
 - `taxonomy`
   - `seal` canonicalizes an explicitly authored registry draft and calculates
@@ -311,7 +369,7 @@ derived artifact write.
   - `--resume` revalidates before skipping; idempotent reruns preserve the
     artifact package byte-for-byte for identical evidence.
   - Future expansion should add discovery/source-pack/OpenKB and approved-live
-    execution with explicit artifact-root and approval-token gates.
+    execution with approval-token gates.
 
 ## Example
 
@@ -473,6 +531,51 @@ state. `no-change`, `corrected`, and `confirmed` return `0`; `escalated` and
 This offline command does not call models, run workers, mutate the taxonomy, or
 write live Zotero/OpenKB/index/source-pack state.
 
+## Evidence-Safe Staging Maintenance
+
+The local maintenance group is separate from stage execution and performs no
+provider, Zotero, OpenKB, PageIndex, source-pack, or network operation:
+
+```bash
+millefeuille maintenance staging inspect \
+  --source-root /exact/source-pack-root \
+  --quarantine-root /exact/quarantine-root \
+  --json
+
+millefeuille maintenance staging plan \
+  --source-root /exact/source-pack-root \
+  --quarantine-root /exact/quarantine-root \
+  --run-id run-maintenance-001 \
+  --candidate batches/millefeuille/batch-1/.retrieval.tmp-0123456789abcdef \
+  --candidate-count 1 \
+  --disposal quarantine-until-mf-197 \
+  --stop-condition candidate-drift \
+  --stop-condition concurrent-namespace-change \
+  --stop-condition first-error \
+  --stop-condition root-identity-drift \
+  --stop-condition stale-or-active-lock \
+  --stop-condition unsupported-atomic-primitive \
+  --json
+
+millefeuille maintenance staging apply \
+  --source-root /exact/source-pack-root \
+  --quarantine-root /exact/quarantine-root \
+  --plan cleanup-plan.json \
+  --approval-receipt exact-receipt.json \
+  --mode approved-live \
+  --json
+```
+
+`inspect` and `plan` are read-only on Windows and POSIX. `apply` defaults to a
+no-effect preview refusal. Local mutation requires the exact content-addressed
+plan, exact MF-100 maintenance receipt, stable same-device roots, and the Linux
+pinned descriptor/`renameat2(RENAME_NOREPLACE)` boundary. It atomically moves
+only strictly recognized abandoned unpublished generations into quarantine,
+pre-reserves consumed audit evidence, and never deletes. Windows and macOS
+apply fail before audit reservation. Full candidate, manifest, lock, rollback,
+idempotence, recovery, and MF-197 disposal rules are normative in
+`staging-cleanup.md`.
+
 ## Run Modes
 
 - `preview`
@@ -488,12 +591,21 @@ write live Zotero/OpenKB/index/source-pack state.
     source-pack writes, or package publication.
 
 - `approved-live`
-  - Requires a named approval token or operator confirmation outside committed
-    files.
+  - Requires an exact, unexpired, untampered approval receipt from a trusted
+    operator approval channel.
   - Used for PDF recovery, OCR calls, model calls, source-pack writes, OpenKB
     writes, index writes, Zotero writes, and release actions.
-  - The current stage-oriented preview CLI stops with exit code `3`; it does
-    not implement approved-live execution.
+  - The available CLI bindings must match operation, target/selector, run, item
+    cap, and canonical roots. The normative receipt contract additionally binds
+    provider/model, budget, disposal, stop, expiry, and single-use replay state.
+  - Receipt validation never promotes `preview` or `read-only-live`.
+  - Zotero writeback additionally requires explicit
+    `--writeback approved-live`; the global mode and writeback mode do not
+    imply one another.
+  - The current stage-oriented CLI stops with exit code `3` even after a valid
+    receipt; it does not implement provider calls or approved-live writes.
+  - The full receipt, replay, audit, and adapter obligations are normative in
+    `approved-live-receipts.md`.
 
 ## Exit Rules
 

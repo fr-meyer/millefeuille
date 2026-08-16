@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import os
 from pathlib import Path
 import stat
@@ -51,6 +52,76 @@ class TestMillefeuilleSecureIo(unittest.TestCase):
 
         self.assertEqual(actual, payload)
 
+    def test_portable_bounded_read_rejects_opened_size_before_payload_read(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "oversized.bin"
+            path.write_bytes(b"oversized")
+
+            with (
+                mock.patch.object(
+                    secure_io,
+                    "_supports_no_follow",
+                    return_value=False,
+                ),
+                mock.patch.object(secure_io.os, "read") as read,
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "exceeds 8 bytes",
+                ),
+            ):
+                secure_io.read_bytes_no_follow(
+                    path,
+                    "bounded artifact",
+                    max_bytes=8,
+                )
+
+        read.assert_not_called()
+
+    def test_portable_bounded_read_accepts_the_exact_boundary(self):
+        payload = b"boundary"
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "boundary.bin"
+            path.write_bytes(payload)
+
+            with mock.patch.object(
+                secure_io,
+                "_supports_no_follow",
+                return_value=False,
+            ):
+                actual = secure_io.read_bytes_no_follow(
+                    path,
+                    "bounded artifact",
+                    max_bytes=len(payload),
+                )
+
+        self.assertEqual(actual, payload)
+
+    def test_portable_bounded_read_rejects_growth_during_read(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "growing.bin"
+            path.write_bytes(b"ok")
+            reads = iter((b"ok", b"x"))
+
+            with (
+                mock.patch.object(
+                    secure_io,
+                    "_supports_no_follow",
+                    return_value=False,
+                ),
+                mock.patch.object(secure_io.os, "read", side_effect=reads) as read,
+                self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "exceeds 2 bytes",
+                ),
+            ):
+                secure_io.read_bytes_no_follow(
+                    path,
+                    "growing artifact",
+                    max_bytes=2,
+                )
+
+        self.assertEqual([call.args[1] for call in read.call_args_list], [3, 1])
+
     def test_regular_file_read_flags_include_binary_mode_when_available(self):
         binary_flag = 1 << 27
         with mock.patch.object(
@@ -62,6 +133,36 @@ class TestMillefeuilleSecureIo(unittest.TestCase):
             flags = secure_io._regular_file_read_flags(no_follow=False)
 
         self.assertEqual(flags & binary_flag, binary_flag)
+
+    def test_windows_portable_read_uses_write_excluding_handle(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "artifact.bin"
+            payload = b"stable windows bytes"
+            path.write_bytes(payload)
+            expected_stat = path.stat()
+            fd = os.open(path, os.O_RDONLY)
+
+            with (
+                mock.patch.object(secure_io, "_WINDOWS", True),
+                mock.patch.object(
+                    secure_io,
+                    "_supports_no_follow",
+                    return_value=False,
+                ),
+                mock.patch.object(
+                    secure_io,
+                    "_open_windows_locked_regular_file_fd",
+                    return_value=(fd, expected_stat),
+                ) as locked_open,
+            ):
+                actual = secure_io.read_bytes_no_follow(path, "windows artifact")
+
+        self.assertEqual(actual, payload)
+        locked_open.assert_called_once_with(
+            path,
+            label="windows artifact",
+            expected_stat=mock.ANY,
+        )
 
     def test_windows_ctime_drift_does_not_change_stability_snapshot(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -303,6 +404,58 @@ class TestMillefeuilleSecureIo(unittest.TestCase):
             )
 
         inspect.assert_called_once_with(Path("."))
+
+    @unittest.skipUnless(
+        os.name == "nt",
+        "requires Windows kernel share-mode enforcement",
+    )
+    def test_windows_read_blocks_same_size_mtime_preserving_mutation(self):
+        payload = b"A" * 131072
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "artifact.bin"
+            path.write_bytes(payload)
+            before = path.stat()
+            real_read = os.read
+            mutation_attempts: list[str] = []
+
+            def read_with_mutation_attempt(fd: int, size: int) -> bytes:
+                chunk = real_read(fd, size)
+                if not mutation_attempts:
+                    try:
+                        with path.open("r+b", buffering=0) as stream:
+                            stream.seek(0)
+                            stream.write(b"B" * len(payload))
+                        os.utime(
+                            path,
+                            ns=(before.st_atime_ns, before.st_mtime_ns),
+                        )
+                    except OSError as exc:
+                        if (
+                            getattr(exc, "winerror", None) not in {5, 32, 33}
+                            and exc.errno != errno.EACCES
+                        ):
+                            raise
+                        mutation_attempts.append("blocked")
+                    else:
+                        mutation_attempts.append("mutated")
+                return chunk
+
+            with (
+                mock.patch.object(
+                    secure_io,
+                    "_supports_no_follow",
+                    return_value=False,
+                ),
+                mock.patch.object(
+                    secure_io.os,
+                    "read",
+                    side_effect=read_with_mutation_attempt,
+                ),
+            ):
+                actual = secure_io.read_bytes_no_follow(path, "locked artifact")
+
+        self.assertEqual(mutation_attempts, ["blocked"])
+        self.assertEqual(actual, payload)
 
 
 if __name__ == "__main__":

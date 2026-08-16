@@ -15,6 +15,10 @@ from millefeuille.domain.card_fixtures import (
     CARD_MARKDOWN_REF,
     load_paper_card,
 )
+from millefeuille.domain.card_index_contract import (
+    load_and_validate_canonical_card_index,
+    validate_paper_card_identity,
+)
 from millefeuille.domain.config import ArtifactExportConfig
 from millefeuille.domain.extraction_fixtures import (
     NATIVE_EVIDENCE_REF,
@@ -26,10 +30,10 @@ from millefeuille.domain.extraction_fixtures import (
 )
 from millefeuille.domain.index_fixtures import (
     INDEX_STATUS_REF,
-    load_retrieval_index_status,
 )
 from millefeuille.domain.millefeuille import (
     ManualGate,
+    MillefeuilleContractError,
     RunMode,
     StageManifest,
     StageName,
@@ -210,30 +214,32 @@ def resolve_artifact_run_context(
 
     paper_id = paper_id_for_item(item)
     artifact_root = str(config.artifact_root).strip()
-    if artifact_root != SOURCE_PACK_ARTIFACT_ROOT:
-        run_dir = Path(config.artifact_root) / paper_id / run_id
-        return ArtifactRunContext(
-            run_dir=run_dir,
-            source_pack_ref=f"source-packs/zotero/{paper_id}",
-        )
-
     source_pack_root = config.source_pack_root or DEFAULT_SOURCE_PACK_ROOT
     source_pack_dir = Path(source_pack_root) / "zotero" / paper_id
     source_pack_manifest = source_pack_dir / "manifest.json"
+    if artifact_root == SOURCE_PACK_ARTIFACT_ROOT:
+        run_dir = source_pack_dir / "analyses" / "millefeuille" / run_id
+    else:
+        run_dir = Path(config.artifact_root) / paper_id / run_id
+
     if not source_pack_manifest.is_file():
-        raise ValueError(
-            "export.artifacts.artifact_root=source-pack requires an existing "
-            f"source-pack manifest at {source_pack_manifest}"
+        if artifact_root == SOURCE_PACK_ARTIFACT_ROOT:
+            raise ValueError(
+                "export.artifacts.artifact_root=source-pack requires an existing "
+                f"source-pack manifest at {source_pack_manifest.as_posix()}"
+            )
+        return ArtifactRunContext(
+            run_dir=run_dir,
+            source_pack_ref=str(source_pack_dir),
         )
     try:
         source_pack_hash = load_source_pack_manifest_source_hash(source_pack_manifest)
     except ValueError as exc:
         raise ValueError(
-            "export.artifacts.artifact_root=source-pack requires a source-pack "
-            f"manifest with a verified source_hash at {source_pack_manifest}: {exc}"
+            "artifact export requires a source-pack manifest with a verified "
+            f"source_hash at {source_pack_manifest.as_posix()}: {exc}"
         ) from exc
 
-    run_dir = source_pack_dir / "analyses" / "millefeuille" / run_id
     manifest_ref = _relative_ref(source_pack_manifest, run_dir)
     extraction_refs = _resolve_extraction_refs(
         source_pack_dir=source_pack_dir,
@@ -248,6 +254,7 @@ def resolve_artifact_run_context(
     card_refs = _resolve_card_refs(
         run_dir=run_dir,
         paper_id=paper_id,
+        run_id=run_id,
         expected_source_hash=source_pack_hash,
     )
     index_refs = _resolve_index_refs(
@@ -797,6 +804,7 @@ def _resolve_card_refs(
     *,
     run_dir: Path,
     paper_id: str,
+    run_id: str,
     expected_source_hash: str,
 ) -> dict[str, str | None]:
     card_json_path = run_dir / CARD_JSON_REF
@@ -811,11 +819,18 @@ def _resolve_card_refs(
     if not card_json_path.is_file() or not card_markdown_path.is_file():
         raise ValueError(f"incomplete paper card fixture under {card_json_path.parent}")
     payload = load_paper_card(card_json_path)
-    if payload["paper_id"] != paper_id:
-        raise ValueError(f"paper card paper_id drift at {card_json_path}")
-    identity = payload["identity"]
-    if identity.get("source_hash") not in (None, expected_source_hash):
-        raise ValueError(f"paper card source_hash drift at {card_json_path}")
+    try:
+        validate_paper_card_identity(
+            payload,
+            paper_id=paper_id,
+            run_id=run_id,
+            source_hash=expected_source_hash,
+            require_source_hash=True,
+        )
+    except MillefeuilleContractError as exc:
+        raise ValueError(
+            f"paper card identity drift at {card_json_path}: {exc}"
+        ) from exc
     return {
         "paper_card_json_ref": _relative_ref(card_json_path, run_dir),
         "paper_card_markdown_ref": _relative_ref(card_markdown_path, run_dir),
@@ -840,34 +855,21 @@ def _resolve_index_refs(
         raise ValueError(
             f"incomplete retrieval index fixture under {index_status_path.parent}"
         )
-    payload = load_retrieval_index_status(index_status_path)
-    if payload["paper_id"] != paper_id:
-        raise ValueError(f"retrieval index paper_id drift at {index_status_path}")
-    if payload["run_id"] != run_id:
-        raise ValueError(f"retrieval index run_id drift at {index_status_path}")
-    if payload["source_hash"] != expected_source_hash:
-        raise ValueError(f"retrieval index source_hash drift at {index_status_path}")
-    index_dir = index_status_path.parent
-    expected_selected_ref = _relative_ref(
-        source_pack_dir / ROUTE_MARKDOWN_REF,
-        index_dir,
-    )
-    expected_summary_ref = _relative_ref(run_dir / SUMMARY_ARTIFACT_REF, index_dir)
-    expected_card_ref = _relative_ref(run_dir / CARD_JSON_REF, index_dir)
-    if payload["selected_fulltext_ref"] != expected_selected_ref:
-        raise ValueError(
-            f"retrieval index selected_fulltext_ref drift at {index_status_path}"
+    try:
+        _, index_artifact = load_and_validate_canonical_card_index(
+            card_path=run_dir / CARD_JSON_REF,
+            index_path=index_status_path,
+            paper_id=paper_id,
+            run_id=run_id,
+            source_hash=expected_source_hash,
+            selected_fulltext_path=source_pack_dir / ROUTE_MARKDOWN_REF,
+            summary_path=run_dir / SUMMARY_ARTIFACT_REF,
         )
-    if payload["summary_ref"] != expected_summary_ref:
-        raise ValueError(f"retrieval index summary_ref drift at {index_status_path}")
-    if payload["paper_card_ref"] != expected_card_ref:
-        raise ValueError(f"retrieval index paper_card_ref drift at {index_status_path}")
-    for ref_name in ("selected_fulltext_ref", "summary_ref", "paper_card_ref"):
-        ref = str(payload[ref_name])
-        if not (index_dir / ref).is_file():
-            raise ValueError(
-                f"incomplete retrieval index fixture under {index_status_path.parent}"
-            )
+    except MillefeuilleContractError as exc:
+        raise ValueError(
+            f"paper card/index contract drift at {index_status_path}: {exc}"
+        ) from exc
+    payload = index_artifact.payload
     return {
         "retrieval_index_status_ref": _relative_ref(index_status_path, run_dir),
         "index_records": _merge_index_records(list(payload["lanes"])),

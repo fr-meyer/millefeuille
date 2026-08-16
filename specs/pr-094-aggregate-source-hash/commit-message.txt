@@ -1,0 +1,8 @@
+chore: add PR #94 delivery gates
+
+Record the canonical MF-006 Speculoos task and publication artifacts for the
+aggregate retrieval source-hash compatibility change.
+
+Task: pr-094-aggregate-source-hash
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

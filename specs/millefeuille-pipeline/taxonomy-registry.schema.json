@@ -8,7 +8,8 @@
     "entries and set-like arrays are sorted and duplicate-free",
     "entry IDs and sibling labels are unique",
     "level, parent, replacement, active-parent, and released-tree coverage rules pass",
-    "previous_version differs from taxonomy_version"
+    "previous_version differs from taxonomy_version",
+    "root registries have null previous_version and previous_content_identity; non-root registries require both"
   ],
   "type": "object",
   "additionalProperties": false,
@@ -17,6 +18,7 @@
     "registry_id",
     "taxonomy_version",
     "previous_version",
+    "previous_content_identity",
     "status",
     "governing_basis",
     "owner_id",
@@ -35,6 +37,12 @@
         {"type": "null"}
       ]
     },
+    "previous_content_identity": {
+      "oneOf": [
+        {"$ref": "#/$defs/contentIdentity"},
+        {"type": "null"}
+      ]
+    },
     "status": {
       "enum": ["draft", "released", "deprecated", "archived"]
     },
@@ -43,6 +51,7 @@
     "entries": {
       "type": "array",
       "minItems": 1,
+      "maxItems": 512,
       "items": {"$ref": "#/$defs/entry"}
     },
     "content_identity": {"$ref": "#/$defs/contentIdentity"}
@@ -69,6 +78,7 @@
     "sortedTextArray": {
       "type": "array",
       "uniqueItems": true,
+      "maxItems": 32,
       "items": {"$ref": "#/$defs/text"}
     },
     "entry": {

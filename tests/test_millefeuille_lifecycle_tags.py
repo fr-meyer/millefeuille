@@ -80,6 +80,7 @@ def _taxonomy_registry() -> dict[str, object]:
             "registry_id": "research-papers",
             "taxonomy_version": TAXONOMY_VERSION,
             "previous_version": None,
+            "previous_content_identity": None,
             "status": "released",
             "governing_basis": "primary intellectual contribution",
             "owner_id": "taxonomy-owner",

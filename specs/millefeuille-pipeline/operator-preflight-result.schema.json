@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/operator-preflight-result.schema.json",
+  "title": "Millefeuille Operator Preflight Result",
+  "description": "A deterministic, content-addressed, credential-value-free result from the no-effect operator preflight.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "packet_id",
+    "packet_digest",
+    "mode",
+    "decision",
+    "external_effects_performed",
+    "credential_readiness",
+    "approval_receipt",
+    "checks",
+    "blockers",
+    "secret_material_persisted",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-operator-preflight-result/v0.1"
+    },
+    "packet_id": {
+      "$ref": "#/$defs/exactIdentity"
+    },
+    "packet_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "mode": {
+      "enum": ["preview", "read-only-live", "approved-live"]
+    },
+    "decision": {
+      "enum": [
+        "approved-scope-validated-execution-unsupported",
+        "blocked",
+        "ready-for-preview",
+        "ready-for-read-only-live"
+      ]
+    },
+    "external_effects_performed": {
+      "const": false
+    },
+    "credential_readiness": {
+      "type": "array",
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/credentialReadiness"
+      }
+    },
+    "approval_receipt": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["receipt_id", "content_digest", "status"],
+          "properties": {
+            "receipt_id": {"$ref": "#/$defs/exactIdentity"},
+            "content_digest": {"$ref": "#/$defs/digest"},
+            "status": {"const": "validated"}
+          }
+        }
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status"],
+        "properties": {
+          "id": {
+            "enum": [
+              "approval-receipt",
+              "credential-readiness",
+              "mode-binding",
+              "no-external-effect",
+              "packet-integrity",
+              "scope-validation"
+            ]
+          },
+          "status": {
+            "enum": ["failed", "not-applicable", "passed"]
+          }
+        }
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "maxLength": 256,
+        "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9][a-z0-9-]*)*$"
+      }
+    },
+    "secret_material_persisted": {
+      "const": false
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "content_digest"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "content_digest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  },
+  "$defs": {
+    "exactIdentity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@/+\\-]*$",
+      "not": {"enum": ["all", "any", "everything"]}
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "credentialReadiness": {
+      "oneOf": [
+        {"$ref": "#/$defs/indexWriteReadiness"},
+        {"$ref": "#/$defs/modelOauthReadiness"},
+        {"$ref": "#/$defs/ocrProviderReadiness"},
+        {"$ref": "#/$defs/openkbWriteReadiness"},
+        {"$ref": "#/$defs/zoteroLibraryReadiness"},
+        {"$ref": "#/$defs/zoteroReadReadiness"},
+        {"$ref": "#/$defs/zoteroWriteReadiness"}
+      ]
+    },
+    "credentialStateObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "reference", "state"],
+      "properties": {
+        "type": {"type": "string"},
+        "reference": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{1,127}$"
+        },
+        "state": {"enum": ["missing", "present"]}
+      }
+    },
+    "indexWriteReadiness": {
+      "$ref": "#/$defs/credentialStateObject",
+      "properties": {
+        "type": {"const": "index-write"},
+        "reference": {
+          "enum": ["PAGEINDEX_API_KEY", "MILLEFEUILLE_CREDENTIAL_INDEX_WRITE"]
+        }
+      }
+    },
+    "modelOauthReadiness": {
+      "$ref": "#/$defs/credentialStateObject",
+      "properties": {
+        "type": {"const": "model-oauth"},
+        "reference": {
+          "enum": [
+            "OPENCLAW_CODEX_OAUTH_READY",
+            "MILLEFEUILLE_CREDENTIAL_MODEL_OAUTH"
+          ]
+        }
+      }
+    },
+    "ocrProviderReadiness": {
+      "$ref": "#/$defs/credentialStateObject",
+      "properties": {
+        "type": {"const": "ocr-provider"},
+        "reference": {
+          "enum": [
+            "MISTRAL_API_KEY",
+            "PAGEINDEX_API_KEY",
+            "MILLEFEUILLE_CREDENTIAL_OCR_PROVIDER"
+          ]
+        }
+      }
+    },
+    "openkbWriteReadiness": {
+      "$ref": "#/$defs/credentialStateObject",
+      "properties": {
+        "type": {"const": "openkb-write"},
+        "reference": {
+          "enum": ["OPENKB_API_KEY", "MILLEFEUILLE_CREDENTIAL_OPENKB_WRITE"]
+        }
+      }
+    },
+    "zoteroLibraryReadiness": {
+      "$ref": "#/$defs/credentialStateObject",
+      "properties": {
+        "type": {"const": "zotero-library-id"},
+        "reference": {
+          "enum": [
+            "ZOTERO_LIBRARY_ID",
+            "MILLEFEUILLE_CREDENTIAL_ZOTERO_LIBRARY_ID"
+          ]
+        }
+      }
+    },
+    "zoteroReadReadiness": {
+      "$ref": "#/$defs/credentialStateObject",
+      "properties": {
+        "type": {"const": "zotero-read"},
+        "reference": {
+          "enum": ["ZOTERO_READ_KEY", "MILLEFEUILLE_CREDENTIAL_ZOTERO_READ"]
+        }
+      }
+    },
+    "zoteroWriteReadiness": {
+      "$ref": "#/$defs/credentialStateObject",
+      "properties": {
+        "type": {"const": "zotero-write"},
+        "reference": {
+          "enum": ["ZOTERO_WRITE_KEY", "MILLEFEUILLE_CREDENTIAL_ZOTERO_WRITE"]
+        }
+      }
+    }
+  },
+  "x-millefeuille-semantic-validation": [
+    "Reject duplicate or unknown fields, non-NFC strings, interior Unicode control or format characters, non-finite numbers, and secret or private-payload markers before rendering.",
+    "Compute integrity.content_digest over canonical UTF-8 JSON of every top-level field except integrity, with sorted object keys, unescaped Unicode, no insignificant whitespace, and no non-finite numbers.",
+    "Recompute the source packet content digest and require packet_id, packet_digest, mode, every credential type/reference row, and the validated approval receipt identity to match that packet before trusting a result.",
+    "Credential readiness, checks by id, and blockers must be sorted and unique. Credential readiness contains only an allowlisted type, environment reference name, and present or missing state; never a credential value.",
+    "The six invariant checks are mandatory; mode binding, no external effect, packet integrity, and scope validation must pass. Credential check and blockers must agree with every missing type.",
+    "Approved-live requires a validated receipt identity. A ready approved scope still has the external-execution-unsupported blocker and never reports execution; a blocked approved scope reports its credential blockers.",
+    "Preview and read-only-live results cannot contain approval validation or an external-execution-unsupported blocker.",
+    "external_effects_performed and secret_material_persisted must remain false."
+  ]
+}

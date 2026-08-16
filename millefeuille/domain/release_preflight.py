@@ -50,12 +50,16 @@ def write_release_candidate_preflight(
     paper_id: str | None = None,
     item_key: str | None = None,
     candidate_version: str | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> ReleasePreflightResult:
     resolved = resolve_run_artifacts(
         source_pack_root=source_pack_root,
         run_id=run_id,
         paper_id=paper_id,
         item_key=item_key,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
     pyproject = tomllib.loads(
         (Path(repo_root) / "pyproject.toml").read_text(encoding="utf-8")

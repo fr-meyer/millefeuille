@@ -3,6 +3,27 @@
 This is a plan artifact only. It does not grant permission to run live Zotero,
 recover PDFs, call OCR providers, write OpenKB, or write source packs.
 
+## Required Operator Preflight
+
+Before any adapter-specific preview or manual approval, validate a strict
+`millefeuille-operator-preflight-packet/v0.1` with
+`millefeuille operator-preflight`. The packet binds the explicit invocation
+mode, exact source adapter and selector, item cap and resolved count, run and
+roots, operations, targets and destination roles, provider/model/profile,
+call/cost budgets, disposal, stop conditions, rollback actions, acceptance
+status, and allowlisted credential references.
+
+Credential readiness checks only present or missing state and never emits,
+persists, logs, or hashes credential values. Preview and read-only-live cannot
+carry receipt approval. Approved-live additionally requires the exact MF-100
+receipt identity and a reserved content-addressed receipt target that covers
+packet-only controls. A fully valid approved-live preflight remains no-effect
+and exits at the unsupported manual gate.
+
+The normative contract is `operator-preflight.md`; its two JSON Schemas define
+the packet and sanitized result. It does not replace adapter-side revalidation,
+durable replay state, consumption evidence, or approval-authority verification.
+
 ## Bounded Dogfood Sequence
 
 1. Confirm staging tag and target item count.
@@ -21,14 +42,27 @@ recover PDFs, call OCR providers, write OpenKB, or write source packs.
 
 ## Required Approval Packet
 
-- exact staging tag;
+The separate approval record is serialized as
+`millefeuille-approved-live-receipt/v0.1` and validated according to
+`approved-live-receipts.md`. It binds:
+
+- exact staging tag, source, or query selector;
 - maximum Zotero item count;
-- allowed live operations;
-- output directories/source-pack root;
-- OCR backend and budget if OCR is allowed;
-- OpenKB target;
-- disposal policy for PDFs and provider payloads;
-- stop condition and rollback notes.
+- allowed live operations and exact targets;
+- output directories and source-pack root;
+- OCR/provider backend, exact model, call cap, and budget when provider calls
+  are allowed;
+- OpenKB, Zotero, index, or local targets;
+- disposal policy for PDFs, provider responses, and temporary files;
+- stop conditions, run ID, approving identity/time, and expiry;
+- canonical content digest and durable single-use replay identity.
+- the operator packet's reserved `preflight-scope` target, whose content
+  identity also binds adapter, resolved count, destination roles, provider
+  profile, rollback, acceptance, and credential-reference controls.
+
+The receipt is content-addressed evidence, not a credential or digital
+signature. The execution request must be derived independently and match every
+bound control before a live adapter can consume the receipt.
 
 ## Default Refusal Conditions
 
@@ -38,6 +72,10 @@ recover PDFs, call OCR providers, write OpenKB, or write source packs.
 - request to classify before acceptance evidence;
 - request to commit raw PDFs, authenticated URLs, provider payloads, or secrets;
 - request to write Zotero/OpenKB/source packs without explicit approval.
+- missing, expired, previously consumed, tampered, secret-bearing, wildcard,
+  or scope-drifted approval receipt;
+- receipt presented while the explicit mode remains `preview` or
+  `read-only-live`.
 
 ## Post-PR79 Summary Model Profile
 

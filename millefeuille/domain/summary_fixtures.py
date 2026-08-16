@@ -198,12 +198,21 @@ def write_summaries_from_evidence(
     evidence_path: str | Path,
     source_pack_root: str | Path,
     run_id: str,
+    artifact_run_dir: str | Path | None = None,
 ) -> list[SummaryFixtureWriteResult]:
     root = Path(source_pack_root)
     resolved_run_id = _required_string(run_id, "run_id")
     records = load_summary_fixture_evidence_batch(evidence_path)
     _reject_duplicate_records(records)
-    planned = [_plan_summary(record, root, resolved_run_id) for record in records]
+    planned = [
+        _plan_summary(
+            record,
+            root,
+            resolved_run_id,
+            artifact_run_dir=artifact_run_dir,
+        )
+        for record in records
+    ]
     return [_apply_planned_summary_write(plan) for plan in planned]
 
 
@@ -217,6 +226,8 @@ def _plan_summary(
     evidence: SummaryFixtureEvidence,
     source_pack_root: Path,
     run_id: str,
+    *,
+    artifact_run_dir: str | Path | None,
 ) -> _PlannedSummaryWrite:
     source_pack_dir, source_hash = _resolve_source_pack_dir(
         source_pack_root=source_pack_root,
@@ -235,7 +246,11 @@ def _plan_summary(
     )
     summary_fixture = load_hierarchical_summary(evidence.summary_path)
     paper_id = source_pack_dir.name
-    run_dir = source_pack_dir / "analyses" / "millefeuille" / run_id
+    run_dir = (
+        Path(artifact_run_dir)
+        if artifact_run_dir is not None
+        else source_pack_dir / "analyses" / "millefeuille" / run_id
+    )
     summary_output_path = run_dir / SUMMARY_ARTIFACT_REF
     expected_payload, expected_texts = _materialize_summary_bundle(
         fixture_payload=summary_fixture,

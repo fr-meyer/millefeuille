@@ -5,11 +5,18 @@ offline-first contract. It is safe to review and test without Zotero
 credentials, PDF bytes, OCR providers, OpenKB writes, source-pack writes,
 GitHub publication, releases, or package-index changes.
 
+Reusable packets for carrying this contract through feature delivery, bounded
+approval, adapter evidence, dogfood, maintenance handoff, migration, and
+release are indexed in the adjacent
+[`millefeuille-delivery`](../millefeuille-delivery/README.md) directory.
+
 Files:
 
 - `vision.md` - complete paper-processing product vision.
 - `remaining-work.md` - end-to-end work pipeline and manual gates.
 - `cli-contract.md` - intended command groups and run modes.
+- `legacy-migration.md` - operator migration and deprecation contract for the
+  original Hydra workflow and the source-pack lifecycle.
 - `stage-manifest.schema.json` - machine-readable stage manifest shape.
 - `artifact-storage.md` - artifact-root and source-pack storage contract.
 - `source-pack-manifest.schema.json` - source-pack source identity and hash
@@ -21,6 +28,30 @@ Files:
 - `model-execution-plan.schema.json` - no-call model execution plan shape.
 - `model-provenance-record.schema.json` - provider-payload-free model
   provenance record shape.
+- `approved-live-receipt.schema.json` - exact-scope, short-lived, single-use
+  live approval shape.
+- `approved-live-audit.schema.json` - sanitized receipt validation/consumption
+  evidence shape.
+- `approved-live-receipts.md` - normative hash, scope, replay, audit, and CLI
+  gate contract.
+- `temporary-bridge-ownership.schema.json` - exact ownership and private-asset
+  inventory proof for a future abandoned unpublished bridge generation.
+- `staging-cleanup-inspection.schema.json` - sanitized read-only candidate and
+  capability report.
+- `staging-cleanup-plan.schema.json` - content-addressed exact-candidate
+  quarantine plan.
+- `staging-cleanup-audit.schema.json` - pre-reserved sanitized receipt
+  consumption evidence.
+- `staging-cleanup-disposition.schema.json` - bounded quarantine, rollback, or
+  recovery outcome evidence.
+- `staging-cleanup.md` - normative recognition, receipt, pinned transaction,
+  rollback, and MF-197 disposal boundary.
+- `operator-preflight-packet.schema.json` - exact no-effect operator request,
+  readiness controls, and reserved receipt-scope binding.
+- `operator-preflight-result.schema.json` - deterministic sanitized readiness
+  result shape.
+- `operator-preflight.md` - normative packet, credential-reference,
+  authorization-context, output, and exit-code contract.
 - `hierarchical-summary.schema.json` - page/section/paper summary shape.
 - `paper-card.schema.json` - compact human/agent card shape.
 - `retrieval-index-status.schema.json` - retrieval/index lane status shape.
@@ -65,6 +96,24 @@ Files:
   points before promotion/tagging.
 - `live-run-plan.md` - future live dogfood plan, still requiring approval.
 
+Approved-live receipt parsing and exact request validation live in
+`millefeuille/domain/live_receipts.py`. The current CLI can validate a receipt
+as part of its fail-closed stage manual gate. The separate MF-106 maintenance
+executor uses one narrowly scoped receipt only for a same-filesystem local
+quarantine; it does not enable a provider call or external write. Presenting a
+receipt in preview or read-only mode remains rejected.
+
+Offline operator-packet validation lives in
+`millefeuille/domain/operator_preflight.py` and is exposed by
+`millefeuille operator-preflight`. It independently binds mode, adapter,
+selection and count, roots, operations, destination roles, provider/profile,
+budgets, disposal, stop, rollback, acceptance, allowlisted credential
+references, and the exact MF-100 receipt identity. Approved-live adds a
+reserved content-addressed receipt target so controls not represented directly
+by MF-100 cannot drift. The command checks only credential presence, never
+credential values, performs no external effect, and preserves the exit-3
+unsupported-live boundary after successful approval validation.
+
 Executable offline contract models live in
 `millefeuille/domain/millefeuille.py`. They cover stage manifests,
 manual gates, tag-state transitions, single-run and batch acceptance summaries,
@@ -89,6 +138,16 @@ unverified namespace entries in place for explicit operator cleanup; unavailable
 primitives fail closed before publication. This boundary assumes trusted
 ownership or cooperative same-UID writers: POSIX locks and mode bits do not
 prevent an uncooperative owner from mutating staging after the last check.
+
+Evidence-safe cleanup for those unpublished leftovers lives in
+`millefeuille/domain/staging_cleanup.py` and
+`millefeuille/cli/maintenance.py`. Inspection and content-addressed planning are
+portable and read-only. Linux apply pins roots and descendant parents, uses a
+persistent advisory maintenance lock and pre-reserved consumed audit, and moves
+only strictly recognized zero-byte retrieval generations or manifest-owned
+abandoned bridge generations with descriptor-relative atomic no-replace
+renames. It never deletes; Windows/macOS apply and all permanent disposal remain
+unsupported.
 
 Taxonomy registry validation and pure artifact derivation live in
 `millefeuille/domain/taxonomy.py`. The `millefeuille taxonomy` command seals

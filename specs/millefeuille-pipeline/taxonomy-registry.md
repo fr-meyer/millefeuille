@@ -24,9 +24,22 @@ Every artifact uses canonical JSON SHA-256 identity. Canonical hashing removes
 only the top-level `content_identity`, serializes UTF-8 JSON with sorted object
 keys and compact separators, and records `sha256:<64 lowercase hex>`. Registry
 entries and set-like string arrays must also be sorted and duplicate-free.
+Every non-root registry also records both the previous taxonomy version and its
+exact `previous_content_identity`; a root records both as null. Consequently a
+new version cryptographically binds its immediate predecessor instead of
+trusting a reusable version label or a merely compatible entry shape.
+
 Loading fails closed on malformed JSON, unknown or missing fields, padded or
 non-NFC/control-bearing strings, malformed hashes, duplicate IDs or sibling labels,
 invalid parent/replacement links, non-canonical order, and any hash drift.
+
+Collection sizes are bounded before canonical sorting, hashing, or repeated
+validation work: a registry contains at most 512 entries; each entry contains
+at most 32 include rules, exclude rules, and boundary notes; a proposal names
+at most 512 affected entry IDs and 64 evidence references; and an application
+accepts at most four reviews, matching the three required roles plus the one
+optional subject-matter-reviewer role. Runtime validation and the JSON Schemas
+enforce the same limits.
 
 Stable IDs are never recycled. A later version may revise a label, definition,
 or boundary rule, but it cannot move an existing ID to another level or parent
@@ -71,7 +84,16 @@ OpenKB, an index, or a source pack.
 3. `taxonomy lock` derives a self-contained snapshot for a named scope.
 4. `taxonomy propose` binds a released candidate to the exact released base.
    The declared affected IDs must equal the complete entry-level diff. The
-   proposal must include evidence, impact, historical-reclassification choice,
+   candidate's previous content identity must equal the base's content identity.
+   Specific operation names are executable contracts: `add` only adds IDs;
+   `rename` changes labels only; `clarify` changes only definitions, include or
+   exclude rules, or boundary notes; `deprecate` performs only active-to-
+   deprecated transitions with optional replacement IDs; `split` deprecates
+   existing IDs and adds at least two IDs; and `merge` deprecates at least two
+   existing IDs to one common active replacement. A change combining other
+   shapes must declare `mixed`; validation never infers a narrower operation
+   from prose. The proposal must include evidence, impact,
+   historical-reclassification choice,
    and migration instructions. Its active-batch policy is always
    `preserve-locked-version`.
 5. `taxonomy review` creates separate immutable reviews. Apply requires three
@@ -105,14 +127,17 @@ millefeuille taxonomy apply --base-registry taxonomy-v19.json --proposal TCR-202
 ## Rollback
 
 Rollback never reactivates or edits an old file in place. The historical
-source must be compatible with the current base lineage: every source entry ID
-must still exist in the base with the same level and parent. A source-only ID
-therefore rejects the source as non-ancestral. The new released candidate must
-restore every source entry exactly. It must also retain every later base-only
-ID byte-for-value from the current base, with one exception: a later entry that
-is `active` must change only its status to `deprecated`. An already-deprecated
-later entry remains completely unchanged. Labels, definitions, inclusion and
-exclusion rules, boundary notes, parents, levels, and replacement IDs cannot
+source must be the current base's exact content-addressed immediate predecessor:
+both `base.previous_version` and `base.previous_content_identity` must match the
+source. Version-name reuse, a fabricated sealed registry, and a structurally
+compatible but unrelated source therefore fail closed. Every source entry ID
+must also still exist in the base with the same level and parent. The new
+released candidate must restore every source entry exactly. It must also retain
+every later base-only ID byte-for-value from the current base, with one
+exception: a later entry that is `active` must change only its status to
+`deprecated`. An already-deprecated later entry remains completely unchanged.
+Labels, definitions, inclusion and exclusion rules, boundary notes, parents,
+levels, and replacement IDs cannot
 change during rollback. During rollback, the candidate entry-ID set must equal
 the base/source union. This rejects unrelated new IDs.
 
