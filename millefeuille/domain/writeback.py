@@ -55,12 +55,16 @@ def write_writeback_plan(
     paper_id: str | None = None,
     item_key: str | None = None,
     preview_path: str | Path | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
 ) -> WritebackPlanResult:
     resolved = resolve_run_artifacts(
         source_pack_root=source_pack_root,
         run_id=run_id,
         paper_id=paper_id,
         item_key=item_key,
+        artifact_root=artifact_root,
+        stage_manifest=stage_manifest,
     )
     preview_json_path = (
         Path(preview_path)

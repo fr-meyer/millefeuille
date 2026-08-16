@@ -1,0 +1,8 @@
+fix: complete PR #95 delivery gates
+
+Preserve the hard-rename invariant in the migration contract and record the
+canonical MF-005 Speculoos task and publication artifacts.
+
+Task: pr-095-legacy-migration
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/lifecycle-tag-registry.schema.json",
+  "title": "Millefeuille Canonical Lifecycle Tag Registry",
+  "description": "The immutable content-addressed v0.1 lifecycle-tag and observation-only legacy-tag policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "registry_version",
+    "authority",
+    "tags",
+    "transitions",
+    "exception_transition_policy",
+    "legacy_tags",
+    "terminal_success",
+    "write_policy",
+    "content_identity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-lifecycle-tag-registry/v0.1"
+    },
+    "registry_id": {"const": "millefeuille-lifecycle"},
+    "registry_version": {"const": "0.1"},
+    "authority": {"const": "local-artifact-evidence-not-zotero-tags"},
+    "tags": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/tagDefinition"}
+    },
+    "transitions": {
+      "type": "array",
+      "minItems": 19,
+      "maxItems": 19,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to"],
+        "properties": {
+          "from": {"$ref": "#/$defs/tag"},
+          "to": {"$ref": "#/$defs/tag"}
+        }
+      }
+    },
+    "exception_transition_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "destinations"],
+      "properties": {
+        "from": {"const": "any-canonical-state"},
+        "destinations": {
+          "const": [
+            "millefeuille-error",
+            "millefeuille-needs-review"
+          ]
+        }
+      }
+    },
+    "legacy_tags": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/legacyPolicy",
+          "properties": {
+            "match": {"const": "exact"},
+            "selector": {"const": "millefeuille-processed"},
+            "observed_meaning": {
+              "const": "legacy-millefeuille-processing-reported-success"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/legacyPolicy",
+          "properties": {
+            "match": {"const": "prefix"},
+            "selector": {"const": "docai"},
+            "observed_meaning": {"const": "external-predecessor-outcome"}
+          }
+        }
+      ],
+      "items": false
+    },
+    "terminal_success": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tag",
+        "requires_acceptance_pass",
+        "requires_classification_decision",
+        "requires_released_taxonomy_lock"
+      ],
+      "properties": {
+        "tag": {"const": "millefeuille-classified"},
+        "requires_acceptance_pass": {"const": true},
+        "requires_classification_decision": {"const": "classified"},
+        "requires_released_taxonomy_lock": {"const": true}
+      }
+    },
+    "write_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "selection_removal",
+        "legacy_outcome_removal",
+        "historical_tags_preserved_by_default",
+        "requires_current-zotero-version-recheck",
+        "requires_separate_approved-live_writeback"
+      ],
+      "properties": {
+        "mode": {"const": "preview-only"},
+        "selection_removal": {"const": "terminal-success-only"},
+        "legacy_outcome_removal": {"const": "never-auto-propose"},
+        "historical_tags_preserved_by_default": {"const": true},
+        "requires_current-zotero-version-recheck": {"const": true},
+        "requires_separate_approved-live_writeback": {"const": true}
+      }
+    },
+    "content_identity": {"$ref": "#/$defs/contentIdentity"}
+  },
+  "$defs": {
+    "tag": {
+      "enum": [
+        "millefeuille",
+        "millefeuille-previewed",
+        "millefeuille-handoff-exported",
+        "millefeuille-source-verified",
+        "millefeuille-source-packed",
+        "millefeuille-extracted-native",
+        "millefeuille-extracted-ocr",
+        "millefeuille-structure-ready",
+        "millefeuille-summarized",
+        "millefeuille-card-ready",
+        "millefeuille-openkb-added",
+        "millefeuille-indexed",
+        "millefeuille-acceptance-passed",
+        "millefeuille-ready-for-classification",
+        "millefeuille-classified",
+        "millefeuille-needs-review",
+        "millefeuille-error"
+      ]
+    },
+    "tagDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag", "kind", "evidence_stage"],
+      "properties": {
+        "tag": {"$ref": "#/$defs/tag"},
+        "kind": {
+          "enum": [
+            "selection",
+            "progress",
+            "acceptance",
+            "terminal-success",
+            "exception"
+          ]
+        },
+        "evidence_stage": {
+          "type": ["string", "null"],
+          "enum": [
+            null,
+            "discover",
+            "handoff",
+            "recover",
+            "source-pack",
+            "extract-native",
+            "extract-ocr",
+            "structure",
+            "summarize",
+            "card",
+            "openkb-add",
+            "index",
+            "acceptance",
+            "classify"
+          ]
+        }
+      }
+    },
+    "legacyPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "match",
+        "selector",
+        "observed_meaning",
+        "canonical_mapping",
+        "removal_policy"
+      ],
+      "properties": {
+        "match": {"enum": ["exact", "prefix"]},
+        "selector": {"type": "string", "minLength": 1, "maxLength": 128},
+        "observed_meaning": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "canonical_mapping": {"type": "null"},
+        "removal_policy": {"const": "preserve-history"}
+      }
+    },
+    "contentIdentity": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "x-millefeuille-semantic-validation": [
+    "Runtime validation exact-matches the complete registry to the canonical v0.1 policy and recomputes content_identity over canonical UTF-8 JSON excluding content_identity.",
+    "Tag order equals TagState declaration order; normal transitions equal ALLOWED_TAG_TRANSITIONS and exception destinations retain TagState's any-state compatibility.",
+    "millefeuille-processed and every tag beginning with docai are observation-only, have no canonical mapping, and are preserved.",
+    "The checked-in lifecycle-tag-registry.v0.1.json must equal the runtime registry byte-for-content after JSON parsing."
+  ]
+}

@@ -5,11 +5,18 @@ offline-first contract. It is safe to review and test without Zotero
 credentials, PDF bytes, OCR providers, OpenKB writes, source-pack writes,
 GitHub publication, releases, or package-index changes.
 
+Reusable packets for carrying this contract through feature delivery, bounded
+approval, adapter evidence, dogfood, maintenance handoff, migration, and
+release are indexed in the adjacent
+[`millefeuille-delivery`](../millefeuille-delivery/README.md) directory.
+
 Files:
 
 - `vision.md` - complete paper-processing product vision.
 - `remaining-work.md` - end-to-end work pipeline and manual gates.
 - `cli-contract.md` - intended command groups and run modes.
+- `legacy-migration.md` - operator migration and deprecation contract for the
+  original Hydra workflow and the source-pack lifecycle.
 - `stage-manifest.schema.json` - machine-readable stage manifest shape.
 - `artifact-storage.md` - artifact-root and source-pack storage contract.
 - `source-pack-manifest.schema.json` - source-pack source identity and hash
@@ -27,6 +34,18 @@ Files:
   evidence shape.
 - `approved-live-receipts.md` - normative hash, scope, replay, audit, and CLI
   gate contract.
+- `temporary-bridge-ownership.schema.json` - exact ownership and private-asset
+  inventory proof for a future abandoned unpublished bridge generation.
+- `staging-cleanup-inspection.schema.json` - sanitized read-only candidate and
+  capability report.
+- `staging-cleanup-plan.schema.json` - content-addressed exact-candidate
+  quarantine plan.
+- `staging-cleanup-audit.schema.json` - pre-reserved sanitized receipt
+  consumption evidence.
+- `staging-cleanup-disposition.schema.json` - bounded quarantine, rollback, or
+  recovery outcome evidence.
+- `staging-cleanup.md` - normative recognition, receipt, pinned transaction,
+  rollback, and MF-197 disposal boundary.
 - `operator-preflight-packet.schema.json` - exact no-effect operator request,
   readiness controls, and reserved receipt-scope binding.
 - `operator-preflight-result.schema.json` - deterministic sanitized readiness
@@ -59,10 +78,27 @@ Files:
   adjudication action inputs.
 - `classification-action-record.schema.json` - immutable action lineage and
   final-decision refs.
+- `taxonomy-registry.schema.json` and `taxonomy-registry.example.json` -
+  content-addressed two-level registry contract and non-production draft.
+- `taxonomy-lock.schema.json` - immutable batch/pilot/run registry snapshot.
+- `taxonomy-change-proposal.schema.json` and
+  `taxonomy-change-review.schema.json` - exact candidate, impact, migration,
+  and independent approval contracts.
+- `taxonomy-application.schema.json` - governed forward apply/rollback record.
+- `lifecycle-tag-registry.schema.json` and
+  `lifecycle-tag-registry.v0.1.json` - immutable content-addressed lifecycle
+  vocabulary, TagState-compatible transitions, and observation-only legacy
+  policy.
+- `lifecycle-tag-migration-plan.schema.json` - exact item-version, current-tag,
+  run, source, and evidence bindings for a no-effect migration preview.
 - `retrieval-index-contract.md` - OpenKB/PageIndex and optional index lanes.
 - `classification-orchestration.md` - CLI-owned classification modes and
   multi-agent governance.
+- `taxonomy-registry.md` - locking, stable-ID, manual change, and rollback
+  rules.
 - `tag-state-machine.md` - Zotero tag lifecycle design.
+- `lifecycle-tag-migration.md` - normative legacy-observation, evidence
+  derivation, selection-removal, and future MF-160 write boundary.
 - `ocr-backend-contract.md` - native/OCR evidence adapter contract.
 - `release-version-policy.md` - Speculoos-governed release and version path.
 - `release-candidate-preflight.md` - local RC preflight artifacts and stop
@@ -71,9 +107,10 @@ Files:
 
 Approved-live receipt parsing and exact request validation live in
 `millefeuille/domain/live_receipts.py`. The current CLI can validate a receipt
-only as part of its fail-closed manual gate: no validated receipt enables a
-provider call or external write yet, and presenting a receipt in preview or
-read-only mode is rejected.
+as part of its fail-closed stage manual gate. The separate MF-106 maintenance
+executor uses one narrowly scoped receipt only for a same-filesystem local
+quarantine; it does not enable a provider call or external write. Presenting a
+receipt in preview or read-only mode remains rejected.
 
 Offline operator-packet validation lives in
 `millefeuille/domain/operator_preflight.py` and is exposed by
@@ -110,6 +147,33 @@ unverified namespace entries in place for explicit operator cleanup; unavailable
 primitives fail closed before publication. This boundary assumes trusted
 ownership or cooperative same-UID writers: POSIX locks and mode bits do not
 prevent an uncooperative owner from mutating staging after the last check.
+
+Evidence-safe cleanup for those unpublished leftovers lives in
+`millefeuille/domain/staging_cleanup.py` and
+`millefeuille/cli/maintenance.py`. Inspection and content-addressed planning are
+portable and read-only. Linux apply pins roots and descendant parents, uses a
+persistent advisory maintenance lock and pre-reserved consumed audit, and moves
+only strictly recognized zero-byte retrieval generations or manifest-owned
+abandoned bridge generations with descriptor-relative atomic no-replace
+renames. It never deletes; Windows/macOS apply and all permanent disposal remain
+unsupported.
+
+Taxonomy registry validation and pure artifact derivation live in
+`millefeuille/domain/taxonomy.py`. The `millefeuille taxonomy` command seals
+explicit drafts, validates registries/locks, and derives proposals, independent
+reviews, applications, and forward-only rollbacks as JSON without choosing
+labels, replacing files, or making live calls.
+
+Lifecycle-tag registry validation and migration-plan derivation live in
+`millefeuille/domain/lifecycle_tags.py`. The `millefeuille lifecycle-tags`
+command prints or validates the immutable v0.1 registry and derives one
+content-addressed preview from exact local manifest, index, acceptance,
+classification, and released single-run taxonomy-lock evidence. Zotero tags
+remain observations: `millefeuille-processed` and every `docai`-prefixed tag
+are preserved and never satisfy a lifecycle stage. The command never reads or
+writes Zotero, and even a terminal plan can propose removal only of the exact
+`millefeuille` selection tag subject to an MF-160 version recheck and separate
+approved-live authority.
 
 Preview/read-only stage commands now live under `millefeuille/cli/stages.py`:
 `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,

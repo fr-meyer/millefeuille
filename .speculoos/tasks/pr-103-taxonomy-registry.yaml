@@ -1,0 +1,105 @@
+id: pr-103-taxonomy-registry
+roadmap_card: MF-154
+title: Add governed taxonomy registry
+status: in-progress
+branch: feat/pr-mf-154-taxonomy-registry
+base_branch: dev
+github:
+  issue: null
+  pull_request: 103
+  issue_project_item: unavailable
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/103
+  head_sha: null  # Active-task exact-head binding is external; see notes.
+  merge_commit: null
+write_paths:
+  - .speculoos/tasks/pr-103-taxonomy-registry.yaml
+  - README.md
+  - millefeuille/cli/main.py
+  - millefeuille/cli/taxonomy.py
+  - millefeuille/domain/taxonomy.py
+  - specs/millefeuille-pipeline/README.md
+  - specs/millefeuille-pipeline/classification-orchestration.md
+  - specs/millefeuille-pipeline/cli-contract.md
+  - specs/millefeuille-pipeline/remaining-work.md
+  - specs/millefeuille-pipeline/taxonomy-application.schema.json
+  - specs/millefeuille-pipeline/taxonomy-change-proposal.schema.json
+  - specs/millefeuille-pipeline/taxonomy-change-review.schema.json
+  - specs/millefeuille-pipeline/taxonomy-lock.schema.json
+  - specs/millefeuille-pipeline/taxonomy-registry.example.json
+  - specs/millefeuille-pipeline/taxonomy-registry.md
+  - specs/millefeuille-pipeline/taxonomy-registry.schema.json
+  - specs/pr-103-taxonomy-registry/**
+  - tests/test_millefeuille_contract_artifacts.py
+  - tests/test_millefeuille_taxonomy_registry.py
+scope:
+  - add deterministic content-addressed two-level taxonomy registries and
+    immutable scope locks
+  - add offline proposal, independent three-role review, application, and
+    forward-only rollback artifacts with CLI commands
+  - preserve stable IDs during rollback, restore historical entries exactly,
+    and deprecate later-added IDs without mutating their other values
+  - enforce requester, reviewer, and applier separation
+  - add strict JSON Schemas, a deliberately non-authoritative example,
+    governance documentation, and regression coverage
+non_goals:
+  - taxonomy generation or approval of any production taxonomy
+  - credential access, provider/model calls, private-paper reads, source-pack
+    mutation, classification, or live Zotero/OpenKB/PageIndex writes
+  - dev-to-main promotion, release tags, package publication, deployment, or
+    approval bypass
+acceptance:
+  - registry and lock identities are canonical, deterministic, bounded, and
+    fail closed on malformed, duplicate, unknown, or mutable input
+  - proposal, review, application, and rollback artifacts preserve exact
+    lineage and enforce requester/reviewer/applier separation
+  - rollback restores prior entries exactly while retaining and deprecating
+    later-added stable IDs
+  - CLI operations remain repository-local and offline with deterministic,
+    schema-valid outputs
+  - focused tests, full unittest discovery, schema parsing, Ruff, changed-file
+    format, diff, private-data, Speculoos, and publication checks pass
+validation:
+  - ".venv/bin/python -m unittest tests.test_millefeuille_taxonomy_registry tests.test_millefeuille_contract_artifacts"
+  - ".venv/bin/python -m unittest discover -s tests"
+  - ".venv/bin/ruff check ."
+  - ".venv/bin/ruff format --check millefeuille/cli/main.py millefeuille/cli/taxonomy.py millefeuille/domain/taxonomy.py tests/test_millefeuille_contract_artifacts.py tests/test_millefeuille_taxonomy_registry.py"
+  - "git diff --check"
+  - "speculoos validate --task pr-103-taxonomy-registry --validation \"git diff --check\" --json"
+  - "speculoos publish-check --task pr-103-taxonomy-registry --pr-body specs/pr-103-taxonomy-registry/pr-body.md --commit-message specs/pr-103-taxonomy-registry/commit-message.txt --json"
+publication_boundary:
+  statement: Repository-local taxonomy registry, lock, proposal, review,
+    application, rollback contracts, offline CLI operations, schemas,
+    documentation, synthetic example data, tests, and Speculoos metadata only.
+    No taxonomy generation, production approval, credential access,
+    provider/model call, private-paper read, source-pack mutation,
+    classification, live Zotero/OpenKB/PageIndex write, stable-branch
+    promotion, release, tag, package publication, deployment, or approval
+    bypass.
+documentation_impact:
+  status: none
+  rationale: No additional README.md or docs/ edit is needed for this
+    repository-local packaging commit. The feature diff already updates the
+    top-level README and pipeline README, classification orchestration, CLI
+    contract, remaining-work ledger, and dedicated taxonomy registry contract.
+private_data_scan: required; public source, documentation, schemas, synthetic
+  non-authoritative example data, tests, and repository-local Speculoos
+  artifacts only, with no credentials, private papers, provider payloads, or
+  host-specific paths
+publish_authority: Active Millefeuille delivery-train supervisor; routine
+  feature-to-dev publication, exact-head Mergeguez review, policy-gated merge,
+  dependent-PR retargeting, cleanup, and next-episode advancement are approved.
+  Live operations, dev-to-main promotion, release, and deployment remain
+  excluded.
+notes:
+  - The active task head field remains null while the PR is open because
+    embedding a commit's own SHA creates a self-reference cycle. Exact pre-merge
+    review and check evidence bind validation to GitHub's live head.
+  - Current dev was integrated before validation. The obsolete cross-platform
+    CI stack wording is removed from the GitHub publication packet; PR103 now
+    targets dev directly.
+delivery:
+  mode: inherit_branch_policy
+  continue_after_review: true

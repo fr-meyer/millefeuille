@@ -16,9 +16,9 @@ api_key: ${oc.env:PAGEINDEX_API_KEY,""}
 # Base URL for PageIndex API
 base_url: "https://api.pageindex.ai"
 
-# use_sdk: Use PageIndex SDK instead of HTTP API (false = HTTP API, true = SDK)
-# Both HTTP API and SDK modes are production-ready. Setting use_sdk: true enables
-# the PageIndex SDK with full support for upload, OCR retrieval, and cleanup operations.
+# use_sdk: Select SDK instead of HTTP API for the legacy Hydra OCR workflow.
+# Both modes remain supported during the legacy compatibility window. New
+# lifecycle PageIndex ingestion is MCP-only and must not reuse this setting.
 use_sdk: true
 
 # Batch processing configuration

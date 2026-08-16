@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/staging-cleanup-audit.schema.json",
+  "title": "Millefeuille Staging Cleanup Consumption Audit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "receipt_identity",
+    "receipt_digest",
+    "request_digest",
+    "plan_digest",
+    "operation",
+    "candidate_count",
+    "evaluated_at",
+    "secret_material_persisted",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {"const": "millefeuille-staging-cleanup-audit/v0.1"},
+    "status": {"const": "consumed"},
+    "receipt_identity": {"$ref": "staging-cleanup-plan.schema.json#/$defs/digest"},
+    "receipt_digest": {"$ref": "staging-cleanup-plan.schema.json#/$defs/digest"},
+    "request_digest": {"$ref": "staging-cleanup-plan.schema.json#/$defs/digest"},
+    "plan_digest": {"$ref": "staging-cleanup-plan.schema.json#/$defs/digest"},
+    "operation": {"const": "maintenance.quarantine-abandoned-retrieval-staging-and-bridge-assets"},
+    "candidate_count": {"type": "integer", "minimum": 1, "maximum": 256},
+    "evaluated_at": {"$ref": "approved-live-receipt.schema.json#/$defs/canonicalUtcTimestamp"},
+    "secret_material_persisted": {"const": false},
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "content_digest"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "content_digest": {"$ref": "staging-cleanup-plan.schema.json#/$defs/digest"}
+      }
+    }
+  },
+  "x-millefeuille-semantic-validation": [
+    "Compute integrity.content_digest over canonical UTF-8 JSON of every top-level field except integrity; reject duplicate keys, non-finite numbers, unknown fields, secret-bearing material, and a filename that does not equal .mf106-audit-<receipt-digest-hex>.json.",
+    "Reserve the audit atomically and durably before the first candidate move. A reservation is consumed evidence even when a later move fails or rolls back and must never be deleted to reuse authority."
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/temporary-bridge-ownership.schema.json",
+  "title": "Millefeuille Temporary Bridge Ownership",
+  "description": "Content-addressed ownership proof for one abandoned, unpublished temporary bridge generation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "producer_id",
+    "run_id",
+    "bridge_id",
+    "publication_state",
+    "cleanup_state",
+    "inventory",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-temporary-bridge-ownership/v0.1"
+    },
+    "producer_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9][a-z0-9-]*)*$",
+      "maxLength": 256
+    },
+    "run_id": {
+      "allOf": [
+        {"$ref": "approved-live-receipt.schema.json#/$defs/exactIdentity"},
+        {"not": {"pattern": "[Hh][Tt][Tt][Pp][Ss]?://"}}
+      ]
+    },
+    "bridge_id": {
+      "allOf": [
+        {"$ref": "approved-live-receipt.schema.json#/$defs/exactIdentity"},
+        {"not": {"pattern": "[Hh][Tt][Tt][Pp][Ss]?://"}}
+      ]
+    },
+    "publication_state": {"const": "unpublished"},
+    "cleanup_state": {"const": "abandoned"},
+    "inventory": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["relative_path", "type", "size_bytes", "sha256"],
+        "properties": {
+          "relative_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^(?!\\.{1,2}$)[^/\\\\]+$",
+            "not": {"enum": ["ownership.json"]}
+          },
+          "type": {"const": "file"},
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "content_digest"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "content_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  },
+  "x-millefeuille-semantic-validation": [
+    "The generation directory name must match .millefeuille-bridge.tmp- followed by exactly 16 lowercase hexadecimal characters and be a direct child of the explicitly supplied source root.",
+    "Compute integrity.content_digest over canonical UTF-8 JSON of every top-level field except integrity; reject duplicate keys, non-finite numbers, unknown fields, credentials, URLs, and private byte markers.",
+    "Inventory paths must be sorted, unique, flat, slash-normalized relative filenames; ownership.json is reserved and every inventory entry must be a singly linked no-follow regular file.",
+    "The directory entry set must equal ownership.json plus inventory exactly. Every size and SHA-256 must match stable descriptor reads; links, reparse points, hard links, missing entries, extra entries, writable generations, and drift are refusal conditions."
+  ]
+}

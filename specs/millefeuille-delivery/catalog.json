@@ -1,0 +1,307 @@
+{
+  "schema_version": "millefeuille-delivery-template-catalog/v0.1",
+  "placeholder_pattern": "\\{\\{[a-z][a-z0-9_]*\\}\\}",
+  "templates": [
+    {
+      "id": "feature",
+      "path": "templates/feature-packet.md",
+      "purpose": "Plan, review, and close one bounded repository change.",
+      "required_headings": [
+        "Packet Metadata",
+        "Objective",
+        "Dependencies",
+        "Scope",
+        "Non-Goals",
+        "Acceptance Criteria",
+        "Changed Files",
+        "Validation",
+        "Evidence",
+        "Review And Delivery State",
+        "Release Flow",
+        "Publication Boundary"
+      ],
+      "required_placeholders": [
+        "packet_id",
+        "task_id",
+        "title",
+        "owner",
+        "created_at",
+        "status",
+        "base_branch",
+        "head_branch",
+        "objective",
+        "acceptance_criterion",
+        "changed_file",
+        "validation_command",
+        "validation_result"
+      ],
+      "required_markers": [
+        "feature PRs target `dev`",
+        "release/promotion PRs target `main`",
+        "exact reviewed head"
+      ]
+    },
+    {
+      "id": "approval",
+      "path": "templates/approval-packet.md",
+      "purpose": "Bound one credentialed, paid, mutating, or otherwise live operation.",
+      "required_headings": [
+        "Packet Metadata",
+        "Requested Operation",
+        "Exact Boundaries",
+        "Preconditions",
+        "Allowed Operations",
+        "Denied Operations",
+        "Credential And Secret Handling",
+        "Output And Disposal Policy",
+        "Budget And Limits",
+        "Stop Conditions",
+        "Rollback Plan",
+        "Evidence To Capture",
+        "Approval Decision",
+        "Publication Boundary"
+      ],
+      "required_placeholders": [
+        "packet_id",
+        "requester",
+        "approver",
+        "created_at",
+        "expires_at",
+        "staging_tag",
+        "maximum_item_count",
+        "allowed_operation",
+        "output_root",
+        "source_pack_root",
+        "ocr_backend",
+        "provider_budget",
+        "openkb_target",
+        "disposal_policy",
+        "stop_condition",
+        "rollback_action",
+        "decision"
+      ],
+      "required_markers": [
+        "exact staging tag",
+        "maximum Zotero item count",
+        "disposal policy",
+        "stop condition",
+        "separate decision"
+      ]
+    },
+    {
+      "id": "adapter-evidence",
+      "path": "templates/adapter-evidence-packet.md",
+      "purpose": "Prove an adapter preserves identity, integrity, safety, and failure semantics.",
+      "required_headings": [
+        "Packet Metadata",
+        "Objective",
+        "Adapter Boundary",
+        "Source Contract",
+        "Target Contract",
+        "Capability Matrix",
+        "Identity And Integrity Mapping",
+        "Error And Retry Semantics",
+        "Fixtures",
+        "Validation",
+        "Evidence",
+        "Compatibility",
+        "Verdict",
+        "Publication Boundary"
+      ],
+      "required_placeholders": [
+        "packet_id",
+        "adapter_name",
+        "adapter_version",
+        "owner",
+        "created_at",
+        "source_contract",
+        "target_contract",
+        "identity_field",
+        "integrity_field",
+        "fixture_ref",
+        "validation_command",
+        "verdict"
+      ],
+      "required_markers": [
+        "provider payloads",
+        "identity",
+        "integrity",
+        "fail closed"
+      ]
+    },
+    {
+      "id": "dogfood",
+      "path": "templates/dogfood-report.md",
+      "purpose": "Record bounded no-write or separately approved live dogfood evidence.",
+      "required_headings": [
+        "Packet Metadata",
+        "Goal",
+        "Authority And Mode",
+        "Bounded Scenario",
+        "Commands Or Actions Exercised",
+        "Readback",
+        "Safety Invariants",
+        "Evidence",
+        "Friction",
+        "Product Gaps",
+        "Reconciliation",
+        "Carry-Forward Constraints",
+        "Outcome",
+        "Publication Boundary"
+      ],
+      "required_placeholders": [
+        "packet_id",
+        "repository",
+        "owner",
+        "run_at",
+        "run_mode",
+        "approval_packet_ref",
+        "goal",
+        "bounded_input",
+        "action",
+        "readback",
+        "evidence_ref",
+        "friction",
+        "reconciliation",
+        "carry_forward_constraint",
+        "outcome"
+      ],
+      "required_markers": [
+        "planning surfaces only",
+        "not release",
+        "no-write",
+        "Reconciliation",
+        "Carry-Forward Constraints"
+      ]
+    },
+    {
+      "id": "maintenance-handoff",
+      "path": "templates/maintenance-handoff.md",
+      "purpose": "Transfer a restartable maintenance state without relying on chat memory.",
+      "required_headings": [
+        "Packet Metadata",
+        "Handoff Summary",
+        "Current State",
+        "Trigger And Impact",
+        "Owned Surfaces",
+        "Safety Invariants",
+        "Operator Procedure",
+        "Validation",
+        "Evidence",
+        "Rollback And Recovery",
+        "Open Risks",
+        "Restart Instructions",
+        "Next Owner",
+        "Publication Boundary"
+      ],
+      "required_placeholders": [
+        "packet_id",
+        "title",
+        "outgoing_owner",
+        "next_owner",
+        "created_at",
+        "status",
+        "current_head",
+        "current_state",
+        "trigger",
+        "operator_step",
+        "validation_command",
+        "evidence_ref",
+        "rollback_action",
+        "restart_step"
+      ],
+      "required_markers": [
+        "Restart Instructions",
+        "rollback",
+        "current head",
+        "unresolved"
+      ]
+    },
+    {
+      "id": "migration",
+      "path": "templates/migration-packet.md",
+      "purpose": "Move contracts or operators between old and new paths with an explicit retirement gate.",
+      "required_headings": [
+        "Packet Metadata",
+        "Objective",
+        "Current And Target States",
+        "Compatibility Contract",
+        "Inventory And Mapping",
+        "Migration Phases",
+        "Validation",
+        "Evidence",
+        "Rollback And Recovery",
+        "Deprecation And Removal",
+        "Communication",
+        "Decision",
+        "Publication Boundary"
+      ],
+      "required_placeholders": [
+        "packet_id",
+        "migration_name",
+        "owner",
+        "created_at",
+        "source_contract",
+        "target_contract",
+        "compatibility_window",
+        "old_surface",
+        "new_surface",
+        "migration_phase",
+        "validation_command",
+        "rollback_checkpoint",
+        "removal_gate",
+        "decision"
+      ],
+      "required_markers": [
+        "compatibility",
+        "deprecation",
+        "rollback",
+        "removal gate"
+      ]
+    },
+    {
+      "id": "release",
+      "path": "templates/release-packet.md",
+      "purpose": "Assemble promotion, tag, and package evidence while keeping each gate independent.",
+      "required_headings": [
+        "Packet Metadata",
+        "Release Scope",
+        "Included Changes",
+        "Compatibility And Migration",
+        "Validation Matrix",
+        "Approved Live Evidence",
+        "Known Limitations",
+        "Promotion",
+        "Version And Changelog",
+        "Tag",
+        "Package Publication",
+        "Rollback",
+        "Approval Decision",
+        "Publication Boundary"
+      ],
+      "required_placeholders": [
+        "packet_id",
+        "version",
+        "owner",
+        "created_at",
+        "dev_head",
+        "main_base",
+        "included_change",
+        "validation_lane",
+        "validation_result",
+        "live_evidence_ref",
+        "promotion_pr",
+        "release_commit",
+        "tag_name",
+        "package_target",
+        "decision"
+      ],
+      "required_markers": [
+        "`dev` to `main`",
+        "separate approval",
+        "Tag",
+        "Package Publication"
+      ]
+    }
+  ]
+}

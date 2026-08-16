@@ -15,7 +15,7 @@ The separation is:
 
 Production classification requires:
 
-- locked taxonomy version;
+- a released taxonomy registry and an exact, content-addressed lock snapshot;
 - paper card and source-pack refs;
 - extraction, structure, summary, index, and acceptance evidence;
 - model profile for the classification stage when a model is used;
@@ -23,6 +23,12 @@ Production classification requires:
 
 Classification must not run from title keywords alone when the evidence package
 contains deeper paper evidence needed to resolve the decision.
+
+The registry, lock, and manual change lifecycle are defined in
+`taxonomy-registry.md`. Existing v0.1 classification artifacts retain their
+historical opaque `taxonomy_version` for compatibility, but a new live run must
+resolve that version through a valid lock. An active batch stays on its original
+snapshot even after a newer registry is approved.
 
 ## Modes
 

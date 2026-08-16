@@ -30,6 +30,7 @@ from millefeuille.domain.live_receipts import (
     LiveTarget,
     ReceiptReplayState,
     validate_approved_live_receipt,
+    validate_approved_live_receipt_for_no_effect,
 )
 from millefeuille.domain.millefeuille import MillefeuilleContractError, RunMode
 from millefeuille.domain.secure_io import read_bytes_no_follow
@@ -1330,12 +1331,20 @@ def evaluate_operator_preflight(
             approval_receipt.content_digest,
         ):
             raise MillefeuilleContractError("approval receipt identity drift")
-        validate_approved_live_receipt(
-            approval_receipt,
-            packet.to_approved_live_request(),
-            now=now,
-            replay_state=replay_state,
-        )
+        request = packet.to_approved_live_request()
+        if replay_state is None:
+            validate_approved_live_receipt_for_no_effect(
+                approval_receipt,
+                request,
+                now=now,
+            )
+        else:
+            validate_approved_live_receipt(
+                approval_receipt,
+                request,
+                now=now,
+                replay_state=replay_state,
+            )
         approval_validation = ApprovalReceiptValidation(
             receipt_id=approval_receipt.receipt_id,
             content_digest=approval_receipt.content_digest,

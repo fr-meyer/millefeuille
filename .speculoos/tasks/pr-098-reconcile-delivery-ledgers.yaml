@@ -1,0 +1,52 @@
+id: pr-098-reconcile-delivery-ledgers
+roadmap_card: MF-000
+title: Reconcile repository and planning truth
+status: in-progress
+branch: chore/pr-098-ledger-reconciliation
+base_branch: dev
+github:
+  issue: null
+  pull_request: 98
+  issue_project_item: unavailable
+  project_item: unavailable
+  pull_request_project_item: unavailable
+  project_status: unavailable
+  url: https://github.com/fr-meyer/millefeuille/pull/98
+  head_sha: null
+  merge_commit: null
+scope:
+  - reconcile repository-local delivery ledgers through merged PR 88
+  - distinguish stable main from integration dev
+  - clear stale active-PR and review state, then record this reconciliation PR
+  - replace historical validation claims with exact-head evidence requirements
+  - record the unavailable GitHub Project and local Vibe Kanban readback state
+non_goals:
+  - application behavior changes
+  - credentials, provider calls, live reads or writes, or private payloads
+  - dev-to-main promotion, release tags, package publication, or deployment
+  - bypassing exact-head review, checks, or merge policy
+acceptance:
+  - manifest and GitHub completed ledgers contain the same unique task IDs
+  - recorded delivery PRs 71, 73, 75, 77, 79, 80, 82, 84, 86, and 88 have
+    exact merged head, merge, review, and check evidence
+  - repository surfaces distinguish default main from integration dev
+  - active PR and review evidence describe PR 98 without stale historical claims
+  - YAML and JSON parse; ledger, branch-truth, and diff checks pass
+validation:
+  - parse all .speculoos and specs YAML and JSON
+  - compare manifest and GitHub completed task IDs for order and uniqueness
+  - verify default main, integration dev, and active PR 98 invariants
+  - git diff --check
+publication_boundary:
+  statement: Metadata-only reconciliation with no product behavior, credentials,
+    provider calls, live writes, deployment, release, stable-branch mutation, or
+    approval bypass.
+documentation_impact:
+  status: none
+  rationale: This repository-local delivery reconciliation changes no
+    user-facing product behavior or operator workflow.
+notes:
+  - PR 98 supersedes PR 89 solely to satisfy the repository actor policy's
+    chore/pr-* head-branch requirement.
+  - GitHub ProjectV2 remains unavailable because the current credential lacks
+    project scopes; no Project mutation is attempted.

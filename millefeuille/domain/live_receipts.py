@@ -24,6 +24,11 @@ APPROVED_LIVE_RECEIPT_SCHEMA_VERSION = "millefeuille-approved-live-receipt/v0.1"
 APPROVED_LIVE_AUDIT_SCHEMA_VERSION = "millefeuille-approved-live-audit/v0.1"
 APPROVED_LIVE_RECEIPT_MAX_BYTES = 65_536
 APPROVED_LIVE_RECEIPT_MAX_VALIDITY = timedelta(hours=24)
+STAGING_CLEANUP_MAINTENANCE_OPERATION = (
+    "maintenance.quarantine-abandoned-retrieval-staging-and-bridge-assets"
+)
+STAGING_CLEANUP_MAINTENANCE_SELECTOR = "maintenance-plan"
+STAGING_CLEANUP_MAINTENANCE_DISPOSAL = "quarantine-until-mf-197"
 
 _JSON_SAFE_INTEGER_MAX = (1 << 53) - 1
 _RECEIPT_FIELDS = frozenset(
@@ -85,6 +90,7 @@ _SELECTOR_KINDS = frozenset(
         "doi",
         "title",
         "slug",
+        STAGING_CLEANUP_MAINTENANCE_SELECTOR,
     }
 )
 _PDF_DISPOSITIONS = frozenset(
@@ -100,7 +106,12 @@ _PROVIDER_PAYLOAD_DISPOSITIONS = frozenset(
 )
 _PROVIDER_OPERATION_PREFIXES = ("model.", "ocr.")
 _TEMPORARY_FILE_DISPOSITIONS = frozenset(
-    {"delete-after-run", "delete-on-failure", "not-applicable"}
+    {
+        "delete-after-run",
+        "delete-on-failure",
+        "not-applicable",
+        STAGING_CLEANUP_MAINTENANCE_DISPOSAL,
+    }
 )
 _TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
 _SAFE_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@/+\-]{0,255}\Z")
@@ -362,6 +373,7 @@ class ApprovedLiveScope:
             minimum=0,
         )
         _validate_stop_conditions(self.stop_conditions)
+        self._validate_staging_cleanup_scope()
         if _operations_require_provider(self.operations) and self.provider is None:
             raise MillefeuilleContractError(
                 "model and OCR operations require an exact provider and model"
@@ -385,6 +397,40 @@ class ApprovedLiveScope:
                 raise MillefeuilleContractError(
                     "provider payload disposal is required when a provider is bound"
                 )
+
+    def _validate_staging_cleanup_scope(self) -> None:
+        uses_operation = STAGING_CLEANUP_MAINTENANCE_OPERATION in self.operations
+        uses_selector = (
+            self.selector.kind == STAGING_CLEANUP_MAINTENANCE_SELECTOR
+        )
+        uses_disposal = (
+            self.disposal_policy.temporary_files
+            == STAGING_CLEANUP_MAINTENANCE_DISPOSAL
+        )
+        if not (uses_operation or uses_selector or uses_disposal):
+            return
+        if self.operations != (STAGING_CLEANUP_MAINTENANCE_OPERATION,):
+            raise MillefeuilleContractError(
+                "staging cleanup approval must bind its exact maintenance operation"
+            )
+        if not uses_selector or _DIGEST_RE.fullmatch(self.selector.value) is None:
+            raise MillefeuilleContractError(
+                "staging cleanup approval must select an exact maintenance plan digest"
+            )
+        if not uses_disposal:
+            raise MillefeuilleContractError(
+                "staging cleanup approval must use its quarantine disposition"
+            )
+        if (
+            self.disposal_policy.pdfs != "not-applicable"
+            or self.disposal_policy.provider_payloads != "not-applicable"
+            or self.provider is not None
+            or self.max_provider_calls != 0
+            or self.max_cost_usd_micros != 0
+        ):
+            raise MillefeuilleContractError(
+                "staging cleanup approval cannot bind provider or PDF work"
+            )
 
     @classmethod
     def from_dict(cls, payload: object) -> ApprovedLiveScope:
@@ -631,7 +677,12 @@ class ApprovedLiveRequest:
 
 @dataclass(frozen=True)
 class ReceiptReplayState:
-    """Previously consumed receipt identities from a durable audit ledger."""
+    """Previously reserved receipt identities from a durable audit ledger.
+
+    Every verified record reserves its receipt.  Replay safety must not depend
+    on the mutable informational distinction between ``validated`` and
+    ``consumed``.
+    """
 
     receipt_ids: frozenset[str] = frozenset()
     content_digests: frozenset[str] = frozenset()
@@ -753,9 +804,8 @@ class ReceiptReplayState:
                 raise MillefeuilleContractError(
                     "approved-live audit request_digest mismatch"
                 )
-            if status == "consumed":
-                receipt_ids.add(receipt_id)
-                content_digests.add(digest)
+            receipt_ids.add(receipt_id)
+            content_digests.add(digest)
         return cls(frozenset(receipt_ids), frozenset(content_digests))
 
 
@@ -824,6 +874,10 @@ def validate_approved_live_receipt(
 ) -> None:
     """Authorize only an exact, unexpired, unconsumed request scope."""
 
+    if replay_state is None:
+        raise MillefeuilleContractError(
+            "approved-live authorization requires an explicit replay_state"
+        )
     evaluation_time = _normalize_now(now)
     approved_at = _parse_utc_timestamp(
         receipt.approval.approved_at,
@@ -835,7 +889,7 @@ def validate_approved_live_receipt(
     if evaluation_time >= expires_at:
         raise MillefeuilleContractError("approved-live receipt has expired")
 
-    replay = replay_state or ReceiptReplayState()
+    replay = replay_state
     if receipt.receipt_id in replay.receipt_ids:
         raise MillefeuilleContractError(
             "approved-live receipt has already been consumed"
@@ -887,6 +941,24 @@ def validate_approved_live_receipt(
     )
 
 
+def validate_approved_live_receipt_for_no_effect(
+    receipt: ApprovedLiveReceipt,
+    request: ApprovedLiveRequest,
+    *,
+    now: datetime | None = None,
+) -> None:
+    """Validate a receipt only for a boundary that cannot perform live effects.
+
+    This deliberately supplies an empty replay snapshot and therefore must not
+    be used as authorization by a live adapter.  Live authorization calls
+    ``validate_approved_live_receipt`` with an explicitly loaded durable state.
+    """
+
+    validate_approved_live_receipt(
+        receipt, request, now=now, replay_state=ReceiptReplayState()
+    )
+
+
 def build_approved_live_audit_record(
     receipt: ApprovedLiveReceipt,
     request: ApprovedLiveRequest,
@@ -895,7 +967,10 @@ def build_approved_live_audit_record(
     status: str = "validated",
     replay_state: ReceiptReplayState | None = None,
 ) -> dict[str, Any]:
-    """Return a strict allowlisted audit object without credential material."""
+    """Return a strict allowlisted audit object without credential material.
+
+    Omitted replay state fails closed through the authorization primitive.
+    """
 
     if status not in {"validated", "consumed"}:
         raise MillefeuilleContractError("approved-live audit status is unsupported")

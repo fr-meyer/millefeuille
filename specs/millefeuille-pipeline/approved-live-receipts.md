@@ -5,7 +5,10 @@ Millefeuille action. A receipt records approval; it is not a credential, a
 transferable capability, a provider adapter, or permission to widen the requested
 work. The current stage CLI validates receipts only to prove that its manual
 gate fails closed. It still performs no provider call, Zotero/OpenKB/index
-mutation, PDF recovery, or live source-pack write.
+mutation, PDF recovery, or live source-pack write. The separate MF-106 local
+maintenance executor is the first receipt consumer: it can only atomically
+quarantine strictly proven abandoned unpublished staging on supported Linux
+filesystems and never performs permanent disposal or an external write.
 
 ## Normative Artifacts
 
@@ -27,7 +30,7 @@ One receipt binds all of the following:
 - a sorted, unique list of exact operation IDs;
 - a sorted, unique list of target kind/ID pairs;
 - one exact Zotero tag/query, paper/item identity, source pack, DOI, title,
-  slug, or batch-manifest selector;
+  slug, batch-manifest, or content-addressed maintenance-plan selector;
 - the execution item cap and, at authorization time, a selected count no
   greater than that cap;
 - normalized absolute output and source-pack roots;
@@ -50,6 +53,12 @@ integer millionths of one US dollar so accounting never depends on floating
 point. `model.*` and `ocr.*` operations always require an exact provider/model
 binding; they cannot be authorized with a null provider.
 
+`maintenance-plan` and temporary-file disposal
+`quarantine-until-mf-197` are narrow backward-compatible enum extensions. A
+maintenance request must bind the selector value to its exact cleanup-plan
+digest and use the quarantine disposition; accepting either enum does not
+widen any other operation or an older receipt.
+
 ## Time and Single Use
 
 Approval and expiry are canonical UTC timestamps with whole seconds. Expiry
@@ -61,16 +70,27 @@ approved_at <= evaluation_time < expires_at
 ```
 
 Live executors must build `ReceiptReplayState` from a durable audit ledger and
-reject a previously consumed receipt ID or content digest before any external
-effect. They must reserve or record consumption atomically with their
+reject a previously reserved receipt ID or content digest before any external
+effect. The live authorization and audit-builder APIs fail closed when callers
+omit replay state; an explicit state loaded from the durable ledger is
+mandatory. Only the separately named no-effect validation helper may use an
+empty snapshot, and it must never guard a live adapter. They must reserve or
+record consumption atomically with their
 execution boundary; a crash after reservation requires explicit operator
-resolution, never automatic replay. A `validated` audit record proves only a
-no-effect gate check and does not consume the receipt. Only `consumed` records
-enter replay state.
+resolution, never automatic replay.
 
-The current CLI never records consumption because it cannot execute live work.
+Every structurally and cryptographically verified durable audit record enters
+replay state, including a `validated` no-effect record. The
+`validated|consumed` status is informational and never controls replay
+reservation. This conservative rule means changing that mutable status cannot
+make a single-use receipt reusable.
+
+The stage CLI never records consumption because it cannot execute live work.
 After successful receipt validation it still exits through the unsupported-live
-gate.
+gate. MF-106 instead reserves a sanitized `consumed` maintenance audit before
+its first local move. The reservation remains consumed after any failure or
+rollback. An exact completed rerun may no-op against the matching audit; every
+other retry or recovery requires a new plan and separately approved receipt.
 
 ## Content Identity and Approval Authenticity
 
@@ -112,30 +132,50 @@ the supplied value in an error.
 - `secret_material_persisted: false`.
 
 The builder reruns liveness, replay, and exact-scope authorization at the
-recorded evaluation time before it emits either status. It cannot manufacture a
+recorded evaluation time before it emits either status. If a caller durably
+records either result, that record reserves the receipt; callers that need a
+non-reserving diagnostic must not append it to the replay ledger. It cannot manufacture a
 `validated` or `consumed` record for a mismatched, expired, or replayed request.
 
 It never serializes credentials, request headers, private bytes, prompts,
 provider responses, authenticated URLs, or arbitrary caller fields.
 
-## Current CLI Gate
+## Current CLI Gates
 
-All current stage commands accept `--approval-receipt <json>` alongside
-`--mode`. The rules are:
+All current stage commands accept `--approval-receipt <json>` alongside `--mode`.
+They use the explicitly no-effect receipt validator, never the live-authorization
+primitive. The rules are:
 
 1. `--approval-receipt` with `preview` or `read-only-live` exits at the gate.
    A receipt never changes the selected mode.
 2. Live writeback requires both explicit `--mode approved-live` and explicit
    `--writeback approved-live`, plus a receipt. Neither flag implies the other.
 3. The present single-run gate derives one operation, one target/selector,
-   item cap `1`, run ID, and canonical source-pack root from CLI arguments.
-   Until an explicit artifact root exists, that same canonical root is the
-   bound output root.
-4. The present CLI has no provider execution controls, so its request binds a
+   item cap `1`, run ID, canonical source-pack root, and effective output root
+   from CLI arguments. The output root is the source-pack root only when
+   `--artifact-root` is omitted or explicitly set to `source-pack`; otherwise
+   it is the normalized path supplied by `--artifact-root`.
+4. The request independently requires all three explicit
+   `--approved-live-*-disposal` controls and one or more repeated
+   `--approved-live-stop-condition` values. Missing controls refuse
+   validation; receipt values are never copied into the request.
+5. The present CLI has no provider execution controls, so its request binds a
    null provider and zero provider limits.
-5. A missing, expired, replayed, tampered, secret-bearing, over-broad, or
+6. A missing, expired, replayed, tampered, secret-bearing, over-broad, or
    drifted receipt is rejected. A valid receipt is reported by content digest,
    then execution still exits as unsupported.
+
+The independent `maintenance staging` surface adds these rules:
+
+1. `inspect` and `plan` are read-only and do not accept a receipt.
+2. `apply` defaults to a no-effect preview refusal and requires explicit
+   `--mode approved-live` plus `--approval-receipt`.
+3. Its request is derived from the loaded content-addressed plan and canonical
+   roots, including every exact candidate kind/path, count, disposal, and stop
+   condition. Scope is never copied from the receipt.
+4. Apply is limited to the Linux pinned-directory, advisory-lock, same-device,
+   atomic no-replace boundary described in `staging-cleanup.md`. Windows and
+   macOS refuse before audit reservation or mutation.
 
 Batch and commands without an exact current run/target/root binding remain
 fail-closed. Future live adapters must independently derive every request

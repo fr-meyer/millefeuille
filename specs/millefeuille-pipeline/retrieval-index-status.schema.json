@@ -28,7 +28,10 @@
     },
     "source_hash": {
       "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
+      "pattern": "^sha256(?:-aggregate)?:[0-9a-f]{64}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
     },
     "selected_fulltext_ref": {
       "type": "string",
