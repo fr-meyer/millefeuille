@@ -1,0 +1,383 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/lifecycle-tag-migration-plan.schema.json",
+  "title": "Millefeuille Lifecycle Tag Migration Plan",
+  "description": "A content-addressed preview of exact evidence-backed lifecycle additions and the sole conditionally proposed selection-tag removal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "registry",
+    "item",
+    "run",
+    "evidence",
+    "derived_lifecycle_tags",
+    "observed_legacy_tags",
+    "unsubstantiated_lifecycle_tags",
+    "proposed_adds",
+    "proposed_removes",
+    "preserved_tags",
+    "writeback",
+    "policy_assertions",
+    "content_identity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-lifecycle-tag-migration-plan/v0.1"
+    },
+    "plan_id": {"$ref": "#/$defs/safeIdentity"},
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registry_id", "registry_version", "content_identity"],
+      "properties": {
+        "registry_id": {"const": "millefeuille-lifecycle"},
+        "registry_version": {"const": "0.1"},
+        "content_identity": {"$ref": "#/$defs/contentIdentity"}
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_key", "zotero_version", "current_tags"],
+      "properties": {
+        "item_key": {"$ref": "#/$defs/safeIdentity"},
+        "zotero_version": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+        "current_tags": {"$ref": "#/$defs/observedTagArray"}
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paper_id", "run_id", "source_hash"],
+      "properties": {
+        "paper_id": {"$ref": "#/$defs/safeIdentity"},
+        "run_id": {"$ref": "#/$defs/safeIdentity"},
+        "source_hash": {
+          "type": "string",
+          "pattern": "^sha256(?:-aggregate)?:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage_manifest",
+        "artifact_index",
+        "acceptance_summary",
+        "classification_plan",
+        "classification_decision",
+        "taxonomy_lock"
+      ],
+      "properties": {
+        "stage_manifest": {
+          "$ref": "#/$defs/evidenceBinding",
+          "properties": {
+            "artifact_ref": {"const": "stage-manifest.json"},
+            "schema_version": {"const": "millefeuille-stage-manifest/v0.1"}
+          }
+        },
+        "artifact_index": {
+          "$ref": "#/$defs/evidenceBinding",
+          "properties": {
+            "artifact_ref": {"const": "artifact-index.json"},
+            "schema_version": {"const": "millefeuille-artifact-index/v0.1"}
+          }
+        },
+        "acceptance_summary": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "$ref": "#/$defs/evidenceBinding",
+              "properties": {
+                "artifact_ref": {"const": "reports/acceptance-summary.json"},
+                "schema_version": {
+                  "const": "openkb-millefeuille-acceptance-summary/v0.1"
+                }
+              }
+            }
+          ]
+        },
+        "classification_plan": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "$ref": "#/$defs/evidenceBinding",
+              "properties": {
+                "artifact_ref": {
+                  "const": "classification/classification-plan.json"
+                },
+                "schema_version": {
+                  "const": "millefeuille-classification-plan/v0.1"
+                }
+              }
+            }
+          ]
+        },
+        "classification_decision": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "$ref": "#/$defs/evidenceBinding",
+              "properties": {
+                "schema_version": {
+                  "const": "millefeuille-classification-decision/v0.1"
+                }
+              }
+            }
+          ]
+        },
+        "taxonomy_lock": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/taxonomyLockBinding"}
+          ]
+        }
+      }
+    },
+    "derived_lifecycle_tags": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/tagEvidence"}
+    },
+    "observed_legacy_tags": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tag",
+          "policy_id",
+          "observed_meaning",
+          "canonical_mapping",
+          "removal_policy"
+        ],
+        "properties": {
+          "tag": {"$ref": "#/$defs/observedTag"},
+          "policy_id": {
+            "enum": [
+              "legacy-millefeuille-processed",
+              "legacy-docai-family"
+            ]
+          },
+          "observed_meaning": {
+            "enum": [
+              "legacy-millefeuille-processing-reported-success",
+              "external-predecessor-outcome"
+            ]
+          },
+          "canonical_mapping": {"type": "null"},
+          "removal_policy": {"const": "preserve-history"}
+        }
+      }
+    },
+    "unsubstantiated_lifecycle_tags": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/lifecycleTag"}
+    },
+    "proposed_adds": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/tagEvidence",
+        "required": ["tag", "reason", "evidence"],
+        "properties": {
+          "reason": {"const": "canonical-local-evidence-satisfied"}
+        }
+      }
+    },
+    "proposed_removes": {
+      "type": "array",
+      "maxItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tag", "reason", "preconditions"],
+        "properties": {
+          "tag": {"const": "millefeuille"},
+          "reason": {"const": "terminal-success-evidence-satisfied"},
+          "preconditions": {
+            "const": [
+              "acceptance-pass-revalidated",
+              "classification-decision-revalidated",
+              "separate-approved-live-writeback",
+              "taxonomy-lock-revalidated",
+              "zotero-version-rechecked"
+            ]
+          }
+        }
+      }
+    },
+    "preserved_tags": {"$ref": "#/$defs/observedTagArray"},
+    "writeback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "status",
+        "expected_zotero_version",
+        "external_effects_performed",
+        "requires_mf160_executor",
+        "requires_separate_approval"
+      ],
+      "properties": {
+        "mode": {"const": "preview"},
+        "status": {"const": "not-executed"},
+        "expected_zotero_version": {"$ref": "#/$defs/nonNegativeSafeInteger"},
+        "external_effects_performed": {"const": false},
+        "requires_mf160_executor": {"const": true},
+        "requires_separate_approval": {"const": true}
+      }
+    },
+    "policy_assertions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "legacy_tags_used_as_evidence",
+        "historical_legacy_tags_auto_removed",
+        "zotero_write_performed",
+        "docai_pageindex_implies_indexed",
+        "millefeuille_processed_implies_lifecycle_success"
+      ],
+      "properties": {
+        "legacy_tags_used_as_evidence": {"const": false},
+        "historical_legacy_tags_auto_removed": {"const": false},
+        "zotero_write_performed": {"const": false},
+        "docai_pageindex_implies_indexed": {"const": false},
+        "millefeuille_processed_implies_lifecycle_success": {"const": false}
+      }
+    },
+    "content_identity": {"$ref": "#/$defs/contentIdentity"}
+  },
+  "$defs": {
+    "safeIdentity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@+\\-/]*$"
+    },
+    "contentIdentity": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "nonNegativeSafeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "observedTag": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^\\S(?:[^\\r\\n\\u0000-\\u001f]*\\S)?$"
+    },
+    "observedTagArray": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/observedTag"}
+    },
+    "lifecycleTag": {
+      "enum": [
+        "millefeuille",
+        "millefeuille-previewed",
+        "millefeuille-handoff-exported",
+        "millefeuille-source-verified",
+        "millefeuille-source-packed",
+        "millefeuille-extracted-native",
+        "millefeuille-extracted-ocr",
+        "millefeuille-structure-ready",
+        "millefeuille-summarized",
+        "millefeuille-card-ready",
+        "millefeuille-openkb-added",
+        "millefeuille-indexed",
+        "millefeuille-acceptance-passed",
+        "millefeuille-ready-for-classification",
+        "millefeuille-classified",
+        "millefeuille-needs-review",
+        "millefeuille-error"
+      ]
+    },
+    "evidenceName": {
+      "enum": [
+        "stage_manifest",
+        "artifact_index",
+        "acceptance_summary",
+        "classification_plan",
+        "classification_decision",
+        "taxonomy_lock"
+      ]
+    },
+    "evidenceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_ref", "schema_version", "content_identity"],
+      "properties": {
+        "artifact_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._@+-]{0,254}(?:/[A-Za-z0-9][A-Za-z0-9._@+-]{0,254})*$"
+        },
+        "schema_version": {"type": "string", "minLength": 1, "maxLength": 256},
+        "content_identity": {"$ref": "#/$defs/contentIdentity"}
+      }
+    },
+    "taxonomyLockBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_ref",
+        "schema_version",
+        "content_identity",
+        "lock_id",
+        "scope_type",
+        "scope_id",
+        "taxonomy_version"
+      ],
+      "properties": {
+        "artifact_ref": {"const": "taxonomy-lock.json"},
+        "schema_version": {"const": "millefeuille-taxonomy-lock/v0.1"},
+        "content_identity": {"$ref": "#/$defs/contentIdentity"},
+        "lock_id": {"$ref": "#/$defs/safeIdentity"},
+        "scope_type": {"const": "single-run"},
+        "scope_id": {"$ref": "#/$defs/safeIdentity"},
+        "taxonomy_version": {"$ref": "#/$defs/safeIdentity"}
+      }
+    },
+    "tagEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag", "evidence"],
+      "properties": {
+        "tag": {"$ref": "#/$defs/lifecycleTag"},
+        "reason": {"const": "canonical-local-evidence-satisfied"},
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/evidenceName"}
+        }
+      }
+    }
+  },
+  "x-millefeuille-semantic-validation": [
+    "Runtime validation rejects duplicate/unknown fields, non-finite numbers, non-NFC strings, interior controls, unsafe refs, noncanonical ordering, and content-identity drift.",
+    "The plan binds exact current Zotero tags and version plus stage-manifest, artifact-index, paper, run, source, acceptance, classification, and released single-run taxonomy-lock identities.",
+    "Existing tags are observations only. millefeuille-processed and every docai-prefixed tag are preserved and cannot derive a lifecycle tag; docai-pageindex never derives millefeuille-indexed.",
+    "millefeuille-classified requires acceptance pass, a classified decision, and an exact released taxonomy lock for the same single run.",
+    "Only the exact millefeuille selection tag may appear in proposed_removes, only after terminal success, and MF-160 must recheck the Zotero version and separate approval before any write.",
+    "Every proposed addition equals a missing evidence-derived lifecycle tag; unsubstantiated current lifecycle tags remain observations and are reported rather than removed.",
+    "The command is preview-only: external_effects_performed remains false and no plan authorizes a Zotero read or write."
+  ]
+}

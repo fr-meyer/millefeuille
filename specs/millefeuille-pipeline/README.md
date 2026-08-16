@@ -76,12 +76,20 @@ Files:
   `taxonomy-change-review.schema.json` - exact candidate, impact, migration,
   and independent approval contracts.
 - `taxonomy-application.schema.json` - governed forward apply/rollback record.
+- `lifecycle-tag-registry.schema.json` and
+  `lifecycle-tag-registry.v0.1.json` - immutable content-addressed lifecycle
+  vocabulary, TagState-compatible transitions, and observation-only legacy
+  policy.
+- `lifecycle-tag-migration-plan.schema.json` - exact item-version, current-tag,
+  run, source, and evidence bindings for a no-effect migration preview.
 - `retrieval-index-contract.md` - OpenKB/PageIndex and optional index lanes.
 - `classification-orchestration.md` - CLI-owned classification modes and
   multi-agent governance.
 - `taxonomy-registry.md` - locking, stable-ID, manual change, and rollback
   rules.
 - `tag-state-machine.md` - Zotero tag lifecycle design.
+- `lifecycle-tag-migration.md` - normative legacy-observation, evidence
+  derivation, selection-removal, and future MF-160 write boundary.
 - `ocr-backend-contract.md` - native/OCR evidence adapter contract.
 - `release-version-policy.md` - Speculoos-governed release and version path.
 - `release-candidate-preflight.md` - local RC preflight artifacts and stop
@@ -146,6 +154,17 @@ Taxonomy registry validation and pure artifact derivation live in
 explicit drafts, validates registries/locks, and derives proposals, independent
 reviews, applications, and forward-only rollbacks as JSON without choosing
 labels, replacing files, or making live calls.
+
+Lifecycle-tag registry validation and migration-plan derivation live in
+`millefeuille/domain/lifecycle_tags.py`. The `millefeuille lifecycle-tags`
+command prints or validates the immutable v0.1 registry and derives one
+content-addressed preview from exact local manifest, index, acceptance,
+classification, and released single-run taxonomy-lock evidence. Zotero tags
+remain observations: `millefeuille-processed` and every `docai`-prefixed tag
+are preserved and never satisfy a lifecycle stage. The command never reads or
+writes Zotero, and even a terminal plan can propose removal only of the exact
+`millefeuille` selection tag subject to an MF-160 version recheck and separate
+approved-live authority.
 
 Preview/read-only stage commands now live under `millefeuille/cli/stages.py`:
 `extract-native`, `extract-ocr`, `route`, `structure`, `summarize`, `card`,

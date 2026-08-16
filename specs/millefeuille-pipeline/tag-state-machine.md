@@ -3,6 +3,13 @@
 Tags should represent stage state, not final classification truth. They are
 secondary to handoff/source-pack/OpenKB evidence.
 
+The machine-readable v0.1 authority is
+`lifecycle-tag-registry.v0.1.json`, validated by
+`lifecycle-tag-registry.schema.json` and the runtime exact-policy validator.
+Its ordered tags match `TagState`, and its normal transitions match
+`ALLOWED_TAG_TRANSITIONS`. See `lifecycle-tag-migration.md` for the offline,
+content-addressed migration preview and its separate approval boundary.
+
 ## Suggested Tags
 
 - `millefeuille`
@@ -94,3 +101,14 @@ is acceptable.
 - Removing a staging tag is a separate write action and requires approval.
 - Tag writeback is separate from stage execution. A stage can pass in the
   manifest while the live Zotero tag write remains preview-only until approved.
+- Zotero tags are observations, never stage evidence. The exact
+  `millefeuille-processed` tag and every `docai`-prefixed tag are legacy
+  observations with no canonical mapping and must be preserved by MF-161.
+- `docai-pageindex` does not imply `millefeuille-indexed`; indexing requires a
+  passed index stage and explicit final lane evidence.
+- `millefeuille-classified` requires a passing acceptance summary, a classified
+  decision, and the released taxonomy version locked to the exact single run.
+- An offline migration preview may propose removing only the exact
+  `millefeuille` selection tag, only after terminal success. MF-160 must recheck
+  the current Zotero item version and obtain separate approved-live authority
+  before any mutation.

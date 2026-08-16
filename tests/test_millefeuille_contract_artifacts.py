@@ -19,6 +19,7 @@ REQUIRED_DOCS = [
     "classification-orchestration.md",
     "taxonomy-registry.md",
     "tag-state-machine.md",
+    "lifecycle-tag-migration.md",
     "ocr-backend-contract.md",
     "release-version-policy.md",
     "release-candidate-preflight.md",
@@ -47,6 +48,8 @@ REQUIRED_JSON_SCHEMAS = [
     "taxonomy-change-proposal.schema.json",
     "taxonomy-change-review.schema.json",
     "taxonomy-application.schema.json",
+    "lifecycle-tag-registry.schema.json",
+    "lifecycle-tag-migration-plan.schema.json",
     "model-execution-evidence.schema.json",
     "model-execution-plan.schema.json",
     "model-provenance-record.schema.json",
@@ -106,6 +109,14 @@ class TestMillefeuilleContractArtifacts(unittest.TestCase):
                 schema = json.loads((SPEC_DIR / name).read_text(encoding="utf-8"))
                 self.assertIn("title", schema)
                 self.assertIn("type", schema)
+
+        registry = json.loads(
+            (SPEC_DIR / "lifecycle-tag-registry.v0.1.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            registry["schema_version"],
+            "millefeuille-lifecycle-tag-registry/v0.1",
+        )
 
     def test_stage_manifest_schema_is_parseable_and_names_required_stages(self):
         schema = json.loads(
