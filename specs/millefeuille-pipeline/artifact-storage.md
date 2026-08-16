@@ -156,6 +156,15 @@ Every non-trivial run should emit:
 - `completion-gate-result.json`
 - `zotero-writeback-plan.json` when Zotero state would change
 
+The read-only status surface consumes `completion-gate-result.json` only as a
+strict `millefeuille-completion-gate-result/v0.1` public JSON artifact owned by
+the release stage. A future approved-live writeback result is a strict
+`millefeuille-zotero-writeback-result/v0.1` public JSON artifact owned by the
+writeback stage. Both are content-addressed, contain sanitized identities and
+counts only, and require the applicable manual approval upstream. A writeback
+result also binds the exact source-pack item version and exact observed
+post-write item version; status never creates either record.
+
 An offline acceptance batch additionally emits one run-scoped acceptance
 summary per validated locator plus
 `batches/millefeuille/<batch-id>/reports/acceptance-batch-summary.{json,md}`.

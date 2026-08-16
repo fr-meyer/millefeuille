@@ -1,0 +1,9 @@
+feat(status): complete strict status observability joins
+
+Record the canonical MF-141 task and publication artifacts after integrating
+current dev and validating deterministic read-only status joins, sanitized
+observations, and non-authoritative readiness boundaries.
+
+Task: pr-107-status-observability
+
+Co-authored-by: mergeguez[bot] <285669409+mergeguez[bot]@users.noreply.github.com>

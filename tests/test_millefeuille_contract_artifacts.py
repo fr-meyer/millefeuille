@@ -26,6 +26,7 @@ REQUIRED_DOCS = [
     "live-run-plan.md",
     "approved-live-receipts.md",
     "operator-preflight.md",
+    "status-observability.md",
 ]
 
 REQUIRED_JSON_SCHEMAS = [
@@ -57,6 +58,10 @@ REQUIRED_JSON_SCHEMAS = [
     "approved-live-audit.schema.json",
     "operator-preflight-packet.schema.json",
     "operator-preflight-result.schema.json",
+    "status.schema.json",
+    "status-observation.schema.json",
+    "completion-gate-result.schema.json",
+    "zotero-writeback-result.schema.json",
 ]
 
 REQUIRED_STAGES = {

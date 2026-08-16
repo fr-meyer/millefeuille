@@ -52,6 +52,15 @@ Files:
   result shape.
 - `operator-preflight.md` - normative packet, credential-reference,
   authorization-context, output, and exit-code contract.
+- `status.schema.json` - deterministic sanitized joined-status output.
+- `status-observation.schema.json` - strict non-authoritative local evidence
+  envelope.
+- `completion-gate-result.schema.json` - content-addressed quality claim used
+  by the status join.
+- `zotero-writeback-result.schema.json` - content-addressed sanitized
+  approved-live result claim used by the status join.
+- `status-observability.md` - normative read-only join, safety, authority, and
+  strict-exit contract.
 - `hierarchical-summary.schema.json` - page/section/paper summary shape.
 - `paper-card.schema.json` - compact human/agent card shape.
 - `retrieval-index-status.schema.json` - retrieval/index lane status shape.

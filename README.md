@@ -668,6 +668,7 @@ Zotero/OpenKB/index/source-pack state.
 millefeuille artifacts --index /path/to/artifact-index.json
 millefeuille status --index /path/to/artifact-index.json
 millefeuille status --artifact-root /path/to/run --strict
+millefeuille status --source-pack-root /path/to/source-packs --paper-id zotero-ITEM1 --run-id run-001 --strict
 ```
 
 These commands are intentionally outside the Hydra pipeline path. They do not
@@ -680,9 +681,23 @@ Use `--json` when another tool or agent needs machine-readable output:
 millefeuille status --index /path/to/artifact-index.json --json
 ```
 
-`millefeuille status --strict` exits with code `2` when the artifact index has
-blocking stage, index, or approved-live writeback states such as `failed`,
-`needs-review`, `manual-gate`, or `not-started`.
+The canonical source-pack form joins the manifest identity, stage manifest,
+artifact index, exact index lanes and selected/card/summary refs, acceptance,
+single-paper classification, and writeback plan/result refs. Repeat
+`--evidence <json>` for strict local Zotero-state, provider-usage,
+index-ledger, quality, or writeback-result observations. These envelopes are
+non-authoritative, contain sanitized counts/digests/states only, and never
+trigger a live call. Missing evidence is `not-observed`; it blocks only when a
+canonical passed stage or approved-live writeback claim requires it.
+Live-state evidence must match the one exact source-pack Zotero version, or
+the exact post-write version in a bound result; missing or conflicting
+multi-source versions fail closed.
+
+`millefeuille status --strict` exits with code `2` for any joined blocker, not
+only artifact-index status. Contract drift or unsafe paths return `3`.
+Approved-live output can be `observational-live-ready`, never an authoritative
+or unqualified live completion. See
+`specs/millefeuille-pipeline/status-observability.md`.
 
 Dry-run artifact writing can seed the artifact/status surface from the existing
 Zotero discovery and OpenKB handoff preview path:
