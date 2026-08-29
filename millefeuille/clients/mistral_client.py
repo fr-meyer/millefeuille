@@ -5,6 +5,7 @@ OCR API, handling file uploads, OCR processing, and result parsing into domain m
 """
 
 from collections.abc import Callable
+from dataclasses import dataclass
 import logging
 import re
 import time
@@ -23,6 +24,15 @@ from .exceptions import (
 from .ocr_client import OCRClient, OCRProvider
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class MistralOCRExecution:
+    """Transient OCR output with exact request/response model attribution."""
+
+    requested_model: str
+    returned_model: str | None
+    pages: list[PageContent]
 
 
 class MistralClient(OCRClient):
@@ -370,6 +380,32 @@ class MistralClient(OCRClient):
         return markdown
 
     def process_pdf(self, doc_id: str) -> list[PageContent]:
+        """Process a PDF while preserving the legacy page-list interface."""
+
+        return self._process_pdf_execution(
+            doc_id,
+            require_model_attribution=False,
+        ).pages
+
+    def process_pdf_with_attribution(self, doc_id: str) -> MistralOCRExecution:
+        """Process one PDF and require exact returned-model attribution.
+
+        Approved-live consumers should use this method and persist only the
+        requested and returned model IDs plus independently sanitized evidence,
+        never the provider response or extracted page payloads.
+        """
+
+        return self._process_pdf_execution(
+            doc_id,
+            require_model_attribution=True,
+        )
+
+    def _process_pdf_execution(
+        self,
+        doc_id: str,
+        *,
+        require_model_attribution: bool,
+    ) -> MistralOCRExecution:
         """Process a PDF through Mistral OCR API and extract page content.
 
         This method sends the signed URL (retrieved internally from doc_id) to
@@ -424,6 +460,13 @@ class MistralClient(OCRClient):
                 extract_header=self.config.extract_header,
                 extract_footer=self.config.extract_footer,
             )
+            returned_model = getattr(ocr_response, "model", None)
+            if not isinstance(returned_model, str) or not returned_model.strip():
+                returned_model = None
+                if require_model_attribution:
+                    raise MistralOCRError(
+                        "Mistral OCR response model attribution is missing"
+                    )
 
             # Parse pages into PageContent objects
             pages = []
@@ -495,7 +538,11 @@ class MistralClient(OCRClient):
                 pages.append(page_content)
 
             logger.info(f"Successfully processed PDF: {len(pages)} pages extracted")
-            return pages
+            return MistralOCRExecution(
+                requested_model=self.config.model,
+                returned_model=returned_model,
+                pages=pages,
+            )
 
         except MistralError as e:
             error_msg = f"Failed to process PDF via OCR API: {str(e)}"
