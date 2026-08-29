@@ -26,6 +26,9 @@ from millefeuille.domain.live_receipts import (
     load_approved_live_receipt,
     validate_approved_live_receipt_for_no_effect,
 )
+from millefeuille.domain.local_structure import (
+    prepare_local_structures_from_route_evidence,
+)
 from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
     RunMode,
@@ -48,6 +51,9 @@ from millefeuille.domain.retrieve import (
     write_retrieval_batch_result,
 )
 from millefeuille.domain.stage_runtime import resolve_run_artifacts
+from millefeuille.domain.summary_preparation import (
+    prepare_summary_execution_packages,
+)
 from millefeuille.domain.writeback import write_writeback_plan
 
 CANONICAL_RUN_STAGES = (
@@ -103,7 +109,21 @@ def run_stage_cli(
     if mode_exit is not None:
         return mode_exit
     try:
-        if args.command in {stage.value for stage in OFFLINE_FIXTURE_STAGES}:
+        if args.command == "structure-prepare":
+            result = prepare_local_structures_from_route_evidence(
+                route_evidence_paths=args.route_evidence,
+                output_dir=args.output_dir,
+            )
+            payload = result.to_dict()
+        elif args.command == "summarize-prepare":
+            result = prepare_summary_execution_packages(
+                route_evidence_paths=args.route_evidence,
+                structure_evidence_paths=args.structure_evidence,
+                output_dir=args.output_dir,
+                profile=args.profile,
+            )
+            payload = result.to_dict()
+        elif args.command in {stage.value for stage in OFFLINE_FIXTURE_STAGES}:
             result = write_offline_fixture_stage(
                 stage=args.command,
                 evidence_path=args.evidence,
@@ -320,6 +340,48 @@ def _build_parser() -> argparse.ArgumentParser:
         _add_run_locator_args(fixture_stage)
         fixture_stage.add_argument("--evidence", required=True)
         fixture_stage.add_argument("--json", action="store_true")
+
+    structure_prepare = subparsers.add_parser(
+        "structure-prepare",
+        help=(
+            "Prepare deterministic provider-free structure evidence from selected "
+            "Markdown without writing source packs."
+        ),
+    )
+    structure_prepare.add_argument(
+        "--route-evidence",
+        action="append",
+        required=True,
+        help=(
+            "Route-selection evidence JSON/JSONL; repeat for multiple files. "
+            "Its Markdown path is resolved relative to the evidence file."
+        ),
+    )
+    structure_prepare.add_argument("--output-dir", required=True)
+    structure_prepare.add_argument("--json", action="store_true")
+
+    summarize_prepare = subparsers.add_parser(
+        "summarize-prepare",
+        help=(
+            "Bind selected Markdown and structure evidence to deterministic "
+            "no-call summary plans without generating summaries."
+        ),
+    )
+    summarize_prepare.add_argument(
+        "--route-evidence",
+        action="append",
+        required=True,
+        help="Route-selection evidence JSON/JSONL; repeat for multiple files.",
+    )
+    summarize_prepare.add_argument(
+        "--structure-evidence",
+        action="append",
+        required=True,
+        help="Structure evidence JSON/JSONL; repeat for multiple files.",
+    )
+    summarize_prepare.add_argument("--output-dir", required=True)
+    summarize_prepare.add_argument("--profile")
+    summarize_prepare.add_argument("--json", action="store_true")
 
     acceptance = subparsers.add_parser(
         "acceptance",
