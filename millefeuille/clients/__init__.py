@@ -23,7 +23,7 @@ from .exceptions import (
     ZoteroClientError,
     ZoteroItemNotFoundError,
 )
-from .mistral_client import MistralClient
+from .mistral_client import MistralClient, MistralOCRExecution
 from .ocr_client import OCRClient, OCRProvider
 from .pageindex_client import PageIndexClient
 from .pageindex_tree_client import PageIndexTreeClient
@@ -36,6 +36,7 @@ __all__ = [
     "OCRProvider",
     "OCRClientError",
     "MistralClient",
+    "MistralOCRExecution",
     "MistralClientError",
     "MistralUploadError",
     "MistralOCRError",
