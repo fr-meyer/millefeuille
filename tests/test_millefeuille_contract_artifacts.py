@@ -54,6 +54,8 @@ REQUIRED_JSON_SCHEMAS = [
     "model-execution-evidence.schema.json",
     "model-execution-plan.schema.json",
     "model-provenance-record.schema.json",
+    "summary-preparation.schema.json",
+    "summary-preparation-batch.schema.json",
     "approved-live-receipt.schema.json",
     "approved-live-audit.schema.json",
     "operator-preflight-packet.schema.json",

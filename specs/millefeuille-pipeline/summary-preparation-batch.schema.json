@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/summary-preparation-batch.schema.json",
+  "title": "Millefeuille Summary Preparation Batch",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "profile",
+    "output_dir",
+    "documents",
+    "totals",
+    "provider_calls",
+    "source_pack_writes",
+    "zotero_writes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "millefeuille-summary-preparation-batch/v0.1"},
+    "status": {"const": "prepared-no-call"},
+    "profile": {"type": "string", "minLength": 1},
+    "output_dir": {"type": "string", "minLength": 1},
+    "documents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["paper_id", "package_path", "work_unit_counts", "blockers"],
+        "additionalProperties": false,
+        "properties": {
+          "paper_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$"},
+          "package_path": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]+\\.summary-preparation\\.json$"
+          },
+          "work_unit_counts": {"$ref": "#/$defs/work_unit_counts"},
+          "blockers": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "required": [
+        "documents",
+        "requested_stages",
+        "work_units",
+        "summary_outputs_generated"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "documents": {"type": "integer", "minimum": 1},
+        "requested_stages": {"type": "integer", "minimum": 3},
+        "work_units": {"type": "integer", "minimum": 1},
+        "summary_outputs_generated": {"const": 0}
+      }
+    },
+    "provider_calls": {"const": 0},
+    "source_pack_writes": {"const": 0},
+    "zotero_writes": {"const": 0}
+  },
+  "$defs": {
+    "work_unit_counts": {
+      "type": "object",
+      "required": [
+        "summarize_page",
+        "summarize_section",
+        "summarize_full_paper"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "summarize_page": {"type": "integer", "minimum": 1},
+        "summarize_section": {"type": "integer", "minimum": 0},
+        "summarize_full_paper": {"const": 1}
+      }
+    }
+  }
+}

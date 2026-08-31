@@ -42,6 +42,8 @@ class StructureFixtureEvidence:
     schema_version: str = STRUCTURE_EVIDENCE_SCHEMA_VERSION
     outline_path: Path | None = None
     status: str = "ok"
+    structure_backend: str = "fixture-structure"
+    coverage_source: str = "fixture"
     locators: int | None = None
     sections: int = 0
     tables: int = 0
@@ -132,6 +134,14 @@ class StructureFixtureEvidence:
             schema_version=schema_version,
             outline_path=outline_path,
             status=_required_string(payload.get("status", "ok"), "status"),
+            structure_backend=_required_string(
+                payload.get("structure_backend", "fixture-structure"),
+                "structure_backend",
+            ),
+            coverage_source=_required_string(
+                payload.get("coverage_source", "fixture"),
+                "coverage_source",
+            ),
             locators=_optional_int(payload.get("locators"), "locators"),
             sections=_required_int(payload.get("sections", 0), "sections"),
             tables=_required_int(payload.get("tables", 0), "tables"),
@@ -295,7 +305,7 @@ def _plan_structure(
         zotero_version=evidence.zotero_version,
     )
     record = StructureEvidenceRecord(
-        structure_backend="fixture-structure",
+        structure_backend=evidence.structure_backend,
         selected_route=evidence.selected_route,
         source_pack=f"source-packs/zotero/{source_pack_dir.name}",
         attachment_identity=identity,
@@ -308,7 +318,7 @@ def _plan_structure(
         coverage={
             "locators": locators,
             "pages": evidence.page_count,
-            "source": "fixture",
+            "source": evidence.coverage_source,
         },
         structure=structure_payload,
         outline_markdown_ref=(
