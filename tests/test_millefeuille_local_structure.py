@@ -17,6 +17,10 @@ from millefeuille.domain.local_structure import (
     prepare_local_structures_from_route_evidence,
 )
 from millefeuille.domain.millefeuille import MillefeuilleContractError
+from tests.platform_capabilities import (
+    requires_secure_nofollow_writes,
+    requires_unsupported_secure_nofollow_writes,
+)
 
 
 class TestLocalMarkdownStructure(unittest.TestCase):
@@ -66,6 +70,7 @@ Opening text.
         self.assertIn("no non-page Markdown headings detected", warnings)
 
 
+@requires_secure_nofollow_writes
 class TestLocalStructurePreparation(unittest.TestCase):
     def _write_route_evidence(self, root: Path) -> Path:
         markdown_path = root / "selected.md"
@@ -288,6 +293,63 @@ class TestLocalStructurePreparation(unittest.TestCase):
             payload = json.loads(stdout.getvalue())
             self.assertEqual(payload["status"], "created")
             self.assertEqual(payload["documents"][0]["section_count"], 2)
+
+
+class TestUnsupportedLocalStructurePreparation(unittest.TestCase):
+    @requires_unsupported_secure_nofollow_writes
+    def test_cli_fails_closed_without_creating_output_parent(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            markdown_path = root / "selected.md"
+            markdown_path.write_text(
+                "# Page 1\n# Introduction\nText.\n",
+                encoding="utf-8",
+            )
+            route_evidence = root / "route.json"
+            route_evidence.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "millefeuille-route-selection-evidence/v0.1",
+                        "source_type": "zotero",
+                        "item_key": "ITEM1",
+                        "attachment_key": "ATT1",
+                        "canonical_filename": "Fixture.pdf",
+                        "markdown_path": markdown_path.name,
+                        "expected_sha256": "a" * 64,
+                        "page_count": 1,
+                        "selected_route": "native",
+                        "paper_id": "zotero-ITEM1",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            output_dir = root / "prepared"
+            stdout = StringIO()
+            stderr = StringIO()
+
+            exit_code = run_stage_cli(
+                [
+                    "structure-prepare",
+                    "--route-evidence",
+                    str(route_evidence),
+                    "--output-dir",
+                    str(output_dir),
+                    "--json",
+                ],
+                stdout=stdout,
+                stderr=stderr,
+            )
+
+            self.assertEqual(exit_code, 2)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertIn(
+                "requires no-follow filesystem writes on this platform",
+                stderr.getvalue(),
+            )
+            self.assertFalse(output_dir.exists())
 
 
 if __name__ == "__main__":

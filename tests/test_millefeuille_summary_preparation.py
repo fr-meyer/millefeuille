@@ -20,6 +20,7 @@ from millefeuille.domain.summary_preparation import (
     SUMMARY_PREPARATION_SCHEMA_VERSION,
     prepare_summary_execution_packages,
 )
+from tests.platform_capabilities import requires_secure_nofollow_writes
 
 SPEC_DIR = Path(__file__).resolve().parents[1] / "specs" / "millefeuille-pipeline"
 SUMMARY_SCHEMA_NAMES = (
@@ -29,6 +30,7 @@ SUMMARY_SCHEMA_NAMES = (
 )
 
 
+@requires_secure_nofollow_writes
 class TestSummaryPreparation(unittest.TestCase):
     def _prepare_inputs(self, root: Path) -> tuple[Path, Path]:
         markdown_path = root / "selected.md"
