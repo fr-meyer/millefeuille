@@ -99,3 +99,19 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+# python-semantic-release: GitHub tags + GitHub Releases on `main` only.
+# Keep tag_format without a `v` prefix to match existing tags 0.1.0–0.4.0.
+# Do not upload to PyPI. Partial tags (0, 0.5) are disabled.
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+commit_parser = "conventional"
+tag_format = "{version}"
+allow_zero_version = true
+major_on_zero = false
+add_partial_tags = false
+build_command = "true"
+
+[tool.semantic_release.branches.main]
+match = "(main)"
+prerelease = false
