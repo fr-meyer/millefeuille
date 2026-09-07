@@ -14,6 +14,7 @@ github:
 scope:
   - add python-semantic-release configuration matching existing unprefixed SemVer tags
   - run the release job only after the test matrix on push to main
+  - install python-semantic-release==10.6.2 via pip and run semantic-release version; do not use a third-party GitHub Action
   - GitHub tag plus GitHub Release only; no PyPI, npm, or extra registry token
 non_goals:
   - cutting a release from this PR

@@ -8,7 +8,8 @@ This PR targets `dev`. It does **not** cut a release and does **not** promote `d
 
 - Conventional Commits: `feat:` → minor, `fix:`/`perf:` → patch, `BREAKING CHANGE:` → major (`major_on_zero = false` while 0.x).
 - Tag format `{version}` to match existing tags `0.1.0`–`0.4.0` (no `v` prefix; no partial tags).
-- Release job uses `secrets.GITHUB_TOKEN` with `contents: write` only on that job. Workflow default remains `contents: read`.
+- Release job uses only GitHub-owned Actions (`actions/checkout`, `actions/setup-python`) plus `pip install python-semantic-release==10.6.2`, then `semantic-release version`. No third-party GitHub Action (millefeuille allows GitHub-owned actions only).
+- Release job uses `secrets.GITHUB_TOKEN` as `GH_TOKEN` with `contents: write` only on that job. Workflow default remains `contents: read`.
 - No PyPI/npm upload. `build_command` is a no-op.
 - Rollback: remove or `if: false` the `release` job, revert `pyproject.toml` PSR tables, leave existing tags in place.
 
