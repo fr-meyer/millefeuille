@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "millefeuille"
-version = "0.4.0"
+version = "0.5.0"
 description = "Run the source-pack, extraction, OpenKB handoff, acceptance, and classification lifecycle for research-paper attachments discovered from Zotero."
 readme = "README.md"
 requires-python = ">=3.11"
