@@ -8,7 +8,7 @@ way. Provider adapters must validate these envelopes before and after every call
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 import json
 import re
@@ -159,13 +159,12 @@ def build_model_executor_request(
     max_attempts: int,
     retry_on: list[str],
     fallback_models: list[str],
-    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     """Build a payload-free request bound to one exact transient input.
 
     Source locators are represented only by count and a canonical hash. The input
-    bytes are represented only by length and hash. Omitting ``idempotency_key``
-    derives a stable key from every other request field.
+    bytes are represented only by length and hash. A stable idempotency key
+    is derived from every other request field.
     """
 
     locator_values = _validate_source_locators(source_locators)
@@ -209,10 +208,9 @@ def build_model_executor_request(
             "policy": fallback_policy,
             "models": fallback_models,
         },
-        "idempotency_key": idempotency_key or "pending",
+        "idempotency_key": "pending",
     }
-    if idempotency_key is None:
-        request["idempotency_key"] = _derived_idempotency_key(request)
+    request["idempotency_key"] = _derived_idempotency_key(request)
     return validate_model_executor_request(request)
 
 
@@ -574,8 +572,16 @@ def validate_model_executor_result(
 
     started_at = _timestamp(payload.get("started_at"), "started_at")
     completed_at = _timestamp(payload.get("completed_at"), "completed_at")
-    if _parse_timestamp(completed_at) < _parse_timestamp(started_at):
+    started_time = _parse_timestamp(started_at)
+    completed_time = _parse_timestamp(completed_at)
+    if completed_time < started_time:
         raise MillefeuilleContractError("model executor result time order is invalid")
+    if completed_time - started_time > timedelta(
+        seconds=normalized_request["timeout_seconds"]
+    ):
+        raise MillefeuilleContractError(
+            "model executor result exceeded timeout_seconds"
+        )
 
     chain = [
         normalized_request["requested_model"],

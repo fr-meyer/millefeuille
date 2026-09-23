@@ -133,6 +133,26 @@ class TestModelExecutorContract(unittest.TestCase):
             cost_micro_usd=123,
         )
 
+    def test_result_enforces_total_execution_timeout(self):
+        request = self._request()
+        at_limit = self._success_result(request)
+        at_limit["completed_at"] = "2026-08-27T12:03:00Z"
+        at_limit["attempts"][0]["completed_at"] = "2026-08-27T12:03:00Z"
+        self.assertEqual(
+            validate_model_executor_result(request=request, result=at_limit),
+            at_limit,
+        )
+
+        over_limit = deepcopy(at_limit)
+        over_limit["completed_at"] = "2026-08-27T12:03:00.000001Z"
+        over_limit["attempts"][0]["completed_at"] = (
+            "2026-08-27T12:03:00.000001Z"
+        )
+        with self.assertRaisesRegex(
+            MillefeuilleContractError, "exceeded timeout_seconds"
+        ):
+            validate_model_executor_result(request=request, result=over_limit)
+
     def test_request_round_trip_is_payload_free_and_schema_valid(self):
         request = self._request()
 
