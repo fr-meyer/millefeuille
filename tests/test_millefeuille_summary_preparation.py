@@ -32,7 +32,9 @@ SUMMARY_SCHEMA_NAMES = (
 
 @requires_secure_nofollow_writes
 class TestSummaryPreparation(unittest.TestCase):
-    def _prepare_inputs(self, root: Path) -> tuple[Path, Path]:
+    def _prepare_inputs(
+        self, root: Path, *, expected_page_count: int = 1
+    ) -> tuple[Path, Path]:
         markdown_path = root / "selected.md"
         markdown_path.write_text(
             "# Page 1\n# Introduction\nPrivate paper text.\n",
@@ -49,7 +51,7 @@ class TestSummaryPreparation(unittest.TestCase):
                     "canonical_filename": "Fixture.pdf",
                     "markdown_path": markdown_path.name,
                     "expected_sha256": "a" * 64,
-                    "page_count": 1,
+                    "page_count": expected_page_count,
                     "selected_route": "native",
                     "paper_id": "zotero-ITEM1",
                 },
@@ -159,6 +161,34 @@ class TestSummaryPreparation(unittest.TestCase):
                 registry=registry,
             ).validate(summary)
 
+    def test_prepares_warning_bearing_structure_without_claiming_full_coverage(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            route_path, structure_path = self._prepare_inputs(
+                root, expected_page_count=3
+            )
+
+            result = prepare_summary_execution_packages(
+                route_evidence_paths=[route_path],
+                structure_evidence_paths=[structure_path],
+                output_dir=root / "summary-preparation",
+            )
+
+            package = json.loads(
+                result.documents[0].package_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual(package["identity"]["page_count"], 3)
+            self.assertEqual(result.documents[0].work_unit_counts["summarize_page"], 1)
+            self.assertEqual(
+                package["work_units"]["summarize_page"],
+                [{"unit_id": "page-1", "source_locators": ["p.1"]}],
+            )
+            self.assertIn(
+                "structure page coverage incomplete",
+                package["execution"]["blockers"],
+            )
+            self.assertFalse(package["execution"]["ready_for_approved_live_execution"])
+
     def test_rejects_structure_locator_drift_before_writing_outputs(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
@@ -263,6 +293,9 @@ class TestSummaryPreparation(unittest.TestCase):
             structure_path = structure_evidence_path.parent / evidence["structure_path"]
             structure = json.loads(structure_path.read_text(encoding="utf-8"))
             structure["pages"].append(dict(structure["pages"][0]))
+            structure["coverage"]["expected_pages"] = 2
+            structure["coverage"]["detected_pages"] = 2
+            structure["coverage"]["locators"] += 1
             structure_path.write_text(
                 json.dumps(structure, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
