@@ -32,6 +32,7 @@ from millefeuille.domain.live_receipts import (
     ApprovedLiveReceipt,
     ReceiptReplayState,
     build_approved_live_audit_record,
+    validate_approved_live_receipt,
 )
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.operator_preflight import OperatorPreflightPacket
@@ -148,9 +149,15 @@ def _reserve_root_approval(
         rows = connection.execute("SELECT audit_json FROM approvals").fetchall()
         audits = [_parse_canonical_audit(row[0]) for row in rows]
         replay_state = ReceiptReplayState.from_audit_records(audits)
+        request = packet.to_approved_live_request()
+        validate_approved_live_receipt(
+            receipt,
+            request,
+            replay_state=replay_state,
+        )
         audit = build_approved_live_audit_record(
             receipt,
-            packet.to_approved_live_request(),
+            request,
             status="consumed",
             replay_state=replay_state,
         )

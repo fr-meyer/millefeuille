@@ -99,8 +99,13 @@ class _FakeClient:
         )
 
 
-def _approved_pair(root: Path, *, model: str = "gpt-5.6-sol"):
-    now = datetime.now(UTC).replace(microsecond=0)
+def _approved_pair(
+    root: Path,
+    *,
+    model: str = "gpt-5.6-sol",
+    approved_at: datetime | None = None,
+):
+    now = (approved_at or datetime.now(UTC)).replace(microsecond=0)
     root_text = str(root)
     destination = {
         "kind": "artifact-root",
@@ -232,6 +237,25 @@ def _trusted_approval(directory: str, packet, receipt):
 
 @unittest.skipUnless(os.name == "posix", "POSIX ledger only")
 class TestGptOauthCanary(unittest.TestCase):
+    def test_broker_denies_expired_receipt_without_ledger_row(self):
+        with tempfile.TemporaryDirectory() as directory:
+            control = Path(directory)
+            packet, receipt = _approved_pair(
+                control / "artifact",
+                approved_at=datetime.now(UTC) - timedelta(hours=2),
+            )
+            with (
+                patch.object(broker, "_CONTROL_DIR", control),
+                patch.object(broker, "_CONTROL_OWNER_UID", os.getuid()),
+                self.assertRaisesRegex(MillefeuilleContractError, "expired"),
+            ):
+                broker._reserve_root_approval(packet, receipt)
+            with sqlite3.connect(control / "gpt-oauth-canary.sqlite3") as connection:
+                self.assertEqual(
+                    connection.execute("SELECT COUNT(*) FROM approvals").fetchone()[0],
+                    0,
+                )
+
     def test_missing_agent_local_oauth_does_not_consume_receipt(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "ledger"
@@ -505,6 +529,80 @@ class TestGptOauthCanary(unittest.TestCase):
                     MillefeuilleContractError, "already been consumed"
                 ):
                     broker._reserve_root_approval(packet, receipt)
+
+    @unittest.skipUnless(
+        os.name == "posix" and os.geteuid() == 0,
+        "requires Linux root and a separate model user",
+    )
+    def test_root_broker_rejects_expired_node_request(self):
+        import pwd
+
+        with tempfile.TemporaryDirectory() as directory:
+            control = Path(directory)
+            control.chmod(0o755)
+            socket_path = control / "gpt-oauth-canary.sock"
+            packet, receipt = _approved_pair(
+                control / "artifact",
+                approved_at=datetime.now(UTC) - timedelta(hours=2),
+            )
+            approval_path = control / "gpt-oauth-canary-approval.json"
+            approval_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "millefeuille-gpt-canary-approval/v0.1",
+                        "receipt_id": receipt.receipt_id,
+                        "receipt_digest": receipt.content_digest,
+                        "packet_digest": packet.content_digest,
+                        "approver_id": receipt.approval.approver_id,
+                        "approved_at": receipt.approval.approved_at,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            approval_path.chmod(0o644)
+            with (
+                patch.object(canary, "_TRUSTED_APPROVAL_PATH", approval_path),
+                patch.object(canary, "_BROKER_SOCKET_PATH", socket_path),
+                patch.object(broker, "_BROKER_SOCKET_PATH", socket_path),
+                patch.object(broker, "_CONTROL_DIR", control),
+            ):
+                server = os.fork()
+                if server == 0:
+                    try:
+                        broker.serve_one_reservation(timeout_seconds=5)
+                    except BaseException:
+                        os._exit(1)
+                    os._exit(0)
+                for _ in range(200):
+                    if socket_path.exists():
+                        break
+                    time.sleep(0.01)
+                self.assertTrue(socket_path.exists())
+                model_user = pwd.getpwnam("node")
+                client = os.fork()
+                if client == 0:
+                    os.setgid(model_user.pw_gid)
+                    os.setuid(model_user.pw_uid)
+                    try:
+                        canary._reserve_with_broker(packet, receipt)
+                    except MillefeuilleContractError:
+                        os._exit(0)
+                    os._exit(1)
+                _, client_status = os.waitpid(client, 0)
+                _, server_status = os.waitpid(server, 0)
+                self.assertEqual(os.waitstatus_to_exitcode(client_status), 0)
+                self.assertEqual(os.waitstatus_to_exitcode(server_status), 0)
+                database = control / "gpt-oauth-canary.sqlite3"
+                with sqlite3.connect(database) as connection:
+                    self.assertEqual(
+                        connection.execute(
+                            "SELECT COUNT(*) FROM approvals"
+                        ).fetchone()[0],
+                        0,
+                    )
 
     def test_output_binding_drift_is_rejected_and_receipt_stays_consumed(self):
         with tempfile.TemporaryDirectory() as directory:
