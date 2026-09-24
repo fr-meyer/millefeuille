@@ -14,6 +14,7 @@ from contextlib import closing, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -34,6 +35,7 @@ from millefeuille.domain.model_executor import (
 
 _MAX_OPENCLAW_STDOUT_BYTES = 4 * 1024 * 1024
 _MAX_OPENCLAW_STDERR_BYTES = 256 * 1024
+_LOGGER = logging.getLogger(__name__)
 _SUPPORTED_RUNTIME_MODEL = "openai/gpt-5.6-sol"
 _SUPPORTED_AUTH_DB_SCHEMA = 19
 _AGENT_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}\Z")
@@ -617,7 +619,10 @@ class OpenClawModelClient:
             MillefeuilleContractError,
             UnicodeError,
             ValueError,
-        ):
+        ) as exc:
+            # Validator messages are fixed strings; never log response content.
+            reason = type(exc).__name__ if isinstance(exc, UnicodeError) else str(exc)
+            _LOGGER.warning("OpenClaw response rejected: %s", reason)
             return self._failed_execution(
                 request=normalized,
                 started_at=started_at,
@@ -839,17 +844,20 @@ def _validate_openclaw_response(
         raise MillefeuilleContractError("OpenClaw model attribution is missing")
     actual_model = f"{provider}/{model}"
 
-    tools = _required_mapping(response.get("toolSummary"), "OpenClaw tool summary")
-    if type(tools.get("calls")) is not int or tools["calls"] != 0:
-        raise MillefeuilleContractError("OpenClaw agent exec used a tool")
-    if tools.get("tools") not in (None, []):
-        raise MillefeuilleContractError("OpenClaw tool list is inconsistent")
-    bridge = _required_mapping(response.get("bridgeCalls"), "OpenClaw bridge calls")
-    if any(
-        type(bridge.get(key)) is not int or bridge[key] != 0
-        for key in ("search", "describe", "call")
-    ):
-        raise MillefeuilleContractError("OpenClaw agent exec used a tool bridge")
+    # OpenClaw 2026.9.4 omits these summaries when no tool or bridge ran.
+    if "toolSummary" in response:
+        tools = _required_mapping(response["toolSummary"], "OpenClaw tool summary")
+        if type(tools.get("calls")) is not int or tools["calls"] != 0:
+            raise MillefeuilleContractError("OpenClaw agent exec used a tool")
+        if tools.get("tools") not in (None, []):
+            raise MillefeuilleContractError("OpenClaw tool list is inconsistent")
+    if "bridgeCalls" in response:
+        bridge = _required_mapping(response["bridgeCalls"], "OpenClaw bridge calls")
+        if any(
+            type(bridge.get(key)) is not int or bridge[key] != 0
+            for key in ("search", "describe", "call")
+        ):
+            raise MillefeuilleContractError("OpenClaw agent exec used a tool bridge")
     if response.get("codeModeEngaged") is not False:
         raise MillefeuilleContractError("OpenClaw agent exec engaged code mode")
     turns = response.get("assistantTurns")
@@ -857,19 +865,36 @@ def _validate_openclaw_response(
         raise MillefeuilleContractError("OpenClaw agent exec used multiple turns")
 
     payloads = response.get("payloads")
-    if not isinstance(payloads, list) or len(payloads) != 1:
-        raise MillefeuilleContractError("OpenClaw response must contain one payload")
-    output = _required_mapping(payloads[0], "OpenClaw payload")
-    if output.get("mediaUrl") is not None or output.get("mediaUrls") not in (None, []):
-        raise MillefeuilleContractError("OpenClaw response contains media")
-    text = output.get("text")
-    if not isinstance(text, str) or not text.strip():
+    if not isinstance(payloads, list) or not payloads:
+        raise MillefeuilleContractError("OpenClaw response has no payload")
+    visible_texts = []
+    for item in payloads:
+        output = _required_mapping(item, "OpenClaw payload")
+        if output.get("mediaUrl") is not None or output.get("mediaUrls") not in (
+            None,
+            [],
+        ):
+            raise MillefeuilleContractError("OpenClaw response contains media")
+        for marker in ("isError", "isReasoning", "isCommentary"):
+            if marker in output and output[marker] is not True:
+                raise MillefeuilleContractError("OpenClaw payload marker is invalid")
+        if output.get("isError") is True:
+            raise MillefeuilleContractError("OpenClaw response contains an error")
+        text = output.get("text")
+        if text is not None and not isinstance(text, str):
+            raise MillefeuilleContractError("OpenClaw response text is invalid")
+        if output.get("isReasoning") is True or output.get("isCommentary") is True:
+            continue
+        if isinstance(text, str) and text.strip():
+            visible_texts.append(text.rstrip())
+    if not visible_texts:
         raise MillefeuilleContractError("OpenClaw response text is empty")
-    if response.get("final") != text:
+    final_text = "\n".join(visible_texts)
+    if response.get("final") != final_text:
         raise MillefeuilleContractError("OpenClaw final text mismatch")
     if actual_model != requested_model:
-        return actual_model, text
-    return actual_model, text
+        return actual_model, final_text
+    return actual_model, final_text
 
 
 def _required_mapping(value: object, label: str) -> Mapping[str, Any]:

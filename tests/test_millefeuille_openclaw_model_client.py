@@ -690,10 +690,15 @@ class TestOpenClawModelClient(unittest.TestCase):
         )
         self.assertIsNone(execution.output)
 
-    def test_missing_tool_evidence_fails_closed(self):
+    def test_openclaw_omits_zero_use_summaries_and_trims_final_text(self):
         payload = b'{"return":{"canary":"ok"}}'
         response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
         del response["toolSummary"]
+        del response["bridgeCalls"]
+        response["payloads"] = [
+            {"text": "thinking", "isReasoning": True},
+            {"text": '{"canary":"ok"}\n'},
+        ]
         runner = _QueuedRunner(
             [_completed(_auth_status("openai")), _completed(response)]
         )
@@ -702,18 +707,36 @@ class TestOpenClawModelClient(unittest.TestCase):
             input_payload=payload,
             output_validator=self._validate_canary,
         )
-        self.assertEqual(execution.result["status"], "failed")
-        self.assertEqual(
-            execution.result["attempts"][0]["failure_code"], "invalid_response"
-        )
-        self.assertIsNone(execution.output)
+        self.assertEqual(execution.result["status"], "succeeded")
+        self.assertEqual(execution.output, b'{"canary":"ok"}')
 
     def test_missing_agent_safety_evidence_fails_closed(self):
         payload = b'{"return":{"canary":"ok"}}'
-        for missing in ("bridgeCalls", "codeModeEngaged", "assistantTurns"):
+        for missing in ("codeModeEngaged", "assistantTurns"):
             with self.subTest(missing=missing):
                 response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
                 del response[missing]
+                runner = _QueuedRunner(
+                    [_completed(_auth_status("openai")), _completed(response)]
+                )
+                execution = OpenClawModelClient(command_runner=runner).execute(
+                    request=self._request(payload=payload),
+                    input_payload=payload,
+                    output_validator=self._validate_canary,
+                )
+                self.assertEqual(execution.result["status"], "failed")
+                self.assertEqual(
+                    execution.result["attempts"][0]["failure_code"],
+                    "invalid_response",
+                )
+                self.assertIsNone(execution.output)
+
+    def test_present_zero_use_summaries_must_be_valid(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        for field in ("toolSummary", "bridgeCalls"):
+            with self.subTest(field=field):
+                response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+                response[field] = None
                 runner = _QueuedRunner(
                     [_completed(_auth_status("openai")), _completed(response)]
                 )
