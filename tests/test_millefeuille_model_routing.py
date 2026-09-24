@@ -5,6 +5,7 @@ from __future__ import annotations
 from io import StringIO
 import json
 import unittest
+from unittest.mock import patch
 
 from millefeuille.cli.stages import run_stage_cli
 from millefeuille.domain.millefeuille import MillefeuilleContractError
@@ -60,6 +61,35 @@ class TestSummaryModelRouting(unittest.TestCase):
                 profile="research-default", stage="summarize_section", **options
             ),
         )
+
+    def test_work_unit_uses_one_validated_plan_lookup(self):
+        plan = build_summary_execution_plan(
+            profile="research-default", stage="summarize_page"
+        )
+        with patch(
+            "millefeuille.domain.model_executor.build_summary_execution_plan",
+            side_effect=[plan, AssertionError("second profile lookup")],
+        ) as lookup:
+            request = build_summary_work_unit_request(
+                execution_plan=plan,
+                work_unit={"unit_id": "page-1", "source_locators": ["p.1"]},
+                input_payload=b"transient input",
+                output_schema_id="summary-page",
+                output_schema_version="v1",
+            )
+        self.assertEqual(lookup.call_count, 1)
+        self.assertEqual(request["requested_model"], plan["requested_model"])
+
+        changed = json.loads(json.dumps(plan))
+        changed["requested_model"] = "xai/grok-4.6"
+        with self.assertRaisesRegex(MillefeuilleContractError, "plan drift"):
+            build_summary_work_unit_request(
+                execution_plan=changed,
+                work_unit={"unit_id": "page-1", "source_locators": ["p.1"]},
+                input_payload=b"transient input",
+                output_schema_id="summary-page",
+                output_schema_version="v1",
+            )
 
     def test_unknown_models_and_hidden_fallback_fail_closed(self):
         base = {"profile": "research-default", "stage": "summarize_page"}

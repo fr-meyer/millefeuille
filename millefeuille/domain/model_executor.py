@@ -231,6 +231,25 @@ def resolve_summary_model_route(
     """
 
     plan = build_summary_execution_plan(profile=profile, stage=stage)
+    return _resolve_summary_model_route_from_plan(
+        plan=plan,
+        requested_model=requested_model,
+        thinking=thinking,
+        fallback_models=fallback_models,
+        retry_on=retry_on,
+    )
+
+
+def _resolve_summary_model_route_from_plan(
+    *,
+    plan: dict[str, Any],
+    requested_model: str | None,
+    thinking: str | None,
+    fallback_models: list[str] | None,
+    retry_on: list[str] | None,
+) -> dict[str, Any]:
+    """Use a plan already validated by the caller as the route's sole default."""
+
     if plan["execution"]["fixture_only"]:
         raise MillefeuilleContractError(
             "fixture-only model profile cannot select a live executor route"
@@ -263,8 +282,8 @@ def resolve_summary_model_route(
     return {
         "schema_version": "millefeuille-summary-model-route/v0.1",
         "status": "planned-offline",
-        "profile": profile,
-        "stage": stage,
+        "profile": plan["profile"],
+        "stage": plan["stage"],
         "profile_model": plan["requested_model"],
         "requested_model": selected_model,
         "override_used": selected_model != plan["requested_model"],
@@ -368,9 +387,8 @@ def build_summary_work_unit_request(
         parameters.get("prompt_version"),
         "execution_plan prompt_version",
     )
-    route = resolve_summary_model_route(
-        profile=profile,
-        stage=stage,
+    route = _resolve_summary_model_route_from_plan(
+        plan=canonical_plan,
         requested_model=requested_model,
         thinking=thinking,
         fallback_models=fallback_models,
