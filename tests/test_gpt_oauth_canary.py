@@ -28,7 +28,9 @@ from millefeuille.domain.operator_preflight import (
 
 
 class _FakeClient:
-    def __init__(self, *, fail: bool = False, output_override: bytes | None = None) -> None:
+    def __init__(
+        self, *, fail: bool = False, output_override: bytes | None = None
+    ) -> None:
         self.calls = 0
         self.fail = fail
         self.output_override = output_override
