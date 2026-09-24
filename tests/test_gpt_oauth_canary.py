@@ -36,11 +36,24 @@ from millefeuille.domain.operator_preflight import (
 
 class _FakeClient:
     def __init__(
-        self, *, fail: bool = False, output_override: bytes | None = None
+        self,
+        *,
+        fail: bool = False,
+        output_override: bytes | None = None,
+        preflight_ready: bool = True,
     ) -> None:
         self.calls = 0
+        self.preflight_calls = 0
         self.fail = fail
         self.output_override = output_override
+        self.preflight_ready = preflight_ready
+
+    def preflight_auth(self):
+        self.preflight_calls += 1
+        if not self.preflight_ready:
+            raise MillefeuilleContractError(
+                "OpenClaw agent-local GPT OAuth is unavailable"
+            )
 
     def execute(self, *, request, input_payload, output_validator):
         self.calls += 1
@@ -219,6 +232,29 @@ def _trusted_approval(directory: str, packet, receipt):
 
 @unittest.skipUnless(os.name == "posix", "POSIX ledger only")
 class TestGptOauthCanary(unittest.TestCase):
+    def test_missing_agent_local_oauth_does_not_consume_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "ledger"
+            packet, receipt = _approved_pair(root)
+            client = _FakeClient(preflight_ready=False)
+            kwargs = {
+                "packet": packet,
+                "receipt": receipt,
+                "artifact_root": root,
+                "environment": {"OPENCLAW_CODEX_OAUTH_READY": "present"},
+                "client": client,
+            }
+            with _trusted_approval(directory, packet, receipt):
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "agent-local GPT OAuth"
+                ):
+                    run_gpt_oauth_canary(**kwargs)
+                self.assertEqual(client.calls, 0)
+                client.preflight_ready = True
+                result = run_gpt_oauth_canary(**kwargs)
+                self.assertEqual(result["executor_result"]["status"], "succeeded")
+                self.assertEqual(client.calls, 1)
+
     def test_one_call_then_durable_replay_refusal(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "ledger"

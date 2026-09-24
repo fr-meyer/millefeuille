@@ -6,6 +6,7 @@ from copy import deepcopy
 import json
 import os
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,7 @@ from jsonschema import ValidationError
 from millefeuille.clients.openclaw_model_client import (
     OpenClawModelClient,
     _bounded_run,
+    _has_agent_local_oauth_profile,
     _OutputLimitExceeded,
 )
 from millefeuille.domain.millefeuille import MillefeuilleContractError
@@ -103,6 +105,61 @@ def _model_response(provider: str, model: str, text: str) -> dict[str, object]:
 
 
 class TestOpenClawModelClient(unittest.TestCase):
+    def setUp(self):
+        local_probe = patch(
+            "millefeuille.clients.openclaw_model_client._has_agent_local_oauth_profile",
+            return_value=True,
+        )
+        self.local_probe = local_probe.start()
+        self.addCleanup(local_probe.stop)
+
+    def test_agent_local_probe_checks_only_oauth_type(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agent_dir = Path(directory)
+            database = agent_dir / "openclaw-agent.sqlite"
+            with sqlite3.connect(database) as connection:
+                connection.execute(
+                    "CREATE TABLE auth_profile_store (store_key TEXT PRIMARY KEY, "
+                    "store_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+                )
+                connection.execute(
+                    "INSERT INTO auth_profile_store VALUES ('primary', ?, 0)",
+                    (
+                        json.dumps(
+                            {
+                                "profiles": {
+                                    "openai:research": {
+                                        "type": "oauth",
+                                        "provider": "openai",
+                                    },
+                                    "openai:key": {
+                                        "type": "api_key",
+                                        "provider": "openai",
+                                    },
+                                }
+                            }
+                        ),
+                    ),
+                )
+            self.assertTrue(
+                _has_agent_local_oauth_profile(directory, "openai:research")
+            )
+            self.assertFalse(_has_agent_local_oauth_profile(directory, "openai:key"))
+            self.assertFalse(
+                _has_agent_local_oauth_profile(directory, "openai:missing")
+            )
+
+    def test_shared_oauth_only_fails_before_agent_execution(self):
+        runner = _QueuedRunner([_completed(_auth_status("openai"))])
+        self.local_probe.return_value = False
+        client = OpenClawModelClient(command_runner=runner)
+
+        with self.assertRaisesRegex(
+            MillefeuilleContractError, "agent-local GPT OAuth"
+        ):
+            client.preflight_auth()
+        self.assertEqual(len(runner.commands), 1)
+
     def _request(
         self,
         *,

@@ -72,9 +72,9 @@ def run_gpt_oauth_canary(
     now: datetime | None = None,
     client: OpenClawModelClient | None = None,
 ) -> dict[str, Any]:
-    """Reserve one exact approval before dispatch and return sanitized proof.
+    """Check isolated auth, reserve one approval, and return sanitized proof.
 
-    A reservation is final even when auth lookup or execution fails. The
+    A reservation is final even when repeated auth lookup or execution fails. The
     function never retries and never returns the provider's raw response.
     """
 
@@ -124,9 +124,11 @@ def run_gpt_oauth_canary(
         or any(check.status != "passed" for check in preflight.checks)
     ):
         raise MillefeuilleContractError("canary operator preflight did not validate")
+    executor = client or OpenClawModelClient()
+    executor.preflight_auth()
     _reserve_with_broker(packet, receipt)
 
-    execution = (client or OpenClawModelClient()).execute(
+    execution = executor.execute(
         request=request,
         input_payload=_PROMPT,
         output_validator=_validate_canary_output,

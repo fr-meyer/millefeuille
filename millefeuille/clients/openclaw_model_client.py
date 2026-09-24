@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 import re
 import signal
+import sqlite3
 import subprocess
 import tempfile
 import threading
@@ -212,6 +213,34 @@ def _bounded_run(
         return completed
 
 
+def _has_agent_local_oauth_profile(agent_dir: str, profile_ref: str) -> bool:
+    """Check the store that isolated ``agent exec`` can actually read.
+
+    OpenClaw's ordinary model status includes shared OAuth profiles, while
+    ``agent exec`` only admits portable static credentials from that shared
+    store. Its selected OAuth profile therefore needs an agent-local entry.
+    Query only the credential type; never load secret material into Python.
+    """
+
+    database = Path(agent_dir) / "openclaw-agent.sqlite"
+    if not database.is_file() or database.is_symlink():
+        return False
+    profile_type_path = f"$.profiles.{json.dumps(profile_ref)}.type"
+    try:
+        with sqlite3.connect(
+            database.as_uri() + "?mode=ro", uri=True, timeout=1
+        ) as connection:
+            connection.execute("PRAGMA query_only = ON")
+            row = connection.execute(
+                "SELECT json_extract(store_json, ?) FROM auth_profile_store "
+                "WHERE store_key = 'primary'",
+                (profile_type_path,),
+            ).fetchone()
+    except (OSError, sqlite3.Error):
+        return False
+    return row is not None and row[0] == "oauth"
+
+
 class OpenClawModelClient:
     """Execute GPT-only, no-fallback requests through saved subscription OAuth."""
 
@@ -229,6 +258,18 @@ class OpenClawModelClient:
         self.agent_id = agent_id
         self.executable = executable
         self._run = command_runner
+
+    def preflight_auth(self, *, timeout_seconds: float = 30) -> None:
+        """Refuse an unavailable isolated OAuth route before canary reservation."""
+
+        try:
+            self._require_single_oauth_profile(
+                _SUPPORTED_RUNTIME_MODEL, timeout_seconds=timeout_seconds
+            )
+        except (OSError, subprocess.SubprocessError, ValueError) as exc:
+            raise MillefeuilleContractError(
+                "OpenClaw agent-local GPT OAuth is unavailable"
+            ) from exc
 
     def execute(
         self,
@@ -620,6 +661,8 @@ class OpenClawModelClient:
         ]
         if len(oauth_matches) != 1:
             raise ValueError("OpenClaw stored OAuth profile is unavailable")
+        if not _has_agent_local_oauth_profile(agent_dir, profile_ref):
+            raise ValueError("OpenClaw agent-local OAuth profile is unavailable")
         shell_fallback = _required_mapping(
             auth.get("shellEnvFallback"), "shell environment fallback"
         )
