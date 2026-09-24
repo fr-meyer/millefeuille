@@ -123,6 +123,7 @@ def build_local_markdown_structure(
     current_page = 1
     current_page_record: dict[str, Any] | None = None
     reference_heading_level: int | None = None
+    explicit_page_marker_seen = False
     in_fence = False
 
     def ensure_page(line_number: int, page_number: int) -> dict[str, Any]:
@@ -160,13 +161,22 @@ def build_local_markdown_structure(
         page_match = _PAGE_HEADING_RE.fullmatch(stripped)
         if page_match:
             page_number = int(page_match.group(1))
-            if page_number < 1 or (pages and page_number <= pages[-1]["page"]):
+            adopts_implicit_page = (
+                not explicit_page_marker_seen
+                and page_number == 1
+                and bool(pages)
+                and pages[-1]["page"] == 1
+            )
+            if page_number < 1 or (
+                pages and page_number <= pages[-1]["page"] and not adopts_implicit_page
+            ):
                 raise MillefeuilleContractError(
                     f"repeated or non-monotonic page marker p.{page_number} "
                     f"at line {line_number}"
                 )
+            explicit_page_marker_seen = True
             current_page = page_number
-            ensure_page(line_number, current_page)
+            ensure_page(line_number, current_page)["line_end"] = line_number
             section_stack.clear()
             continue
 

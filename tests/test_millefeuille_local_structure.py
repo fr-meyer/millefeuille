@@ -156,10 +156,37 @@ class TestLocalStructurePreparation(unittest.TestCase):
             self.assertEqual(evidence["coverage_source"], "selected-markdown")
             self.assertEqual(evidence["sections"], 2)
 
+    def test_first_page_marker_adopts_leading_content(self):
+        for prefix in ("\n", "Front matter.\n"):
+            with (
+                self.subTest(prefix=prefix),
+                tempfile.TemporaryDirectory() as tempdir,
+            ):
+                root = Path(tempdir)
+                route_evidence = self._write_route_evidence(
+                    root,
+                    markdown_text=(
+                        prefix
+                        + "# Page 1\n# Introduction\nText.\n"
+                        + "# Page 2\n# Results\nText.\n"
+                    ),
+                )
+                result = prepare_local_structures_from_route_evidence(
+                    route_evidence_paths=[route_evidence],
+                    output_dir=root / "prepared",
+                )
+                structure = json.loads(
+                    result.documents[0].structure_path.read_text(encoding="utf-8")
+                )
+                self.assertEqual([page["page"] for page in structure["pages"]], [1, 2])
+                self.assertEqual(structure["coverage"]["detected_pages"], 2)
+                self.assertEqual(result.documents[0].page_count, 2)
+
     def test_rejects_non_monotonic_page_markers_before_outputs(self):
         for markdown_text in (
             "# Page 1\nText.\n# Page 2\nText.\n# Page 1\nText.\n",
             "# Page 1\nText.\n# Page 1\nText.\n",
+            "Preamble.\n# Page 1\nText.\n# Page 1\nText.\n",
             "# Page 0\nText.\n",
         ):
             with (
