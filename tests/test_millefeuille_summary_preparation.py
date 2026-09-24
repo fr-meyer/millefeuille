@@ -33,13 +33,14 @@ SUMMARY_SCHEMA_NAMES = (
 @requires_secure_nofollow_writes
 class TestSummaryPreparation(unittest.TestCase):
     def _prepare_inputs(
-        self, root: Path, *, expected_page_count: int = 1
+        self,
+        root: Path,
+        *,
+        expected_page_count: int = 1,
+        markdown_text: str = "# Page 1\n# Introduction\nPrivate paper text.\n",
     ) -> tuple[Path, Path]:
         markdown_path = root / "selected.md"
-        markdown_path.write_text(
-            "# Page 1\n# Introduction\nPrivate paper text.\n",
-            encoding="utf-8",
-        )
+        markdown_path.write_text(markdown_text, encoding="utf-8")
         route_path = root / "route.json"
         route_path.write_text(
             json.dumps(
@@ -188,6 +189,32 @@ class TestSummaryPreparation(unittest.TestCase):
                 package["execution"]["blockers"],
             )
             self.assertFalse(package["execution"]["ready_for_approved_live_execution"])
+
+    def test_rejects_empty_markdown_zero_page_structure_without_outputs(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            route_path, structure_evidence_path = self._prepare_inputs(
+                root, markdown_text=""
+            )
+            evidence = json.loads(
+                structure_evidence_path.read_text(encoding="utf-8")
+            )
+            structure_path = structure_evidence_path.parent / evidence["structure_path"]
+            structure = json.loads(structure_path.read_text(encoding="utf-8"))
+            self.assertEqual(structure["coverage"]["detected_pages"], 0)
+            self.assertEqual(structure["pages"], [])
+
+            output_dir = root / "summary-preparation"
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "requires at least one detected structure page",
+            ):
+                prepare_summary_execution_packages(
+                    route_evidence_paths=[route_path],
+                    structure_evidence_paths=[structure_evidence_path],
+                    output_dir=output_dir,
+                )
+            self.assertFalse(output_dir.exists())
 
     def test_rejects_structure_locator_drift_before_writing_outputs(self):
         with tempfile.TemporaryDirectory() as tempdir:

@@ -383,6 +383,10 @@ def _validate_structure_payload(
         raise MillefeuilleContractError(
             "summary preparation structure detected page coverage drift"
         )
+    if detected_pages == 0:
+        raise MillefeuilleContractError(
+            "summary preparation requires at least one detected structure page"
+        )
     collection_counts = {
         "pages": detected_pages,
         "sections": evidence.sections,
