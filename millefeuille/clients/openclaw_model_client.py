@@ -446,7 +446,7 @@ class OpenClawModelClient:
             )
 
         try:
-            response = json.loads(stdout)
+            response = _strict_json_loads(stdout)
             actual_model, output = _validate_openclaw_response(
                 response,
                 requested_model=normalized["requested_model"],
@@ -476,7 +476,7 @@ class OpenClawModelClient:
             )
 
         try:
-            parsed_output = json.loads(output)
+            parsed_output = _strict_json_loads(output)
             output_validator(parsed_output)
         except Exception:
             # Validator errors fail closed; process-control exceptions propagate.
@@ -546,7 +546,7 @@ class OpenClawModelClient:
             > _MAX_OPENCLAW_STDERR_BYTES
         ):
             raise ValueError("OpenClaw auth status output exceeded limit")
-        payload = json.loads(completed.stdout or "")
+        payload = _strict_json_loads(completed.stdout or "")
         if payload.get("agentId") != self.agent_id:
             raise ValueError("OpenClaw auth status agent drift")
         agent_dir = payload.get("agentDir")
@@ -702,6 +702,27 @@ def _required_mapping(value: object, label: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError(f"{label} must be an object")
     return value
+
+
+def _strict_json_loads(value: str) -> Any:
+    """Reject ambiguous or non-standard JSON before validating model evidence."""
+
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in result:
+                raise ValueError("JSON object has a duplicate field")
+            result[key] = item
+        return result
+
+    def reject_constant(_value: str) -> Any:
+        raise ValueError("JSON contains a non-standard constant")
+
+    return json.loads(
+        value,
+        object_pairs_hook=unique_object,
+        parse_constant=reject_constant,
+    )
 
 
 def _attempt(

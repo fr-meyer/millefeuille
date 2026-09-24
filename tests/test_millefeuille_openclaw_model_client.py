@@ -410,6 +410,58 @@ class TestOpenClawModelClient(unittest.TestCase):
         self.assertEqual(execution.result["schema_validation"]["status"], "failed")
         self.assertIsNone(execution.output)
 
+    def test_ambiguous_or_nonstandard_model_json_fails_closed(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        samples = (
+            '{"canary":"wrong","canary":"ok"}',
+            '{"canary":"ok","nested":{"x":1,"x":2}}',
+            '{"canary":"ok","extra":NaN}',
+            '{"canary":"ok","extra":Infinity}',
+            '{"canary":"ok","extra":-Infinity}',
+        )
+        for output in samples:
+            with self.subTest(output=output):
+                runner = _QueuedRunner(
+                    [
+                        _completed(_auth_status("openai")),
+                        _completed(_model_response("openai", "gpt-5.6-sol", output)),
+                    ]
+                )
+                execution = OpenClawModelClient(command_runner=runner).execute(
+                    request=self._request(payload=payload),
+                    input_payload=payload,
+                    output_validator=lambda _value: None,
+                )
+                self.assertEqual(execution.result["status"], "failed")
+                self.assertEqual(
+                    execution.result["attempts"][0]["failure_code"],
+                    "schema_validation_failed",
+                )
+                self.assertIsNone(execution.output)
+
+    def test_duplicate_outer_response_field_fails_closed(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+        raw = json.dumps(response).replace('"ok": true', '"ok": false, "ok": true')
+        runner = _QueuedRunner(
+            [
+                _completed(_auth_status("openai")),
+                subprocess.CompletedProcess(
+                    args=[], returncode=0, stdout=raw, stderr=""
+                ),
+            ]
+        )
+        execution = OpenClawModelClient(command_runner=runner).execute(
+            request=self._request(payload=payload),
+            input_payload=payload,
+            output_validator=self._validate_canary,
+        )
+        self.assertEqual(execution.result["status"], "failed")
+        self.assertEqual(
+            execution.result["attempts"][0]["failure_code"], "invalid_response"
+        )
+        self.assertIsNone(execution.output)
+
     def test_tool_use_fails_closed_without_output_binding(self):
         payload = b'{"return":{"canary":"ok"}}'
         response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')

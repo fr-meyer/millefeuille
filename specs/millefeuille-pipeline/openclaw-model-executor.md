@@ -34,6 +34,8 @@ provider/model attribution, one non-media text payload matching `final`, zero
 outer and bridge tool calls, no Code Mode, and exactly one assistant turn. The
 caller then validates the parsed JSON against its output contract. Only the
 output bytes and a sanitized executor result envelope return to the caller.
+Duplicate object keys and non-standard JSON constants are rejected in auth,
+outer execution, and model-output envelopes before validation.
 Malformed or ambiguous evidence fails without an output binding. Explicit
 fallback requests are rejected by this one-shot adapter; each later attempt
 requires its own request and provenance.
