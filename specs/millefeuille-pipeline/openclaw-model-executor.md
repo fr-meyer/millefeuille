@@ -60,16 +60,19 @@ fails the proof. This is not a cost estimator for paper execution.
 After Franck approves the exact packet and receipt through the authenticated
 manual channel, the administrator publishes their identities into the fixed
 root-owned `/etc/millefeuille/gpt-oauth-canary-approval.json` store inside the
-GCP container. The model-running user cannot write that store. A self-computed
-receipt digest or caller-supplied file cannot establish approval. The runner
-independently validates the trusted store, packet, exact receipt scope, OAuth
-readiness marker, and durable replay ledger. A SQLite transaction
-reserves the sanitized receipt audit before the first possible model call.
+GCP container. The model-running user cannot write that store or the replay
+ledger. A self-computed receipt digest or caller-supplied file cannot establish
+approval. The runner checks the packet and OAuth readiness, then asks a
+one-shot administrator broker over a root-owned Unix socket for a durable
+reservation. The broker independently validates the trusted store and exact
+receipt scope. Its SQLite transaction in the root-owned control directory
+reserves the sanitized receipt audit before it grants the first possible model
+call. A missing broker or approval store fails closed.
 A failed or interrupted call leaves that receipt consumed and requires a new
 approval. Successful results return only the validated executor envelope and
 approval identities; provider output is never returned or persisted. The
-private audit directory and SQLite database must be owned by the executing
-user with modes `0700` and `0600` respectively. No source pack, Zotero,
+root-owned control directory must not be writable by the model user, and its
+SQLite database has mode `0600`. No source pack, Zotero,
 OpenKB, or index write is performed.
 
 This canary does not execute prepared page/section/full-paper work units.

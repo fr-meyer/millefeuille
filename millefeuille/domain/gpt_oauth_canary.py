@@ -9,22 +9,20 @@ after authenticated human approval. A receipt's self-hash alone is insufficient.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from contextlib import suppress
 from datetime import datetime
 import hashlib
 import hmac
 import json
 import os
 from pathlib import Path
-import sqlite3
+import socket
 import stat
+import struct
 from typing import Any
 
 from millefeuille.clients.openclaw_model_client import OpenClawModelClient
 from millefeuille.domain.live_receipts import (
     ApprovedLiveReceipt,
-    ReceiptReplayState,
-    build_approved_live_audit_record,
 )
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.model_executor import (
@@ -61,13 +59,15 @@ _TRUSTED_APPROVAL_FIELDS = frozenset(
     }
 )
 _TRUSTED_APPROVAL_SCHEMA = "millefeuille-gpt-canary-approval/v0.1"
+_BROKER_SOCKET_PATH = Path("/etc/millefeuille/gpt-oauth-canary.sock")
+_BROKER_OWNER_UID = 0
 
 
 def run_gpt_oauth_canary(
     *,
     packet: OperatorPreflightPacket,
     receipt: ApprovedLiveReceipt,
-    ledger_dir: str | Path,
+    artifact_root: str | Path,
     environment: Mapping[str, str] | None = None,
     now: datetime | None = None,
     client: OpenClawModelClient | None = None,
@@ -87,9 +87,8 @@ def run_gpt_oauth_canary(
     if receipt.approval.approver_id != "fr-meyer":
         raise MillefeuilleContractError("canary approver is not authorized")
 
-    root = Path(ledger_dir)
+    root = Path(artifact_root)
     _require_canary_scope(packet, receipt, root)
-    _verify_trusted_approval(packet, receipt)
     request = build_model_executor_request(
         task_kind="structure",
         unit_id=_SELECTOR,
@@ -107,66 +106,16 @@ def run_gpt_oauth_canary(
         fallback_models=[],
     )
 
-    _require_private_ledger_dir(root)
-    database = root / "gpt-oauth-canary.sqlite3"
-    _require_private_database_or_absent(database)
-    try:
-        descriptor = os.open(
-            database,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-            0o600,
-        )
-    except FileExistsError:
-        _require_private_database_or_absent(database)
-    else:
-        os.close(descriptor)
-    connection = sqlite3.connect(database, timeout=15, isolation_level=None)
-    try:
-        _require_private_database_or_absent(database)
-        connection.execute("PRAGMA synchronous=FULL")
-        connection.execute(
-            "CREATE TABLE IF NOT EXISTS approvals ("
-            "receipt_id TEXT PRIMARY KEY, "
-            "receipt_digest TEXT UNIQUE NOT NULL, "
-            "audit_json TEXT NOT NULL)"
-        )
-        connection.execute("BEGIN IMMEDIATE")
-        rows = connection.execute("SELECT audit_json FROM approvals").fetchall()
-        audits = [_parse_canonical_audit(row[0]) for row in rows]
-        replay_state = ReceiptReplayState.from_audit_records(audits)
-        preflight = evaluate_operator_preflight(
-            packet,
-            explicit_mode="approved-live",
-            approval_receipt=receipt,
-            environment=environment,
-            now=now,
-            replay_state=replay_state,
-        )
-        if any(row.state != "present" for row in preflight.credential_readiness):
-            raise MillefeuilleContractError("canary OAuth readiness marker is missing")
-        audit = build_approved_live_audit_record(
-            receipt,
-            packet.to_approved_live_request(),
-            evaluated_at=now,
-            status="consumed",
-            replay_state=replay_state,
-        )
-        connection.execute(
-            "INSERT INTO approvals (receipt_id, receipt_digest, audit_json) "
-            "VALUES (?, ?, ?)",
-            (
-                receipt.receipt_id,
-                receipt.content_digest,
-                _canonical_json(audit),
-            ),
-        )
-        connection.execute("COMMIT")
-    except BaseException:
-        if connection.in_transaction:
-            connection.execute("ROLLBACK")
-        raise
-    finally:
-        connection.close()
+    preflight = evaluate_operator_preflight(
+        packet,
+        explicit_mode="approved-live",
+        approval_receipt=receipt,
+        environment=environment,
+        now=now,
+    )
+    if any(row.state != "present" for row in preflight.credential_readiness):
+        raise MillefeuilleContractError("canary OAuth readiness marker is missing")
+    _reserve_with_broker(packet, receipt)
 
     execution = (client or OpenClawModelClient()).execute(
         request=request,
@@ -322,44 +271,72 @@ def _require_canary_scope(
         raise MillefeuilleContractError("packet is outside the GPT-only canary scope")
 
 
-def _require_private_ledger_dir(root: Path) -> None:
-    if os.name != "posix" or not root.is_absolute():
-        raise MillefeuilleContractError("canary ledger requires an absolute POSIX path")
-    for ancestor in (root, *root.parents):
-        if ancestor.is_symlink():
-            raise MillefeuilleContractError("canary ledger path has a symlink")
-    with suppress(FileExistsError):
-        root.mkdir(mode=0o700)
-    detail = root.lstat()
-    if (
-        not stat.S_ISDIR(detail.st_mode)
-        or detail.st_uid != os.getuid()
-        or stat.S_IMODE(detail.st_mode) != 0o700
-    ):
-        raise MillefeuilleContractError("canary ledger directory is not private")
+def _reserve_with_broker(
+    packet: OperatorPreflightPacket,
+    receipt: ApprovedLiveReceipt,
+) -> None:
+    """Obtain one durable reservation from the root-owned one-shot broker."""
 
-
-def _require_private_database_or_absent(path: Path) -> None:
+    path = _BROKER_SOCKET_PATH
     try:
+        parent = path.parent.lstat()
         detail = path.lstat()
-    except FileNotFoundError:
-        return
+    except FileNotFoundError as exc:
+        raise MillefeuilleContractError("GPT canary broker is unavailable") from exc
     if (
-        not stat.S_ISREG(detail.st_mode)
-        or detail.st_uid != os.getuid()
-        or stat.S_IMODE(detail.st_mode) != 0o600
+        os.name != "posix"
+        or not stat.S_ISDIR(parent.st_mode)
+        or not stat.S_ISSOCK(detail.st_mode)
+        or parent.st_uid != _BROKER_OWNER_UID
+        or detail.st_uid != _BROKER_OWNER_UID
+        or stat.S_IMODE(parent.st_mode) & 0o022
     ):
-        raise MillefeuilleContractError("canary audit database is not private")
-
-
-def _parse_canonical_audit(value: str) -> dict[str, Any]:
+        raise MillefeuilleContractError("GPT canary broker is not administrator-owned")
+    request_bytes = _canonical_json(
+        {"packet": packet.to_dict(), "receipt": receipt.to_dict()}
+    ).encode("utf-8")
+    if len(request_bytes) > 131072:
+        raise MillefeuilleContractError("GPT canary broker request is too large")
     try:
-        payload = json.loads(value)
-    except (TypeError, ValueError) as exc:
-        raise MillefeuilleContractError("canary audit ledger is invalid") from exc
-    if not isinstance(payload, dict) or _canonical_json(payload) != value:
-        raise MillefeuilleContractError("canary audit ledger is not canonical")
-    return payload
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
+            channel.settimeout(15)
+            channel.connect(str(path))
+            if hasattr(socket, "SO_PEERCRED"):
+                identity = channel.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12)
+                _pid, uid, _gid = struct.unpack("3i", identity)
+                if uid != _BROKER_OWNER_UID:
+                    raise MillefeuilleContractError(
+                        "GPT canary broker peer is not administrator-owned"
+                    )
+            channel.sendall(struct.pack("!I", len(request_bytes)) + request_bytes)
+            size = struct.unpack("!I", _read_exact(channel, 4))[0]
+            if size > 4096:
+                raise MillefeuilleContractError("GPT canary broker reply is too large")
+            reply = json.loads(
+                _read_exact(channel, size).decode("utf-8"),
+                object_pairs_hook=_unique_json_object,
+                parse_constant=_reject_json_constant,
+            )
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise MillefeuilleContractError("GPT canary broker failed closed") from exc
+    if (
+        not isinstance(reply, dict)
+        or set(reply) != {"status", "receipt_digest"}
+        or reply["status"] != "reserved"
+        or not isinstance(reply["receipt_digest"], str)
+        or not hmac.compare_digest(reply["receipt_digest"], receipt.content_digest)
+    ):
+        raise MillefeuilleContractError("GPT canary broker refused reservation")
+
+
+def _read_exact(channel: socket.socket, size: int) -> bytes:
+    result = bytearray()
+    while len(result) < size:
+        part = channel.recv(size - len(result))
+        if not part:
+            raise OSError("GPT canary broker closed early")
+        result.extend(part)
+    return bytes(result)
 
 
 def _canonical_json(value: dict[str, Any]) -> str:

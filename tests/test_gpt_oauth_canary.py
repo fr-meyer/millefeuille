@@ -10,10 +10,12 @@ import os
 from pathlib import Path
 import sqlite3
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
 from millefeuille.clients.openclaw_model_client import OpenClawModelExecution
+from millefeuille.domain import gpt_canary_broker as broker
 from millefeuille.domain import gpt_oauth_canary as canary
 from millefeuille.domain.gpt_oauth_canary import run_gpt_oauth_canary
 from millefeuille.domain.live_receipts import (
@@ -183,7 +185,7 @@ def _approved_pair(root: Path, *, model: str = "gpt-5.6-sol"):
 
 @contextmanager
 def _trusted_approval(directory: str, packet, receipt):
-    """Emulate an administrator-owned store in unprivileged offline tests."""
+    """Emulate trusted approval and a one-shot broker in offline client tests."""
 
     path = Path(directory) / "admin-approval.json"
     record = {
@@ -198,9 +200,19 @@ def _trusted_approval(directory: str, packet, receipt):
         json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n",
         encoding="utf-8",
     )
+    reserved: set[str] = set()
+
+    def reserve(_packet, current_receipt):
+        if current_receipt.content_digest in reserved:
+            raise MillefeuilleContractError(
+                "approved-live receipt has already been consumed"
+            )
+        reserved.add(current_receipt.content_digest)
+
     with (
         patch.object(canary, "_TRUSTED_APPROVAL_PATH", path),
         patch.object(canary, "_TRUSTED_APPROVAL_OWNER_UID", os.getuid()),
+        patch.object(canary, "_reserve_with_broker", side_effect=reserve),
     ):
         yield
 
@@ -215,7 +227,7 @@ class TestGptOauthCanary(unittest.TestCase):
             kwargs = {
                 "packet": packet,
                 "receipt": receipt,
-                "ledger_dir": root,
+                "artifact_root": root,
                 "environment": {"OPENCLAW_CODEX_OAUTH_READY": "present"},
                 "client": client,
             }
@@ -235,16 +247,13 @@ class TestGptOauthCanary(unittest.TestCase):
             root = Path(directory) / "ledger"
             packet, receipt = _approved_pair(root)
             client = _FakeClient()
-            with (
-                patch.object(
-                    canary, "_TRUSTED_APPROVAL_PATH", Path(directory) / "absent.json"
-                ),
-                self.assertRaisesRegex(MillefeuilleContractError, "no trusted"),
+            with self.assertRaisesRegex(
+                MillefeuilleContractError, "broker is unavailable"
             ):
                 run_gpt_oauth_canary(
                     packet=packet,
                     receipt=receipt,
-                    ledger_dir=root,
+                    artifact_root=root,
                     environment={"OPENCLAW_CODEX_OAUTH_READY": "present"},
                     client=client,
                 )
@@ -253,7 +262,7 @@ class TestGptOauthCanary(unittest.TestCase):
                     run_gpt_oauth_canary(
                         packet=packet,
                         receipt=receipt,
-                        ledger_dir=root,
+                        artifact_root=root,
                         environment={},
                         client=client,
                     )
@@ -261,7 +270,7 @@ class TestGptOauthCanary(unittest.TestCase):
                 run_gpt_oauth_canary(
                     packet=packet,
                     receipt=receipt,
-                    ledger_dir=root,
+                    artifact_root=root,
                     environment={"OPENCLAW_CODEX_OAUTH_READY": "present"},
                     client=client,
                 )
@@ -271,11 +280,10 @@ class TestGptOauthCanary(unittest.TestCase):
         os.name != "posix" or os.getuid() == 0,
         "requires an unprivileged POSIX test user",
     )
-    def test_caller_owned_approval_file_cannot_authorize_model_call(self):
+    def test_caller_owned_approval_file_cannot_authenticate(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "ledger"
             packet, receipt = _approved_pair(root)
-            client = _FakeClient()
             with (
                 _trusted_approval(directory, packet, receipt),
                 patch.object(canary, "_TRUSTED_APPROVAL_OWNER_UID", 0),
@@ -283,14 +291,7 @@ class TestGptOauthCanary(unittest.TestCase):
                     MillefeuilleContractError, "administrator-owned"
                 ),
             ):
-                run_gpt_oauth_canary(
-                    packet=packet,
-                    receipt=receipt,
-                    ledger_dir=root,
-                    environment={"OPENCLAW_CODEX_OAUTH_READY": "present"},
-                    client=client,
-                )
-            self.assertEqual(client.calls, 0)
+                canary._verify_trusted_approval(packet, receipt)
             self.assertFalse(root.exists())
 
     def test_grok_scope_refused_before_ledger_or_call(self):
@@ -302,7 +303,7 @@ class TestGptOauthCanary(unittest.TestCase):
                 run_gpt_oauth_canary(
                     packet=packet,
                     receipt=receipt,
-                    ledger_dir=root,
+                    artifact_root=root,
                     environment={"OPENCLAW_CODEX_OAUTH_READY": "present"},
                     client=client,
                 )
@@ -317,7 +318,7 @@ class TestGptOauthCanary(unittest.TestCase):
             kwargs = {
                 "packet": packet,
                 "receipt": receipt,
-                "ledger_dir": root,
+                "artifact_root": root,
                 "environment": {"OPENCLAW_CODEX_OAUTH_READY": "present"},
             }
             with _trusted_approval(directory, packet, receipt):
@@ -331,26 +332,120 @@ class TestGptOauthCanary(unittest.TestCase):
 
     def test_tampered_audit_blocks_future_call(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "ledger"
-            packet, receipt = _approved_pair(root)
-            kwargs = {
-                "packet": packet,
-                "receipt": receipt,
-                "ledger_dir": root,
-                "environment": {"OPENCLAW_CODEX_OAUTH_READY": "present"},
-            }
-            with _trusted_approval(directory, packet, receipt):
-                run_gpt_oauth_canary(**kwargs, client=_FakeClient())
-                connection = sqlite3.connect(root / "gpt-oauth-canary.sqlite3")
+            control = Path(directory)
+            packet, receipt = _approved_pair(control / "artifact")
+            with (
+                patch.object(broker, "_CONTROL_DIR", control),
+                patch.object(broker, "_CONTROL_OWNER_UID", os.getuid()),
+            ):
+                broker._reserve_root_approval(packet, receipt)
+                connection = sqlite3.connect(control / "gpt-oauth-canary.sqlite3")
                 try:
                     connection.execute("UPDATE approvals SET audit_json = ?", ('{}',))
                     connection.commit()
                 finally:
                     connection.close()
-                client = _FakeClient()
                 with self.assertRaisesRegex(MillefeuilleContractError, "audit"):
-                    run_gpt_oauth_canary(**kwargs, client=client)
-            self.assertEqual(client.calls, 0)
+                    broker._reserve_root_approval(packet, receipt)
+
+    @unittest.skipUnless(
+        os.name == "posix" and os.geteuid() == 0,
+        "requires Linux root and a separate model user",
+    )
+    def test_model_user_cannot_delete_root_replay_database(self):
+        import pwd
+
+        with tempfile.TemporaryDirectory() as directory:
+            control = Path(directory)
+            control.chmod(0o755)
+            packet, receipt = _approved_pair(control / "artifact")
+            with (
+                patch.object(broker, "_CONTROL_DIR", control),
+                patch.object(broker, "_CONTROL_OWNER_UID", 0),
+            ):
+                broker._reserve_root_approval(packet, receipt)
+                database = control / "gpt-oauth-canary.sqlite3"
+                model_user = pwd.getpwnam("node")
+                child = os.fork()
+                if child == 0:
+                    os.setgid(model_user.pw_gid)
+                    os.setuid(model_user.pw_uid)
+                    try:
+                        database.unlink()
+                    except PermissionError:
+                        os._exit(0)
+                    os._exit(1)
+                _, status = os.waitpid(child, 0)
+                self.assertEqual(os.waitstatus_to_exitcode(status), 0)
+                self.assertTrue(database.exists())
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "already been consumed"
+                ):
+                    broker._reserve_root_approval(packet, receipt)
+
+    @unittest.skipUnless(
+        os.name == "posix" and os.geteuid() == 0,
+        "requires Linux root and a separate model user",
+    )
+    def test_root_broker_grants_one_node_reservation(self):
+        import pwd
+
+        with tempfile.TemporaryDirectory() as directory:
+            control = Path(directory)
+            control.chmod(0o755)
+            socket_path = control / "gpt-oauth-canary.sock"
+            packet, receipt = _approved_pair(control / "artifact")
+            record = {
+                "schema_version": "millefeuille-gpt-canary-approval/v0.1",
+                "receipt_id": receipt.receipt_id,
+                "receipt_digest": receipt.content_digest,
+                "packet_digest": packet.content_digest,
+                "approver_id": receipt.approval.approver_id,
+                "approved_at": receipt.approval.approved_at,
+            }
+            approval_path = control / "gpt-oauth-canary-approval.json"
+            approval_path.write_text(
+                json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n",
+                encoding="utf-8",
+            )
+            approval_path.chmod(0o644)
+            with (
+                patch.object(canary, "_TRUSTED_APPROVAL_PATH", approval_path),
+                patch.object(canary, "_BROKER_SOCKET_PATH", socket_path),
+                patch.object(broker, "_BROKER_SOCKET_PATH", socket_path),
+                patch.object(broker, "_CONTROL_DIR", control),
+            ):
+                server = os.fork()
+                if server == 0:
+                    try:
+                        broker.serve_one_reservation(timeout_seconds=5)
+                    except BaseException:
+                        os._exit(1)
+                    os._exit(0)
+                for _ in range(200):
+                    if socket_path.exists():
+                        break
+                    time.sleep(0.01)
+                self.assertTrue(socket_path.exists())
+                model_user = pwd.getpwnam("node")
+                client = os.fork()
+                if client == 0:
+                    os.setgid(model_user.pw_gid)
+                    os.setuid(model_user.pw_uid)
+                    try:
+                        canary._reserve_with_broker(packet, receipt)
+                    except BaseException:
+                        os._exit(1)
+                    os._exit(0)
+                _, client_status = os.waitpid(client, 0)
+                _, server_status = os.waitpid(server, 0)
+                self.assertEqual(os.waitstatus_to_exitcode(client_status), 0)
+                self.assertEqual(os.waitstatus_to_exitcode(server_status), 0)
+                self.assertTrue((control / "gpt-oauth-canary.sqlite3").exists())
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "already been consumed"
+                ):
+                    broker._reserve_root_approval(packet, receipt)
 
     def test_output_binding_drift_is_rejected_and_receipt_stays_consumed(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -359,7 +454,7 @@ class TestGptOauthCanary(unittest.TestCase):
             kwargs = {
                 "packet": packet,
                 "receipt": receipt,
-                "ledger_dir": root,
+                "artifact_root": root,
                 "environment": {"OPENCLAW_CODEX_OAUTH_READY": "present"},
             }
             with _trusted_approval(directory, packet, receipt):
