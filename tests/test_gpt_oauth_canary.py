@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 import hashlib
+import json
+import os
 from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from millefeuille.clients.openclaw_model_client import OpenClawModelExecution
+from millefeuille.domain import gpt_oauth_canary as canary
 from millefeuille.domain.gpt_oauth_canary import run_gpt_oauth_canary
 from millefeuille.domain.live_receipts import (
     APPROVED_LIVE_RECEIPT_SCHEMA_VERSION,
@@ -176,7 +181,31 @@ def _approved_pair(root: Path, *, model: str = "gpt-5.6-sol"):
     )
 
 
-@unittest.skipUnless(__import__("os").name == "posix", "POSIX ledger only")
+@contextmanager
+def _trusted_approval(directory: str, packet, receipt):
+    """Emulate an administrator-owned store in unprivileged offline tests."""
+
+    path = Path(directory) / "admin-approval.json"
+    record = {
+        "schema_version": "millefeuille-gpt-canary-approval/v0.1",
+        "receipt_id": receipt.receipt_id,
+        "receipt_digest": receipt.content_digest,
+        "packet_digest": packet.content_digest,
+        "approver_id": receipt.approval.approver_id,
+        "approved_at": receipt.approval.approved_at,
+    }
+    path.write_text(
+        json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    with (
+        patch.object(canary, "_TRUSTED_APPROVAL_PATH", path),
+        patch.object(canary, "_TRUSTED_APPROVAL_OWNER_UID", os.getuid()),
+    ):
+        yield
+
+
+@unittest.skipUnless(os.name == "posix", "POSIX ledger only")
 class TestGptOauthCanary(unittest.TestCase):
     def test_one_call_then_durable_replay_refusal(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -186,54 +215,83 @@ class TestGptOauthCanary(unittest.TestCase):
             kwargs = {
                 "packet": packet,
                 "receipt": receipt,
-                "trusted_receipt_digest": receipt.content_digest,
                 "ledger_dir": root,
                 "environment": {"OPENCLAW_CODEX_OAUTH_READY": "present"},
                 "client": client,
             }
-            result = run_gpt_oauth_canary(**kwargs)
-            self.assertEqual(result["executor_result"]["status"], "succeeded")
-            self.assertFalse(result["raw_output_persisted"])
-            self.assertEqual(client.calls, 1)
-            with self.assertRaisesRegex(
-                MillefeuilleContractError, "already been consumed"
-            ):
-                run_gpt_oauth_canary(**kwargs)
+            with _trusted_approval(directory, packet, receipt):
+                result = run_gpt_oauth_canary(**kwargs)
+                self.assertEqual(result["executor_result"]["status"], "succeeded")
+                self.assertFalse(result["raw_output_persisted"])
+                self.assertEqual(client.calls, 1)
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "already been consumed"
+                ):
+                    run_gpt_oauth_canary(**kwargs)
             self.assertEqual(client.calls, 1)
 
-    def test_trusted_digest_and_oauth_readiness_fail_before_reservation(self):
+    def test_self_created_receipt_and_oauth_readiness_fail_before_reservation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "ledger"
             packet, receipt = _approved_pair(root)
             client = _FakeClient()
-            with self.assertRaisesRegex(MillefeuilleContractError, "trusted approval"):
+            with (
+                patch.object(
+                    canary, "_TRUSTED_APPROVAL_PATH", Path(directory) / "absent.json"
+                ),
+                self.assertRaisesRegex(MillefeuilleContractError, "no trusted"),
+            ):
                 run_gpt_oauth_canary(
                     packet=packet,
                     receipt=receipt,
-                    trusted_receipt_digest="sha256:" + "0" * 64,
                     ledger_dir=root,
                     environment={"OPENCLAW_CODEX_OAUTH_READY": "present"},
                     client=client,
                 )
-            with self.assertRaisesRegex(MillefeuilleContractError, "readiness"):
+            with _trusted_approval(directory, packet, receipt):
+                with self.assertRaisesRegex(MillefeuilleContractError, "readiness"):
+                    run_gpt_oauth_canary(
+                        packet=packet,
+                        receipt=receipt,
+                        ledger_dir=root,
+                        environment={},
+                        client=client,
+                    )
+                self.assertEqual(client.calls, 0)
                 run_gpt_oauth_canary(
                     packet=packet,
                     receipt=receipt,
-                    trusted_receipt_digest=receipt.content_digest,
                     ledger_dir=root,
-                    environment={},
+                    environment={"OPENCLAW_CODEX_OAUTH_READY": "present"},
+                    client=client,
+                )
+            self.assertEqual(client.calls, 1)
+
+    @unittest.skipIf(
+        os.name != "posix" or os.getuid() == 0,
+        "requires an unprivileged POSIX test user",
+    )
+    def test_caller_owned_approval_file_cannot_authorize_model_call(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "ledger"
+            packet, receipt = _approved_pair(root)
+            client = _FakeClient()
+            with (
+                _trusted_approval(directory, packet, receipt),
+                patch.object(canary, "_TRUSTED_APPROVAL_OWNER_UID", 0),
+                self.assertRaisesRegex(
+                    MillefeuilleContractError, "administrator-owned"
+                ),
+            ):
+                run_gpt_oauth_canary(
+                    packet=packet,
+                    receipt=receipt,
+                    ledger_dir=root,
+                    environment={"OPENCLAW_CODEX_OAUTH_READY": "present"},
                     client=client,
                 )
             self.assertEqual(client.calls, 0)
-            run_gpt_oauth_canary(
-                packet=packet,
-                receipt=receipt,
-                trusted_receipt_digest=receipt.content_digest,
-                ledger_dir=root,
-                environment={"OPENCLAW_CODEX_OAUTH_READY": "present"},
-                client=client,
-            )
-            self.assertEqual(client.calls, 1)
+            self.assertFalse(root.exists())
 
     def test_grok_scope_refused_before_ledger_or_call(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -244,7 +302,6 @@ class TestGptOauthCanary(unittest.TestCase):
                 run_gpt_oauth_canary(
                     packet=packet,
                     receipt=receipt,
-                    trusted_receipt_digest=receipt.content_digest,
                     ledger_dir=root,
                     environment={"OPENCLAW_CODEX_OAUTH_READY": "present"},
                     client=client,
@@ -260,16 +317,16 @@ class TestGptOauthCanary(unittest.TestCase):
             kwargs = {
                 "packet": packet,
                 "receipt": receipt,
-                "trusted_receipt_digest": receipt.content_digest,
                 "ledger_dir": root,
                 "environment": {"OPENCLAW_CODEX_OAUTH_READY": "present"},
             }
-            with self.assertRaisesRegex(RuntimeError, "simulated failure"):
-                run_gpt_oauth_canary(**kwargs, client=failed_client)
-            with self.assertRaisesRegex(
-                MillefeuilleContractError, "already been consumed"
-            ):
-                run_gpt_oauth_canary(**kwargs, client=_FakeClient())
+            with _trusted_approval(directory, packet, receipt):
+                with self.assertRaisesRegex(RuntimeError, "simulated failure"):
+                    run_gpt_oauth_canary(**kwargs, client=failed_client)
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "already been consumed"
+                ):
+                    run_gpt_oauth_canary(**kwargs, client=_FakeClient())
             self.assertEqual(failed_client.calls, 1)
 
     def test_tampered_audit_blocks_future_call(self):
@@ -279,20 +336,20 @@ class TestGptOauthCanary(unittest.TestCase):
             kwargs = {
                 "packet": packet,
                 "receipt": receipt,
-                "trusted_receipt_digest": receipt.content_digest,
                 "ledger_dir": root,
                 "environment": {"OPENCLAW_CODEX_OAUTH_READY": "present"},
             }
-            run_gpt_oauth_canary(**kwargs, client=_FakeClient())
-            connection = sqlite3.connect(root / "gpt-oauth-canary.sqlite3")
-            try:
-                connection.execute("UPDATE approvals SET audit_json = ?", ('{}',))
-                connection.commit()
-            finally:
-                connection.close()
-            client = _FakeClient()
-            with self.assertRaisesRegex(MillefeuilleContractError, "audit"):
-                run_gpt_oauth_canary(**kwargs, client=client)
+            with _trusted_approval(directory, packet, receipt):
+                run_gpt_oauth_canary(**kwargs, client=_FakeClient())
+                connection = sqlite3.connect(root / "gpt-oauth-canary.sqlite3")
+                try:
+                    connection.execute("UPDATE approvals SET audit_json = ?", ('{}',))
+                    connection.commit()
+                finally:
+                    connection.close()
+                client = _FakeClient()
+                with self.assertRaisesRegex(MillefeuilleContractError, "audit"):
+                    run_gpt_oauth_canary(**kwargs, client=client)
             self.assertEqual(client.calls, 0)
 
     def test_output_binding_drift_is_rejected_and_receipt_stays_consumed(self):
@@ -302,19 +359,19 @@ class TestGptOauthCanary(unittest.TestCase):
             kwargs = {
                 "packet": packet,
                 "receipt": receipt,
-                "trusted_receipt_digest": receipt.content_digest,
                 "ledger_dir": root,
                 "environment": {"OPENCLAW_CODEX_OAUTH_READY": "present"},
             }
-            with self.assertRaisesRegex(MillefeuilleContractError, "binding"):
-                run_gpt_oauth_canary(
-                    **kwargs,
-                    client=_FakeClient(output_override=b'{"canary":"bad"}'),
-                )
-            with self.assertRaisesRegex(
-                MillefeuilleContractError, "already been consumed"
-            ):
-                run_gpt_oauth_canary(**kwargs, client=_FakeClient())
+            with _trusted_approval(directory, packet, receipt):
+                with self.assertRaisesRegex(MillefeuilleContractError, "binding"):
+                    run_gpt_oauth_canary(
+                        **kwargs,
+                        client=_FakeClient(output_override=b'{"canary":"bad"}'),
+                    )
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "already been consumed"
+                ):
+                    run_gpt_oauth_canary(**kwargs, client=_FakeClient())
 
 
 if __name__ == "__main__":

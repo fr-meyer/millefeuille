@@ -57,10 +57,13 @@ audit root, and explicit disposal/stop controls. The zero cap relies on the
 adapter's subscription-OAuth-only route; any reported nonzero provider cost
 fails the proof. This is not a cost estimator for paper execution.
 
-The caller must supply the receipt digest from Franck's authenticated manual
-approval channel. A self-computed receipt digest alone does not establish
-approval. The runner independently validates the packet, exact receipt scope,
-OAuth readiness marker, and durable replay ledger. A SQLite transaction
+After Franck approves the exact packet and receipt through the authenticated
+manual channel, the administrator publishes their identities into the fixed
+root-owned `/etc/millefeuille/gpt-oauth-canary-approval.json` store inside the
+GCP container. The model-running user cannot write that store. A self-computed
+receipt digest or caller-supplied file cannot establish approval. The runner
+independently validates the trusted store, packet, exact receipt scope, OAuth
+readiness marker, and durable replay ledger. A SQLite transaction
 reserves the sanitized receipt audit before the first possible model call.
 A failed or interrupted call leaves that receipt consumed and requires a new
 approval. Successful results return only the validated executor envelope and

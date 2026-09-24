@@ -2,8 +2,8 @@
 
 This is deliberately separate from paper execution. The prompt contains no
 paper text and the only durable data is sanitized approval/executor evidence.
-The caller must obtain ``trusted_receipt_digest`` from an authenticated human
-approval channel; a receipt's self-hash alone does not prove approval.
+The administrator publishes exact approval evidence to a root-owned store
+after authenticated human approval. A receipt's self-hash alone is insufficient.
 """
 
 from __future__ import annotations
@@ -36,6 +36,7 @@ from millefeuille.domain.operator_preflight import (
     compute_operator_root_target_id,
     evaluate_operator_preflight,
 )
+from millefeuille.domain.secure_io import read_bytes_no_follow
 
 _PROMPT = b'Return only this JSON object, with no explanation: {"canary":"ok"}'
 _MODEL = "openai/gpt-5.6-sol"
@@ -47,13 +48,25 @@ _STOP_CONDITIONS = (
     "schema-failure",
 )
 _ROLLBACK_ACTIONS = ("stop-and-review",)
+_TRUSTED_APPROVAL_PATH = Path("/etc/millefeuille/gpt-oauth-canary-approval.json")
+_TRUSTED_APPROVAL_OWNER_UID = 0
+_TRUSTED_APPROVAL_FIELDS = frozenset(
+    {
+        "schema_version",
+        "receipt_id",
+        "receipt_digest",
+        "packet_digest",
+        "approver_id",
+        "approved_at",
+    }
+)
+_TRUSTED_APPROVAL_SCHEMA = "millefeuille-gpt-canary-approval/v0.1"
 
 
 def run_gpt_oauth_canary(
     *,
     packet: OperatorPreflightPacket,
     receipt: ApprovedLiveReceipt,
-    trusted_receipt_digest: str,
     ledger_dir: str | Path,
     environment: Mapping[str, str] | None = None,
     now: datetime | None = None,
@@ -71,17 +84,12 @@ def run_gpt_oauth_canary(
         raise MillefeuilleContractError("canary requires an approved-live receipt")
     packet = OperatorPreflightPacket.from_dict(packet.to_dict())
     receipt = ApprovedLiveReceipt.from_dict(receipt.to_dict())
-    if not isinstance(trusted_receipt_digest, str) or not hmac.compare_digest(
-        trusted_receipt_digest, receipt.content_digest
-    ):
-        raise MillefeuilleContractError(
-            "trusted approval digest does not match receipt"
-        )
     if receipt.approval.approver_id != "fr-meyer":
         raise MillefeuilleContractError("canary approver is not authorized")
 
     root = Path(ledger_dir)
     _require_canary_scope(packet, receipt, root)
+    _verify_trusted_approval(packet, receipt)
     request = build_model_executor_request(
         task_kind="structure",
         unit_id=_SELECTOR,
@@ -209,6 +217,62 @@ def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
             raise ValueError("duplicate JSON field")
         value[key] = item
     return value
+
+
+def _reject_json_constant(_value: str) -> Any:
+    raise ValueError("non-standard JSON constant")
+
+
+def _verify_trusted_approval(
+    packet: OperatorPreflightPacket,
+    receipt: ApprovedLiveReceipt,
+) -> None:
+    """Read a fixed administrator-owned approval record, never caller input."""
+
+    path = _TRUSTED_APPROVAL_PATH
+    try:
+        parent = path.parent.lstat()
+        detail = path.lstat()
+    except FileNotFoundError as exc:
+        raise MillefeuilleContractError(
+            "GPT canary has no trusted administrator approval"
+        ) from exc
+    if (
+        not stat.S_ISDIR(parent.st_mode)
+        or not stat.S_ISREG(detail.st_mode)
+        or parent.st_uid != _TRUSTED_APPROVAL_OWNER_UID
+        or detail.st_uid != _TRUSTED_APPROVAL_OWNER_UID
+        or stat.S_IMODE(parent.st_mode) & 0o022
+        or stat.S_IMODE(detail.st_mode) & 0o022
+    ):
+        raise MillefeuilleContractError(
+            "GPT canary approval store is not administrator-owned"
+        )
+    try:
+        encoded = read_bytes_no_follow(path, "GPT canary approval", max_bytes=8192)
+        record = json.loads(
+            encoded.decode("utf-8"),
+            object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_json_constant,
+        )
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise MillefeuilleContractError("GPT canary approval is invalid") from exc
+    if (
+        not isinstance(record, dict)
+        or set(record) != _TRUSTED_APPROVAL_FIELDS
+        or encoded != (_canonical_json(record) + "\n").encode("utf-8")
+        or record["schema_version"] != _TRUSTED_APPROVAL_SCHEMA
+        or record["receipt_id"] != receipt.receipt_id
+        or record["approver_id"] != receipt.approval.approver_id
+        or record["approved_at"] != receipt.approval.approved_at
+        or not isinstance(record["receipt_digest"], str)
+        or not isinstance(record["packet_digest"], str)
+        or not hmac.compare_digest(
+            record["receipt_digest"], receipt.content_digest
+        )
+        or not hmac.compare_digest(record["packet_digest"], packet.content_digest)
+    ):
+        raise MillefeuilleContractError("GPT canary approval identity does not match")
 
 
 def _require_canary_scope(
