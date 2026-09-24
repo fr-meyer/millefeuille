@@ -271,6 +271,47 @@ class TestOpenClawModelClient(unittest.TestCase):
         )
         self.assertIsNone(execution.result["authentication"]["profile_ref"])
 
+    def test_openclaw_ok_oauth_status_is_usable(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        auth = _auth_status("openai")
+        auth["auth"]["oauth"]["profiles"][0]["status"] = "ok"
+        runner = _QueuedRunner(
+            [
+                _completed(auth),
+                _completed(_model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')),
+            ]
+        )
+        execution = OpenClawModelClient(command_runner=runner).execute(
+            request=self._request(payload=payload),
+            input_payload=payload,
+            output_validator=self._validate_canary,
+        )
+        self.assertEqual(execution.result["status"], "succeeded")
+
+    def test_missing_or_unknown_oauth_status_fails_before_model_execution(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        for status in (None, "future-unknown"):
+            with self.subTest(status=status):
+                auth = _auth_status("openai")
+                profile = auth["auth"]["oauth"]["profiles"][0]
+                if status is None:
+                    del profile["status"]
+                else:
+                    profile["status"] = status
+                runner = _QueuedRunner([_completed(auth)])
+                execution = OpenClawModelClient(command_runner=runner).execute(
+                    request=self._request(payload=payload),
+                    input_payload=payload,
+                    output_validator=self._validate_canary,
+                )
+                self.assertEqual(len(runner.commands), 1)
+                self.assertEqual(execution.result["status"], "failed")
+                self.assertEqual(
+                    execution.result["attempts"][0]["failure_code"],
+                    "auth_unavailable",
+                )
+                self.assertIsNone(execution.output)
+
     def test_actual_model_mismatch_fails_closed_without_output_binding(self):
         payload = b'{"return":{"canary":"ok"}}'
         runner = _QueuedRunner(

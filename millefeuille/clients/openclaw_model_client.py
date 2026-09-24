@@ -551,7 +551,7 @@ class OpenClawModelClient:
             and candidate.get("provider") == provider
             and candidate.get("type") == "oauth"
             and candidate.get("source") == "store"
-            and candidate.get("status") not in {"expired", "unavailable"}
+            and candidate.get("status") in {"ok", "valid", "expiring"}
         ]
         if len(oauth_matches) != 1:
             raise ValueError("OpenClaw stored OAuth profile is unavailable")
