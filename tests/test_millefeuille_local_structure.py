@@ -69,15 +69,41 @@ Opening text.
         self.assertIn("missing page markers: 2, 3", warnings)
         self.assertIn("no non-page Markdown headings detected", warnings)
 
+    def test_keeps_bibliography_entries_across_page_markers(self):
+        markdown = (
+            "# Page 1\n"
+            "## References\n"
+            "[1] First source.\n"
+            "# Page 2\n"
+            "[2] Second source.\n"
+            "## Appendix\n"
+            "[3] This is not a reference.\n"
+        )
+
+        structure, _outline, counts, warnings = build_local_markdown_structure(
+            markdown, expected_page_count=2
+        )
+
+        self.assertEqual(counts["references"], 2)
+        self.assertEqual(
+            [(entry["label"], entry["page"]) for entry in structure["references"]],
+            [("1", 1), ("2", 2)],
+        )
+        self.assertEqual(warnings, [])
+
 
 @requires_secure_nofollow_writes
 class TestLocalStructurePreparation(unittest.TestCase):
-    def _write_route_evidence(self, root: Path) -> Path:
+    def _write_route_evidence(
+        self,
+        root: Path,
+        *,
+        markdown_text: str = (
+            "# Page 1\n# Introduction\nText.\n# Page 2\n# Results\nText.\n"
+        ),
+    ) -> Path:
         markdown_path = root / "selected.md"
-        markdown_path.write_text(
-            "# Page 1\n# Introduction\nText.\n# Page 2\n# Results\nText.\n",
-            encoding="utf-8",
-        )
+        markdown_path.write_text(markdown_text, encoding="utf-8")
         evidence_path = root / "route.json"
         evidence_path.write_text(
             json.dumps(
@@ -129,6 +155,32 @@ class TestLocalStructurePreparation(unittest.TestCase):
             self.assertEqual(evidence["structure_backend"], LOCAL_STRUCTURE_BACKEND)
             self.assertEqual(evidence["coverage_source"], "selected-markdown")
             self.assertEqual(evidence["sections"], 2)
+
+    def test_rejects_non_monotonic_page_markers_before_outputs(self):
+        for markdown_text in (
+            "# Page 1\nText.\n# Page 2\nText.\n# Page 1\nText.\n",
+            "# Page 1\nText.\n# Page 1\nText.\n",
+            "# Page 0\nText.\n",
+        ):
+            with (
+                self.subTest(markdown_text=markdown_text),
+                tempfile.TemporaryDirectory() as tempdir,
+            ):
+                root = Path(tempdir)
+                route_evidence = self._write_route_evidence(
+                    root, markdown_text=markdown_text
+                )
+                output_dir = root / "prepared"
+
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "repeated or non-monotonic page marker",
+                ):
+                    prepare_local_structures_from_route_evidence(
+                        route_evidence_paths=[route_evidence],
+                        output_dir=output_dir,
+                    )
+                self.assertFalse(output_dir.exists())
 
     def test_input_order_replays_deterministically(self):
         with tempfile.TemporaryDirectory() as tempdir:

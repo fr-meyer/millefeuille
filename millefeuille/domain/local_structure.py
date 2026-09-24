@@ -30,9 +30,7 @@ LOCAL_STRUCTURE_BACKEND = "local-markdown-headings-v0.1"
 
 _PAGE_HEADING_RE = re.compile(r"^#{1,6}\s+Page\s+(\d+)\s*$", re.IGNORECASE)
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
-_TABLE_SEPARATOR_RE = re.compile(
-    r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$"
-)
+_TABLE_SEPARATOR_RE = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$")
 _IMAGE_RE = re.compile(r"!\[([^\]]*)\]\([^)]*\)")
 _FIGURE_CAPTION_RE = re.compile(r"^\s*(?:figure|fig\.)\s+([A-Za-z0-9.-]+)\b", re.I)
 _TABLE_CAPTION_RE = re.compile(r"^\s*table\s+([A-Za-z0-9.-]+)\b", re.I)
@@ -162,14 +160,14 @@ def build_local_markdown_structure(
         page_match = _PAGE_HEADING_RE.fullmatch(stripped)
         if page_match:
             page_number = int(page_match.group(1))
-            if pages and page_number <= pages[-1]["page"]:
-                warnings.append(
-                    f"non-monotonic page marker p.{page_number} at line {line_number}"
+            if page_number < 1 or (pages and page_number <= pages[-1]["page"]):
+                raise MillefeuilleContractError(
+                    f"repeated or non-monotonic page marker p.{page_number} "
+                    f"at line {line_number}"
                 )
             current_page = page_number
             ensure_page(line_number, current_page)
             section_stack.clear()
-            reference_heading_level = None
             continue
 
         page = ensure_page(line_number, current_page)
@@ -200,8 +198,7 @@ def build_local_markdown_structure(
             if normalized_title in _REFERENCE_TITLES:
                 reference_heading_level = level
             elif (
-                reference_heading_level is not None
-                and level <= reference_heading_level
+                reference_heading_level is not None and level <= reference_heading_level
             ):
                 reference_heading_level = None
 
@@ -304,9 +301,7 @@ def build_local_markdown_structure(
     if sections:
         for section in sections:
             indent = "  " * max(0, section["level"] - 1)
-            outline_lines.append(
-                f"{indent}- {section['title']} ({section['locator']})"
-            )
+            outline_lines.append(f"{indent}- {section['title']} ({section['locator']})")
     else:
         outline_lines.append("- No section headings detected.")
     outline_lines.extend(
