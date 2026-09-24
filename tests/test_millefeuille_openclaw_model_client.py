@@ -6,10 +6,17 @@ from copy import deepcopy
 import json
 import os
 import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 
-from millefeuille.clients.openclaw_model_client import OpenClawModelClient
+from jsonschema import ValidationError
+
+from millefeuille.clients.openclaw_model_client import (
+    OpenClawModelClient,
+    _bounded_run,
+    _OutputLimitExceeded,
+)
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.model_executor import build_model_executor_request
 
@@ -166,9 +173,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         command = runner.commands[1]
         self.assertEqual(command[:3], ["openclaw", "agent", "exec"])
         self.assertEqual(command[command.index("--message-file") + 1], "-")
-        self.assertEqual(
-            command[command.index("--model") + 1], "openai/gpt-5.6-sol"
-        )
+        self.assertEqual(command[command.index("--model") + 1], "openai/gpt-5.6-sol")
         self.assertEqual(command[command.index("--thinking") + 1], "xhigh")
         self.assertNotIn(payload.decode(), command)
         self.assertEqual(runner.kwargs[1]["input"], payload.decode())
@@ -198,9 +203,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         runner = _QueuedRunner(
             [
                 _completed(_auth_status("xai")),
-                _completed(
-                    _model_response("xai", "grok-4.6", '{"canary":"ok"}')
-                ),
+                _completed(_model_response("xai", "grok-4.6", '{"canary":"ok"}')),
             ]
         )
         client = OpenClawModelClient(command_runner=runner)
@@ -245,9 +248,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         runner = _QueuedRunner(
             [
                 _completed(_auth_status("openai")),
-                _completed(
-                    _model_response("openai", "gpt-5.5", '{"canary":"ok"}')
-                ),
+                _completed(_model_response("openai", "gpt-5.5", '{"canary":"ok"}')),
             ]
         )
         client = OpenClawModelClient(command_runner=runner)
@@ -334,6 +335,85 @@ class TestOpenClawModelClient(unittest.TestCase):
             execution.result["attempts"][0]["failure_code"], "invalid_response"
         )
         self.assertIsNone(execution.output)
+
+    def test_missing_agent_safety_evidence_fails_closed(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        for missing in ("bridgeCalls", "codeModeEngaged", "assistantTurns"):
+            with self.subTest(missing=missing):
+                response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+                del response[missing]
+                runner = _QueuedRunner(
+                    [_completed(_auth_status("openai")), _completed(response)]
+                )
+                execution = OpenClawModelClient(command_runner=runner).execute(
+                    request=self._request(payload=payload),
+                    input_payload=payload,
+                    output_validator=self._validate_canary,
+                )
+                self.assertEqual(execution.result["status"], "failed")
+                self.assertEqual(
+                    execution.result["attempts"][0]["failure_code"],
+                    "invalid_response",
+                )
+                self.assertIsNone(execution.output)
+
+    def test_jsonschema_validator_error_is_a_failed_execution(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        runner = _QueuedRunner(
+            [
+                _completed(_auth_status("openai")),
+                _completed(_model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')),
+            ]
+        )
+
+        def reject(_value: object) -> None:
+            raise ValidationError("test schema rejection")
+
+        execution = OpenClawModelClient(command_runner=runner).execute(
+            request=self._request(payload=payload),
+            input_payload=payload,
+            output_validator=reject,
+        )
+        self.assertEqual(execution.result["status"], "failed")
+        self.assertEqual(
+            execution.result["attempts"][0]["failure_code"],
+            "schema_validation_failed",
+        )
+        self.assertIsNone(execution.output)
+
+    def test_auth_lookup_uses_request_budget_and_timeout_fails_closed(self):
+        payload = b'{"return":{"canary":"ok"}}'
+
+        class TimeoutRunner(_QueuedRunner):
+            def __call__(self, command: list[str], **kwargs):
+                self.commands.append(command)
+                self.kwargs.append(kwargs)
+                raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+        runner = TimeoutRunner([])
+        execution = OpenClawModelClient(command_runner=runner).execute(
+            request=self._request(payload=payload, timeout_seconds=10),
+            input_payload=payload,
+            output_validator=self._validate_canary,
+        )
+        self.assertEqual(len(runner.commands), 1)
+        self.assertLessEqual(runner.kwargs[0]["timeout"], 10)
+        self.assertEqual(execution.result["status"], "failed")
+        self.assertEqual(execution.result["attempts"][0]["failure_code"], "timeout")
+
+    def test_default_runner_bounds_stdout_and_stderr_during_capture(self):
+        for stream in ("stdout", "stderr"):
+            with self.subTest(stream=stream), self.assertRaises(_OutputLimitExceeded):
+                _bounded_run(
+                    [
+                        sys.executable,
+                        "-c",
+                        f"import sys; sys.{stream}.write('x' * 8192)",
+                    ],
+                    timeout=5,
+                    max_stdout_bytes=1024,
+                    max_stderr_bytes=1024,
+                )
 
     def test_short_timeout_rejected_before_any_process(self):
         payload = b'{"return":{"canary":"ok"}}'

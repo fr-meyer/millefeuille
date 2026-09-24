@@ -10,6 +10,7 @@ the provider-neutral executor result envelope.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
@@ -18,6 +19,8 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+import threading
+import time
 from typing import Any
 
 from millefeuille.domain.millefeuille import MillefeuilleContractError
@@ -28,6 +31,7 @@ from millefeuille.domain.model_executor import (
 )
 
 _MAX_OPENCLAW_STDOUT_BYTES = 4 * 1024 * 1024
+_MAX_OPENCLAW_STDERR_BYTES = 256 * 1024
 _AGENT_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}\Z")
 _CHILD_ENV_ALLOWLIST = frozenset(
     {
@@ -74,6 +78,110 @@ CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
 OutputValidator = Callable[[Any], None]
 
 
+class _OutputLimitExceeded(subprocess.SubprocessError):
+    """A child exceeded its bounded in-memory output allowance."""
+
+
+def _bounded_run(
+    command: list[str],
+    *,
+    input: str | None = None,
+    capture_output: bool = True,
+    text: bool = True,
+    encoding: str = "utf-8",
+    timeout: float,
+    check: bool = False,
+    env: Mapping[str, str] | None = None,
+    max_stdout_bytes: int = _MAX_OPENCLAW_STDOUT_BYTES,
+    max_stderr_bytes: int = _MAX_OPENCLAW_STDERR_BYTES,
+) -> subprocess.CompletedProcess[str]:
+    """Run a child with live stdout/stderr caps and no unbounded capture."""
+
+    if not capture_output or not text or encoding != "utf-8":
+        raise ValueError("bounded OpenClaw runner requires UTF-8 text capture")
+    input_bytes = input.encode("utf-8") if input is not None else None
+    with subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE if input_bytes is not None else subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=dict(env) if env is not None else None,
+    ) as process:
+        assert process.stdout is not None and process.stderr is not None
+        stdout = bytearray()
+        stderr = bytearray()
+        overflow = threading.Event()
+        read_errors: list[OSError] = []
+
+        def collect(stream: Any, buffer: bytearray, limit: int) -> None:
+            try:
+                while chunk := os.read(stream.fileno(), 64 * 1024):
+                    if len(buffer) + len(chunk) > limit:
+                        overflow.set()
+                        with suppress(ProcessLookupError):
+                            process.kill()
+                        return
+                    buffer.extend(chunk)
+            except OSError as exc:
+                read_errors.append(exc)
+
+        def send_input() -> None:
+            assert input_bytes is not None and process.stdin is not None
+            try:
+                with process.stdin:
+                    for offset in range(0, len(input_bytes), 64 * 1024):
+                        view = memoryview(input_bytes)[offset : offset + 64 * 1024]
+                        while view:
+                            view = view[os.write(process.stdin.fileno(), view) :]
+            except (BrokenPipeError, OSError):
+                # The child may reject stdin; its exit status remains authoritative.
+                pass
+
+        readers = [
+            threading.Thread(
+                target=collect,
+                args=(process.stdout, stdout, max_stdout_bytes),
+                daemon=True,
+            ),
+            threading.Thread(
+                target=collect,
+                args=(process.stderr, stderr, max_stderr_bytes),
+                daemon=True,
+            ),
+        ]
+        for reader in readers:
+            reader.start()
+        writer = (
+            threading.Thread(target=send_input, daemon=True)
+            if input_bytes is not None
+            else None
+        )
+        if writer is not None:
+            writer.start()
+        try:
+            returncode = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+            raise
+        finally:
+            for thread in [*readers, *([writer] if writer is not None else [])]:
+                thread.join(timeout=1)
+        if overflow.is_set():
+            raise _OutputLimitExceeded("OpenClaw child output limit exceeded")
+        if any(reader.is_alive() for reader in readers) or read_errors:
+            raise subprocess.SubprocessError("OpenClaw child output was incomplete")
+        completed = subprocess.CompletedProcess(
+            args=command,
+            returncode=returncode,
+            stdout=stdout.decode(encoding),
+            stderr=stderr.decode(encoding),
+        )
+        if check:
+            completed.check_returncode()
+        return completed
+
+
 class OpenClawModelClient:
     """Execute exact no-fallback requests through saved subscription OAuth."""
 
@@ -82,14 +190,12 @@ class OpenClawModelClient:
         *,
         agent_id: str = "franck",
         executable: str = "openclaw",
-        command_runner: CommandRunner = subprocess.run,
+        command_runner: CommandRunner = _bounded_run,
     ) -> None:
         if not isinstance(agent_id, str) or _AGENT_ID.fullmatch(agent_id) is None:
             raise MillefeuilleContractError("OpenClaw agent_id is invalid")
         if not executable or not executable.strip():
-            raise MillefeuilleContractError(
-                "OpenClaw executable must be non-empty"
-            )
+            raise MillefeuilleContractError("OpenClaw executable must be non-empty")
         self.agent_id = agent_id
         self.executable = executable
         self._run = command_runner
@@ -130,21 +236,42 @@ class OpenClawModelClient:
             raise MillefeuilleContractError(
                 "OpenClaw execution requires timeout_seconds >= 10"
             )
+        started_at = _utc_now()
+        deadline = time.monotonic() + normalized["timeout_seconds"] - 1
         try:
             auth_profile_ref, agent_dir = self._require_single_oauth_profile(
-                normalized["requested_model"]
+                normalized["requested_model"],
+                timeout_seconds=max(0.001, deadline - time.monotonic()),
+            )
+        except subprocess.TimeoutExpired:
+            return self._failed_execution(
+                request=normalized,
+                started_at=started_at,
+                failure_code="timeout",
+                auth_profile_ref=None,
+                actual_model=None,
+                schema_validation_status="not_run",
             )
         except (OSError, subprocess.SubprocessError, ValueError):
             return self._failed_execution(
                 request=normalized,
-                started_at=_utc_now(),
+                started_at=started_at,
                 failure_code="auth_unavailable",
                 auth_profile_ref=None,
                 actual_model=None,
                 schema_validation_status="not_run",
             )
 
-        started_at = _utc_now()
+        remaining = deadline - time.monotonic()
+        if remaining <= 3:
+            return self._failed_execution(
+                request=normalized,
+                started_at=started_at,
+                failure_code="timeout",
+                auth_profile_ref=auth_profile_ref,
+                actual_model=None,
+                schema_validation_status="not_run",
+            )
         try:
             with tempfile.TemporaryDirectory(
                 prefix="millefeuille-openclaw-"
@@ -154,9 +281,7 @@ class OpenClawModelClient:
                     json.dumps(
                         {
                             "agents": {
-                                "entries": {
-                                    self.agent_id: {"agentDir": agent_dir}
-                                },
+                                "entries": {self.agent_id: {"agentDir": agent_dir}},
                                 "defaults": {
                                     "systemAgent": {"agentId": self.agent_id},
                                     "model": {
@@ -196,7 +321,7 @@ class OpenClawModelClient:
                     "--thinking",
                     normalized["thinking"],
                     "--timeout",
-                    str(normalized["timeout_seconds"] - 3),
+                    str(max(1, int(remaining - 2))),
                     "--no-auth-env-only",
                     "--json",
                 ]
@@ -206,7 +331,7 @@ class OpenClawModelClient:
                     capture_output=True,
                     text=True,
                     encoding="utf-8",
-                    timeout=normalized["timeout_seconds"] - 2,
+                    timeout=max(0.001, deadline - time.monotonic() - 1),
                     check=False,
                     env=_oauth_only_environment(),
                 )
@@ -215,6 +340,15 @@ class OpenClawModelClient:
                 request=normalized,
                 started_at=started_at,
                 failure_code="timeout",
+                auth_profile_ref=auth_profile_ref,
+                actual_model=None,
+                schema_validation_status="not_run",
+            )
+        except _OutputLimitExceeded:
+            return self._failed_execution(
+                request=normalized,
+                started_at=started_at,
+                failure_code="invalid_response",
                 auth_profile_ref=auth_profile_ref,
                 actual_model=None,
                 schema_validation_status="not_run",
@@ -230,20 +364,24 @@ class OpenClawModelClient:
             )
 
         stdout = completed.stdout or ""
+        stderr = completed.stderr or ""
+        if (
+            len(stdout.encode("utf-8")) > _MAX_OPENCLAW_STDOUT_BYTES
+            or len(stderr.encode("utf-8")) > _MAX_OPENCLAW_STDERR_BYTES
+        ):
+            return self._failed_execution(
+                request=normalized,
+                started_at=started_at,
+                failure_code="invalid_response",
+                auth_profile_ref=auth_profile_ref,
+                actual_model=None,
+                schema_validation_status="not_run",
+            )
         if completed.returncode != 0:
             return self._failed_execution(
                 request=normalized,
                 started_at=started_at,
                 failure_code="provider_error",
-                auth_profile_ref=auth_profile_ref,
-                actual_model=None,
-                schema_validation_status="not_run",
-            )
-        if len(stdout.encode("utf-8")) > _MAX_OPENCLAW_STDOUT_BYTES:
-            return self._failed_execution(
-                request=normalized,
-                started_at=started_at,
-                failure_code="invalid_response",
                 auth_profile_ref=auth_profile_ref,
                 actual_model=None,
                 schema_validation_status="not_run",
@@ -282,7 +420,8 @@ class OpenClawModelClient:
         try:
             parsed_output = json.loads(output)
             output_validator(parsed_output)
-        except (json.JSONDecodeError, MillefeuilleContractError, ValueError, TypeError):
+        except Exception:
+            # Validator errors fail closed; process-control exceptions propagate.
             return self._failed_execution(
                 request=normalized,
                 started_at=started_at,
@@ -321,7 +460,7 @@ class OpenClawModelClient:
         return OpenClawModelExecution(result=result, output=output_bytes)
 
     def _require_single_oauth_profile(
-        self, requested_model: str
+        self, requested_model: str, *, timeout_seconds: float
     ) -> tuple[str, str]:
         provider = requested_model.split("/", 1)[0]
         command = [
@@ -337,11 +476,18 @@ class OpenClawModelClient:
             capture_output=True,
             text=True,
             encoding="utf-8",
-            timeout=120,
+            timeout=min(120, timeout_seconds),
             check=False,
+            env=_oauth_only_environment(),
         )
         if completed.returncode != 0:
             raise ValueError("OpenClaw auth status failed")
+        if (
+            len((completed.stdout or "").encode("utf-8")) > _MAX_OPENCLAW_STDOUT_BYTES
+            or len((completed.stderr or "").encode("utf-8"))
+            > _MAX_OPENCLAW_STDERR_BYTES
+        ):
+            raise ValueError("OpenClaw auth status output exceeded limit")
         payload = json.loads(completed.stdout or "")
         if payload.get("agentId") != self.agent_id:
             raise ValueError("OpenClaw auth status agent drift")
@@ -466,18 +612,16 @@ def _validate_openclaw_response(
         raise MillefeuilleContractError("OpenClaw agent exec used a tool")
     if tools.get("tools") not in (None, []):
         raise MillefeuilleContractError("OpenClaw tool list is inconsistent")
-    bridge_calls = response.get("bridgeCalls")
-    if bridge_calls is not None:
-        bridge = _required_mapping(bridge_calls, "OpenClaw bridge calls")
-        if any(
-            type(bridge.get(key)) is not int or bridge[key] != 0
-            for key in ("search", "describe", "call")
-        ):
-            raise MillefeuilleContractError("OpenClaw agent exec used a tool bridge")
-    if response.get("codeModeEngaged") not in (None, False):
+    bridge = _required_mapping(response.get("bridgeCalls"), "OpenClaw bridge calls")
+    if any(
+        type(bridge.get(key)) is not int or bridge[key] != 0
+        for key in ("search", "describe", "call")
+    ):
+        raise MillefeuilleContractError("OpenClaw agent exec used a tool bridge")
+    if response.get("codeModeEngaged") is not False:
         raise MillefeuilleContractError("OpenClaw agent exec engaged code mode")
     turns = response.get("assistantTurns")
-    if turns is not None and (type(turns) is not int or turns != 1):
+    if type(turns) is not int or turns != 1:
         raise MillefeuilleContractError("OpenClaw agent exec used multiple turns")
 
     payloads = response.get("payloads")
@@ -519,9 +663,7 @@ def _attempt(
         "status": status,
         "started_at": started_at,
         "completed_at": completed_at,
-        "auth_class": (
-            "subscription_oauth" if auth_profile_ref is not None else None
-        ),
+        "auth_class": ("subscription_oauth" if auth_profile_ref is not None else None),
         "auth_profile_ref": auth_profile_ref,
         "failure_code": failure_code,
     }
@@ -539,8 +681,6 @@ def _sha256(payload: bytes) -> str:
 
 def _oauth_only_environment() -> dict[str, str]:
     env = {
-        key: value
-        for key, value in os.environ.items()
-        if key in _CHILD_ENV_ALLOWLIST
+        key: value for key, value in os.environ.items() if key in _CHILD_ENV_ALLOWLIST
     }
     return env

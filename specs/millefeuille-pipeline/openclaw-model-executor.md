@@ -20,14 +20,14 @@ run's approved-live scope and output-contract validation.
   agent directory only as the stored-auth source. `agent exec` strips inherited
   agent database locations from its run config and uses temporary run state.
 - The child environment passes only a small operational allowlist. Provider API
-  keys and Codex API keys are not passed. The subprocess and OpenClaw run each
-  have a deadline inside the request's timeout.
+  keys and Codex API keys are not passed. Auth lookup and model execution share one request deadline. Child stdout
+  and stderr are capped during capture, including the auth lookup.
 
 ## Result boundary
 
 Success requires the stable `agent exec --json` envelope to report `ok`, exact
 provider/model attribution, one non-media text payload matching `final`, zero
-outer and bridge tool calls, no Code Mode, and at most one assistant turn. The
+outer and bridge tool calls, no Code Mode, and exactly one assistant turn. The
 caller then validates the parsed JSON against its output contract. Only the
 output bytes and a sanitized executor result envelope return to the caller.
 Malformed or ambiguous evidence fails without an output binding. Explicit
@@ -35,6 +35,6 @@ fallback requests are rejected by this one-shot adapter; each later attempt
 requires its own request and provenance.
 
 The adapter has offline mock coverage for OAuth refusal, request/input drift,
-model mismatch, schema failure, missing or positive tool-use evidence, and
-prompt transport. GCP validation used OpenClaw 2026.9.4 config validation and
+model mismatch, schema failure, missing or positive tool-use evidence,
+auth timeouts, bounded capture, and prompt transport. GCP validation used OpenClaw 2026.9.4 config validation and
 read-only auth status. No live model call or paper text was used for this slice.
