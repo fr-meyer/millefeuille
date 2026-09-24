@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -525,6 +527,57 @@ class TestOpenClawModelClient(unittest.TestCase):
                     max_stdout_bytes=1024,
                     max_stderr_bytes=1024,
                 )
+
+    @unittest.skipUnless(os.name == "posix", "requires POSIX process groups")
+    def test_timeout_kills_spawned_descendant(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            pid_path = Path(tempdir) / "child.pid"
+            marker_path = Path(tempdir) / "survived"
+            child = (
+                "import pathlib,sys,time; time.sleep(2); "
+                "pathlib.Path(sys.argv[1]).write_text('survived')"
+            )
+            parent = (
+                "import pathlib,subprocess,sys,time; "
+                f"child=subprocess.Popen([sys.executable,'-c',{child!r},"
+                "sys.argv[2]]); "
+                "pathlib.Path(sys.argv[1]).write_text(str(child.pid)); "
+                "time.sleep(30)"
+            )
+            with self.assertRaises(subprocess.TimeoutExpired):
+                _bounded_run(
+                    [sys.executable, "-c", parent, str(pid_path), str(marker_path)],
+                    timeout=1,
+                )
+            self.assertTrue(pid_path.exists(), "descendant was not started")
+            time.sleep(2.2)
+            self.assertFalse(marker_path.exists(), "descendant survived timeout")
+
+    @unittest.skipUnless(os.name == "posix", "requires POSIX process groups")
+    def test_output_limit_kills_spawned_descendant(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            pid_path = Path(tempdir) / "child.pid"
+            marker_path = Path(tempdir) / "survived"
+            child = (
+                "import pathlib,sys,time; time.sleep(2); "
+                "pathlib.Path(sys.argv[1]).write_text('survived')"
+            )
+            parent = (
+                "import pathlib,subprocess,sys,time; "
+                f"child=subprocess.Popen([sys.executable,'-c',{child!r},"
+                "sys.argv[2]]); "
+                "pathlib.Path(sys.argv[1]).write_text(str(child.pid)); "
+                "sys.stdout.write('x'*8192); sys.stdout.flush(); time.sleep(30)"
+            )
+            with self.assertRaises(_OutputLimitExceeded):
+                _bounded_run(
+                    [sys.executable, "-c", parent, str(pid_path), str(marker_path)],
+                    timeout=5,
+                    max_stdout_bytes=1024,
+                )
+            self.assertTrue(pid_path.exists(), "descendant was not started")
+            time.sleep(2.2)
+            self.assertFalse(marker_path.exists(), "descendant survived output cap")
 
     def test_invalid_utf8_from_either_child_stream_fails_closed(self):
         payload = b'{"return":{"canary":"ok"}}'

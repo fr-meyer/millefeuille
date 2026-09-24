@@ -17,6 +17,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import subprocess
 import tempfile
 import threading
@@ -83,6 +84,26 @@ class _OutputLimitExceeded(subprocess.SubprocessError):
     """A child exceeded its bounded in-memory output allowance."""
 
 
+def _kill_process_tree(process: subprocess.Popen[bytes]) -> None:
+    """Stop the isolated child group, including runtime/provider descendants."""
+
+    if os.name == "nt":
+        with suppress(OSError, subprocess.TimeoutExpired):
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+                check=False,
+            )
+        with suppress(ProcessLookupError):
+            process.kill()
+    else:
+        with suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+
+
 def _bounded_run(
     command: list[str],
     *,
@@ -107,6 +128,10 @@ def _bounded_run(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=dict(env) if env is not None else None,
+        start_new_session=os.name != "nt",
+        creationflags=(
+            subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+        ),
     ) as process:
         assert process.stdout is not None and process.stderr is not None
         stdout = bytearray()
@@ -119,8 +144,7 @@ def _bounded_run(
                 while chunk := os.read(stream.fileno(), 64 * 1024):
                     if len(buffer) + len(chunk) > limit:
                         overflow.set()
-                        with suppress(ProcessLookupError):
-                            process.kill()
+                        _kill_process_tree(process)
                         return
                     buffer.extend(chunk)
             except OSError as exc:
@@ -162,12 +186,17 @@ def _bounded_run(
         try:
             returncode = process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
+            _kill_process_tree(process)
+            with suppress(subprocess.TimeoutExpired):
+                process.wait(timeout=2)
             raise
         finally:
             for thread in [*readers, *([writer] if writer is not None else [])]:
                 thread.join(timeout=1)
+            if any(reader.is_alive() for reader in readers):
+                _kill_process_tree(process)
+                for reader in readers:
+                    reader.join(timeout=1)
         if overflow.is_set():
             raise _OutputLimitExceeded("OpenClaw child output limit exceeded")
         if any(reader.is_alive() for reader in readers) or read_errors:
