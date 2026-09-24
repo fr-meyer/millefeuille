@@ -31,6 +31,7 @@ from millefeuille.domain.model_executor import (
 )
 from millefeuille.domain.operator_preflight import (
     OperatorPreflightPacket,
+    compute_operator_authorization_context_digest,
     compute_operator_root_target_id,
     evaluate_operator_preflight,
 )
@@ -244,6 +245,16 @@ def _require_canary_scope(
         "artifact-root",
         compute_operator_root_target_id(packet.artifact_root),
     )
+    expected_targets = sorted(
+        (
+            expected_destination,
+            (
+                "preflight-scope",
+                compute_operator_authorization_context_digest(packet.to_dict()),
+            ),
+        )
+    )
+    actual_targets = sorted((target.kind, target.id) for target in packet.targets)
     if (
         packet.mode != "approved-live"
         or packet.operations != ("model.execute",)
@@ -266,7 +277,7 @@ def _require_canary_scope(
         or len(packet.destinations) != 1
         or (packet.destinations[0].kind, packet.destinations[0].id)
         != expected_destination
-        or len(packet.targets) != 2
+        or actual_targets != expected_targets
         or len(packet.credential_requirements) != 1
         or packet.credential_requirements[0].credential_type != "model-oauth"
         or packet.credential_requirements[0].reference != "OPENCLAW_CODEX_OAUTH_READY"

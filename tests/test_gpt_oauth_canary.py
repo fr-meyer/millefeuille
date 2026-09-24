@@ -236,6 +236,70 @@ def _trusted_approval(directory: str, packet, receipt):
 
 @unittest.skipUnless(os.name == "posix", "POSIX ledger only")
 class TestGptOauthCanary(unittest.TestCase):
+    def test_scope_rejects_replaced_duplicate_and_extra_targets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "artifact"
+            packet, receipt = _approved_pair(root)
+            original = packet.to_dict()
+            destination = original["destinations"][0]
+            scope = next(
+                target
+                for target in original["targets"]
+                if target["kind"] == "preflight-scope"
+            )
+            drifted_scope = dict(scope)
+            drifted_scope["id"] = scope["id"][:-1] + (
+                "0" if scope["id"][-1] != "0" else "1"
+            )
+            extra_destination = dict(destination)
+            extra_destination["id"] = destination["id"][:-1] + (
+                "0" if destination["id"][-1] != "0" else "1"
+            )
+            extra_context = packet.to_dict()
+            extra_context["targets"] = sorted(
+                [destination, extra_destination],
+                key=lambda row: (row["kind"], row["id"]),
+            )
+            extra_scope = {
+                "kind": "preflight-scope",
+                "id": compute_operator_authorization_context_digest(extra_context),
+            }
+            cases = {
+                "replaced": [destination, drifted_scope],
+                "duplicate": [destination, destination],
+                "extra": sorted(
+                    [destination, extra_destination, extra_scope],
+                    key=lambda row: (row["kind"], row["id"]),
+                ),
+            }
+            for label, targets in cases.items():
+                with self.subTest(label=label):
+                    changed_packet = packet.to_dict()
+                    changed_receipt = receipt.to_dict()
+                    changed_packet["targets"] = targets
+                    changed_receipt["scope"]["targets"] = targets
+                    changed_receipt["integrity"]["content_digest"] = (
+                        compute_approved_live_receipt_digest(changed_receipt)
+                    )
+                    changed_packet["approval_receipt"]["content_digest"] = (
+                        changed_receipt["integrity"]["content_digest"]
+                    )
+                    changed_packet["integrity"]["content_digest"] = (
+                        compute_operator_preflight_packet_digest(changed_packet)
+                    )
+                    if label != "extra":
+                        with self.assertRaises(MillefeuilleContractError):
+                            OperatorPreflightPacket.from_dict(changed_packet)
+                        continue
+                    parsed_packet = OperatorPreflightPacket.from_dict(changed_packet)
+                    parsed_receipt = ApprovedLiveReceipt.from_dict(changed_receipt)
+                    with self.assertRaisesRegex(
+                        MillefeuilleContractError, "outside the GPT-only canary scope"
+                    ):
+                        canary._require_canary_scope(
+                            parsed_packet, parsed_receipt, root
+                        )
+
     def test_broker_denies_expired_receipt_without_ledger_row(self):
         with tempfile.TemporaryDirectory() as directory:
             control = Path(directory)
