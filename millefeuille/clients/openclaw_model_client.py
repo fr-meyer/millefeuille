@@ -280,6 +280,21 @@ class OpenClawModelClient:
                 config_path.write_text(
                     json.dumps(
                         {
+                            "auth": {
+                                "profiles": {
+                                    auth_profile_ref: {
+                                        "provider": normalized["requested_model"].split(
+                                            "/", 1
+                                        )[0],
+                                        "mode": "oauth",
+                                    }
+                                },
+                                "order": {
+                                    normalized["requested_model"].split("/", 1)[0]: [
+                                        auth_profile_ref
+                                    ]
+                                },
+                            },
                             "agents": {
                                 "entries": {self.agent_id: {"agentDir": agent_dir}},
                                 "defaults": {

@@ -189,6 +189,15 @@ class TestOpenClawModelClient(unittest.TestCase):
         )
         self.assertEqual(runner.runtime_configs[0]["plugins"], {"enabled": False})
         self.assertEqual(
+            runner.runtime_configs[0]["auth"],
+            {
+                "profiles": {
+                    "openai:research": {"provider": "openai", "mode": "oauth"}
+                },
+                "order": {"openai": ["openai:research"]},
+            },
+        )
+        self.assertEqual(
             runner.runtime_configs[0]["agents"]["defaults"]["models"][
                 "openai/gpt-5.6-sol"
             ]["agentRuntime"],
@@ -248,6 +257,44 @@ class TestOpenClawModelClient(unittest.TestCase):
             execution.result["authentication"]["profile_ref"],
             "xai:research",
         )
+
+    def test_auth_pin_is_unchanged_when_profile_store_drifts(self):
+        payload = b'{"return":{"canary":"ok"}}'
+
+        class DriftRunner(_QueuedRunner):
+            def __call__(self, command: list[str], **kwargs):
+                if "--config" not in command:
+                    response = super().__call__(command, **kwargs)
+                    self.available_profile_ids = {"openai:replacement"}
+                    return response
+                config_path = command[command.index("--config") + 1]
+                with open(config_path, encoding="utf-8") as handle:
+                    config = json.load(handle)
+                self.asserted_pin = config["auth"]["order"]["openai"]
+                self.commands.append(command)
+                self.kwargs.append(kwargs)
+                selected_profile = self.asserted_pin[0]
+                if selected_profile in self.available_profile_ids:
+                    return _completed(
+                        _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+                    )
+                return subprocess.CompletedProcess(
+                    args=command,
+                    returncode=1,
+                    stdout="",
+                    stderr="selected profile unavailable",
+                )
+
+        runner = DriftRunner([_completed(_auth_status("openai"))])
+        execution = OpenClawModelClient(command_runner=runner).execute(
+            request=self._request(payload=payload),
+            input_payload=payload,
+            output_validator=self._validate_canary,
+        )
+        self.assertEqual(runner.available_profile_ids, {"openai:replacement"})
+        self.assertEqual(runner.asserted_pin, ["openai:research"])
+        self.assertEqual(execution.result["status"], "failed")
+        self.assertIsNone(execution.output)
 
     def test_non_oauth_profile_fails_before_provider_execution(self):
         status = _auth_status("openai")
