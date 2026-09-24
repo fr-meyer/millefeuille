@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/model-executor-request.schema.json",
+  "title": "Millefeuille Provider-neutral Model Executor Request",
+  "type": "object",
+  "$comment": "This control envelope excludes prompts, source text, provider payloads, credentials, and output. Consumers MUST also apply the first-party semantic validator.",
+  "x-millefeuille-semantic-validation": {
+    "required": true,
+    "first_party_validator": "millefeuille.domain.model_executor.validate_model_executor_request",
+    "assertions": [
+      "fallback.models excludes requested_model",
+      "fallback.policy=none implies retry.max_attempts=1 and retry.retry_on=[]",
+      "fallback.policy=explicit implies retry.max_attempts=1+len(fallback.models)",
+      "retry.retry_on is sorted and unique"
+    ]
+  },
+  "required": [
+    "schema_version",
+    "task",
+    "requested_model",
+    "thinking",
+    "authentication",
+    "prompt_template",
+    "input",
+    "output_contract",
+    "timeout_seconds",
+    "retry",
+    "fallback",
+    "idempotency_key"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "allowedModel": {
+      "enum": ["openai/gpt-5.6-sol", "xai/grok-4.6"]
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-model-executor-request/v0.1"
+    },
+    "task": {
+      "type": "object",
+      "required": [
+        "kind",
+        "unit_id",
+        "source_locator_count",
+        "source_locators_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "structure",
+            "summarize_page",
+            "summarize_section",
+            "summarize_full_paper"
+          ]
+        },
+        "unit_id": {"$ref": "#/$defs/safeId"},
+        "source_locator_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "source_locators_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "requested_model": {"$ref": "#/$defs/allowedModel"},
+    "thinking": {"const": "xhigh"},
+    "authentication": {
+      "type": "object",
+      "required": ["control_plane", "required_class", "api_key_allowed"],
+      "additionalProperties": false,
+      "properties": {
+        "control_plane": {"const": "openclaw"},
+        "required_class": {"const": "subscription_oauth"},
+        "api_key_allowed": {"const": false}
+      }
+    },
+    "prompt_template": {
+      "type": "object",
+      "required": ["id", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/safeId"},
+        "version": {"$ref": "#/$defs/safeId"}
+      }
+    },
+    "input": {
+      "type": "object",
+      "required": ["sha256", "bytes"],
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "output_contract": {
+      "type": "object",
+      "required": ["schema_id", "schema_version"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"
+        },
+        "schema_version": {"$ref": "#/$defs/safeId"}
+      }
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3600
+    },
+    "retry": {
+      "type": "object",
+      "required": ["max_attempts", "retry_on"],
+      "additionalProperties": false,
+      "properties": {
+        "max_attempts": {"type": "integer", "minimum": 1, "maximum": 8},
+        "retry_on": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "empty_output",
+              "model_unavailable",
+              "provider_error",
+              "timeout"
+            ]
+          }
+        }
+      }
+    },
+    "fallback": {
+      "type": "object",
+      "required": ["policy", "models"],
+      "additionalProperties": false,
+      "properties": {
+        "policy": {"enum": ["none", "explicit"]},
+        "models": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/allowedModel"}
+        }
+      }
+    },
+    "idempotency_key": {"$ref": "#/$defs/safeId"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "fallback": {
+            "properties": {"policy": {"const": "none"}},
+            "required": ["policy"]
+          }
+        },
+        "required": ["fallback"]
+      },
+      "then": {
+        "properties": {
+          "fallback": {"properties": {"models": {"maxItems": 0}}},
+          "retry": {
+            "properties": {
+              "max_attempts": {"const": 1},
+              "retry_on": {"maxItems": 0}
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "fallback": {"properties": {"models": {"minItems": 1}}},
+          "retry": {"properties": {"retry_on": {"minItems": 1}}}
+        }
+      }
+    }
+  ]
+}

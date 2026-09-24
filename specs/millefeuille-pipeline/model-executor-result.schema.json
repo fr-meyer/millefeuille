@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/model-executor-result.schema.json",
+  "title": "Millefeuille Provider-neutral Model Executor Result",
+  "type": "object",
+  "$comment": "This control envelope excludes model output and provider payloads. Generic schema validation MUST be paired with request-bound first-party semantic validation.",
+  "x-millefeuille-semantic-validation": {
+    "required": true,
+    "first_party_validator": "millefeuille.domain.model_executor.validate_model_executor_result",
+    "requires": ["request", "result"],
+    "assertions": [
+      "request_sha256 and idempotency_key bind the exact request",
+      "attempt models follow the declared route exactly once in order",
+      "every fallback transition follows an authorized retry failure",
+      "successful requested/actual/attempt model IDs are equal",
+      "successful auth class is subscription_oauth",
+      "successful output schema validation passed",
+      "usage.total_tokens == usage.input_tokens + usage.output_tokens"
+    ]
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "request_sha256",
+    "idempotency_key",
+    "requested_model",
+    "actual_model",
+    "thinking",
+    "authentication",
+    "started_at",
+    "completed_at",
+    "attempts",
+    "fallback",
+    "schema_validation",
+    "output",
+    "usage",
+    "cost"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "safeSchemaId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"
+    },
+    "safeProfileRef": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,255}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?Z$"
+    },
+    "allowedModel": {
+      "enum": ["openai/gpt-5.6-sol", "xai/grok-4.6"]
+    },
+    "nullableAllowedModel": {
+      "oneOf": [
+        {"$ref": "#/$defs/allowedModel"},
+        {"type": "null"}
+      ]
+    },
+    "attempt": {
+      "type": "object",
+      "required": [
+        "sequence",
+        "model",
+        "actual_model",
+        "status",
+        "started_at",
+        "completed_at",
+        "auth_class",
+        "auth_profile_ref",
+        "failure_code"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "sequence": {"type": "integer", "minimum": 1, "maximum": 8},
+        "model": {"$ref": "#/$defs/allowedModel"},
+        "actual_model": {
+          "oneOf": [
+            {"$ref": "#/$defs/safeSchemaId"},
+            {"type": "null"}
+          ]
+        },
+        "status": {"enum": ["succeeded", "failed"]},
+        "started_at": {"$ref": "#/$defs/timestamp"},
+        "completed_at": {"$ref": "#/$defs/timestamp"},
+        "auth_class": {
+          "oneOf": [
+            {"const": "subscription_oauth"},
+            {"type": "null"}
+          ]
+        },
+        "auth_profile_ref": {
+          "oneOf": [
+            {"$ref": "#/$defs/safeProfileRef"},
+            {"type": "null"}
+          ]
+        },
+        "failure_code": {
+          "oneOf": [
+            {
+              "enum": [
+                "actual_model_mismatch",
+                "auth_not_oauth",
+                "auth_unavailable",
+                "empty_output",
+                "input_drift",
+                "invalid_response",
+                "model_unavailable",
+                "provider_error",
+                "schema_validation_failed",
+                "timeout",
+                "transport_ambiguous"
+              ]
+            },
+            {"type": "null"}
+          ]
+        }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-model-executor-result/v0.1"
+    },
+    "status": {"enum": ["succeeded", "failed"]},
+    "request_sha256": {"$ref": "#/$defs/sha256"},
+    "idempotency_key": {"$ref": "#/$defs/safeId"},
+    "requested_model": {"$ref": "#/$defs/allowedModel"},
+    "actual_model": {"$ref": "#/$defs/nullableAllowedModel"},
+    "thinking": {"const": "xhigh"},
+    "authentication": {
+      "type": "object",
+      "required": ["class", "profile_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "class": {
+          "oneOf": [
+            {"const": "subscription_oauth"},
+            {"type": "null"}
+          ]
+        },
+        "profile_ref": {
+          "oneOf": [
+            {"$ref": "#/$defs/safeProfileRef"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "started_at": {"$ref": "#/$defs/timestamp"},
+    "completed_at": {"$ref": "#/$defs/timestamp"},
+    "attempts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {"$ref": "#/$defs/attempt"}
+    },
+    "fallback": {
+      "type": "object",
+      "required": ["used", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "used": {"type": "boolean"},
+        "reason": {
+          "oneOf": [
+            {
+              "enum": [
+                "empty_output",
+                "model_unavailable",
+                "provider_error",
+                "timeout"
+              ]
+            },
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "schema_validation": {
+      "type": "object",
+      "required": ["status", "schema_id", "schema_version"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {"enum": ["passed", "failed", "not_run"]},
+        "schema_id": {"$ref": "#/$defs/safeSchemaId"},
+        "schema_version": {"$ref": "#/$defs/safeId"}
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["sha256", "bytes"],
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        },
+        "bytes": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "usage": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["input_tokens", "output_tokens", "total_tokens"],
+          "additionalProperties": false,
+          "properties": {
+            "input_tokens": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "output_tokens": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "total_tokens": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        {"type": "null"}
+      ]
+    },
+    "cost": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["currency", "micro_usd"],
+          "additionalProperties": false,
+          "properties": {
+            "currency": {"const": "USD"},
+            "micro_usd": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        {"type": "null"}
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"status": {"const": "succeeded"}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "actual_model": {"$ref": "#/$defs/allowedModel"},
+          "authentication": {
+            "properties": {
+              "class": {"const": "subscription_oauth"},
+              "profile_ref": {"$ref": "#/$defs/safeProfileRef"}
+            }
+          },
+          "schema_validation": {
+            "properties": {"status": {"const": "passed"}}
+          },
+          "output": {
+            "properties": {
+              "sha256": {"$ref": "#/$defs/sha256"},
+              "bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "actual_model": {"type": "null"},
+          "output": {
+            "properties": {
+              "sha256": {"type": "null"},
+              "bytes": {"type": "null"}
+            }
+          }
+        }
+      }
+    }
+  ]
+}
