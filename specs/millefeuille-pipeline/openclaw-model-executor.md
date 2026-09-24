@@ -42,3 +42,31 @@ The adapter has offline mock coverage for OAuth refusal, request/input drift,
 model mismatch, schema failure, missing or positive tool-use evidence,
 auth timeouts, bounded capture, and prompt transport. GCP validation used OpenClaw 2026.9.4 config validation and
 read-only auth status. No live model call or paper text was used for this slice.
+
+## GPT-only acceptance canary
+
+`millefeuille.domain.gpt_oauth_canary.run_gpt_oauth_canary` is a supervised,
+single-call acceptance boundary. It sends one fixed synthetic JSON prompt to
+`openai/gpt-5.6-sol` with `thinking=xhigh`, no fallback, no tools, and no paper
+content. It accepts only an exact approved-live operator packet and MF-100
+receipt for the local `gpt-oauth-canary` fixture, one item, one `model.execute`
+operation, one provider call, a zero incremental API-spend cap, private local
+audit root, and explicit disposal/stop controls. The zero cap relies on the
+adapter's subscription-OAuth-only route; any reported nonzero provider cost
+fails the proof. This is not a cost estimator for paper execution.
+
+The caller must supply the receipt digest from Franck's authenticated manual
+approval channel. A self-computed receipt digest alone does not establish
+approval. The runner independently validates the packet, exact receipt scope,
+OAuth readiness marker, and durable replay ledger. A SQLite transaction
+reserves the sanitized receipt audit before the first possible model call.
+A failed or interrupted call leaves that receipt consumed and requires a new
+approval. Successful results return only the validated executor envelope and
+approval identities; provider output is never returned or persisted. The
+private audit directory and SQLite database must be owned by the executing
+user with modes `0700` and `0600` respectively. No source pack, Zotero,
+OpenKB, or index write is performed.
+
+This canary does not execute prepared page/section/full-paper work units.
+That integration still requires an approved batch executor, output contracts,
+acceptance, provenance materialization, and separate durable-write receipts.
