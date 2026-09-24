@@ -10,7 +10,7 @@ the provider-neutral executor result envelope.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from contextlib import suppress
+from contextlib import closing, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
@@ -227,8 +227,8 @@ def _has_agent_local_oauth_profile(agent_dir: str, profile_ref: str) -> bool:
         return False
     profile_type_path = f"$.profiles.{json.dumps(profile_ref)}.type"
     try:
-        with sqlite3.connect(
-            database.as_uri() + "?mode=ro", uri=True, timeout=1
+        with closing(
+            sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=1)
         ) as connection:
             connection.execute("PRAGMA query_only = ON")
             row = connection.execute(
