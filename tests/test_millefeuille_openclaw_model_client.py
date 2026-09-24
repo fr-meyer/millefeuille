@@ -710,6 +710,28 @@ class TestOpenClawModelClient(unittest.TestCase):
         self.assertEqual(execution.result["status"], "succeeded")
         self.assertEqual(execution.output, b'{"canary":"ok"}')
 
+    def test_multiple_visible_payloads_fail_even_when_joined_json_is_valid(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+        response["payloads"] = [
+            {"text": '{"canary":'},
+            {"text": '"ok"}'},
+        ]
+        response["final"] = '{"canary":\n"ok"}'
+        runner = _QueuedRunner(
+            [_completed(_auth_status("openai")), _completed(response)]
+        )
+        execution = OpenClawModelClient(command_runner=runner).execute(
+            request=self._request(payload=payload),
+            input_payload=payload,
+            output_validator=self._validate_canary,
+        )
+        self.assertEqual(execution.result["status"], "failed")
+        self.assertEqual(
+            execution.result["attempts"][0]["failure_code"], "invalid_response"
+        )
+        self.assertIsNone(execution.output)
+
     def test_missing_agent_safety_evidence_fails_closed(self):
         payload = b'{"return":{"canary":"ok"}}'
         for missing in ("codeModeEngaged", "assistantTurns"):

@@ -887,9 +887,11 @@ def _validate_openclaw_response(
             continue
         if isinstance(text, str) and text.strip():
             visible_texts.append(text.rstrip())
-    if not visible_texts:
-        raise MillefeuilleContractError("OpenClaw response text is empty")
-    final_text = "\n".join(visible_texts)
+    if len(visible_texts) != 1:
+        raise MillefeuilleContractError(
+            "OpenClaw response must contain one visible text"
+        )
+    final_text = visible_texts[0]
     if response.get("final") != final_text:
         raise MillefeuilleContractError("OpenClaw final text mismatch")
     if actual_model != requested_model:
