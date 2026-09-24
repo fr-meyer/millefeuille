@@ -31,9 +31,7 @@ from millefeuille.domain.structure_fixtures import (
 )
 
 SUMMARY_PREPARATION_SCHEMA_VERSION = "millefeuille-summary-preparation/v0.1"
-SUMMARY_PREPARATION_BATCH_SCHEMA_VERSION = (
-    "millefeuille-summary-preparation-batch/v0.1"
-)
+SUMMARY_PREPARATION_BATCH_SCHEMA_VERSION = "millefeuille-summary-preparation-batch/v0.1"
 
 
 @dataclass(frozen=True)
@@ -126,8 +124,7 @@ def prepare_summary_execution_packages(
             )
         if missing_route:
             details.append(
-                "missing route for "
-                + ", ".join(":".join(key) for key in missing_route)
+                "missing route for " + ", ".join(":".join(key) for key in missing_route)
             )
         raise MillefeuilleContractError(
             "summary preparation evidence join is incomplete: " + "; ".join(details)
@@ -165,8 +162,7 @@ def prepare_summary_execution_packages(
                 "documents": len(prepared),
                 "requested_stages": len(prepared) * len(SUMMARY_MODEL_STAGES),
                 "work_units": sum(
-                    sum(document.work_unit_counts.values())
-                    for document in prepared
+                    sum(document.work_unit_counts.values()) for document in prepared
                 ),
                 "summary_outputs_generated": 0,
             },
@@ -247,6 +243,10 @@ def _prepare_document(
     _validate_structure_payload(structure, structure_payload)
 
     work_units = _build_work_units(structure_payload)
+    page_unit_ids = [unit["unit_id"] for unit in work_units["summarize_page"]]
+    expected_page_unit_ids = [
+        f"page-{page}" for page in range(1, structure.page_count + 1)
+    ]
     blockers = sorted(
         {
             blocker
@@ -258,7 +258,7 @@ def _prepare_document(
         }
         | (
             {"structure page coverage incomplete"}
-            if structure_payload["coverage"]["detected_pages"] != structure.page_count
+            if page_unit_ids != expected_page_unit_ids
             else set()
         )
     )
@@ -310,9 +310,7 @@ def _prepare_document(
         paper_id=paper_id,
         package_path=package_path,
         package_bytes=_canonical_json_bytes(package),
-        work_unit_counts={
-            stage: len(units) for stage, units in work_units.items()
-        },
+        work_unit_counts={stage: len(units) for stage, units in work_units.items()},
         blockers=tuple(blockers),
     )
 
@@ -412,9 +410,7 @@ def _build_work_units(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]
     page_units = [
         {
             "unit_id": f"page-{_required_positive_int(page.get('page'), 'page')}",
-            "source_locators": [
-                _required_locator(page.get("locator"), "page locator")
-            ],
+            "source_locators": [_required_locator(page.get("locator"), "page locator")],
         }
         for page in pages
     ]
@@ -483,9 +479,7 @@ def _required_locator(value: object, field_name: str) -> str:
         )
     locator = value.strip()
     if len(locator) > 500 or any(character in locator for character in "\r\n\0"):
-        raise MillefeuilleContractError(
-            f"summary preparation {field_name} is unsafe"
-        )
+        raise MillefeuilleContractError(f"summary preparation {field_name} is unsafe")
     return locator
 
 

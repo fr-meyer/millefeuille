@@ -102,11 +102,14 @@ class TestSummaryPreparation(unittest.TestCase):
             )
             self.assertEqual(package["execution"]["provider_call_performed"], False)
             self.assertEqual(package["execution"]["summary_outputs_generated"], 0)
-            self.assertEqual(set(package["execution_plans"]), {
-                "summarize_page",
-                "summarize_section",
-                "summarize_full_paper",
-            })
+            self.assertEqual(
+                set(package["execution_plans"]),
+                {
+                    "summarize_page",
+                    "summarize_section",
+                    "summarize_full_paper",
+                },
+            )
             self.assertEqual(
                 package["work_units"],
                 {
@@ -145,12 +148,9 @@ class TestSummaryPreparation(unittest.TestCase):
                 for name in SUMMARY_SCHEMA_NAMES
             ]
             registry = Registry().with_resources(
-                (schema["$id"], Resource.from_contents(schema))
-                for schema in schemas
+                (schema["$id"], Resource.from_contents(schema)) for schema in schemas
             )
-            by_name = {
-                schema["$id"].rsplit("/", 1)[-1]: schema for schema in schemas
-            }
+            by_name = {schema["$id"].rsplit("/", 1)[-1]: schema for schema in schemas}
             for schema in schemas:
                 Draft202012Validator.check_schema(schema)
             Draft202012Validator(
@@ -190,15 +190,51 @@ class TestSummaryPreparation(unittest.TestCase):
             )
             self.assertFalse(package["execution"]["ready_for_approved_live_execution"])
 
+    def test_blocks_gapped_and_out_of_range_page_ids(self):
+        for expected_page_count, markdown_text, expected_ids in (
+            (2, "# Page 1\nText.\n# Page 3\nText.\n", ["page-1", "page-3"]),
+            (1, "# Page 3\nText.\n", ["page-3"]),
+        ):
+            with (
+                self.subTest(markdown_text=markdown_text),
+                tempfile.TemporaryDirectory() as tempdir,
+            ):
+                root = Path(tempdir)
+                route_path, structure_path = self._prepare_inputs(
+                    root,
+                    expected_page_count=expected_page_count,
+                    markdown_text=markdown_text,
+                )
+                result = prepare_summary_execution_packages(
+                    route_evidence_paths=[route_path],
+                    structure_evidence_paths=[structure_path],
+                    output_dir=root / "summary-preparation",
+                )
+                package = json.loads(
+                    result.documents[0].package_path.read_text(encoding="utf-8")
+                )
+                self.assertEqual(
+                    [
+                        unit["unit_id"]
+                        for unit in package["work_units"]["summarize_page"]
+                    ],
+                    expected_ids,
+                )
+                self.assertIn(
+                    "structure page coverage incomplete",
+                    package["execution"]["blockers"],
+                )
+                self.assertFalse(
+                    package["execution"]["ready_for_approved_live_execution"]
+                )
+
     def test_rejects_empty_markdown_zero_page_structure_without_outputs(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
             route_path, structure_evidence_path = self._prepare_inputs(
                 root, markdown_text=""
             )
-            evidence = json.loads(
-                structure_evidence_path.read_text(encoding="utf-8")
-            )
+            evidence = json.loads(structure_evidence_path.read_text(encoding="utf-8"))
             structure_path = structure_evidence_path.parent / evidence["structure_path"]
             structure = json.loads(structure_path.read_text(encoding="utf-8"))
             self.assertEqual(structure["coverage"]["detected_pages"], 0)
@@ -220,9 +256,7 @@ class TestSummaryPreparation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
             route_path, structure_evidence_path = self._prepare_inputs(root)
-            evidence = json.loads(
-                structure_evidence_path.read_text(encoding="utf-8")
-            )
+            evidence = json.loads(structure_evidence_path.read_text(encoding="utf-8"))
             structure_path = structure_evidence_path.parent / evidence["structure_path"]
             structure = json.loads(structure_path.read_text(encoding="utf-8"))
             structure["pages"][0]["locator"] = ""
@@ -276,9 +310,7 @@ class TestSummaryPreparation(unittest.TestCase):
                 json.dumps(route_payload, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
-            structure_payload = json.loads(
-                structure_path.read_text(encoding="utf-8")
-            )
+            structure_payload = json.loads(structure_path.read_text(encoding="utf-8"))
             structure_payload["item_key"] = "ITEM2"
             structure_payload["attachment_key"] = "ATT2"
             duplicate_structure = structure_path.parent / "duplicate.evidence.json"
@@ -309,9 +341,7 @@ class TestSummaryPreparation(unittest.TestCase):
                 json.dumps(route_payload, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
-            evidence = json.loads(
-                structure_evidence_path.read_text(encoding="utf-8")
-            )
+            evidence = json.loads(structure_evidence_path.read_text(encoding="utf-8"))
             evidence["page_count"] = 2
             structure_evidence_path.write_text(
                 json.dumps(evidence, indent=2, sort_keys=True) + "\n",
