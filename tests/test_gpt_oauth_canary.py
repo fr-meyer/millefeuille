@@ -48,8 +48,9 @@ class _FakeClient:
         self.output_override = output_override
         self.preflight_ready = preflight_ready
 
-    def preflight_auth(self):
+    def preflight_auth(self, *, run_timeout_seconds):
         self.preflight_calls += 1
+        assert run_timeout_seconds == 90
         if not self.preflight_ready:
             raise MillefeuilleContractError(
                 "OpenClaw agent-local GPT OAuth is unavailable"
@@ -62,8 +63,8 @@ class _FakeClient:
         assert b'"canary":"ok"' in input_payload
         output_validator({"canary": "ok"})
         output = b'{"canary":"ok"}'
-        timestamp = datetime.now(UTC).isoformat(timespec="microseconds").replace(
-            "+00:00", "Z"
+        timestamp = (
+            datetime.now(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
         )
         model = request["requested_model"]
         result = materialize_model_executor_result(
@@ -168,9 +169,7 @@ def _approved_pair(
             "approver_id": "fr-meyer",
             "approved_at": now.isoformat().replace("+00:00", "Z"),
         },
-        "expires_at": (now + timedelta(hours=1)).isoformat().replace(
-            "+00:00", "Z"
-        ),
+        "expires_at": (now + timedelta(hours=1)).isoformat().replace("+00:00", "Z"),
         "scope": {
             "operations": packet["operations"],
             "targets": packet["targets"],
@@ -424,7 +423,7 @@ class TestGptOauthCanary(unittest.TestCase):
                 broker._reserve_root_approval(packet, receipt)
                 connection = sqlite3.connect(control / "gpt-oauth-canary.sqlite3")
                 try:
-                    connection.execute("UPDATE approvals SET audit_json = ?", ('{}',))
+                    connection.execute("UPDATE approvals SET audit_json = ?", ("{}",))
                     connection.commit()
                 finally:
                     connection.close()
@@ -598,9 +597,9 @@ class TestGptOauthCanary(unittest.TestCase):
                 database = control / "gpt-oauth-canary.sqlite3"
                 with sqlite3.connect(database) as connection:
                     self.assertEqual(
-                        connection.execute(
-                            "SELECT COUNT(*) FROM approvals"
-                        ).fetchone()[0],
+                        connection.execute("SELECT COUNT(*) FROM approvals").fetchone()[
+                            0
+                        ],
                         0,
                     )
 

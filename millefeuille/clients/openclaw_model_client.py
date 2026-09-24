@@ -278,11 +278,15 @@ def _read_agent_local_oauth_access(
     return {key: credential[key] for key in allowed if key in credential}
 
 
-def _has_agent_local_oauth_profile(agent_dir: str, profile_ref: str) -> bool:
-    """Check that an agent-local OAuth access credential can cover a short run."""
+def _has_agent_local_oauth_profile(
+    agent_dir: str, profile_ref: str, *, min_valid_seconds: float = 30
+) -> bool:
+    """Check that agent-local OAuth access can cover the requested run."""
 
     return (
-        _read_agent_local_oauth_access(agent_dir, profile_ref, min_valid_seconds=30)
+        _read_agent_local_oauth_access(
+            agent_dir, profile_ref, min_valid_seconds=min_valid_seconds
+        )
         is not None
     )
 
@@ -351,12 +355,19 @@ class OpenClawModelClient:
         self.executable = executable
         self._run = command_runner
 
-    def preflight_auth(self, *, timeout_seconds: float = 30) -> None:
+    def preflight_auth(
+        self, *, timeout_seconds: float = 30, run_timeout_seconds: float = 90
+    ) -> None:
         """Refuse an unavailable isolated OAuth route before canary reservation."""
 
+        if run_timeout_seconds < 10:
+            raise MillefeuilleContractError("OpenClaw run timeout is too short")
         try:
+            # Leave room for the one-use broker handoff before execution starts.
             self._require_single_oauth_profile(
-                _SUPPORTED_RUNTIME_MODEL, timeout_seconds=timeout_seconds
+                _SUPPORTED_RUNTIME_MODEL,
+                timeout_seconds=timeout_seconds,
+                min_valid_seconds=run_timeout_seconds + 60,
             )
         except (OSError, subprocess.SubprocessError, ValueError) as exc:
             raise MillefeuilleContractError(
@@ -412,6 +423,7 @@ class OpenClawModelClient:
             ) = self._require_single_oauth_profile(
                 normalized["requested_model"],
                 timeout_seconds=max(0.001, deadline - time.monotonic()),
+                min_valid_seconds=normalized["timeout_seconds"],
             )
         except subprocess.TimeoutExpired:
             return self._failed_execution(
@@ -684,7 +696,11 @@ class OpenClawModelClient:
         return OpenClawModelExecution(result=result, output=output_bytes)
 
     def _require_single_oauth_profile(
-        self, requested_model: str, *, timeout_seconds: float
+        self,
+        requested_model: str,
+        *,
+        timeout_seconds: float,
+        min_valid_seconds: float = 30,
     ) -> tuple[str, str]:
         provider = requested_model.split("/", 1)[0]
         command = [
@@ -781,7 +797,9 @@ class OpenClawModelClient:
         ]
         if len(oauth_matches) != 1:
             raise ValueError("OpenClaw stored OAuth profile is unavailable")
-        if not _has_agent_local_oauth_profile(agent_dir, profile_ref):
+        if not _has_agent_local_oauth_profile(
+            agent_dir, profile_ref, min_valid_seconds=min_valid_seconds
+        ):
             raise ValueError("OpenClaw agent-local OAuth profile is unavailable")
         shell_fallback = _required_mapping(
             auth.get("shellEnvFallback"), "shell environment fallback"

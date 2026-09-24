@@ -155,6 +155,16 @@ class TestOpenClawModelClient(unittest.TestCase):
             self.assertTrue(
                 _has_agent_local_oauth_profile(directory, "openai:research")
             )
+            self.assertTrue(
+                _has_agent_local_oauth_profile(
+                    directory, "openai:research", min_valid_seconds=200
+                )
+            )
+            self.assertFalse(
+                _has_agent_local_oauth_profile(
+                    directory, "openai:research", min_valid_seconds=210
+                )
+            )
             self.assertFalse(_has_agent_local_oauth_profile(directory, "openai:key"))
             self.assertFalse(
                 _has_agent_local_oauth_profile(directory, "openai:missing")
@@ -173,6 +183,16 @@ class TestOpenClawModelClient(unittest.TestCase):
         with self.assertRaisesRegex(MillefeuilleContractError, "agent-local GPT OAuth"):
             client.preflight_auth()
         self.assertEqual(len(runner.commands), 1)
+
+    def test_preflight_requires_full_run_and_handoff_margin(self):
+        status = _auth_status("openai")
+        runner = _QueuedRunner([_completed(status)])
+        OpenClawModelClient(command_runner=runner).preflight_auth(
+            run_timeout_seconds=90
+        )
+        self.local_probe.assert_called_once_with(
+            status["agentDir"], "openai:research", min_valid_seconds=150
+        )
 
     def test_non_object_auth_status_fails_closed(self):
         payload = b'{"return":{"canary":"ok"}}'

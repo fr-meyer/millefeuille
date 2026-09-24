@@ -125,7 +125,7 @@ def run_gpt_oauth_canary(
     ):
         raise MillefeuilleContractError("canary operator preflight did not validate")
     executor = client or OpenClawModelClient()
-    executor.preflight_auth()
+    executor.preflight_auth(run_timeout_seconds=request["timeout_seconds"])
     _reserve_with_broker(packet, receipt)
 
     execution = executor.execute(
@@ -227,9 +227,7 @@ def _verify_trusted_approval(
         or record["approved_at"] != receipt.approval.approved_at
         or not isinstance(record["receipt_digest"], str)
         or not isinstance(record["packet_digest"], str)
-        or not hmac.compare_digest(
-            record["receipt_digest"], receipt.content_digest
-        )
+        or not hmac.compare_digest(record["receipt_digest"], receipt.content_digest)
         or not hmac.compare_digest(record["packet_digest"], packet.content_digest)
     ):
         raise MillefeuilleContractError("GPT canary approval identity does not match")
@@ -271,8 +269,7 @@ def _require_canary_scope(
         or len(packet.targets) != 2
         or len(packet.credential_requirements) != 1
         or packet.credential_requirements[0].credential_type != "model-oauth"
-        or packet.credential_requirements[0].reference
-        != "OPENCLAW_CODEX_OAUTH_READY"
+        or packet.credential_requirements[0].reference != "OPENCLAW_CODEX_OAUTH_READY"
         or packet.artifact_root != str(root)
         or packet.source_pack_root != str(root)
         or packet.approval_receipt is None
