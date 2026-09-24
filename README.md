@@ -814,8 +814,26 @@ verified. `selected_route=native` requires native extraction evidence,
 marks `route` passed and exposes the selected fulltext ref without calling
 providers or writing OpenKB/index lanes.
 
-Once the route sidecar exists, the dry-run path can stage structure fixture
-evidence:
+Selected Markdown can first be converted into conservative provider-free
+structure evidence without touching source packs:
+
+```bash
+millefeuille structure-prepare \
+  --route-evidence /path/to/route-selection-evidence.jsonl \
+  --output-dir /path/to/local-structure-preparation \
+  --json
+```
+
+`structure-prepare` detects explicit `# Page N` markers, Markdown headings,
+tables, figures, and numbered references. It emits structure JSON, an outline,
+and fixture-compatible evidence with source locators and coverage warnings.
+The command preflights the whole batch, rejects drift on replay, and records
+zero provider calls, source-pack writes, and Zotero writes in `summary.json`.
+It does not claim semantic sections when the selected Markdown exposes none.
+Repeat `--route-evidence` to prepare several route records in one batch.
+
+Once the route sidecar exists, the dry-run path can stage that structure
+fixture evidence:
 
 ```bash
 millefeuille --artifact-root source-pack \
@@ -827,9 +845,35 @@ millefeuille --artifact-root source-pack \
 
 Structure fixture evidence writes `structure/structure.json` plus optional
 `structure/outline.md` only after the source-pack manifest, selected route, and
-selected fulltext are verified. The dry-run artifact index then marks
+selected fulltext are verified. Evidence prepared by `structure-prepare`
+retains the `local-markdown-headings-v0.1` backend and
+`selected-markdown` coverage source. The dry-run artifact index then marks
 `structure` passed and exposes the structure refs without calling model
 providers or writing OpenKB/index lanes.
+
+Selected Markdown and local structure evidence can then be bound to the
+configured summary model plans without a provider call:
+
+```bash
+millefeuille summarize-prepare \
+  --route-evidence /path/to/route-selection-evidence.jsonl \
+  --structure-evidence /path/to/structure-evidence.jsonl \
+  --output-dir /path/to/summary-preparation \
+  --profile research-default \
+  --json
+```
+
+`summarize-prepare` joins the route and structure identities, verifies the
+structure payload, hashes the selected Markdown and structure bytes, and emits
+one input-bound preparation package per paper. Each package includes
+locator-only page, section, and full-paper work units so a later approved
+executor does not have to infer summary scope from prose. Per-paper and batch
+summaries expose exact work-unit counts for bounded execution planning without
+claiming that a work unit equals a provider call. The packages contain no paper
+text or section titles and perform no credential lookup, provider call, summary
+generation, source-pack write, or Zotero write. They remain explicitly not
+ready for live execution until an approved executor and provider authorization
+exist. Replay is idempotent and drift fails closed.
 
 Once the structure sidecar exists, the same dry-run path can stage
 hierarchical-summary fixture evidence:

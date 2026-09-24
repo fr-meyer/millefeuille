@@ -259,6 +259,14 @@ artifact or manifest overrides; each batch entry retains canonical resolution.
     `selected/fulltext.md` only after the required native/OCR extraction
     sidecars are already verified.
 
+- `structure-prepare`
+  - Build deterministic provider-free structure evidence from selected
+    Markdown referenced by route-selection evidence.
+  - Detect explicit page markers, Markdown headings, tables, figures, and
+    numbered references; emit locators, coverage, and conservative warnings.
+  - Write only to the explicit local output directory. Preflight the whole
+    batch and reject drift; do not write source packs, call providers, or touch
+    Zotero.
 - `structure`
   - Build page, section, table, figure, and reference structure from the
     selected reconstruction.
@@ -266,7 +274,19 @@ artifact or manifest overrides; each batch entry retains canonical resolution.
   - Preview fixture slice may write `structure/structure.json` plus optional
     `structure/outline.md` only after the source-pack manifest, route sidecar,
     and selected full text are verified.
+  - Preserve an evidence-supplied structure backend and coverage source;
+    legacy fixture evidence defaults to `fixture-structure` and `fixture`.
 
+- `summarize-prepare`
+  - Join route and structure evidence by attachment identity and verify the
+    structure payload before any summary execution.
+  - Hash selected Markdown and structure bytes, then emit deterministic
+    input-bound plans for page, section, and full-paper summary stages.
+  - Report exact per-paper and aggregate work-unit counts for bounded planning;
+    do not equate those counts with provider calls before an executor exists.
+  - Include no paper text and perform no credential lookup, provider call,
+    summary generation, source-pack write, or Zotero write. Keep the package
+    explicitly not ready for approved-live execution.
 - `summarize`
   - Produce page, section, figure/table, full-paper, and scope-specific
     summaries.

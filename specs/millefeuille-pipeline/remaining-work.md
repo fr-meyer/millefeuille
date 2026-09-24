@@ -105,6 +105,11 @@
    - Build page, section, table, figure, and reference structure from the
      selected reconstruction.
    - Emit locators, coverage, and low-confidence warnings.
+   - Provider-free local preparation now exists through `structure-prepare`:
+     it deterministically derives conservative structure fixtures from selected
+     Markdown, preflights batch outputs, rejects replay drift, and performs no
+     source-pack or Zotero write. Remaining work is approved durable-pack
+     materialization and any model-assisted semantic enrichment.
    - Manual gate: model/provider approval only if structure uses a model call;
      source-pack write approval if durable pack artifacts are written.
 
@@ -116,8 +121,15 @@
       model plan and emits strict `millefeuille-model-provenance/v0.1` records
       without accepting prompts, provider payloads, private paper text,
       credentials, unsafe refs, malformed warnings, or invalid token totals.
-      Remaining work is attaching those records to verified run packages after
-      summary execution exists.
+      Provider-free `summarize-prepare` now joins and verifies route/structure
+      identities, hashes the selected inputs, and emits input-bound page,
+      section, and full-paper plans plus locator-only work units without paper
+      text, section titles, credentials, provider calls, summary outputs, or
+      durable-pack writes. Exact per-paper and aggregate work-unit counts now
+      bound future execution planning without treating work units as provider
+      calls. Remaining work is an
+      approved summary executor and attaching validated provenance to verified
+      run packages after execution.
     - Manual gate: model/provider call approval.
 
 11. **Paper Card**
