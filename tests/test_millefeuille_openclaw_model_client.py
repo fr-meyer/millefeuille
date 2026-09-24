@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 import json
 import os
+from pathlib import Path
 import subprocess
 import sys
 import unittest
@@ -51,7 +52,9 @@ def _auth_status(provider: str) -> dict[str, object]:
     profile_id = f"{provider}:research"
     return {
         "agentId": "franck",
-        "agentDir": "/home/node/.openclaw/agents/franck/agent",
+        "agentDir": str(
+            Path(Path.cwd().anchor) / "openclaw" / "agents" / "franck" / "agent"
+        ),
         "auth": {
             "providers": [
                 {
