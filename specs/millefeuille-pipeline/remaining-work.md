@@ -127,9 +127,12 @@
       text, section titles, credentials, provider calls, summary outputs, or
       durable-pack writes. Exact per-paper and aggregate work-unit counts now
       bound future execution planning without treating work units as provider
-      calls. Remaining work is an
-      approved summary executor and attaching validated provenance to verified
-      run packages after execution.
+      calls. A read-only dispatch handoff now re-derives one prepared package
+      from its route, structure, and selected Markdown; it builds complete
+      GPT-only typed requests with explicit output contracts and no provider
+      call or durable write. Remaining work is approved batch execution,
+      structured output/citation validation, acceptance, and attaching
+      validated provenance to verified run packages.
     - Manual gate: model/provider call approval.
 
 11. **Paper Card**
