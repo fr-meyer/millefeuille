@@ -35,6 +35,7 @@ from millefeuille.domain.model_executor import (
 _MAX_OPENCLAW_STDOUT_BYTES = 4 * 1024 * 1024
 _MAX_OPENCLAW_STDERR_BYTES = 256 * 1024
 _SUPPORTED_RUNTIME_MODEL = "openai/gpt-5.6-sol"
+_SUPPORTED_AUTH_DB_SCHEMA = 19
 _AGENT_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}\Z")
 _CHILD_ENV_ALLOWLIST = frozenset(
     {
@@ -85,6 +86,10 @@ class _OutputLimitExceeded(subprocess.SubprocessError):
     """A child exceeded its bounded in-memory output allowance."""
 
 
+class _AuthSnapshotUnavailableError(ValueError):
+    """The selected access credential cannot safely cover this run."""
+
+
 def _kill_process_tree(process: subprocess.Popen[bytes]) -> None:
     """Stop the isolated child group, including runtime/provider descendants."""
 
@@ -130,9 +135,7 @@ def _bounded_run(
         stderr=subprocess.PIPE,
         env=dict(env) if env is not None else None,
         start_new_session=os.name != "nt",
-        creationflags=(
-            subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
-        ),
+        creationflags=(subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0),
     ) as process:
         assert process.stdout is not None and process.stderr is not None
         stdout = bytearray()
@@ -213,32 +216,119 @@ def _bounded_run(
         return completed
 
 
-def _has_agent_local_oauth_profile(agent_dir: str, profile_ref: str) -> bool:
+def _read_agent_local_oauth_access(
+    agent_dir: str, profile_ref: str, *, min_valid_seconds: float
+) -> dict[str, Any] | None:
     """Check the store that isolated ``agent exec`` can actually read.
 
     OpenClaw's ordinary model status includes shared OAuth profiles, while
     ``agent exec`` only admits portable static credentials from that shared
     store. Its selected OAuth profile therefore needs an agent-local entry.
-    Query only the credential type; never load secret material into Python.
+    Read only the selected credential. Never load other profiles into Python.
     """
 
     database = Path(agent_dir) / "openclaw-agent.sqlite"
     if not database.is_file() or database.is_symlink():
-        return False
-    profile_type_path = f"$.profiles.{json.dumps(profile_ref)}.type"
+        return None
+    profile_path = f"$.profiles.{json.dumps(profile_ref)}"
     try:
         with closing(
             sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=1)
         ) as connection:
             connection.execute("PRAGMA query_only = ON")
+            if connection.execute("PRAGMA user_version").fetchone()[0] != (
+                _SUPPORTED_AUTH_DB_SCHEMA
+            ):
+                return None
             row = connection.execute(
                 "SELECT json_extract(store_json, ?) FROM auth_profile_store "
                 "WHERE store_key = 'primary'",
-                (profile_type_path,),
+                (profile_path,),
             ).fetchone()
-    except (OSError, sqlite3.Error):
-        return False
-    return row is not None and row[0] == "oauth"
+        if row is None or not isinstance(row[0], str):
+            return None
+        credential = _strict_json_loads(row[0])
+    except (OSError, sqlite3.Error, ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(credential, dict):
+        return None
+    if credential.get("type") != "oauth" or credential.get("provider") != "openai":
+        return None
+    access = credential.get("access")
+    expires = credential.get("expires")
+    if not isinstance(access, str) or not access.strip():
+        return None
+    if type(expires) not in (int, float) or not (
+        expires > (time.time() + min_valid_seconds + 90) * 1000
+    ):
+        return None
+    # A short-lived access credential is enough for this single run. Omitting
+    # refresh makes rotation from the isolated store impossible.
+    allowed = (
+        "type",
+        "provider",
+        "access",
+        "expires",
+        "accountId",
+        "chatgptPlanType",
+        "email",
+    )
+    return {key: credential[key] for key in allowed if key in credential}
+
+
+def _has_agent_local_oauth_profile(agent_dir: str, profile_ref: str) -> bool:
+    """Check that an agent-local OAuth access credential can cover a short run."""
+
+    return (
+        _read_agent_local_oauth_access(agent_dir, profile_ref, min_valid_seconds=30)
+        is not None
+    )
+
+
+def _write_oauth_access_snapshot(
+    agent_dir: str,
+    profile_ref: str,
+    snapshot_agent_dir: Path,
+    *,
+    min_valid_seconds: float,
+) -> None:
+    """Give agent exec only the checked OAuth access token, never live auth."""
+
+    credential = _read_agent_local_oauth_access(
+        agent_dir, profile_ref, min_valid_seconds=min_valid_seconds
+    )
+    if credential is None:
+        raise _AuthSnapshotUnavailableError(
+            "agent-local OAuth access is unavailable or expiring"
+        )
+    snapshot_agent_dir.mkdir(mode=0o700)
+    database = snapshot_agent_dir / "openclaw-agent.sqlite"
+    with closing(sqlite3.connect(database)) as connection:
+        connection.execute(f"PRAGMA user_version = {_SUPPORTED_AUTH_DB_SCHEMA}")
+        connection.execute(
+            "CREATE TABLE auth_profile_store (store_key TEXT NOT NULL PRIMARY KEY, "
+            "store_json TEXT NOT NULL, updated_at INTEGER NOT NULL) STRICT"
+        )
+        connection.execute(
+            "CREATE TABLE auth_profile_state (state_key TEXT NOT NULL PRIMARY KEY, "
+            "state_json TEXT NOT NULL, updated_at INTEGER NOT NULL) STRICT"
+        )
+        connection.execute(
+            "INSERT INTO auth_profile_store VALUES ('primary', ?, ?)",
+            (
+                json.dumps({"version": 1, "profiles": {profile_ref: credential}}),
+                int(time.time() * 1000),
+            ),
+        )
+        connection.execute(
+            "INSERT INTO auth_profile_state VALUES ('primary', ?, ?)",
+            (
+                json.dumps({"version": 1, "order": {"openai": [profile_ref]}}),
+                int(time.time() * 1000),
+            ),
+        )
+        connection.commit()
+    database.chmod(0o600)
 
 
 class OpenClawModelClient:
@@ -317,7 +407,6 @@ class OpenClawModelClient:
             (
                 auth_profile_ref,
                 agent_dir,
-                auth_state_dir,
             ) = self._require_single_oauth_profile(
                 normalized["requested_model"],
                 timeout_seconds=max(0.001, deadline - time.monotonic()),
@@ -355,6 +444,13 @@ class OpenClawModelClient:
             with tempfile.TemporaryDirectory(
                 prefix="millefeuille-openclaw-"
             ) as temporary_dir:
+                snapshot_agent_dir = Path(temporary_dir) / "auth-agent"
+                _write_oauth_access_snapshot(
+                    agent_dir,
+                    auth_profile_ref,
+                    snapshot_agent_dir,
+                    min_valid_seconds=remaining,
+                )
                 config_path = Path(temporary_dir) / "openclaw.json"
                 config_path.write_text(
                     json.dumps(
@@ -375,7 +471,9 @@ class OpenClawModelClient:
                                 },
                             },
                             "agents": {
-                                "entries": {self.agent_id: {"agentDir": agent_dir}},
+                                "entries": {
+                                    self.agent_id: {"agentDir": str(snapshot_agent_dir)}
+                                },
                                 "defaults": {
                                     "systemAgent": {"agentId": self.agent_id},
                                     "model": {
@@ -427,10 +525,17 @@ class OpenClawModelClient:
                     encoding="utf-8",
                     timeout=max(0.001, deadline - time.monotonic() - 1),
                     check=False,
-                    env=_execution_environment(
-                        temporary_dir, auth_state_dir=auth_state_dir
-                    ),
+                    env=_execution_environment(temporary_dir),
                 )
+        except (_AuthSnapshotUnavailableError, sqlite3.Error):
+            return self._failed_execution(
+                request=normalized,
+                started_at=started_at,
+                failure_code="auth_unavailable",
+                auth_profile_ref=auth_profile_ref,
+                actual_model=None,
+                schema_validation_status="not_run",
+            )
         except subprocess.TimeoutExpired:
             return self._failed_execution(
                 request=normalized,
@@ -566,7 +671,7 @@ class OpenClawModelClient:
 
     def _require_single_oauth_profile(
         self, requested_model: str, *, timeout_seconds: float
-    ) -> tuple[str, str, str]:
+    ) -> tuple[str, str]:
         provider = requested_model.split("/", 1)[0]
         command = [
             self.executable,
@@ -612,7 +717,6 @@ class OpenClawModelClient:
             or Path(config_path).parent != Path(agent_dir).parents[2]
         ):
             raise ValueError("OpenClaw stored OAuth state directory is unavailable")
-        auth_state_dir = str(Path(config_path).parent)
         auth = _required_mapping(payload.get("auth"), "OpenClaw auth status")
         providers = auth.get("providers")
         if not isinstance(providers, list):
@@ -670,7 +774,7 @@ class OpenClawModelClient:
             "appliedKeys"
         ) not in (None, []):
             raise ValueError("OpenClaw environment auth fallback is active")
-        return profile_ref, agent_dir, auth_state_dir
+        return profile_ref, agent_dir
 
     def _failed_execution(
         self,
@@ -824,10 +928,8 @@ def _oauth_only_environment() -> dict[str, str]:
     return env
 
 
-def _execution_environment(
-    temporary_dir: str, *, auth_state_dir: str
-) -> dict[str, str]:
-    """Keep the checked OAuth store while OpenClaw isolates the run state."""
+def _execution_environment(temporary_dir: str) -> dict[str, str]:
+    """Keep the snapshot separate from every live OpenClaw auth store."""
 
     env = _oauth_only_environment()
     isolated = Path(temporary_dir)
@@ -844,8 +946,9 @@ def _execution_environment(
         path = isolated / suffix
         path.mkdir(mode=0o700, exist_ok=True)
         env[key] = str(path)
-    # agent exec snapshots this path for stored OAuth before switching to its
-    # own temporary state directory. Redirecting it here hides the checked
-    # profile and causes a provider failure before a usable model response.
-    env["OPENCLAW_STATE_DIR"] = auth_state_dir
+    auth_state_dir = isolated / "auth-state"
+    auth_state_dir.mkdir(mode=0o700)
+    env["OPENCLAW_STATE_DIR"] = str(auth_state_dir)
+    env.pop("OPENCLAW_AUTH_PROFILE_SECRET_DIR", None)
+    env["OPENCLAW_AUTH_STORE_READONLY"] = "1"
     return env

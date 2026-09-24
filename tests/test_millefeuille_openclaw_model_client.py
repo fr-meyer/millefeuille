@@ -22,6 +22,7 @@ from millefeuille.clients.openclaw_model_client import (
     _bounded_run,
     _has_agent_local_oauth_profile,
     _OutputLimitExceeded,
+    _write_oauth_access_snapshot,
 )
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.model_executor import build_model_executor_request
@@ -113,12 +114,18 @@ class TestOpenClawModelClient(unittest.TestCase):
         )
         self.local_probe = local_probe.start()
         self.addCleanup(local_probe.stop)
+        snapshot_writer = patch(
+            "millefeuille.clients.openclaw_model_client._write_oauth_access_snapshot"
+        )
+        self.snapshot_writer = snapshot_writer.start()
+        self.addCleanup(snapshot_writer.stop)
 
-    def test_agent_local_probe_checks_only_oauth_type(self):
+    def test_agent_local_probe_requires_usable_oauth_access(self):
         with tempfile.TemporaryDirectory() as directory:
             agent_dir = Path(directory)
             database = agent_dir / "openclaw-agent.sqlite"
             with closing(sqlite3.connect(database)) as connection:
+                connection.execute("PRAGMA user_version = 19")
                 connection.execute(
                     "CREATE TABLE auth_profile_store (store_key TEXT PRIMARY KEY, "
                     "store_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
@@ -132,6 +139,8 @@ class TestOpenClawModelClient(unittest.TestCase):
                                     "openai:research": {
                                         "type": "oauth",
                                         "provider": "openai",
+                                        "access": "short-lived-access",
+                                        "expires": (time.time() + 300) * 1000,
                                     },
                                     "openai:key": {
                                         "type": "api_key",
@@ -150,15 +159,18 @@ class TestOpenClawModelClient(unittest.TestCase):
             self.assertFalse(
                 _has_agent_local_oauth_profile(directory, "openai:missing")
             )
+            self.assertFalse(
+                _has_agent_local_oauth_profile(
+                    str(agent_dir / "absent"), "openai:research"
+                )
+            )
 
     def test_shared_oauth_only_fails_before_agent_execution(self):
         runner = _QueuedRunner([_completed(_auth_status("openai"))])
         self.local_probe.return_value = False
         client = OpenClawModelClient(command_runner=runner)
 
-        with self.assertRaisesRegex(
-            MillefeuilleContractError, "agent-local GPT OAuth"
-        ):
+        with self.assertRaisesRegex(MillefeuilleContractError, "agent-local GPT OAuth"):
             client.preflight_auth()
         self.assertEqual(len(runner.commands), 1)
 
@@ -279,12 +291,18 @@ class TestOpenClawModelClient(unittest.TestCase):
         self.assertFalse("OPENAI_API_KEY_1" in child_env)
         auth_env = runner.kwargs[0]["env"]
         self.assertEqual(auth_env["OPENCLAW_STATE_DIR"], state_dir)
-        self.assertEqual(child_env["OPENCLAW_STATE_DIR"], state_dir)
-        self.assertEqual(
-            child_env["OPENCLAW_AUTH_PROFILE_SECRET_DIR"],
-            "/oauth/secret-reference",
-        )
+        self.assertNotEqual(child_env["OPENCLAW_STATE_DIR"], state_dir)
+        self.assertNotIn("OPENCLAW_AUTH_PROFILE_SECRET_DIR", child_env)
+        self.assertEqual(child_env["OPENCLAW_AUTH_STORE_READONLY"], "1")
         temporary_root = os.path.dirname(command[command.index("--config") + 1])
+        self.assertEqual(
+            runner.runtime_configs[0]["agents"]["entries"]["franck"]["agentDir"],
+            os.path.join(temporary_root, "auth-agent"),
+        )
+        self.assertEqual(
+            child_env["OPENCLAW_STATE_DIR"],
+            os.path.join(temporary_root, "auth-state"),
+        )
         for key in (
             "HOME",
             "OPENCLAW_HOME",
@@ -299,6 +317,74 @@ class TestOpenClawModelClient(unittest.TestCase):
                 temporary_root,
             )
             self.assertFalse(child_env[key].startswith("/live/"))
+
+    def test_snapshot_keeps_oauth_when_live_profile_becomes_token(self):
+        with tempfile.TemporaryDirectory() as directory:
+            live = Path(directory) / "live"
+            live.mkdir()
+            database = live / "openclaw-agent.sqlite"
+            oauth = {
+                "type": "oauth",
+                "provider": "openai",
+                "access": "synthetic-access",
+                "refresh": "synthetic-refresh",
+                "expires": (time.time() + 600) * 1000,
+                "accountId": "synthetic-account",
+            }
+            with closing(sqlite3.connect(database)) as connection:
+                connection.execute("PRAGMA user_version = 19")
+                connection.execute(
+                    "CREATE TABLE auth_profile_store (store_key TEXT PRIMARY KEY, "
+                    "store_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+                )
+                connection.execute(
+                    "INSERT INTO auth_profile_store VALUES ('primary', ?, 0)",
+                    (
+                        json.dumps(
+                            {"version": 1, "profiles": {"openai:research": oauth}}
+                        ),
+                    ),
+                )
+                connection.commit()
+            snapshot = Path(directory) / "snapshot"
+            _write_oauth_access_snapshot(
+                str(live), "openai:research", snapshot, min_valid_seconds=30
+            )
+            with closing(sqlite3.connect(database)) as connection:
+                connection.execute(
+                    "UPDATE auth_profile_store SET store_json = ? "
+                    "WHERE store_key = 'primary'",
+                    (
+                        json.dumps(
+                            {
+                                "version": 1,
+                                "profiles": {
+                                    "openai:research": {
+                                        "type": "token",
+                                        "provider": "openai",
+                                        "token": "synthetic-token",
+                                    }
+                                },
+                            }
+                        ),
+                    ),
+                )
+                connection.commit()
+            with closing(
+                sqlite3.connect(snapshot / "openclaw-agent.sqlite")
+            ) as connection:
+                row = connection.execute(
+                    "SELECT store_json FROM auth_profile_store "
+                    "WHERE store_key = 'primary'"
+                ).fetchone()
+            saved = json.loads(row[0])["profiles"]["openai:research"]
+            self.assertEqual(saved["type"], "oauth")
+            self.assertEqual(saved["access"], "synthetic-access")
+            self.assertNotIn("refresh", saved)
+            self.assertNotIn("token", saved)
+            self.assertFalse(
+                _has_agent_local_oauth_profile(str(live), "openai:research")
+            )
 
     def test_xai_request_is_deferred_before_any_process(self):
         payload = b'{"return":{"canary":"ok"}}'
