@@ -238,28 +238,20 @@ class TestOpenClawModelClient(unittest.TestCase):
             )
             self.assertFalse(child_env[key].startswith("/live/"))
 
-    def test_xai_success_is_attributed_to_exact_requested_model(self):
+    def test_xai_request_is_deferred_before_any_process(self):
         payload = b'{"return":{"canary":"ok"}}'
-        runner = _QueuedRunner(
-            [
-                _completed(_auth_status("xai")),
-                _completed(_model_response("xai", "grok-4.6", '{"canary":"ok"}')),
-            ]
-        )
+        runner = _QueuedRunner([])
         client = OpenClawModelClient(command_runner=runner)
 
-        execution = client.execute(
-            request=self._request(model="xai/grok-4.6", payload=payload),
-            input_payload=payload,
-            output_validator=self._validate_canary,
-        )
-
-        self.assertEqual(execution.result["status"], "succeeded")
-        self.assertEqual(execution.result["actual_model"], "xai/grok-4.6")
-        self.assertEqual(
-            execution.result["authentication"]["profile_ref"],
-            "xai:research",
-        )
+        with self.assertRaisesRegex(
+            MillefeuilleContractError, "supports only openai/gpt-5.6-sol"
+        ):
+            client.execute(
+                request=self._request(model="xai/grok-4.6", payload=payload),
+                input_payload=payload,
+                output_validator=self._validate_canary,
+            )
+        self.assertEqual(runner.commands, [])
 
     def test_auth_pin_is_unchanged_when_profile_store_drifts(self):
         payload = b'{"return":{"canary":"ok"}}'

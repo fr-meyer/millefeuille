@@ -2,8 +2,11 @@
 
 The `OpenClawModelClient` executes one provider-neutral model-executor request
 through the installed OpenClaw `agent exec` command. It is a low-level adapter;
-no pipeline stage calls it automatically. A live model call still requires the
-run's approved-live scope and output-contract validation.
+no pipeline stage calls it automatically. The current executable lane is
+`openai/gpt-5.6-sol` through subscription OAuth; xAI/Grok execution is deferred
+until a subscription is active and a separate reviewed change enables it.
+A live GPT call still requires the run's exact approved-live scope and
+output-contract validation.
 
 ## Input and execution boundary
 

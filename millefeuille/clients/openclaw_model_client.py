@@ -32,6 +32,7 @@ from millefeuille.domain.model_executor import (
 
 _MAX_OPENCLAW_STDOUT_BYTES = 4 * 1024 * 1024
 _MAX_OPENCLAW_STDERR_BYTES = 256 * 1024
+_SUPPORTED_RUNTIME_MODEL = "openai/gpt-5.6-sol"
 _AGENT_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}\Z")
 _CHILD_ENV_ALLOWLIST = frozenset(
     {
@@ -183,7 +184,7 @@ def _bounded_run(
 
 
 class OpenClawModelClient:
-    """Execute exact no-fallback requests through saved subscription OAuth."""
+    """Execute GPT-only, no-fallback requests through saved subscription OAuth."""
 
     def __init__(
         self,
@@ -215,6 +216,10 @@ class OpenClawModelClient:
 
         normalized = validate_model_executor_request(request)
         verify_model_executor_input(normalized, input_payload)
+        if normalized["requested_model"] != _SUPPORTED_RUNTIME_MODEL:
+            raise MillefeuilleContractError(
+                "OpenClaw live adapter currently supports only openai/gpt-5.6-sol"
+            )
         if normalized["fallback"] != {"policy": "none", "models": []}:
             raise MillefeuilleContractError(
                 "OpenClaw model execution requires fallback.policy none"
