@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import closing
 from copy import deepcopy
 import json
 import os
@@ -117,7 +118,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             agent_dir = Path(directory)
             database = agent_dir / "openclaw-agent.sqlite"
-            with sqlite3.connect(database) as connection:
+            with closing(sqlite3.connect(database)) as connection:
                 connection.execute(
                     "CREATE TABLE auth_profile_store (store_key TEXT PRIMARY KEY, "
                     "store_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
@@ -141,6 +142,7 @@ class TestOpenClawModelClient(unittest.TestCase):
                         ),
                     ),
                 )
+                connection.commit()
             self.assertTrue(
                 _has_agent_local_oauth_profile(directory, "openai:research")
             )
