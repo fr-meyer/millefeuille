@@ -21,10 +21,14 @@ output-contract validation.
 - A mode-0600 temporary config pins the requested model to OpenClaw's own
   runtime, disables fallback and all tools/plugins, and selects the checked
   agent directory only as the stored-auth source. The execution child receives
-  private temporary home, state, XDG, and temp locations; only the narrow OAuth
-  secret reference location is preserved when configured.
+  private temporary home, XDG, and temp locations; the narrow OAuth secret
+  reference location is preserved when configured.
 - The child environment passes only a small operational allowlist. Provider API
-  keys and Codex API keys are not passed. Auth lookup and model execution share one request deadline. Child stdout
+  keys and Codex API keys are not passed. The checked OpenClaw state directory
+  remains visible for stored OAuth lookup; `agent exec` snapshots it for auth
+  and then creates its own disposable state directory for the run. The adapter
+  redirects home, XDG, and temporary paths into its private workspace.
+  Auth lookup and model execution share one request deadline. Child stdout
   and stderr are capped during capture, including the auth lookup.
 
 ## Result boundary

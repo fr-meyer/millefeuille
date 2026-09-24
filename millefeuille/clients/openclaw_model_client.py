@@ -273,7 +273,11 @@ class OpenClawModelClient:
         started_at = _utc_now()
         deadline = time.monotonic() + normalized["timeout_seconds"] - 1
         try:
-            auth_profile_ref, agent_dir = self._require_single_oauth_profile(
+            (
+                auth_profile_ref,
+                agent_dir,
+                auth_state_dir,
+            ) = self._require_single_oauth_profile(
                 normalized["requested_model"],
                 timeout_seconds=max(0.001, deadline - time.monotonic()),
             )
@@ -382,7 +386,9 @@ class OpenClawModelClient:
                     encoding="utf-8",
                     timeout=max(0.001, deadline - time.monotonic() - 1),
                     check=False,
-                    env=_execution_environment(temporary_dir),
+                    env=_execution_environment(
+                        temporary_dir, auth_state_dir=auth_state_dir
+                    ),
                 )
         except subprocess.TimeoutExpired:
             return self._failed_execution(
@@ -519,7 +525,7 @@ class OpenClawModelClient:
 
     def _require_single_oauth_profile(
         self, requested_model: str, *, timeout_seconds: float
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, str]:
         provider = requested_model.split("/", 1)[0]
         command = [
             self.executable,
@@ -556,6 +562,16 @@ class OpenClawModelClient:
             or not Path(agent_dir).is_absolute()
         ):
             raise ValueError("OpenClaw agent directory is unavailable")
+        config_path = payload.get("configPath")
+        if (
+            not isinstance(config_path, str)
+            or not config_path.strip()
+            or not Path(config_path).is_absolute()
+            or len(Path(agent_dir).parents) < 3
+            or Path(config_path).parent != Path(agent_dir).parents[2]
+        ):
+            raise ValueError("OpenClaw stored OAuth state directory is unavailable")
+        auth_state_dir = str(Path(config_path).parent)
         auth = _required_mapping(payload.get("auth"), "OpenClaw auth status")
         providers = auth.get("providers")
         if not isinstance(providers, list):
@@ -611,7 +627,7 @@ class OpenClawModelClient:
             "appliedKeys"
         ) not in (None, []):
             raise ValueError("OpenClaw environment auth fallback is active")
-        return profile_ref, agent_dir
+        return profile_ref, agent_dir, auth_state_dir
 
     def _failed_execution(
         self,
@@ -765,15 +781,16 @@ def _oauth_only_environment() -> dict[str, str]:
     return env
 
 
-def _execution_environment(temporary_dir: str) -> dict[str, str]:
-    """Keep operational variables but redirect all live state locations."""
+def _execution_environment(
+    temporary_dir: str, *, auth_state_dir: str
+) -> dict[str, str]:
+    """Keep the checked OAuth store while OpenClaw isolates the run state."""
 
     env = _oauth_only_environment()
     isolated = Path(temporary_dir)
     locations = {
         "HOME": "home",
         "OPENCLAW_HOME": "openclaw-home",
-        "OPENCLAW_STATE_DIR": "state",
         "XDG_CONFIG_HOME": "xdg-config",
         "XDG_DATA_HOME": "xdg-data",
         "TMPDIR": "tmp",
@@ -784,4 +801,8 @@ def _execution_environment(temporary_dir: str) -> dict[str, str]:
         path = isolated / suffix
         path.mkdir(mode=0o700, exist_ok=True)
         env[key] = str(path)
+    # agent exec snapshots this path for stored OAuth before switching to its
+    # own temporary state directory. Redirecting it here hides the checked
+    # profile and causes a provider failure before a usable model response.
+    env["OPENCLAW_STATE_DIR"] = auth_state_dir
     return env

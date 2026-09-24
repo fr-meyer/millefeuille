@@ -52,11 +52,11 @@ def _completed(payload: object, *, returncode: int = 0):
 
 def _auth_status(provider: str) -> dict[str, object]:
     profile_id = f"{provider}:research"
+    state_dir = Path(Path.cwd().anchor) / "openclaw"
     return {
         "agentId": "franck",
-        "agentDir": str(
-            Path(Path.cwd().anchor) / "openclaw" / "agents" / "franck" / "agent"
-        ),
+        "configPath": str(state_dir / "openclaw.json"),
+        "agentDir": str(state_dir / "agents" / "franck" / "agent"),
         "auth": {
             "providers": [
                 {
@@ -136,6 +136,7 @@ class TestOpenClawModelClient(unittest.TestCase):
 
     def test_success_uses_exact_model_thinking_and_oauth_profile(self):
         payload = b'{"return":{"canary":"ok"}}'
+        state_dir = str(Path(Path.cwd().anchor) / "openclaw")
         runner = _QueuedRunner(
             [
                 _completed(_auth_status("openai")),
@@ -159,7 +160,7 @@ class TestOpenClawModelClient(unittest.TestCase):
                 "OPENAI_API_KEY_1": "test-only",
                 "HOME": "/live/home",
                 "OPENCLAW_HOME": "/live/openclaw-home",
-                "OPENCLAW_STATE_DIR": "/live/openclaw-state",
+                "OPENCLAW_STATE_DIR": state_dir,
                 "XDG_CONFIG_HOME": "/live/xdg-config",
                 "XDG_DATA_HOME": "/live/xdg-data",
                 "OPENCLAW_AUTH_PROFILE_SECRET_DIR": "/oauth/secret-reference",
@@ -218,7 +219,8 @@ class TestOpenClawModelClient(unittest.TestCase):
         self.assertFalse("OPENAI_API_KEYS" in child_env)
         self.assertFalse("OPENAI_API_KEY_1" in child_env)
         auth_env = runner.kwargs[0]["env"]
-        self.assertEqual(auth_env["OPENCLAW_STATE_DIR"], "/live/openclaw-state")
+        self.assertEqual(auth_env["OPENCLAW_STATE_DIR"], state_dir)
+        self.assertEqual(child_env["OPENCLAW_STATE_DIR"], state_dir)
         self.assertEqual(
             child_env["OPENCLAW_AUTH_PROFILE_SECRET_DIR"],
             "/oauth/secret-reference",
@@ -227,7 +229,6 @@ class TestOpenClawModelClient(unittest.TestCase):
         for key in (
             "HOME",
             "OPENCLAW_HOME",
-            "OPENCLAW_STATE_DIR",
             "XDG_CONFIG_HOME",
             "XDG_DATA_HOME",
             "TMPDIR",
@@ -314,6 +315,29 @@ class TestOpenClawModelClient(unittest.TestCase):
             "auth_unavailable",
         )
         self.assertIsNone(execution.result["authentication"]["profile_ref"])
+
+    def test_oauth_state_path_must_match_the_checked_agent(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        wrong_path = str(Path(Path.cwd().anchor) / "other" / "openclaw.json")
+        for config_path in (None, wrong_path):
+            with self.subTest(config_path=config_path):
+                status = _auth_status("openai")
+                if config_path is None:
+                    del status["configPath"]
+                else:
+                    status["configPath"] = config_path
+                runner = _QueuedRunner([_completed(status)])
+                execution = OpenClawModelClient(command_runner=runner).execute(
+                    request=self._request(payload=payload),
+                    input_payload=payload,
+                    output_validator=self._validate_canary,
+                )
+                self.assertEqual(len(runner.commands), 1)
+                self.assertEqual(execution.result["status"], "failed")
+                self.assertEqual(
+                    execution.result["attempts"][0]["failure_code"],
+                    "auth_unavailable",
+                )
 
     def test_openclaw_ok_oauth_status_is_usable(self):
         payload = b'{"return":{"canary":"ok"}}'
