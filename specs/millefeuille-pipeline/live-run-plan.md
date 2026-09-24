@@ -100,3 +100,20 @@ into PR79 or treated as permission for a live provider call.
   may be used offline to inspect the requested model, authentication lane,
   fallback policy, execution blockers, and future provenance requirements. It
   performs no credential lookup or provider call and does not authorize one.
+
+## Offline Summary Route Selection
+
+`millefeuille models --route --profile research-default --stage summarize_page --json`
+resolves the bundled default without reading credentials or calling a model.
+An operator may add `--model xai/grok-4.6` for a per-job override. A fallback
+requires an ordered `--fallback-model` plus one or more sorted, unique
+`--retry-on` failure codes. The CLI validates the exact model allowlist,
+separate `xhigh` reasoning setting, and chain shape. It rejects fixture-only
+profiles as live executor routes. The same resolver is used when constructing
+a summary work-unit request, so replay identity binds the effective route.
+
+The route output is planning evidence. It does not check OAuth readiness,
+authorize a provider call, or change the OpenClaw default model. The live
+adapter must independently confirm subscription OAuth for the selected model
+at each attempt and record the actual model and fallback reason in the
+executor result.
