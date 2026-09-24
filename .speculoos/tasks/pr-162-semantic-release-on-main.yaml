@@ -1,0 +1,31 @@
+id: pr-162-semantic-release-on-main
+title: Enable python-semantic-release on main after tests
+status: implementation
+branch: chore/pr-162-semantic-release-on-main
+base_branch: dev
+write_paths:
+  - .github/workflows/ci.yml
+  - pyproject.toml
+  - .speculoos/tasks/pr-162-semantic-release-on-main.yaml
+  - specs/pr-162-semantic-release-on-main/**
+github:
+  issue: null
+  pull_request: null
+scope:
+  - add python-semantic-release configuration matching existing unprefixed SemVer tags
+  - run the release job only after the test matrix on push to main
+  - install python-semantic-release==10.6.2 via pip and run semantic-release version; do not use a third-party GitHub Action
+  - GitHub tag plus GitHub Release only; no PyPI, npm, or extra registry token
+non_goals:
+  - cutting a release from this PR
+  - publishing a package to PyPI or npm
+  - changing Zotero, OCR, or OpenKB runtime behavior
+  - merging to main or promoting dev
+  - expanding Mergeguez credentials or branch protection
+acceptance:
+  - test job permissions stay contents:read
+  - release job is skipped on pull_request and on dev
+  - tag_format remains {version} to match 0.4.0 history
+  - no PyPI token is introduced
+publication_boundary: "Repository CI metadata only. Publication Boundary: GitHub tag and GitHub Release on main after tests. No Zotero, OCR, or OpenKB calls. No new credential besides GITHUB_TOKEN contents:write. This PR does not cut a release and does not bypass approval for a later main promotion."
+executor: OpenClaw

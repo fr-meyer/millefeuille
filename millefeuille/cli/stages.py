@@ -26,6 +26,9 @@ from millefeuille.domain.live_receipts import (
     load_approved_live_receipt,
     validate_approved_live_receipt_for_no_effect,
 )
+from millefeuille.domain.local_structure import (
+    prepare_local_structures_from_route_evidence,
+)
 from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
     RunMode,
@@ -36,6 +39,7 @@ from millefeuille.domain.model_execution import (
     build_summary_execution_plan,
     materialize_model_provenance_record_from_files,
 )
+from millefeuille.domain.model_executor import resolve_summary_model_route
 from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
 from millefeuille.domain.offline_stages import (
     OFFLINE_FIXTURE_STAGES,
@@ -48,6 +52,9 @@ from millefeuille.domain.retrieve import (
     write_retrieval_batch_result,
 )
 from millefeuille.domain.stage_runtime import resolve_run_artifacts
+from millefeuille.domain.summary_preparation import (
+    prepare_summary_execution_packages,
+)
 from millefeuille.domain.writeback import write_writeback_plan
 
 CANONICAL_RUN_STAGES = (
@@ -103,7 +110,21 @@ def run_stage_cli(
     if mode_exit is not None:
         return mode_exit
     try:
-        if args.command in {stage.value for stage in OFFLINE_FIXTURE_STAGES}:
+        if args.command == "structure-prepare":
+            result = prepare_local_structures_from_route_evidence(
+                route_evidence_paths=args.route_evidence,
+                output_dir=args.output_dir,
+            )
+            payload = result.to_dict()
+        elif args.command == "summarize-prepare":
+            result = prepare_summary_execution_packages(
+                route_evidence_paths=args.route_evidence,
+                structure_evidence_paths=args.structure_evidence,
+                output_dir=args.output_dir,
+                profile=args.profile,
+            )
+            payload = result.to_dict()
+        elif args.command in {stage.value for stage in OFFLINE_FIXTURE_STAGES}:
             result = write_offline_fixture_stage(
                 stage=args.command,
                 evidence_path=args.evidence,
@@ -214,16 +235,40 @@ def run_stage_cli(
                     stage_manifest=args.stage_manifest,
                 )
         elif args.command == "models":
-            if args.provenance:
+            if args.route:
+                if (
+                    args.plan or args.provenance or args.plan_file
+                    or args.execution_evidence or args.output
+                ):
+                    raise MillefeuilleContractError(
+                        "models --route cannot be combined with other model "
+                        "actions or files"
+                    )
+                if not args.profile or not args.stage:
+                    raise MillefeuilleContractError(
+                        "models --route requires --profile and --stage"
+                    )
+                payload = resolve_summary_model_route(
+                    profile=args.profile,
+                    stage=args.stage,
+                    requested_model=args.model,
+                    thinking=args.thinking,
+                    fallback_models=args.fallback_model,
+                    retry_on=args.retry_on,
+                )
+            elif args.provenance:
                 if args.mode != RunMode.PREVIEW.value:
                     raise MillefeuilleContractError(
                         "models --provenance is preview-only because it "
                         "materializes local JSON evidence"
                     )
-                if args.plan or args.profile or args.stage:
+                if (
+                    args.plan or args.profile or args.stage or args.model
+                    or args.thinking or args.fallback_model or args.retry_on
+                ):
                     raise MillefeuilleContractError(
-                        "models --provenance cannot be combined with --plan, "
-                        "--profile, or --stage"
+                        "models --provenance cannot be combined with plan "
+                        "or route controls"
                     )
                 if not args.plan_file or not args.execution_evidence:
                     raise MillefeuilleContractError(
@@ -236,6 +281,12 @@ def run_stage_cli(
                     output_path=args.output,
                 )
             elif args.plan:
+                if (
+                    args.model or args.thinking or args.fallback_model or args.retry_on
+                ):
+                    raise MillefeuilleContractError(
+                        "model route controls require --route"
+                    )
                 if args.plan_file or args.execution_evidence or args.output:
                     raise MillefeuilleContractError(
                         "models --plan cannot be combined with provenance files"
@@ -252,6 +303,10 @@ def run_stage_cli(
                 if (
                     args.profile
                     or args.stage
+                    or args.model
+                    or args.thinking
+                    or args.fallback_model
+                    or args.retry_on
                     or args.plan_file
                     or args.execution_evidence
                     or args.output
@@ -320,6 +375,48 @@ def _build_parser() -> argparse.ArgumentParser:
         _add_run_locator_args(fixture_stage)
         fixture_stage.add_argument("--evidence", required=True)
         fixture_stage.add_argument("--json", action="store_true")
+
+    structure_prepare = subparsers.add_parser(
+        "structure-prepare",
+        help=(
+            "Prepare deterministic provider-free structure evidence from selected "
+            "Markdown without writing source packs."
+        ),
+    )
+    structure_prepare.add_argument(
+        "--route-evidence",
+        action="append",
+        required=True,
+        help=(
+            "Route-selection evidence JSON/JSONL; repeat for multiple files. "
+            "Its Markdown path is resolved relative to the evidence file."
+        ),
+    )
+    structure_prepare.add_argument("--output-dir", required=True)
+    structure_prepare.add_argument("--json", action="store_true")
+
+    summarize_prepare = subparsers.add_parser(
+        "summarize-prepare",
+        help=(
+            "Bind selected Markdown and structure evidence to deterministic "
+            "no-call summary plans without generating summaries."
+        ),
+    )
+    summarize_prepare.add_argument(
+        "--route-evidence",
+        action="append",
+        required=True,
+        help="Route-selection evidence JSON/JSONL; repeat for multiple files.",
+    )
+    summarize_prepare.add_argument(
+        "--structure-evidence",
+        action="append",
+        required=True,
+        help="Structure evidence JSON/JSONL; repeat for multiple files.",
+    )
+    summarize_prepare.add_argument("--output-dir", required=True)
+    summarize_prepare.add_argument("--profile")
+    summarize_prepare.add_argument("--json", action="store_true")
 
     acceptance = subparsers.add_parser(
         "acceptance",
@@ -447,8 +544,27 @@ def _build_parser() -> argparse.ArgumentParser:
             "one safe provenance JSON record."
         ),
     )
+    models.add_argument(
+        "--route",
+        action="store_true",
+        help="Resolve an explicit no-call model route for one summary stage.",
+    )
     models.add_argument("--profile")
     models.add_argument("--stage", choices=SUMMARY_MODEL_STAGES)
+    models.add_argument("--model", help="Explicit per-job model override.")
+    models.add_argument(
+        "--thinking", help="Separate reasoning setting; xhigh required."
+    )
+    models.add_argument(
+        "--fallback-model",
+        action="append",
+        help="Ordered fallback model; repeat as needed.",
+    )
+    models.add_argument(
+        "--retry-on",
+        action="append",
+        help="Retryable failure code; repeat in sorted order.",
+    )
     models.add_argument("--plan-file")
     models.add_argument("--execution-evidence")
     models.add_argument("--output")
