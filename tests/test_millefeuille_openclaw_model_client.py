@@ -264,7 +264,17 @@ class TestOpenClawModelClient(unittest.TestCase):
             runner.runtime_configs[0]["tools"],
             {"deny": ["*"], "codeMode": {"enabled": False}},
         )
-        self.assertEqual(runner.runtime_configs[0]["plugins"], {"enabled": False})
+        self.assertEqual(
+            runner.runtime_configs[0]["plugins"],
+            {
+                "enabled": True,
+                "allow": ["openai"],
+                "entries": {
+                    "openai": {"enabled": True},
+                    "memory-core": {"enabled": False},
+                },
+            },
+        )
         self.assertEqual(
             runner.runtime_configs[0]["auth"],
             {

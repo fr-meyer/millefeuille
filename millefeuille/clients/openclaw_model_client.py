@@ -451,6 +451,8 @@ class OpenClawModelClient:
                     snapshot_agent_dir,
                     min_valid_seconds=remaining,
                 )
+                # The bundled OpenAI provider is a plugin. Keep it loaded
+                # while the separate tool policy denies every tool.
                 config_path = Path(temporary_dir) / "openclaw.json"
                 config_path.write_text(
                     json.dumps(
@@ -491,7 +493,14 @@ class OpenClawModelClient:
                                 "deny": ["*"],
                                 "codeMode": {"enabled": False},
                             },
-                            "plugins": {"enabled": False},
+                            "plugins": {
+                                "enabled": True,
+                                "allow": ["openai"],
+                                "entries": {
+                                    "openai": {"enabled": True},
+                                    "memory-core": {"enabled": False},
+                                },
+                            },
                         },
                         separators=(",", ":"),
                     ),
