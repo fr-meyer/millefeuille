@@ -152,6 +152,12 @@ class TestOpenClawModelClient(unittest.TestCase):
                 "OPENAI_API_KEY": "test-only",
                 "OPENAI_API_KEYS": "test-only",
                 "OPENAI_API_KEY_1": "test-only",
+                "HOME": "/live/home",
+                "OPENCLAW_HOME": "/live/openclaw-home",
+                "OPENCLAW_STATE_DIR": "/live/openclaw-state",
+                "XDG_CONFIG_HOME": "/live/xdg-config",
+                "XDG_DATA_HOME": "/live/xdg-data",
+                "OPENCLAW_AUTH_PROFILE_SECRET_DIR": "/oauth/secret-reference",
             },
         ):
             execution = client.execute(
@@ -197,6 +203,28 @@ class TestOpenClawModelClient(unittest.TestCase):
         self.assertFalse("OPENAI_API_KEY" in child_env)
         self.assertFalse("OPENAI_API_KEYS" in child_env)
         self.assertFalse("OPENAI_API_KEY_1" in child_env)
+        auth_env = runner.kwargs[0]["env"]
+        self.assertEqual(auth_env["OPENCLAW_STATE_DIR"], "/live/openclaw-state")
+        self.assertEqual(
+            child_env["OPENCLAW_AUTH_PROFILE_SECRET_DIR"],
+            "/oauth/secret-reference",
+        )
+        temporary_root = os.path.dirname(command[command.index("--config") + 1])
+        for key in (
+            "HOME",
+            "OPENCLAW_HOME",
+            "OPENCLAW_STATE_DIR",
+            "XDG_CONFIG_HOME",
+            "XDG_DATA_HOME",
+            "TMPDIR",
+            "TMP",
+            "TEMP",
+        ):
+            self.assertEqual(
+                os.path.commonpath((temporary_root, child_env[key])),
+                temporary_root,
+            )
+            self.assertFalse(child_env[key].startswith("/live/"))
 
     def test_xai_success_is_attributed_to_exact_requested_model(self):
         payload = b'{"return":{"canary":"ok"}}'

@@ -333,7 +333,7 @@ class OpenClawModelClient:
                     encoding="utf-8",
                     timeout=max(0.001, deadline - time.monotonic() - 1),
                     check=False,
-                    env=_oauth_only_environment(),
+                    env=_execution_environment(temporary_dir),
                 )
         except subprocess.TimeoutExpired:
             return self._failed_execution(
@@ -692,4 +692,26 @@ def _oauth_only_environment() -> dict[str, str]:
     env = {
         key: value for key, value in os.environ.items() if key in _CHILD_ENV_ALLOWLIST
     }
+    return env
+
+
+def _execution_environment(temporary_dir: str) -> dict[str, str]:
+    """Keep operational variables but redirect all live state locations."""
+
+    env = _oauth_only_environment()
+    isolated = Path(temporary_dir)
+    locations = {
+        "HOME": "home",
+        "OPENCLAW_HOME": "openclaw-home",
+        "OPENCLAW_STATE_DIR": "state",
+        "XDG_CONFIG_HOME": "xdg-config",
+        "XDG_DATA_HOME": "xdg-data",
+        "TMPDIR": "tmp",
+        "TMP": "tmp",
+        "TEMP": "tmp",
+    }
+    for key, suffix in locations.items():
+        path = isolated / suffix
+        path.mkdir(mode=0o700, exist_ok=True)
+        env[key] = str(path)
     return env

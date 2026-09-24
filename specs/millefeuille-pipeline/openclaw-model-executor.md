@@ -17,8 +17,9 @@ run's approved-live scope and output-contract validation.
   API-key, token, shell-environment fallback, and ambiguous profiles fail closed.
 - A mode-0600 temporary config pins the requested model to OpenClaw's own
   runtime, disables fallback and all tools/plugins, and selects the checked
-  agent directory only as the stored-auth source. `agent exec` strips inherited
-  agent database locations from its run config and uses temporary run state.
+  agent directory only as the stored-auth source. The execution child receives
+  private temporary home, state, XDG, and temp locations; only the narrow OAuth
+  secret reference location is preserved when configured.
 - The child environment passes only a small operational allowlist. Provider API
   keys and Codex API keys are not passed. Auth lookup and model execution share one request deadline. Child stdout
   and stderr are capped during capture, including the auth lookup.
