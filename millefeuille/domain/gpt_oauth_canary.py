@@ -115,6 +115,15 @@ def run_gpt_oauth_canary(
     )
     if any(row.state != "present" for row in preflight.credential_readiness):
         raise MillefeuilleContractError("canary OAuth readiness marker is missing")
+    if (
+        preflight.decision != "approved-scope-validated-execution-unsupported"
+        or preflight.blockers != ("external-execution-unsupported",)
+        or preflight.approval_receipt is None
+        or preflight.approval_receipt.receipt_id != receipt.receipt_id
+        or preflight.approval_receipt.content_digest != receipt.content_digest
+        or any(check.status != "passed" for check in preflight.checks)
+    ):
+        raise MillefeuilleContractError("canary operator preflight did not validate")
     _reserve_with_broker(packet, receipt)
 
     execution = (client or OpenClawModelClient()).execute(

@@ -276,6 +276,29 @@ class TestGptOauthCanary(unittest.TestCase):
                 )
             self.assertEqual(client.calls, 1)
 
+    def test_expired_receipt_cannot_reserve_or_dispatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "ledger"
+            packet, receipt = _approved_pair(root)
+            client = _FakeClient()
+            expired_at = datetime.fromisoformat(
+                receipt.expires_at.replace("Z", "+00:00")
+            )
+            with (
+                patch.object(canary, "_reserve_with_broker") as reserve,
+                self.assertRaisesRegex(MillefeuilleContractError, "expired"),
+            ):
+                run_gpt_oauth_canary(
+                    packet=packet,
+                    receipt=receipt,
+                    artifact_root=root,
+                    environment={"OPENCLAW_CODEX_OAUTH_READY": "present"},
+                    now=expired_at,
+                    client=client,
+                )
+            reserve.assert_not_called()
+            self.assertEqual(client.calls, 0)
+
     @unittest.skipIf(
         os.name != "posix" or os.getuid() == 0,
         "requires an unprivileged POSIX test user",
