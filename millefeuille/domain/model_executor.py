@@ -214,6 +214,75 @@ def build_model_executor_request(
     return validate_model_executor_request(request)
 
 
+def resolve_summary_model_route(
+    *,
+    profile: str,
+    stage: str,
+    requested_model: str | None = None,
+    thinking: str | None = None,
+    fallback_models: list[str] | None = None,
+    retry_on: list[str] | None = None,
+) -> dict[str, Any]:
+    """Resolve a no-call summary route from a stable logical profile.
+
+    Model overrides and fallback order are invocation inputs, never mutations
+    of the bundled profile. The live adapter must still verify OAuth readiness
+    for the selected model at execution time.
+    """
+
+    plan = build_summary_execution_plan(profile=profile, stage=stage)
+    if plan["execution"]["fixture_only"]:
+        raise MillefeuilleContractError(
+            "fixture-only model profile cannot select a live executor route"
+        )
+    selected_model = _allowed_model(
+        plan["requested_model"] if requested_model is None else requested_model
+    )
+    selected_thinking = (
+        plan["requested_parameters"].get("reasoning_effort")
+        if thinking is None
+        else thinking
+    )
+    if selected_thinking != REQUIRED_EXECUTOR_THINKING:
+        raise MillefeuilleContractError("thinking must be xhigh")
+    fallbacks, retry_codes = _normalize_optional_fallback(
+        fallback_models=fallback_models,
+        retry_on=retry_on,
+        label="summary",
+    )
+    if not isinstance(fallbacks, list):
+        raise MillefeuilleContractError("fallback.models must be a list")
+    models = [_allowed_model(model) for model in fallbacks]
+    if len(models) != len(set(models)) or selected_model in models:
+        raise MillefeuilleContractError(
+            "fallback.models must be unique and exclude requested_model"
+        )
+    if len(models) > 7:
+        raise MillefeuilleContractError("fallback chain exceeds eight attempts")
+    codes = _validate_retry_codes(retry_codes)
+    return {
+        "schema_version": "millefeuille-summary-model-route/v0.1",
+        "status": "planned-offline",
+        "profile": profile,
+        "stage": stage,
+        "profile_model": plan["requested_model"],
+        "requested_model": selected_model,
+        "override_used": selected_model != plan["requested_model"],
+        "thinking": selected_thinking,
+        "authentication": {
+            "control_plane": "openclaw",
+            "required_class": "subscription_oauth",
+            "credential_lookup_performed": False,
+        },
+        "retry": {"max_attempts": 1 + len(models), "retry_on": codes},
+        "fallback": {
+            "policy": "explicit" if models else "none",
+            "models": models,
+        },
+        "provider_call_performed": False,
+    }
+
+
 def build_structure_work_unit_request(
     *,
     unit_id: str,
@@ -299,34 +368,29 @@ def build_summary_work_unit_request(
         parameters.get("prompt_version"),
         "execution_plan prompt_version",
     )
-    selected_model = (
-        canonical_plan["requested_model"]
-        if requested_model is None
-        else requested_model
-    )
-    selected_thinking = (
-        parameters.get("reasoning_effort") if thinking is None else thinking
-    )
-    fallbacks, retry_codes = _normalize_optional_fallback(
+    route = resolve_summary_model_route(
+        profile=profile,
+        stage=stage,
+        requested_model=requested_model,
+        thinking=thinking,
         fallback_models=fallback_models,
         retry_on=retry_on,
-        label="summary",
     )
     return build_model_executor_request(
         task_kind=stage,
         unit_id=unit_id,
         source_locators=source_locators,
-        requested_model=selected_model,
-        thinking=selected_thinking,
+        requested_model=route["requested_model"],
+        thinking=route["thinking"],
         prompt_template_id=stage.replace("_", "-"),
         prompt_template_version=prompt_version,
         input_payload=input_payload,
         output_schema_id=output_schema_id,
         output_schema_version=output_schema_version,
         timeout_seconds=timeout_seconds,
-        max_attempts=1 + len(fallbacks),
-        retry_on=retry_codes,
-        fallback_models=fallbacks,
+        max_attempts=route["retry"]["max_attempts"],
+        retry_on=route["retry"]["retry_on"],
+        fallback_models=route["fallback"]["models"],
     )
 
 

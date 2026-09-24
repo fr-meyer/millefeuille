@@ -39,6 +39,7 @@ from millefeuille.domain.model_execution import (
     build_summary_execution_plan,
     materialize_model_provenance_record_from_files,
 )
+from millefeuille.domain.model_executor import resolve_summary_model_route
 from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
 from millefeuille.domain.offline_stages import (
     OFFLINE_FIXTURE_STAGES,
@@ -234,16 +235,40 @@ def run_stage_cli(
                     stage_manifest=args.stage_manifest,
                 )
         elif args.command == "models":
-            if args.provenance:
+            if args.route:
+                if (
+                    args.plan or args.provenance or args.plan_file
+                    or args.execution_evidence or args.output
+                ):
+                    raise MillefeuilleContractError(
+                        "models --route cannot be combined with other model "
+                        "actions or files"
+                    )
+                if not args.profile or not args.stage:
+                    raise MillefeuilleContractError(
+                        "models --route requires --profile and --stage"
+                    )
+                payload = resolve_summary_model_route(
+                    profile=args.profile,
+                    stage=args.stage,
+                    requested_model=args.model,
+                    thinking=args.thinking,
+                    fallback_models=args.fallback_model,
+                    retry_on=args.retry_on,
+                )
+            elif args.provenance:
                 if args.mode != RunMode.PREVIEW.value:
                     raise MillefeuilleContractError(
                         "models --provenance is preview-only because it "
                         "materializes local JSON evidence"
                     )
-                if args.plan or args.profile or args.stage:
+                if (
+                    args.plan or args.profile or args.stage or args.model
+                    or args.thinking or args.fallback_model or args.retry_on
+                ):
                     raise MillefeuilleContractError(
-                        "models --provenance cannot be combined with --plan, "
-                        "--profile, or --stage"
+                        "models --provenance cannot be combined with plan "
+                        "or route controls"
                     )
                 if not args.plan_file or not args.execution_evidence:
                     raise MillefeuilleContractError(
@@ -256,6 +281,12 @@ def run_stage_cli(
                     output_path=args.output,
                 )
             elif args.plan:
+                if (
+                    args.model or args.thinking or args.fallback_model or args.retry_on
+                ):
+                    raise MillefeuilleContractError(
+                        "model route controls require --route"
+                    )
                 if args.plan_file or args.execution_evidence or args.output:
                     raise MillefeuilleContractError(
                         "models --plan cannot be combined with provenance files"
@@ -272,6 +303,10 @@ def run_stage_cli(
                 if (
                     args.profile
                     or args.stage
+                    or args.model
+                    or args.thinking
+                    or args.fallback_model
+                    or args.retry_on
                     or args.plan_file
                     or args.execution_evidence
                     or args.output
@@ -509,8 +544,27 @@ def _build_parser() -> argparse.ArgumentParser:
             "one safe provenance JSON record."
         ),
     )
+    models.add_argument(
+        "--route",
+        action="store_true",
+        help="Resolve an explicit no-call model route for one summary stage.",
+    )
     models.add_argument("--profile")
     models.add_argument("--stage", choices=SUMMARY_MODEL_STAGES)
+    models.add_argument("--model", help="Explicit per-job model override.")
+    models.add_argument(
+        "--thinking", help="Separate reasoning setting; xhigh required."
+    )
+    models.add_argument(
+        "--fallback-model",
+        action="append",
+        help="Ordered fallback model; repeat as needed.",
+    )
+    models.add_argument(
+        "--retry-on",
+        action="append",
+        help="Retryable failure code; repeat in sorted order.",
+    )
     models.add_argument("--plan-file")
     models.add_argument("--execution-evidence")
     models.add_argument("--output")
