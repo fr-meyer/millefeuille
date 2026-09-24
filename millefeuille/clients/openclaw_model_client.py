@@ -707,7 +707,9 @@ class OpenClawModelClient:
             > _MAX_OPENCLAW_STDERR_BYTES
         ):
             raise ValueError("OpenClaw auth status output exceeded limit")
-        payload = _strict_json_loads(completed.stdout or "")
+        payload = _required_mapping(
+            _strict_json_loads(completed.stdout or ""), "OpenClaw auth status"
+        )
         if payload.get("agentId") != self.agent_id:
             raise ValueError("OpenClaw auth status agent drift")
         agent_dir = payload.get("agentDir")

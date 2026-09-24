@@ -174,6 +174,34 @@ class TestOpenClawModelClient(unittest.TestCase):
             client.preflight_auth()
         self.assertEqual(len(runner.commands), 1)
 
+    def test_non_object_auth_status_fails_closed(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        for status in (None, [], "unexpected", 1):
+            with self.subTest(status=status):
+                preflight_runner = _QueuedRunner([_completed(status)])
+                client = OpenClawModelClient(command_runner=preflight_runner)
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "agent-local GPT OAuth"
+                ):
+                    client.preflight_auth()
+                self.assertEqual(len(preflight_runner.commands), 1)
+
+                execution_runner = _QueuedRunner([_completed(status)])
+                execution = OpenClawModelClient(
+                    command_runner=execution_runner
+                ).execute(
+                    request=self._request(payload=payload),
+                    input_payload=payload,
+                    output_validator=self._validate_canary,
+                )
+                self.assertEqual(len(execution_runner.commands), 1)
+                self.assertEqual(execution.result["status"], "failed")
+                self.assertEqual(
+                    execution.result["attempts"][0]["failure_code"],
+                    "auth_unavailable",
+                )
+                self.assertIsNone(execution.output)
+
     def _request(
         self,
         *,
