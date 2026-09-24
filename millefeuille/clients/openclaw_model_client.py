@@ -353,6 +353,15 @@ class OpenClawModelClient:
                 actual_model=None,
                 schema_validation_status="not_run",
             )
+        except UnicodeError:
+            return self._failed_execution(
+                request=normalized,
+                started_at=started_at,
+                failure_code="invalid_response",
+                auth_profile_ref=auth_profile_ref,
+                actual_model=None,
+                schema_validation_status="not_run",
+            )
         except (OSError, subprocess.SubprocessError):
             return self._failed_execution(
                 request=normalized,

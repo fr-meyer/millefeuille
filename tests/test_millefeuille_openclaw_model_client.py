@@ -415,6 +415,48 @@ class TestOpenClawModelClient(unittest.TestCase):
                     max_stderr_bytes=1024,
                 )
 
+    def test_invalid_utf8_from_either_child_stream_fails_closed(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        for stream in ("stdout", "stderr"):
+            with self.subTest(stream=stream):
+
+                class InvalidOutputRunner(_QueuedRunner):
+                    def __call__(
+                        self,
+                        command: list[str],
+                        *,
+                        selected_stream: str = stream,
+                        **kwargs,
+                    ):
+                        if self.responses:
+                            return super().__call__(command, **kwargs)
+                        return _bounded_run(
+                            [
+                                sys.executable,
+                                "-c",
+                                (
+                                    "import sys; "
+                                    f"sys.{selected_stream}.buffer.write(bytes([255]))"
+                                ),
+                            ],
+                            input=kwargs.get("input"),
+                            timeout=kwargs["timeout"],
+                            env=kwargs["env"],
+                        )
+
+                runner = InvalidOutputRunner([_completed(_auth_status("openai"))])
+                execution = OpenClawModelClient(command_runner=runner).execute(
+                    request=self._request(payload=payload),
+                    input_payload=payload,
+                    output_validator=self._validate_canary,
+                )
+                self.assertEqual(execution.result["status"], "failed")
+                self.assertEqual(
+                    execution.result["attempts"][0]["failure_code"],
+                    "invalid_response",
+                )
+                self.assertIsNone(execution.output)
+
     def test_short_timeout_rejected_before_any_process(self):
         payload = b'{"return":{"canary":"ok"}}'
         runner = _QueuedRunner([])
