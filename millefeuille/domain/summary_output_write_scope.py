@@ -153,6 +153,7 @@ def validate_gpt_summary_output_write_preview(
                 plan.observed_usage_ref,
                 plan.summary_record_ref,
                 *(text.ref for text in plan.texts),
+                *(source.ref for source in plan.source_inputs),
             )
         )
     )

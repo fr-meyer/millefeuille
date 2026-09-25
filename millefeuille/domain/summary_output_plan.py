@@ -17,8 +17,12 @@ from millefeuille.domain.millefeuille import (
     HierarchicalSummaryRecord,
     MillefeuilleContractError,
 )
+from millefeuille.domain.secure_io import read_bytes_no_follow
 from millefeuille.domain.summary_batch_plan import plan_grounded_gpt_summary_batch
 from millefeuille.domain.summary_live_execution import TrustedGptSummaryOutcome
+from millefeuille.domain.summary_preparation import (
+    verify_summary_preparation_package,
+)
 from millefeuille.domain.summary_results import accept_summary_execution_batch
 
 _RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
@@ -38,6 +42,13 @@ class PlannedSummaryText:
 
 
 @dataclass(frozen=True)
+class PlannedSummarySource:
+    ref: str
+    sha256: str
+    data: bytes = field(repr=False)
+
+
+@dataclass(frozen=True)
 class SummaryOutputPlan:
     paper_id: str
     run_id: str
@@ -49,6 +60,7 @@ class SummaryOutputPlan:
     write_manifest_json: bytes = field(repr=False)
     summary_record_json: bytes = field(repr=False)
     texts: tuple[PlannedSummaryText, ...] = field(repr=False)
+    source_inputs: tuple[PlannedSummarySource, ...] = field(repr=False)
 
 
 def plan_gpt_summary_outputs(
@@ -92,6 +104,8 @@ def plan_gpt_summary_outputs(
     if accepted != outcome.accepted:
         raise MillefeuilleContractError("GPT summary accepted output drift")
 
+    prepared = verify_summary_preparation_package(**evidence)
+    source_inputs = _plan_source_inputs(prepared, run_id)
     entries: list[dict[str, Any]] = []
     texts: list[PlannedSummaryText] = []
     manifest_entries: list[dict[str, Any]] = []
@@ -144,6 +158,9 @@ def plan_gpt_summary_outputs(
         "write_manifest_ref": write_manifest_ref,
         "observed_usage_ref": observed_usage_ref,
         "summary_record_ref": summary_record_ref,
+        "source_inputs": [
+            {"ref": source.ref, "sha256": source.sha256} for source in source_inputs
+        ],
         "summary_record_sha256": "sha256:"
         + hashlib.sha256(summary_record_json).hexdigest(),
         "entries": manifest_entries,
@@ -161,7 +178,33 @@ def plan_gpt_summary_outputs(
         write_manifest_json=write_manifest_json,
         summary_record_json=summary_record_json,
         texts=tuple(texts),
+        source_inputs=source_inputs,
     )
+
+
+def _plan_source_inputs(
+    preparation: dict[str, Any], run_id: str
+) -> tuple[PlannedSummarySource, ...]:
+    """Snapshot exact prepared source bytes under trusted run refs."""
+    run_dir = f"analyses/millefeuille/{run_id}/structure/inputs"
+    sources: list[PlannedSummarySource] = []
+    for key, filename in (
+        ("selected_markdown", "selected.md"),
+        ("structure", "structure.json"),
+    ):
+        binding = preparation["inputs"][key]
+        data = read_bytes_no_follow(Path(binding["path"]), "summary source input")
+        digest = hashlib.sha256(data).hexdigest()
+        if digest != binding["sha256"] or len(data) != binding["bytes"]:
+            raise MillefeuilleContractError("GPT summary source input drift")
+        sources.append(
+            PlannedSummarySource(
+                ref=f"{run_dir}/{filename}",
+                sha256="sha256:" + digest,
+                data=data,
+            )
+        )
+    return tuple(sources)
 
 
 def _canonical_json(value: dict[str, Any]) -> bytes:

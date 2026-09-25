@@ -19,7 +19,11 @@ Accepted summary text and exact executor evidence are returned only in memory.
 deterministic hierarchical summary record in immutable canonical bytes,
 private text refs, and a text-free prospective write fingerprint. The refs are
 scoped under `analyses/millefeuille/<run_id>/` so separate runs have disjoint
-destinations. The write manifest's own path is fixed in its canonical bytes.
+destinations. The write manifest's own path is fixed in its canonical bytes. It also
+binds exact selected Markdown and structure bytes to run-scoped
+`structure/inputs/` snapshots for future provenance input refs. These
+snapshots are planned in memory and included in the write preview; they
+are not published by the planner.
 `validate_gpt_summary_output_write_preview` rereads the source and validates
 an exact `source-pack.write` packet and MF-100 receipt against that manifest,
 the observed-usage digest, one paper, and one run. Missing actual usage now

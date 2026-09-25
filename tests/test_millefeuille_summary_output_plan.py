@@ -79,6 +79,16 @@ class TestGptSummaryOutputPlan(unittest.TestCase):
         self.assertEqual(before, after)
         self.assertEqual(planned, self._plan())
         self.assertEqual(len(planned.texts), 3)
+        self.assertEqual(len(planned.source_inputs), 2)
+        self.assertEqual(
+            [source.ref.rsplit("/", 1)[-1] for source in planned.source_inputs],
+            ["selected.md", "structure.json"],
+        )
+        for source in planned.source_inputs:
+            self.assertEqual(
+                source.sha256,
+                "sha256:" + hashlib.sha256(source.data).hexdigest(),
+            )
         self.assertTrue(
             planned.summary_record_ref.startswith("analyses/millefeuille/run-gpt-1/")
         )
@@ -90,9 +100,14 @@ class TestGptSummaryOutputPlan(unittest.TestCase):
             json.loads(planned.write_manifest_json)["write_manifest_ref"],
             planned.write_manifest_ref,
         )
+        manifest = json.loads(planned.write_manifest_json)
+        self.assertEqual(manifest["observed_usage_ref"], planned.observed_usage_ref)
         self.assertEqual(
-            json.loads(planned.write_manifest_json)["observed_usage_ref"],
-            planned.observed_usage_ref,
+            manifest["source_inputs"],
+            [
+                {"ref": source.ref, "sha256": source.sha256}
+                for source in planned.source_inputs
+            ],
         )
         record = json.loads(planned.summary_record_json)
         self.assertEqual(
@@ -105,6 +120,7 @@ class TestGptSummaryOutputPlan(unittest.TestCase):
             "sha256:" + hashlib.sha256(planned.texts[0].data).hexdigest(),
         )
         self.assertNotIn("Private accepted summary", repr(planned))
+        self.assertNotIn("Private paper", repr(planned))
         self.assertNotIn(b"Private accepted summary", planned.write_manifest_json)
         self.assertEqual(
             planned.write_manifest_sha256,
@@ -133,6 +149,11 @@ class TestGptSummaryOutputPlan(unittest.TestCase):
         self.assertTrue(
             {item.ref for item in first.texts}.isdisjoint(
                 {item.ref for item in second.texts}
+            )
+        )
+        self.assertTrue(
+            {item.ref for item in first.source_inputs}.isdisjoint(
+                {item.ref for item in second.source_inputs}
             )
         )
 
