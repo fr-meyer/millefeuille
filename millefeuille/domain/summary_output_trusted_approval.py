@@ -36,6 +36,7 @@ _TRUSTED_APPROVAL_FIELDS = frozenset(
         "source_manifest_sha256",
         "write_manifest_sha256",
         "observed_usage_sha256",
+        "provenance_manifest_sha256",
         "paper_id",
         "run_id",
         "file_count",
@@ -104,6 +105,10 @@ def validate_trusted_gpt_summary_output_write_approval(
         )
         or not _digest_matches(
             record["observed_usage_sha256"], preview.observed_usage_sha256
+        )
+        or not _digest_matches(
+            record["provenance_manifest_sha256"],
+            preview.provenance_manifest_sha256,
         )
     ):
         raise MillefeuilleContractError(
