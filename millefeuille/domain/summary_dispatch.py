@@ -9,7 +9,9 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 import hashlib
+import json
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 from millefeuille.domain.millefeuille import MillefeuilleContractError
@@ -20,6 +22,13 @@ from millefeuille.domain.summary_preparation import verify_summary_preparation_p
 
 PromptBuilder = Callable[[str, str, tuple[str, ...], bytes, bytes], bytes]
 GPT_MODEL = "openai/gpt-5.6-sol"
+SUMMARY_OUTPUT_CONTRACTS = MappingProxyType(
+    {
+        "summarize_page": ("summary-page", "v1"),
+        "summarize_section": ("summary-section", "v1"),
+        "summarize_full_paper": ("summary-full-paper", "v1"),
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -27,6 +36,7 @@ class SummaryDispatchUnit:
     paper_id: str
     stage: str
     unit_id: str
+    source_locators: tuple[str, ...]
     request: dict[str, Any]
     input_payload: bytes = field(repr=False)
 
@@ -68,6 +78,8 @@ def plan_verified_summary_dispatch(
             raise MillefeuilleContractError(
                 "summary output contract must be a schema id/version pair"
             )
+    if dict(output_contracts) != dict(SUMMARY_OUTPUT_CONTRACTS):
+        raise MillefeuilleContractError("summary output contract is unsupported")
 
     preparation = verify_summary_preparation_package(
         route_evidence_path=route_evidence_path,
@@ -83,6 +95,7 @@ def plan_verified_summary_dispatch(
     prepared_bytes = read_bytes_no_follow(
         Path(preparation_path), "summary preparation package"
     )
+    preparation_digest = "sha256:" + hashlib.sha256(prepared_bytes).hexdigest()
     units: list[SummaryDispatchUnit] = []
     request_ids: set[str] = set()
     for stage in SUMMARY_MODEL_STAGES:
@@ -103,10 +116,18 @@ def plan_verified_summary_dispatch(
                 ) from exc
             if not prompt_text.strip():
                 raise MillefeuilleContractError("summary prompt must contain text")
+            bound_payload = _bind_prompt(
+                preparation_digest=preparation_digest,
+                paper_id=preparation["paper_id"],
+                stage=stage,
+                unit_id=unit_id,
+                locators=locators,
+                prompt=payload,
+            )
             request = build_summary_work_unit_request(
                 execution_plan=preparation["execution_plans"][stage],
                 work_unit=work_unit,
-                input_payload=payload,
+                input_payload=bound_payload,
                 output_schema_id=schema_id,
                 output_schema_version=schema_version,
                 requested_model=GPT_MODEL,
@@ -124,8 +145,9 @@ def plan_verified_summary_dispatch(
                     paper_id=preparation["paper_id"],
                     stage=stage,
                     unit_id=unit_id,
+                    source_locators=locators,
                     request=request,
-                    input_payload=payload,
+                    input_payload=bound_payload,
                 )
             )
     # A source changed during planning if the bound reads no longer match.
@@ -140,9 +162,34 @@ def plan_verified_summary_dispatch(
         )
     return SummaryDispatchBatch(
         paper_id=preparation["paper_id"],
-        preparation_sha256="sha256:" + hashlib.sha256(prepared_bytes).hexdigest(),
+        preparation_sha256=preparation_digest,
         units=tuple(units),
     )
+
+
+def _bind_prompt(
+    *,
+    preparation_digest: str,
+    paper_id: str,
+    stage: str,
+    unit_id: str,
+    locators: tuple[str, ...],
+    prompt: bytes,
+) -> bytes:
+    binding = json.dumps(
+        {
+            "paper_id": paper_id,
+            "preparation_sha256": preparation_digest,
+            "stage": stage,
+            "unit_id": unit_id,
+            "source_locators": list(locators),
+        },
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return b"Millefeuille summary source binding v0.1\n" + binding + b"\n\n" + prompt
 
 
 def _read_bound_input(binding: dict[str, Any]) -> bytes:

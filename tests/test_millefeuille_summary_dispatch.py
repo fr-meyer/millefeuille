@@ -93,6 +93,8 @@ class TestSummaryDispatch(unittest.TestCase):
             self.assertEqual(len(batch.units), 3)
             self.assertNotIn("Private text", repr(batch))
             self.assertTrue(batch.preparation_sha256.startswith("sha256:"))
+            for unit in batch.units:
+                self.assertIn(batch.preparation_sha256.encode(), unit.input_payload)
             self.assertEqual(
                 [(unit.stage, unit.unit_id) for unit in batch.units],
                 [
@@ -145,6 +147,21 @@ class TestSummaryDispatch(unittest.TestCase):
                     preparation_path=preparation,
                     prompt_builder=self._prompt,
                     output_contracts=CONTRACTS,
+                )
+
+    def test_rejects_unsupported_output_contract_before_prompt_building(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            route, structure, preparation = self._fixture(root)
+            contracts = dict(CONTRACTS)
+            contracts["summarize_page"] = ("unknown-summary", "v1")
+            with self.assertRaisesRegex(MillefeuilleContractError, "unsupported"):
+                plan_verified_summary_dispatch(
+                    route_evidence_path=route,
+                    structure_evidence_path=structure,
+                    preparation_path=preparation,
+                    prompt_builder=self._prompt,
+                    output_contracts=contracts,
                 )
 
     def test_rejects_prompts_the_adapter_cannot_execute(self):
