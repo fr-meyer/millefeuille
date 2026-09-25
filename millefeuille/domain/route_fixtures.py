@@ -20,6 +20,7 @@ from millefeuille.domain.millefeuille import (
     RouteEvidenceRecord,
     RouteSelection,
 )
+from millefeuille.domain.secure_io import read_text_no_follow
 from millefeuille.domain.source_packs import (
     load_source_pack_manifest,
     paper_id_for_zotero_item_key,
@@ -166,12 +167,7 @@ def load_route_selection_evidence_batch(
     path: str | Path,
 ) -> list[RouteSelectionFixtureEvidence]:
     evidence_path = Path(path)
-    try:
-        text = evidence_path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise MillefeuilleContractError(
-            f"could not read route selection evidence {evidence_path}: {exc}"
-        ) from exc
+    text = read_text_no_follow(evidence_path, "route selection evidence")
 
     if evidence_path.suffix == ".jsonl":
         records: list[RouteSelectionFixtureEvidence] = []
