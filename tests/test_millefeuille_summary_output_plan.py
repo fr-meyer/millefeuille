@@ -82,6 +82,14 @@ class TestGptSummaryOutputPlan(unittest.TestCase):
         self.assertTrue(
             planned.summary_record_ref.startswith("analyses/millefeuille/run-gpt-1/")
         )
+        self.assertEqual(
+            planned.write_manifest_ref,
+            "analyses/millefeuille/run-gpt-1/summaries/write-manifest.json",
+        )
+        self.assertEqual(
+            json.loads(planned.write_manifest_json)["write_manifest_ref"],
+            planned.write_manifest_ref,
+        )
         record = json.loads(planned.summary_record_json)
         self.assertEqual(
             [entry["grain"] for entry in record["summaries"]],
