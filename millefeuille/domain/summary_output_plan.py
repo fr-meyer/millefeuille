@@ -45,7 +45,7 @@ class SummaryOutputPlan:
     write_manifest_sha256: str
     summary_record_ref: str
     write_manifest_json: bytes = field(repr=False)
-    summary_record: dict[str, Any] = field(repr=False)
+    summary_record_json: bytes = field(repr=False)
     texts: tuple[PlannedSummaryText, ...] = field(repr=False)
 
 
@@ -131,6 +131,7 @@ def plan_gpt_summary_outputs(
         run_id=run_id,
         summaries=entries,
     ).to_dict()
+    summary_record_json = _canonical_json(summary_record)
     write_manifest = {
         "schema_version": "millefeuille-gpt-summary-output-plan/v0.1",
         "paper_id": accepted.paper_id,
@@ -138,7 +139,7 @@ def plan_gpt_summary_outputs(
         "source_manifest_sha256": outcome.approval.manifest_sha256,
         "summary_record_ref": summary_record_ref,
         "summary_record_sha256": "sha256:"
-        + hashlib.sha256(_canonical_json(summary_record)).hexdigest(),
+        + hashlib.sha256(summary_record_json).hexdigest(),
         "entries": manifest_entries,
     }
     write_manifest_json = _canonical_json(write_manifest)
@@ -150,7 +151,7 @@ def plan_gpt_summary_outputs(
         + hashlib.sha256(write_manifest_json).hexdigest(),
         summary_record_ref=summary_record_ref,
         write_manifest_json=write_manifest_json,
-        summary_record=summary_record,
+        summary_record_json=summary_record_json,
         texts=tuple(texts),
     )
 

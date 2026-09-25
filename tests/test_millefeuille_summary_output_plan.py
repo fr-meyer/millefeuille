@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import FrozenInstanceError, replace
 import hashlib
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -81,13 +82,12 @@ class TestGptSummaryOutputPlan(unittest.TestCase):
         self.assertTrue(
             planned.summary_record_ref.startswith("analyses/millefeuille/run-gpt-1/")
         )
+        record = json.loads(planned.summary_record_json)
         self.assertEqual(
-            [entry["grain"] for entry in planned.summary_record["summaries"]],
+            [entry["grain"] for entry in record["summaries"]],
             ["page", "section", "full-paper"],
         )
-        self.assertEqual(
-            planned.summary_record["summaries"][-1]["scope"], "classification"
-        )
+        self.assertEqual(record["summaries"][-1]["scope"], "classification")
         self.assertEqual(
             planned.texts[0].sha256,
             "sha256:" + hashlib.sha256(planned.texts[0].data).hexdigest(),
@@ -98,6 +98,21 @@ class TestGptSummaryOutputPlan(unittest.TestCase):
             planned.write_manifest_sha256,
             "sha256:" + hashlib.sha256(planned.write_manifest_json).hexdigest(),
         )
+
+    def test_summary_record_bytes_cannot_drift_from_write_fingerprint(self):
+        planned = self._plan()
+        original = planned.summary_record_json
+        manifest = json.loads(planned.write_manifest_json)
+        record = json.loads(original)
+        record["summaries"][0]["text_ref"] = "texts/changed.md"
+        self.assertEqual(planned.summary_record_json, original)
+        self.assertNotEqual(record, json.loads(original))
+        self.assertEqual(
+            manifest["summary_record_sha256"],
+            "sha256:" + hashlib.sha256(planned.summary_record_json).hexdigest(),
+        )
+        with self.assertRaises(FrozenInstanceError):
+            planned.summary_record_json = b"{}\n"
 
     def test_different_runs_have_disjoint_output_refs(self):
         first = self._plan(run_id="run-gpt-1")
