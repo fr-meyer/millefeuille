@@ -24,6 +24,8 @@ from millefeuille.domain.summary_results import accept_summary_execution_batch
 
 _SCHEMA = "millefeuille-gpt-summary-outcome-handoff/v0.1"
 _MAX_BYTES = 64 * 1024 * 1024
+_MAX_JSON_DEPTH = 64
+_MAX_JSON_NODES = 100_000
 _ROOT_FIELDS = frozenset({"schema_version", "approval", "executions"})
 _EXECUTION_FIELDS = frozenset({"result", "output_base64"})
 
@@ -52,13 +54,13 @@ def encode_gpt_summary_outcome_handoff(outcome: TrustedGptSummaryOutcome) -> byt
             }
         )
     try:
-        encoded = _canonical_json(
-            {
-                "schema_version": _SCHEMA,
-                "approval": asdict(outcome.approval),
-                "executions": executions,
-            }
-        )
+        payload = {
+            "schema_version": _SCHEMA,
+            "approval": asdict(outcome.approval),
+            "executions": executions,
+        }
+        _require_bounded_json_shape(payload)
+        encoded = _canonical_json(payload)
     except (TypeError, ValueError, RecursionError) as exc:
         raise MillefeuilleContractError("GPT summary handoff is not JSON") from exc
     if len(encoded) > _MAX_BYTES:
@@ -88,6 +90,7 @@ def decode_gpt_summary_outcome_handoff(
             object_pairs_hook=_unique_object,
             parse_constant=_reject_constant,
         )
+        _require_bounded_json_shape(payload)
         canonical = _canonical_json(payload)
     except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
         raise MillefeuilleContractError("GPT summary handoff JSON is invalid") from exc
@@ -176,3 +179,37 @@ def _unique_object(items: list[tuple[str, Any]]) -> dict[str, Any]:
 
 def _reject_constant(_value: str) -> Any:
     raise ValueError("non-standard GPT summary handoff JSON constant")
+
+
+def _require_bounded_json_shape(value: Any) -> None:
+    """Reject deep or cyclic structures before canonical JSON serialization."""
+
+    pending = [(value, 0, False)]
+    active: set[int] = set()
+    nodes = 0
+    while pending:
+        item, depth, leaving = pending.pop()
+        if leaving:
+            active.remove(id(item))
+            continue
+        nodes += 1
+        if nodes > _MAX_JSON_NODES or depth > _MAX_JSON_DEPTH:
+            raise MillefeuilleContractError("GPT summary handoff JSON is too complex")
+        if isinstance(item, (dict, list)):
+            if isinstance(item, dict) and any(
+                not isinstance(key, str) for key in item
+            ):
+                raise MillefeuilleContractError(
+                    "GPT summary handoff JSON key is invalid"
+                )
+            identity = id(item)
+            if identity in active:
+                raise MillefeuilleContractError(
+                    "GPT summary handoff JSON has cyclic containers"
+                )
+            active.add(identity)
+            pending.append((item, depth, True))
+            values = item.values() if isinstance(item, dict) else item
+            pending.extend((child, depth + 1, False) for child in values)
+        elif type(item) not in (str, int, float, bool, type(None)):
+            raise MillefeuilleContractError("GPT summary handoff JSON value is invalid")
