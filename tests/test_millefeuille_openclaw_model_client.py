@@ -559,6 +559,56 @@ class TestOpenClawModelClient(unittest.TestCase):
         )
         self.assertEqual(execution.result["status"], "succeeded")
 
+    def test_observed_usage_requires_reconciled_token_buckets(self):
+        payload = b'{"return":{"canary":"ok"}}'
+        samples = (
+            (
+                {
+                    "input": 10,
+                    "output": 5,
+                    "cacheRead": 3,
+                    "cacheWrite": 2,
+                    "total": 20,
+                },
+                {"input_tokens": 15, "output_tokens": 5, "total_tokens": 20},
+            ),
+            (
+                {"output": 2, "cacheRead": 4, "total": 6},
+                {"input_tokens": 4, "output_tokens": 2, "total_tokens": 6},
+            ),
+            ({"input": 10, "output": 5, "total": 20}, None),
+            ({"input": True, "output": 5, "total": 6}, None),
+            ({"input": 10, "output": 5, "total": 15.0}, None),
+            ({"input": -1, "output": 5, "total": 4}, None),
+            ({"input": 1, "output": 2, "total": (1 << 53)}, None),
+            ({"cost": {"total": 0.0}}, None),
+        )
+        for usage, expected in samples:
+            with self.subTest(usage=usage):
+                response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+                response["usage"] = usage
+                runner = _QueuedRunner(
+                    [_completed(_auth_status("openai")), _completed(response)]
+                )
+                execution = OpenClawModelClient(command_runner=runner).execute(
+                    request=self._request(payload=payload),
+                    input_payload=payload,
+                    output_validator=self._validate_canary,
+                )
+                self.assertEqual(execution.result["status"], "succeeded")
+                self.assertEqual(execution.result["usage"], expected)
+
+        response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+        runner = _QueuedRunner(
+            [_completed(_auth_status("openai")), _completed(response)]
+        )
+        execution = OpenClawModelClient(command_runner=runner).execute(
+            request=self._request(payload=payload),
+            input_payload=payload,
+            output_validator=self._validate_canary,
+        )
+        self.assertIsNone(execution.result["usage"])
+
     def test_missing_or_unknown_oauth_status_fails_before_model_execution(self):
         payload = b'{"return":{"canary":"ok"}}'
         for status in (None, "future-unknown"):
