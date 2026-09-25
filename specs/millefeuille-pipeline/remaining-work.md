@@ -51,21 +51,31 @@
   receipt-bound batch execution, and an immutable no-write summary output plan.
   The broker socket now becomes accessible only after its listener is ready.
   None of these changes grants a paper-specific approval or publishes output.
+- PR #128 preserves reconciled observed OpenClaw token usage when the runtime
+  reports it. Missing or inconsistent usage remains unavailable; no token or
+  cost values are invented.
+- PRs #129-#130 add an exact no-write preview for run-scoped GPT summary output,
+  a separate administrator-owned `source-pack.write` approval record, and a
+  root-only one-use write-receipt ledger. No live paper execution or summary
+  publication has occurred.
 
 ## Current GPT Pilot Path (2026-09-25)
 
-1. Resolve the live provenance accounting gap. The OpenClaw adapter currently
-   records `usage=None`, while `millefeuille-model-provenance/v0.1` requires
-   exact input, output, and total token counts. Capture validated actual usage
-   or explicitly version the contract for unavailable usage; never fill in
-   invented counts.
-2. Add a separately approved durable writer for the validated in-memory
-   summary bundle. It must bind the exact output manifest and source to a
-   one-use write receipt, verify canonical bytes and hashes, avoid overwrites,
-   and persist only the intended run-scoped summary, text, and audit artifacts.
+1. Complete the live provenance bridge from each validated OpenClaw executor
+   result to a run-scoped provenance record. Actual usage is retained when the
+   runtime reports a consistent count. If usage is unavailable, fail closed or
+   explicitly version the provenance contract; never invent counts or cost.
+2. Build the trusted summary-output broker and writer. It must revalidate the
+   source and canonical output bytes, match the exact administrator approval,
+   consume the one-use write receipt, publish the complete run-scoped bundle
+   without replacement, and record failures without treating a partial write
+   as a completed summary. The preview and replay ledger exist; publication
+   and broker integration remain.
 3. Run one bounded GPT paper pilot on GCP only after its exact MF-100 execution
    packet, receipt, and administrator-owned trusted approval record are in
-   place. Validate its artifacts and provenance before widening the pilot.
+   place. The resulting output requires its own exact `source-pack.write`
+   packet, receipt, and trusted approval. Validate the artifacts and provenance
+   before widening the pilot.
 4. Reconcile the live run with source-pack, paper-card, OpenKB/PageIndex,
    acceptance, classification, and governed Zotero writeback flows. Each live
    external read or write still follows the corresponding exact scope gate.
@@ -165,10 +175,13 @@
       reservation broker and validates every output before returning private
       accepted text in memory. A no-write plan maps a complete accepted batch
       to canonical run-scoped summary bytes, text refs, and a write fingerprint.
-      Remaining work is the live usage/provenance gap, separately approved
-      durable materialization, acceptance, and attaching validated provenance
-      to verified run packages. Grok execution is deferred while its OAuth
-      subscription is inactive.
+      Reconciled observed OpenClaw usage now reaches the executor result when
+      available. A no-write output preview and separate trusted write approval
+      plus one-use ledger now bind the exact source and output manifest.
+      Remaining work is complete live provenance, the trusted publication
+      broker, separately approved durable materialization, acceptance, and
+      attaching validated provenance to verified run packages. Grok execution
+      is deferred while its OAuth subscription is inactive.
     - Manual gate: model/provider call approval.
 
 11. **Paper Card**
