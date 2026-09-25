@@ -16,6 +16,7 @@ import socket
 import stat
 import struct
 import sys
+import time
 from typing import Any
 
 from millefeuille.domain.live_receipts import ApprovedLiveReceipt
@@ -211,12 +212,23 @@ def serve_one_publication(*, timeout_seconds: int = 120) -> None:
             finally:
                 os.umask(previous_umask)
             listener.listen(1)
-            listener.settimeout(timeout_seconds)
             os.chown(_SOCKET_PATH, 0, model_user.pw_gid)
             os.chmod(_SOCKET_PATH, 0o660)
-            with listener.accept()[0] as channel:
+            deadline = time.monotonic() + timeout_seconds
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("GPT publication listener timed out")
+                listener.settimeout(remaining)
+                channel, _ = listener.accept()
+                try:
+                    _require_peer_uid(channel, model_user.pw_uid)
+                except (MillefeuilleContractError, OSError):
+                    channel.close()
+                    continue
+                break
+            with channel:
                 channel.settimeout(30)
-                _require_peer_uid(channel, model_user.pw_uid)
                 try:
                     metadata_size = struct.unpack("!I", _read_exact(channel, 4))[0]
                     if metadata_size > _METADATA_LIMIT:

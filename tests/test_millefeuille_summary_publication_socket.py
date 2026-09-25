@@ -117,6 +117,68 @@ class TestGptSummaryPublicationSocket(unittest.TestCase):
         with self.assertRaises((MillefeuilleContractError, ValueError)):
             publication_socket._parse_request(b'{"x":1,"x":2}')
 
+    def test_wrong_peer_does_not_consume_authorized_request(self):
+        bundle = plan_gpt_summary_publication_bundle(**self.values)
+        commit = GptSummaryFilesystemCommit(
+            run_id=self.fixture.run_id,
+            file_count=len(bundle.files),
+            total_bytes=bundle.total_bytes,
+            bundle_manifest_sha256=bundle.bundle_manifest_sha256,
+            source_pack_root=str(self.fixture.root),
+        )
+        errors: list[Exception] = []
+        rejected = threading.Event()
+        original_require_peer_uid = publication_socket._require_peer_uid
+
+        def check_peer(channel, uid):
+            if threading.current_thread() is server and not rejected.is_set():
+                rejected.set()
+                raise MillefeuilleContractError("wrong peer")
+            return original_require_peer_uid(channel, uid)
+
+        def serve():
+            try:
+                publication_socket.serve_one_publication(timeout_seconds=5)
+            except Exception as exc:
+                errors.append(exc)
+
+        with ExitStack() as stack:
+            for context in self._patch_control():
+                stack.enter_context(context)
+            publish = stack.enter_context(
+                patch.object(
+                    publication_socket,
+                    "publish_trusted_gpt_summary_handoff",
+                    return_value=commit,
+                )
+            )
+            stack.enter_context(
+                patch.object(publication_socket, "_require_peer_uid", check_peer)
+            )
+            server = threading.Thread(target=serve)
+            server.start()
+            for _ in range(500):
+                if (
+                    self.socket_path.exists()
+                    and stat.S_IMODE(self.socket_path.stat().st_mode) == 0o660
+                ):
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("publication socket never became ready")
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
+                channel.connect(str(self.socket_path))
+            self.assertTrue(rejected.wait(timeout=2))
+            self.assertTrue(server.is_alive())
+            ack = publication_socket.request_gpt_summary_publication(**self.values)
+            server.join(timeout=6)
+            self.assertFalse(server.is_alive())
+            self.assertEqual(errors, [])
+            self.assertEqual(publish.call_count, 1)
+            self.assertEqual(ack.bundle_manifest_sha256, bundle.bundle_manifest_sha256)
+            self.assertFalse(self.socket_path.exists())
+        self.assertFalse((self.fixture.root / "analyses").exists())
+
     def test_oversize_metadata_is_denied_before_broker_call(self):
         errors: list[Exception] = []
 
