@@ -22,7 +22,8 @@ scoped under `analyses/millefeuille/<run_id>/` so separate runs have disjoint
 destinations. The write manifest's own path is fixed in its canonical bytes.
 `validate_gpt_summary_output_write_preview` rereads the source and validates
 an exact `source-pack.write` packet and MF-100 receipt against that manifest,
-one paper, and one run. It reports the prospective file refs without reserving
+the observed-usage digest, one paper, and one run. Missing actual usage now
+blocks even the write preview. It reports the prospective file refs without reserving
 the receipt or writing files. `validate_trusted_gpt_summary_output_write_approval`
 also requires a matching administrator-owned record at
 `/etc/millefeuille/gpt-summary-write-approval.json`. The privileged

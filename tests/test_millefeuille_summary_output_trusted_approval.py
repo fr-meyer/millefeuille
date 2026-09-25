@@ -43,6 +43,7 @@ def _case(owner: unittest.TestCase):
         "packet_digest": preview.packet_digest,
         "source_manifest_sha256": preview.source_manifest_sha256,
         "write_manifest_sha256": preview.write_manifest_sha256,
+        "observed_usage_sha256": preview.observed_usage_sha256,
         "paper_id": preview.paper_id,
         "run_id": preview.run_id,
         "file_count": len(preview.file_refs),
@@ -103,6 +104,7 @@ class TestGptSummaryOutputTrustedApproval(unittest.TestCase):
                     )
                 for field, wrong in (
                     ("write_manifest_sha256", "sha256:" + "0" * 64),
+                    ("observed_usage_sha256", "sha256:" + "0" * 64),
                     ("receipt_digest", "sha256:" + "0" * 64),
                     ("paper_id", "other-paper"),
                     ("run_id", "other-run"),
