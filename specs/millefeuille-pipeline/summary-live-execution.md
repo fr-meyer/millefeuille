@@ -51,7 +51,12 @@ now derives strict per-unit `millefeuille-model-provenance/v0.1` records
 from these observed counts, the exact model plans, validated executor
 results, selected Markdown and structure snapshots, and summary text refs.
 A canonical manifest binds each record hash to its result and output.
-Trusted durable publication remains to be implemented.
+`plan_gpt_summary_publication_bundle` now rechecks the exact write preview
+and enumerates all source snapshots, summary texts, records, usage, and
+provenance as immutable in-memory bytes. It verifies every declared
+digest and the complete approved file-ref set. The bundle is still a
+no-write plan; a trusted broker must reserve the receipt and publish
+the files without replacement.
 
 The offline tests use a synthetic paper and a fake model client. They cover
 the preflight and broker gates, complete accepted batches, source drift after
