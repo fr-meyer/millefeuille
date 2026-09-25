@@ -110,44 +110,65 @@ def accept_summary_execution_batch(
     accepted: list[AcceptedSummaryUnit] = []
     for unit, request in zip(batch.units, requests, strict=True):
         execution = executions[(unit.stage, unit.unit_id)]
-        if not isinstance(execution, OpenClawModelExecution):
-            raise MillefeuilleContractError("summary batch execution is invalid")
-        result = validate_model_executor_result(
-            request=request, result=execution.result
-        )
-        if result["status"] != "succeeded" or not isinstance(execution.output, bytes):
-            raise MillefeuilleContractError("summary batch execution did not succeed")
-        if (
-            result["output"]["bytes"] != len(execution.output)
-            or result["output"]["sha256"]
-            != "sha256:" + hashlib.sha256(execution.output).hexdigest()
-        ):
-            raise MillefeuilleContractError("summary batch output binding drift")
-        try:
-            payload = json.loads(
-                execution.output.decode("utf-8"),
-                object_pairs_hook=_strict_object_pairs,
-                parse_constant=_reject_json_constant,
-            )
-        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
-            raise MillefeuilleContractError(
-                "summary batch output is not strict JSON"
-            ) from exc
-        validate_summary_unit_payload(unit, payload)
-        accepted.append(
-            AcceptedSummaryUnit(
-                paper_id=unit.paper_id,
-                stage=unit.stage,
-                unit_id=unit.unit_id,
-                source_locators=tuple(payload["source_locators"]),
-                executor_result=result,
-                summary=payload["summary"],
-            )
-        )
+        accepted.append(_accept_summary_execution_unit(unit, execution, request))
     return AcceptedSummaryBatch(
         paper_id=batch.paper_id,
         preparation_sha256=batch.preparation_sha256,
         units=tuple(accepted),
+    )
+
+
+def accept_summary_execution_unit(
+    *, unit: SummaryDispatchUnit, execution: OpenClawModelExecution
+) -> AcceptedSummaryUnit:
+    """Validate one result before dispatching any later provider call.
+
+    The caller must separately verify the current source package and the
+    approval for the complete batch.
+    """
+
+    request = _validated_unit_request(unit)
+    return _accept_summary_execution_unit(unit, execution, request)
+
+
+def _accept_summary_execution_unit(
+    unit: SummaryDispatchUnit,
+    execution: OpenClawModelExecution,
+    request: dict[str, Any],
+) -> AcceptedSummaryUnit:
+    if not isinstance(execution, OpenClawModelExecution):
+        raise MillefeuilleContractError("summary batch execution is invalid")
+    result = validate_model_executor_result(request=request, result=execution.result)
+    if result["status"] != "succeeded" or not isinstance(execution.output, bytes):
+        raise MillefeuilleContractError("summary batch execution did not succeed")
+    if result["cost"] is not None and result["cost"]["micro_usd"] != 0:
+        raise MillefeuilleContractError(
+            "summary batch reported a nonzero provider cost"
+        )
+    if (
+        result["output"]["bytes"] != len(execution.output)
+        or result["output"]["sha256"]
+        != "sha256:" + hashlib.sha256(execution.output).hexdigest()
+    ):
+        raise MillefeuilleContractError("summary batch output binding drift")
+    try:
+        payload = json.loads(
+            execution.output.decode("utf-8"),
+            object_pairs_hook=_strict_object_pairs,
+            parse_constant=_reject_json_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        raise MillefeuilleContractError(
+            "summary batch output is not strict JSON"
+        ) from exc
+    validate_summary_unit_payload(unit, payload)
+    return AcceptedSummaryUnit(
+        paper_id=unit.paper_id,
+        stage=unit.stage,
+        unit_id=unit.unit_id,
+        source_locators=tuple(payload["source_locators"]),
+        executor_result=result,
+        summary=payload["summary"],
     )
 
 

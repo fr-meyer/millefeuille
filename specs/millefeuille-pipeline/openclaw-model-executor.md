@@ -100,9 +100,9 @@ preparation evidence and compares every planned unit with the verified package;
 the caller must supply all three evidence paths. Missing expected work units,
 extra units, failed executions, or drifted units reject the
 whole batch. It returns accepted text only in memory and does not
-publish a summary or advance acceptance/classification. A future approved
-orchestrator must supply the exact execution receipt and keep durable writes
-behind their separate gates.
+publish a summary or advance acceptance/classification. The receipt-bound
+GPT runner supplies the exact execution receipt and keeps durable writes
+behind their separate gates; see `summary-live-execution.md`.
 
 ## No-call batch execution manifest
 
@@ -114,8 +114,8 @@ idempotency key. It contains no prompt, paper text, source locator, provider
 response, or credential. The schema is
 `summary-execution-manifest.schema.json`.
 
-The manifest digest can be named in a future exact provider-execution packet.
-Planning neither authorizes nor performs a model call. The executor still needs
-an independently verified, single-use live receipt and a durable reservation
-before its first call. Accepted text remains private until a separate approved
+The manifest digest is named in the exact provider-execution packet.
+Planning neither authorizes nor performs a model call. The live runner verifies
+a single-use receipt and its durable reservation before its first call.
+Accepted text remains private until a separate approved
 materialization step assigns durable output references for provenance.
