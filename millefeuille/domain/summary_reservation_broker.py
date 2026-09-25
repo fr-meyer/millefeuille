@@ -21,6 +21,7 @@ from typing import Any
 from millefeuille.domain.live_receipts import ApprovedLiveReceipt
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.operator_preflight import OperatorPreflightPacket
+from millefeuille.domain.secure_io import read_bytes_no_follow
 from millefeuille.domain.summary_execution_scope import (
     SummaryApprovalPreview,
     validate_gpt_summary_approval_preview,
@@ -216,21 +217,10 @@ def _require_evidence_paths(evidence: dict[str, str], source_pack_root: str) -> 
             ) from exc
         if not relative.parts:
             raise MillefeuilleContractError("GPT summary evidence path is invalid")
-        current = Path("/")
-        for part in path.parts[1:]:
-            current /= part
-            try:
-                detail = current.lstat()
-            except OSError as exc:
-                raise MillefeuilleContractError(
-                    "GPT summary evidence path is unavailable"
-                ) from exc
-            if stat.S_ISLNK(detail.st_mode):
-                raise MillefeuilleContractError(
-                    "GPT summary evidence path follows a symlink"
-                )
-        if not stat.S_ISREG(detail.st_mode):
-            raise MillefeuilleContractError("GPT summary evidence path is not a file")
+        # This preflight read follows no path component. The preparation
+        # verifier repeats no-follow reads during the privileged replan, so a
+        # later pathname swap cannot turn this check into authorization.
+        read_bytes_no_follow(path, "GPT summary evidence")
 
 
 def _require_peer_uid(channel: socket.socket, expected_uid: int) -> None:

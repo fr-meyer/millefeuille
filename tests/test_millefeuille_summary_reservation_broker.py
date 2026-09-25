@@ -155,3 +155,49 @@ class TestGptSummaryReservationBroker(unittest.TestCase):
             link.symlink_to(evidence)
             with self.assertRaises(MillefeuilleContractError):
                 broker._require_evidence_paths({"evidence": str(link)}, str(root))
+
+    def test_evidence_swap_after_path_check_fails_closed_during_replan(self):
+        for field in ("route_evidence_path", "structure_evidence_path"):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as tempdir:
+                root = Path(tempdir) / "paper"
+                root.mkdir()
+                evidence, packet, receipt, _record = _case(root)
+                target = Path(evidence[field])
+                outside = Path(tempdir) / "outside.json"
+                outside.write_bytes(target.read_bytes())
+                payload = {
+                    "packet": packet.to_dict(),
+                    "receipt": receipt.to_dict(),
+                    "evidence": {
+                        key: str(evidence[key]) for key in broker._EVIDENCE_FIELDS
+                    },
+                }
+                original_check = broker._require_evidence_paths
+
+                def swap_after_check(
+                    paths,
+                    source_root,
+                    checked=original_check,
+                    checked_target=target,
+                    outside_target=outside,
+                ):
+                    checked(paths, source_root)
+                    checked_target.rename(
+                        checked_target.with_name(checked_target.name + ".saved")
+                    )
+                    checked_target.symlink_to(outside_target)
+
+                with (
+                    patch.object(
+                        broker, "_require_evidence_paths", side_effect=swap_after_check
+                    ),
+                    patch.object(
+                        broker,
+                        "reserve_trusted_gpt_summary_receipt",
+                        side_effect=lambda **kwargs: (
+                            validate_gpt_summary_approval_preview(**kwargs)
+                        ),
+                    ),
+                    self.assertRaises(MillefeuilleContractError),
+                ):
+                    broker._process_request(payload)
