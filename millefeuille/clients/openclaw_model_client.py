@@ -38,6 +38,7 @@ _MAX_OPENCLAW_STDERR_BYTES = 256 * 1024
 _LOGGER = logging.getLogger(__name__)
 _SUPPORTED_RUNTIME_MODEL = "openai/gpt-5.6-sol"
 _SUPPORTED_AUTH_DB_SCHEMA = 19
+_JSON_SAFE_INTEGER_MAX = (1 << 53) - 1
 _AGENT_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}\Z")
 _CHILD_ENV_ALLOWLIST = frozenset(
     {
@@ -690,7 +691,7 @@ class OpenClawModelClient:
             schema_validation_status="passed",
             output_sha256=_sha256(output_bytes),
             output_bytes=len(output_bytes),
-            usage=None,
+            usage=_validated_openclaw_usage(response),
             cost_micro_usd=None,
         )
         return OpenClawModelExecution(result=result, output=output_bytes)
@@ -915,6 +916,37 @@ def _validate_openclaw_response(
     if actual_model != requested_model:
         return actual_model, final_text
     return actual_model, final_text
+
+
+def _validated_openclaw_usage(response: Mapping[str, Any]) -> dict[str, int] | None:
+    """Preserve observed token counts only when OpenClaw's buckets reconcile.
+
+    OpenClaw 2026.9.4 omits zero-valued buckets from its JSON response. Its
+    input bucket excludes cache reads and writes, which count as input tokens
+    in the provenance record. Missing or inconsistent usage stays unknown.
+    """
+
+    raw = response.get("usage")
+    if not isinstance(raw, Mapping):
+        return None
+    total = raw.get("total")
+    if type(total) is not int or not 0 < total <= _JSON_SAFE_INTEGER_MAX:
+        return None
+    buckets: dict[str, int] = {}
+    for name in ("input", "output", "cacheRead", "cacheWrite"):
+        value = raw.get(name, 0)
+        if type(value) is not int or not 0 <= value <= _JSON_SAFE_INTEGER_MAX:
+            return None
+        buckets[name] = value
+    input_tokens = buckets["input"] + buckets["cacheRead"] + buckets["cacheWrite"]
+    output_tokens = buckets["output"]
+    if input_tokens + output_tokens != total:
+        return None
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total,
+    }
 
 
 def _required_mapping(value: object, label: str) -> Mapping[str, Any]:

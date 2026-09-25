@@ -44,6 +44,14 @@ Malformed or ambiguous evidence fails without an output binding. Explicit
 fallback requests are rejected by this one-shot adapter; each later attempt
 requires its own request and provenance.
 
+When OpenClaw reports a positive integer token total that equals its uncached
+input, cache-read input, cache-write input, and output buckets, the adapter
+records input as the sum of the three input buckets and records the observed
+output and total. OpenClaw 2026.9.4 omits zero-valued buckets. Missing,
+malformed, or inconsistent usage remains `null` in the executor result; no
+token count is estimated. The adapter does not treat OpenClaw's estimated cost
+as an incremental API charge.
+
 The adapter has offline mock coverage for OAuth refusal, request/input drift,
 model mismatch, schema failure, missing or positive tool-use evidence,
 auth timeouts, bounded capture, and prompt transport. GCP validation used OpenClaw 2026.9.4 config validation and
@@ -79,9 +87,10 @@ root-owned control directory must not be writable by the model user, and its
 SQLite database has mode `0600`. No source pack, Zotero,
 OpenKB, or index write is performed.
 
-This canary does not execute prepared page/section/full-paper work units.
-That integration still requires an approved batch executor, output contracts,
-acceptance, provenance materialization, and separate durable-write receipts.
+This canary does not execute prepared page/section/full-paper work units. The
+separate receipt-bound GPT batch runner now covers those units, validates the
+outputs, and returns accepted text only in memory. Durable materialization,
+complete provenance, and acceptance remain separate work.
 
 ## In-memory summary batch validation
 
