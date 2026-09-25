@@ -43,6 +43,7 @@ class SummaryOutputPlan:
     run_id: str
     source_manifest_sha256: str
     write_manifest_sha256: str
+    summary_record_ref: str
     write_manifest_json: bytes = field(repr=False)
     summary_record: dict[str, Any] = field(repr=False)
     texts: tuple[PlannedSummaryText, ...] = field(repr=False)
@@ -93,6 +94,8 @@ def plan_gpt_summary_outputs(
     texts: list[PlannedSummaryText] = []
     manifest_entries: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
+    summary_dir = f"analyses/millefeuille/{run_id}/summaries"
+    summary_record_ref = f"{summary_dir}/hierarchical-summary.json"
     for unit in accepted.units:
         summary_id = f"{unit.stage}-{unit.unit_id}"
         if not _SUMMARY_ID.fullmatch(summary_id) or summary_id in seen_ids:
@@ -100,7 +103,7 @@ def plan_gpt_summary_outputs(
         seen_ids.add(summary_id)
         grain, scope = _GRAIN_SCOPE[unit.stage]
         text_ref = f"texts/{summary_id}.md"
-        run_ref = f"summaries/{text_ref}"
+        run_ref = f"{summary_dir}/{text_ref}"
         data = unit.summary.encode("utf-8")
         text_sha256 = "sha256:" + hashlib.sha256(data).hexdigest()
         entries.append(
@@ -133,6 +136,7 @@ def plan_gpt_summary_outputs(
         "paper_id": accepted.paper_id,
         "run_id": run_id,
         "source_manifest_sha256": outcome.approval.manifest_sha256,
+        "summary_record_ref": summary_record_ref,
         "summary_record_sha256": "sha256:"
         + hashlib.sha256(_canonical_json(summary_record)).hexdigest(),
         "entries": manifest_entries,
@@ -144,6 +148,7 @@ def plan_gpt_summary_outputs(
         source_manifest_sha256=outcome.approval.manifest_sha256,
         write_manifest_sha256="sha256:"
         + hashlib.sha256(write_manifest_json).hexdigest(),
+        summary_record_ref=summary_record_ref,
         write_manifest_json=write_manifest_json,
         summary_record=summary_record,
         texts=tuple(texts),

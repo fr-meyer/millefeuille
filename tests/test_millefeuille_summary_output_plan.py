@@ -78,6 +78,9 @@ class TestGptSummaryOutputPlan(unittest.TestCase):
         self.assertEqual(before, after)
         self.assertEqual(planned, self._plan())
         self.assertEqual(len(planned.texts), 3)
+        self.assertTrue(
+            planned.summary_record_ref.startswith("analyses/millefeuille/run-gpt-1/")
+        )
         self.assertEqual(
             [entry["grain"] for entry in planned.summary_record["summaries"]],
             ["page", "section", "full-paper"],
@@ -94,6 +97,16 @@ class TestGptSummaryOutputPlan(unittest.TestCase):
         self.assertEqual(
             planned.write_manifest_sha256,
             "sha256:" + hashlib.sha256(planned.write_manifest_json).hexdigest(),
+        )
+
+    def test_different_runs_have_disjoint_output_refs(self):
+        first = self._plan(run_id="run-gpt-1")
+        second = self._plan(run_id="run-gpt-2")
+        self.assertNotEqual(first.summary_record_ref, second.summary_record_ref)
+        self.assertTrue(
+            {item.ref for item in first.texts}.isdisjoint(
+                {item.ref for item in second.texts}
+            )
         )
 
     def test_rejects_unsafe_run_id_and_changed_source(self):

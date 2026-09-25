@@ -17,7 +17,9 @@ After all calls, the runner verifies the full source and result batch again.
 Accepted summary text and exact executor evidence are returned only in memory.
 `plan_gpt_summary_outputs` revalidates that complete evidence and maps it to a
 deterministic hierarchical summary record, private text refs, and a text-free
-prospective write fingerprint. The plan contains no final model-provenance
+prospective write fingerprint. The prospective refs are scoped under
+`analyses/millefeuille/<run_id>/` so separate runs have disjoint destinations.
+The plan contains no final model-provenance
 record and cannot be published until that record and a separate durable-write
 receipt are validated. This entry point writes no
 summary, source pack, index, Zotero record, or paper card. Durable
