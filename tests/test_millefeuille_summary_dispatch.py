@@ -25,11 +25,15 @@ CONTRACTS = {
 
 @requires_secure_nofollow_writes
 class TestSummaryDispatch(unittest.TestCase):
-    def _fixture(self, root: Path, *, page_count: int = 1) -> tuple[Path, Path, Path]:
+    def _fixture(
+        self,
+        root: Path,
+        *,
+        page_count: int = 1,
+        markdown_text: str = "# Page 1\n# Introduction\nPrivate text.\n",
+    ) -> tuple[Path, Path, Path]:
         markdown = root / "selected.md"
-        markdown.write_text(
-            "# Page 1\n# Introduction\nPrivate text.\n", encoding="utf-8"
-        )
+        markdown.write_text(markdown_text, encoding="utf-8")
         route = root / "route.json"
         route.write_text(
             json.dumps(

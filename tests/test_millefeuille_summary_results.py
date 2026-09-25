@@ -298,7 +298,9 @@ class TestSummaryResults(unittest.TestCase):
             (unit.stage, unit.unit_id): self._execution(unit, self._output(unit))
             for unit in partial.units
         }
-        with self.assertRaisesRegex(MillefeuilleContractError, "stage coverage drift"):
+        with self.assertRaisesRegex(
+            MillefeuilleContractError, "work unit coverage drift"
+        ):
             self._accept(partial, executions)
 
     def test_rejects_a_batch_with_changed_preparation_unit_identity(self):

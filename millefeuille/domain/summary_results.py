@@ -172,8 +172,6 @@ def verify_summary_dispatch_batch(
         not isinstance(unit, SummaryDispatchUnit) for unit in batch.units
     ):
         raise MillefeuilleContractError("summary batch has invalid work units")
-    if {unit.stage for unit in batch.units} != set(SUMMARY_MODEL_STAGES):
-        raise MillefeuilleContractError("summary batch stage coverage drift")
     package_path = Path(preparation_path)
     before = read_bytes_no_follow(package_path, "summary preparation package")
     preparation = verify_summary_preparation_package(

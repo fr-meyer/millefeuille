@@ -97,7 +97,9 @@ class TestSummaryExecutionManifest(unittest.TestCase):
             preparation_sha256=self.batch.preparation_sha256,
             units=self.batch.units[:-1],
         )
-        with self.assertRaisesRegex(MillefeuilleContractError, "stage coverage drift"):
+        with self.assertRaisesRegex(
+            MillefeuilleContractError, "work unit coverage drift"
+        ):
             plan_summary_execution_manifest(batch=partial, **self.evidence)
 
         tampered = deepcopy(self.batch)
@@ -108,3 +110,36 @@ class TestSummaryExecutionManifest(unittest.TestCase):
         self.evidence["preparation_path"].write_text("{}", encoding="utf-8")
         with self.assertRaises(MillefeuilleContractError):
             plan_summary_execution_manifest(batch=self.batch, **self.evidence)
+
+    def test_accepts_canonical_preparation_with_zero_section_units(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            route, structure, preparation = (
+                dispatch_tests.TestSummaryDispatch()._fixture(
+                    Path(tempdir), markdown_text="# Page 1\nPrivate text.\n"
+                )
+            )
+            evidence = {
+                "route_evidence_path": route,
+                "structure_evidence_path": structure,
+                "preparation_path": preparation,
+            }
+            batch = plan_verified_summary_dispatch(
+                **evidence,
+                prompt_builder=dispatch_tests.TestSummaryDispatch._prompt,
+                output_contracts=dispatch_tests.CONTRACTS,
+            )
+            manifest = plan_summary_execution_manifest(batch=batch, **evidence)
+            payload = json.loads(manifest.json_bytes)
+            self.assertEqual(payload["work_unit_count"], 2)
+            self.assertEqual(
+                [unit["stage"] for unit in payload["units"]],
+                ["summarize_page", "summarize_full_paper"],
+            )
+            schema = json.loads(
+                (
+                    Path(__file__).parents[1]
+                    / "specs/millefeuille-pipeline"
+                    / "summary-execution-manifest.schema.json"
+                ).read_text(encoding="utf-8")
+            )
+            Draft202012Validator(schema).validate(payload)

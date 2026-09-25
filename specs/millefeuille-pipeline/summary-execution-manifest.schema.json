@@ -24,11 +24,11 @@
     "requested_model": {"const": "openai/gpt-5.6-sol"},
     "required_auth_class": {"const": "subscription_oauth"},
     "fallback_policy": {"const": "none"},
-    "work_unit_count": {"type": "integer", "minimum": 3},
+    "work_unit_count": {"type": "integer", "minimum": 2},
     "provider_calls_performed": {"const": 0},
     "units": {
       "type": "array",
-      "minItems": 3,
+      "minItems": 2,
       "items": {
         "type": "object",
         "additionalProperties": false,
