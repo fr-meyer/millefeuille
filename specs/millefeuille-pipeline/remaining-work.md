@@ -130,9 +130,14 @@
       calls. A read-only dispatch handoff now re-derives one prepared package
       from its route, structure, and selected Markdown; it builds complete
       GPT-only typed requests with explicit output contracts and no provider
-      call or durable write. Remaining work is approved batch execution,
-      structured output/citation validation, acceptance, and attaching
-      validated provenance to verified run packages.
+      call or durable write. In-memory batch validation now rejects incomplete
+      stages, changed preparation identities, invalid citations, mismatched
+      output hashes, and model/OAuth drift. A no-call manifest fingerprints
+      every planned GPT request for a future exact execution receipt. Remaining
+      work is receipt-bound batch execution, separately approved durable
+      materialization, acceptance, and attaching validated provenance to
+      verified run packages. Grok execution is deferred while its OAuth
+      subscription is inactive.
     - Manual gate: model/provider call approval.
 
 11. **Paper Card**

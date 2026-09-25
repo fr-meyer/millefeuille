@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/summary-execution-manifest.schema.json",
+  "title": "Millefeuille summary execution manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "paper_id",
+    "preparation_sha256",
+    "requested_model",
+    "required_auth_class",
+    "fallback_policy",
+    "work_unit_count",
+    "provider_calls_performed",
+    "units"
+  ],
+  "properties": {
+    "schema_version": {"const": "millefeuille-summary-execution-manifest/v0.1"},
+    "status": {"const": "planned-no-call"},
+    "paper_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$"},
+    "preparation_sha256": {"$ref": "#/$defs/digest"},
+    "requested_model": {"const": "openai/gpt-5.6-sol"},
+    "required_auth_class": {"const": "subscription_oauth"},
+    "fallback_policy": {"const": "none"},
+    "work_unit_count": {"type": "integer", "minimum": 3},
+    "provider_calls_performed": {"const": 0},
+    "units": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stage",
+          "unit_id",
+          "source_locator_count",
+          "source_locators_sha256",
+          "input",
+          "prompt_template",
+          "output_contract",
+          "timeout_seconds",
+          "idempotency_key",
+          "request_sha256"
+        ],
+        "properties": {
+          "stage": {
+            "enum": ["summarize_page", "summarize_section", "summarize_full_paper"]
+          },
+          "unit_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+          "source_locator_count": {"type": "integer", "minimum": 1},
+          "source_locators_sha256": {"$ref": "#/$defs/digest"},
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sha256", "bytes"],
+            "properties": {
+              "sha256": {"$ref": "#/$defs/digest"},
+              "bytes": {"type": "integer", "minimum": 1}
+            }
+          },
+          "prompt_template": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "version"],
+            "properties": {
+              "id": {"type": "string", "minLength": 1},
+              "version": {"type": "string", "minLength": 1}
+            }
+          },
+          "output_contract": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["schema_id", "schema_version"],
+            "properties": {
+              "schema_id": {"type": "string", "minLength": 1},
+              "schema_version": {"const": "v1"}
+            }
+          },
+          "timeout_seconds": {"type": "integer", "minimum": 1},
+          "idempotency_key": {"type": "string", "minLength": 1},
+          "request_sha256": {"$ref": "#/$defs/digest"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
