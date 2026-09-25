@@ -11,6 +11,7 @@ import struct
 import tempfile
 import threading
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -59,6 +60,10 @@ class TestGptSummaryPublicationSocket(unittest.TestCase):
             patch.object(reservation, "_CONTROL_OWNER_UID", os.getuid()),
             patch.object(publication_socket.os, "geteuid", return_value=0),
             patch.object(publication_socket.os, "chown", return_value=None),
+            patch(
+                "pwd.getpwnam",
+                return_value=SimpleNamespace(pw_uid=os.getuid(), pw_gid=os.getgid()),
+            ),
         )
 
     def test_bounded_one_shot_roundtrip_returns_only_commit_identity(self):
