@@ -130,6 +130,7 @@ def validate_gpt_summary_output_write_preview(
         sorted(
             (
                 plan.write_manifest_ref,
+                plan.observed_usage_ref,
                 plan.summary_record_ref,
                 *(text.ref for text in plan.texts),
             )

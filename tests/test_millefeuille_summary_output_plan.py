@@ -90,6 +90,10 @@ class TestGptSummaryOutputPlan(unittest.TestCase):
             json.loads(planned.write_manifest_json)["write_manifest_ref"],
             planned.write_manifest_ref,
         )
+        self.assertEqual(
+            json.loads(planned.write_manifest_json)["observed_usage_ref"],
+            planned.observed_usage_ref,
+        )
         record = json.loads(planned.summary_record_json)
         self.assertEqual(
             [entry["grain"] for entry in record["summaries"]],

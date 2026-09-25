@@ -35,6 +35,15 @@ and publish without overwrites. The plan contains no
 final model-provenance record. This entry point writes no summary, source pack,
 index, Zotero record, or paper card.
 
+`plan_gpt_summary_observed_usage` separately revalidates the complete accepted
+batch and requires actual reconciled input, output, and total token counts for
+every unit. It emits canonical, text-free in-memory evidence bound to the
+output manifest, each executor result, model identity, input hash, and output
+hash. The output manifest fixes the prospective observed-usage path. Missing
+or inconsistent usage fails closed. This evidence is not the final
+`millefeuille-model-provenance/v0.1` record; trusted source/output refs and
+durable publication remain to be implemented.
+
 The offline tests use a synthetic paper and a fake model client. They cover
 the preflight and broker gates, complete accepted batches, source drift after
 one call, a malformed first result, and a mismatched reservation. No live
