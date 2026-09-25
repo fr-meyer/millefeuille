@@ -82,3 +82,21 @@ OpenKB, or index write is performed.
 This canary does not execute prepared page/section/full-paper work units.
 That integration still requires an approved batch executor, output contracts,
 acceptance, provenance materialization, and separate durable-write receipts.
+
+## In-memory summary batch validation
+
+The read-only dispatch handoff plans the three summary stages with explicit
+`summary-page`, `summary-section`, and `summary-full-paper` output contracts,
+all at `v1`. Each model output is one strict JSON object containing exactly
+`schema_version`, `paper_id`, `stage`, `unit_id`, `summary`, and
+`source_locators`. The summary must be non-empty; cited locators must be a
+non-empty, unique, ordered subset of that work unit's verified locators.
+
+The same unit validator can be passed to `OpenClawModelClient.execute` before it
+accepts an output binding. The batch validator then rechecks every result's
+request identity, GPT-only OAuth provenance, output hash and byte count, strict
+JSON, task identity, and citations. Missing, extra, failed, or drifted units
+reject the whole batch. It returns accepted text only in memory and does not
+publish a summary or advance acceptance/classification. A future approved
+orchestrator must supply the exact execution receipt and keep durable writes
+behind their separate gates.
