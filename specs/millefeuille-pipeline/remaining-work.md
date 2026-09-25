@@ -46,6 +46,33 @@
   generating labels or mutating active batches.
 - Current integration branch is `dev`; stable branch is `main`.
 - Current package version is `0.4.0`.
+- PRs #120-#126 add a grounded GPT-only batch manifest, exact MF-100 approval
+  preview and trusted-record validation, a durable one-use reservation broker,
+  receipt-bound batch execution, and an immutable no-write summary output plan.
+  The broker socket now becomes accessible only after its listener is ready.
+  None of these changes grants a paper-specific approval or publishes output.
+
+## Current GPT Pilot Path (2026-09-25)
+
+1. Resolve the live provenance accounting gap. The OpenClaw adapter currently
+   records `usage=None`, while `millefeuille-model-provenance/v0.1` requires
+   exact input, output, and total token counts. Capture validated actual usage
+   or explicitly version the contract for unavailable usage; never fill in
+   invented counts.
+2. Add a separately approved durable writer for the validated in-memory
+   summary bundle. It must bind the exact output manifest and source to a
+   one-use write receipt, verify canonical bytes and hashes, avoid overwrites,
+   and persist only the intended run-scoped summary, text, and audit artifacts.
+3. Run one bounded GPT paper pilot on GCP only after its exact MF-100 execution
+   packet, receipt, and administrator-owned trusted approval record are in
+   place. Validate its artifacts and provenance before widening the pilot.
+4. Reconcile the live run with source-pack, paper-card, OpenKB/PageIndex,
+   acceptance, classification, and governed Zotero writeback flows. Each live
+   external read or write still follows the corresponding exact scope gate.
+5. Expand to the other prepared papers, complete the remaining Zotero/OCR
+   intake and model-boundary audits, then promote the tested `dev` state toward
+   release. Grok execution remains deferred while its OAuth subscription is
+   inactive.
 
 ## Pipeline
 
@@ -133,10 +160,14 @@
       call or durable write. In-memory batch validation now rejects incomplete
       stages, changed preparation identities, invalid citations, mismatched
       output hashes, and model/OAuth drift. A no-call manifest fingerprints
-      every planned GPT request for a future exact execution receipt. Remaining
-      work is receipt-bound batch execution, separately approved durable
-      materialization, acceptance, and attaching validated provenance to
-      verified run packages. Grok execution is deferred while its OAuth
+      every planned GPT request for an exact execution receipt. GPT-only
+      receipt-bound batch execution now uses an administrator-owned, one-use
+      reservation broker and validates every output before returning private
+      accepted text in memory. A no-write plan maps a complete accepted batch
+      to canonical run-scoped summary bytes, text refs, and a write fingerprint.
+      Remaining work is the live usage/provenance gap, separately approved
+      durable materialization, acceptance, and attaching validated provenance
+      to verified run packages. Grok execution is deferred while its OAuth
       subscription is inactive.
     - Manual gate: model/provider call approval.
 
