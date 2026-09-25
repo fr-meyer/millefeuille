@@ -9,7 +9,6 @@ still move the resulting tree. The caller must audit that risk separately.
 
 from __future__ import annotations
 
-import contextlib
 import ctypes
 from dataclasses import dataclass
 import errno
@@ -115,6 +114,7 @@ def commit_prevalidated_gpt_summary_bundle(
         if stage_stat.st_uid != _ROOT_UID or not stat.S_ISDIR(stage_stat.st_mode):
             raise MillefeuilleContractError("GPT publication stage is not root-owned")
         _write_stage(stage_fd, relative_files)
+        os.fchmod(stage_fd, 0o755)
         os.fsync(stage_fd)
         _require_same_path(root, root_fd)
         _require_same_path(root / "analyses", analyses_fd)
@@ -239,16 +239,27 @@ def _open_or_create_child(parent_fd: int, name: str, *, root_only: bool = False)
     try:
         fd = os.open(name, _DIR_FLAGS, dir_fd=parent_fd)
     except FileNotFoundError:
-        with contextlib.suppress(FileExistsError):
-            os.mkdir(name, mode=0o700, dir_fd=parent_fd)
+        created = False
+        try:
+            os.mkdir(name, mode=0o755, dir_fd=parent_fd)
+            created = True
+        except FileExistsError:
+            created = False
         fd = os.open(name, _DIR_FLAGS, dir_fd=parent_fd)
-        os.fsync(parent_fd)
+        if created:
+            if os.fstat(fd).st_uid != _ROOT_UID:
+                os.close(fd)
+                raise MillefeuilleContractError(
+                    "GPT publication newly created directory changed"
+                ) from None
+            os.fchmod(fd, 0o755)
+            os.fsync(parent_fd)
     if root_only:
         info = os.fstat(fd)
-        if info.st_uid != _ROOT_UID or info.st_mode & 0o022:
+        if info.st_uid != _ROOT_UID or stat.S_IMODE(info.st_mode) != 0o755:
             os.close(fd)
             raise MillefeuilleContractError(
-                "GPT publication parent must be root-owned and nonwritable by peers"
+                "GPT publication parent must be root-owned and readable by the app"
             )
     return fd
 
@@ -266,12 +277,13 @@ def _write_stage(
                         directories[key[:-1]], key[-1]
                     )
             parent_fd = directories[parts[:-1]]
-            fd = os.open(parts[-1], _FILE_FLAGS, 0o600, dir_fd=parent_fd)
+            fd = os.open(parts[-1], _FILE_FLAGS, 0o644, dir_fd=parent_fd)
             try:
                 if os.fstat(fd).st_uid != _ROOT_UID:
                     raise MillefeuilleContractError(
                         "GPT publication file is not root-owned"
                     )
+                os.fchmod(fd, 0o644)
                 with os.fdopen(fd, "wb", closefd=False) as stream:
                     stream.write(data)
                     stream.flush()

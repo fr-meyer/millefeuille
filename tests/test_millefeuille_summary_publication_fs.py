@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import os
+import stat
 import sys
 import unittest
 from unittest.mock import patch
@@ -54,12 +55,19 @@ class TestGptSummaryPublicationFilesystem(unittest.TestCase):
             result.bundle_manifest_sha256, self.bundle.bundle_manifest_sha256
         )
         for item in self.bundle.files:
-            self.assertEqual((self.fixture.root / item.ref).read_bytes(), item.data)
+            path = self.fixture.root / item.ref
+            self.assertEqual(path.read_bytes(), item.data)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o644)
         with self.assertRaises(fs.GptSummaryPublicationError) as caught:
             self._commit()
         self.assertFalse(caught.exception.committed)
         self.assertTrue(caught.exception.cleanup_complete)
         parent = self.fixture.root / "analyses" / "millefeuille"
+        self.assertEqual(stat.S_IMODE(parent.stat().st_mode), 0o755)
+        self.assertEqual(
+            stat.S_IMODE((parent / self.bundle.preview.run_id).stat().st_mode),
+            0o755,
+        )
         self.assertEqual(
             [entry.name for entry in parent.iterdir()], [self.bundle.preview.run_id]
         )
