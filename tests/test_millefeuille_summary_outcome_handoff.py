@@ -72,6 +72,21 @@ class TestGptSummaryOutcomeHandoff(unittest.TestCase):
         with self.assertRaises(MillefeuilleContractError):
             self._decode(encoded)
 
+    def test_rejects_deeply_nested_json_without_recursion_escape(self):
+        deeply_nested = b"[" * 1100 + b"0" + b"]" * 1100
+        with self.assertRaises(MillefeuilleContractError):
+            self._decode(deeply_nested)
+        nested_result = 0
+        for _ in range(1100):
+            nested_result = [nested_result]
+        original = self.fixture.outcome
+        executions = list(original.executions)
+        executions[0] = replace(executions[0], result={"deep": nested_result})
+        with self.assertRaises(MillefeuilleContractError):
+            encode_gpt_summary_outcome_handoff(
+                replace(original, executions=tuple(executions))
+            )
+
     @staticmethod
     def _canonical(payload):
         return (

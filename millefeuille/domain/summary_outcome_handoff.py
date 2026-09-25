@@ -59,7 +59,7 @@ def encode_gpt_summary_outcome_handoff(outcome: TrustedGptSummaryOutcome) -> byt
                 "executions": executions,
             }
         )
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, RecursionError) as exc:
         raise MillefeuilleContractError("GPT summary handoff is not JSON") from exc
     if len(encoded) > _MAX_BYTES:
         raise MillefeuilleContractError("GPT summary handoff is too large")
@@ -89,7 +89,7 @@ def decode_gpt_summary_outcome_handoff(
             parse_constant=_reject_constant,
         )
         canonical = _canonical_json(payload)
-    except (UnicodeError, ValueError, TypeError) as exc:
+    except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
         raise MillefeuilleContractError("GPT summary handoff JSON is invalid") from exc
     if (
         not isinstance(payload, dict)
