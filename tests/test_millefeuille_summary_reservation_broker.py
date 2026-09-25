@@ -9,8 +9,10 @@ import os
 from pathlib import Path
 import socket
 import struct
+import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -27,7 +29,12 @@ from tests.test_millefeuille_summary_trusted_approval import _case, _write_recor
 
 @contextmanager
 def _broker_test_controls(control: Path):
+    model_user = SimpleNamespace(pw_uid=os.getuid(), pw_gid=os.getgid())
     with (
+        patch.dict(
+            sys.modules,
+            {"pwd": SimpleNamespace(getpwnam=lambda _name: model_user)},
+        ),
         patch.object(broker, "_CONTROL_DIR", control),
         patch.object(broker, "_BROKER_SOCKET_PATH", control / "summary.sock"),
         patch.object(broker, "_BROKER_OWNER_UID", os.getuid()),
