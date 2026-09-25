@@ -6,7 +6,7 @@ It must be invoked inside a privileged broker, never from the model process.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 import json
 import os
 from pathlib import Path
@@ -28,10 +28,15 @@ from millefeuille.domain.summary_output_trusted_approval import (
     validate_trusted_gpt_summary_output_write_approval,
 )
 from millefeuille.domain.summary_output_write_scope import SummaryOutputWritePreview
+from millefeuille.domain.summary_publication_bundle import (
+    SummaryPublicationBundle,
+    plan_gpt_summary_publication_bundle,
+)
 
 _CONTROL_DIR = Path("/etc/millefeuille")
 _CONTROL_OWNER_UID = 0
 _LEDGER_NAME = "gpt-summary-write.sqlite3"
+_PUBLICATION_TABLE = "publication_attempts"
 
 
 def reserve_trusted_gpt_summary_output_write_receipt(
@@ -45,6 +50,7 @@ def reserve_trusted_gpt_summary_output_write_receipt(
     packet: OperatorPreflightPacket,
     receipt: ApprovedLiveReceipt,
     now: datetime | None = None,
+    publication_bundle: SummaryPublicationBundle | None = None,
 ) -> SummaryOutputWritePreview:
     """Replan, verify root approval, and durably consume one write receipt."""
 
@@ -64,6 +70,21 @@ def reserve_trusted_gpt_summary_output_write_receipt(
         receipt=receipt,
         now=now,
     )
+    if publication_bundle is not None:
+        fresh_bundle = plan_gpt_summary_publication_bundle(
+            outcome=outcome,
+            run_id=run_id,
+            route_evidence_path=route_evidence_path,
+            structure_evidence_path=structure_evidence_path,
+            preparation_path=preparation_path,
+            source_pack_root=source_pack_root,
+            packet=packet,
+            receipt=receipt,
+        )
+        if fresh_bundle != publication_bundle or publication_bundle.preview != preview:
+            raise MillefeuilleContractError(
+                "GPT summary publication bundle changed before reservation"
+            )
     database = _CONTROL_DIR / _LEDGER_NAME
     _require_private_database_or_absent(database)
     if not hasattr(os, "O_NOFOLLOW"):
@@ -92,6 +113,18 @@ def reserve_trusted_gpt_summary_output_write_receipt(
             "receipt_digest TEXT UNIQUE NOT NULL, "
             "audit_json TEXT NOT NULL)"
         )
+        if publication_bundle is not None:
+            connection.execute(
+                f"CREATE TABLE IF NOT EXISTS {_PUBLICATION_TABLE} ("
+                "receipt_digest TEXT PRIMARY KEY, "
+                "receipt_id TEXT UNIQUE NOT NULL, "
+                "run_id TEXT NOT NULL, "
+                "bundle_manifest_sha256 TEXT NOT NULL, "
+                "file_count INTEGER NOT NULL, "
+                "total_bytes INTEGER NOT NULL, "
+                "status TEXT NOT NULL, "
+                "updated_at TEXT NOT NULL)"
+            )
         connection.execute("BEGIN IMMEDIATE")
         rows = connection.execute("SELECT audit_json FROM approvals").fetchall()
         replay_state = ReceiptReplayState.from_audit_records(
@@ -113,6 +146,10 @@ def reserve_trusted_gpt_summary_output_write_receipt(
             "VALUES (?, ?, ?)",
             (receipt.receipt_id, receipt.content_digest, _canonical_json(audit)),
         )
+        if publication_bundle is not None:
+            _insert_publication_attempt(
+                connection, receipt=receipt, bundle=publication_bundle
+            )
         connection.execute("COMMIT")
     except BaseException:
         if connection.in_transaction:
@@ -121,6 +158,30 @@ def reserve_trusted_gpt_summary_output_write_receipt(
     finally:
         connection.close()
     return preview
+
+
+def _insert_publication_attempt(
+    connection: sqlite3.Connection,
+    *,
+    receipt: ApprovedLiveReceipt,
+    bundle: SummaryPublicationBundle,
+) -> None:
+    connection.execute(
+        f"INSERT INTO {_PUBLICATION_TABLE} "
+        "(receipt_digest, receipt_id, run_id, bundle_manifest_sha256, "
+        "file_count, total_bytes, status, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            receipt.content_digest,
+            receipt.receipt_id,
+            bundle.preview.run_id,
+            bundle.bundle_manifest_sha256,
+            len(bundle.files),
+            bundle.total_bytes,
+            "committing",
+            datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        ),
+    )
 
 
 def _require_control_dir() -> None:
