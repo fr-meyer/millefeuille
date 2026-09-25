@@ -32,14 +32,22 @@ blocks even the write preview. It reports the prospective file refs without rese
 the receipt or writing files. `validate_trusted_gpt_summary_output_write_approval`
 also requires a matching administrator-owned record at
 `/etc/millefeuille/gpt-summary-write-approval.json`. The privileged
-`reserve_trusted_gpt_summary_output_write_receipt` primitive then consumes
-that exact receipt in a separate root-owned replay ledger at
-`/etc/millefeuille/gpt-summary-write.sqlite3`. Both checks still write no
-paper output. A future broker and writer must keep the reservation and
-publication in one trusted boundary, revalidate the source and output bytes,
-and publish without overwrites. The plan contains no
-final model-provenance record. This entry point writes no summary, source pack,
-index, Zotero record, or paper card.
+`reserve_trusted_gpt_summary_output_write_receipt` primitive consumes that
+exact receipt in a separate root-owned replay ledger at
+`/etc/millefeuille/gpt-summary-write.sqlite3`. These individual checks write
+no paper output. The root-only `publish_trusted_gpt_summary_handoff` broker
+combines receipt reservation with a pending audit row in one transaction,
+replans the source and exact output bytes, and calls the filesystem writer.
+The writer stages root-owned files, syncs them, and publishes the complete run
+with a Linux atomic no-replace rename. The audit records `published`,
+`failed-before-commit`, or `uncertain` when a rename or final audit outcome
+cannot be proved. A consumed receipt is never replayed. The caller sends its
+transient accepted handoff over a one-shot root-owned Unix socket; the reply
+contains only commit identity, never summary text. This does not index,
+classify, or write to Zotero. Source-pack ancestors on GCP are owned by the
+model user's UID, so an uncooperative same-UID process can still rename an
+ancestor; descriptor-relative checks and the cooperative writer contract do
+not protect against that peer.
 
 `plan_gpt_summary_observed_usage` separately revalidates the complete accepted
 batch and requires actual reconciled input, output, and total token counts for
@@ -60,5 +68,9 @@ the files without replacement.
 
 The offline tests use a synthetic paper and a fake model client. They cover
 the preflight and broker gates, complete accepted batches, source drift after
-one call, a malformed first result, and a mismatched reservation. No live
-paper text or provider call is used in these tests.
+one call, a malformed first result, and a mismatched reservation. A Linux
+root-only integration fixture runs the real publication broker, ledger, audit,
+and filesystem writer against a temporary synthetic source pack, then checks
+every published byte and rejects replay. Normal unprivileged CI skips only
+that root-only case. No live paper text or provider call is used in these
+tests.
