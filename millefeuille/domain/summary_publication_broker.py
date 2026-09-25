@@ -24,12 +24,12 @@ from millefeuille.domain.summary_outcome_handoff import (
 from millefeuille.domain.summary_output_replay_reservation import (
     _CONTROL_DIR,
     _LEDGER_NAME,
+    _PUBLICATION_TABLE,
     _require_control_dir,
     _require_private_database_or_absent,
     reserve_trusted_gpt_summary_output_write_receipt,
 )
 from millefeuille.domain.summary_publication_bundle import (
-    SummaryPublicationBundle,
     plan_gpt_summary_publication_bundle,
 )
 from millefeuille.domain.summary_publication_fs import (
@@ -37,8 +37,6 @@ from millefeuille.domain.summary_publication_fs import (
     GptSummaryPublicationError,
     commit_prevalidated_gpt_summary_bundle,
 )
-
-_AUDIT_TABLE = "publication_attempts"
 
 
 def publish_trusted_gpt_summary_handoff(
@@ -76,10 +74,11 @@ def publish_trusted_gpt_summary_handoff(
         **evidence,
     }
     bundle = plan_gpt_summary_publication_bundle(**scope)
-    reserved = reserve_trusted_gpt_summary_output_write_receipt(**scope, now=now)
+    reserved = reserve_trusted_gpt_summary_output_write_receipt(
+        **scope, now=now, publication_bundle=bundle
+    )
     if reserved != bundle.preview:
         raise MillefeuilleContractError("GPT publication reservation drift")
-    _begin_attempt(receipt=receipt, bundle=bundle)
     try:
         fresh = plan_gpt_summary_publication_bundle(**scope)
         if fresh != bundle:
@@ -108,54 +107,6 @@ def publish_trusted_gpt_summary_handoff(
     return committed
 
 
-def _begin_attempt(
-    *, receipt: ApprovedLiveReceipt, bundle: SummaryPublicationBundle
-) -> None:
-    connection = _open_ledger()
-    try:
-        connection.execute(
-            f"CREATE TABLE IF NOT EXISTS {_AUDIT_TABLE} ("
-            "receipt_digest TEXT PRIMARY KEY, "
-            "receipt_id TEXT UNIQUE NOT NULL, "
-            "run_id TEXT NOT NULL, "
-            "bundle_manifest_sha256 TEXT NOT NULL, "
-            "file_count INTEGER NOT NULL, "
-            "total_bytes INTEGER NOT NULL, "
-            "status TEXT NOT NULL, "
-            "updated_at TEXT NOT NULL)"
-        )
-        connection.execute("BEGIN IMMEDIATE")
-        approval = connection.execute(
-            "SELECT receipt_id FROM approvals WHERE receipt_digest = ?",
-            (receipt.content_digest,),
-        ).fetchone()
-        if approval != (receipt.receipt_id,):
-            raise MillefeuilleContractError("GPT publication receipt was not reserved")
-        connection.execute(
-            f"INSERT INTO {_AUDIT_TABLE} "
-            "(receipt_digest, receipt_id, run_id, bundle_manifest_sha256, "
-            "file_count, total_bytes, status, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                receipt.content_digest,
-                receipt.receipt_id,
-                bundle.preview.run_id,
-                bundle.bundle_manifest_sha256,
-                len(bundle.files),
-                bundle.total_bytes,
-                "committing",
-                _timestamp(),
-            ),
-        )
-        connection.execute("COMMIT")
-    except BaseException:
-        if connection.in_transaction:
-            connection.execute("ROLLBACK")
-        raise
-    finally:
-        connection.close()
-
-
 def _finish_attempt(*, receipt_digest: str, status: str) -> None:
     if status not in {"published", "failed-before-commit", "uncertain"}:
         raise MillefeuilleContractError("GPT publication audit status is invalid")
@@ -163,7 +114,7 @@ def _finish_attempt(*, receipt_digest: str, status: str) -> None:
     try:
         connection.execute("BEGIN IMMEDIATE")
         changed = connection.execute(
-            f"UPDATE {_AUDIT_TABLE} SET status = ?, updated_at = ? "
+            f"UPDATE {_PUBLICATION_TABLE} SET status = ?, updated_at = ? "
             "WHERE receipt_digest = ? AND status = 'committing'",
             (status, _timestamp(), receipt_digest),
         )

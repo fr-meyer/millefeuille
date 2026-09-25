@@ -122,6 +122,35 @@ class TestGptSummaryPublicationBroker(unittest.TestCase):
         self.assertTrue(caught.exception.committed)
         self.assertEqual(self._status(), "committing")
 
+    def test_pending_audit_failure_rolls_back_receipt_reservation(self):
+        with _trusted_control(self.control, self.approval):
+            with (
+                patch.object(
+                    reservation,
+                    "_insert_publication_attempt",
+                    side_effect=OSError("injected"),
+                ),
+                patch.object(
+                    broker, "commit_prevalidated_gpt_summary_bundle"
+                ) as commit,
+                self.assertRaises(OSError),
+            ):
+                self._publish()
+            commit.assert_not_called()
+            with sqlite3.connect(self.control / "gpt-summary-write.sqlite3") as db:
+                self.assertEqual(
+                    db.execute("SELECT COUNT(*) FROM approvals").fetchone()[0], 0
+                )
+                self.assertEqual(
+                    db.execute("SELECT COUNT(*) FROM publication_attempts").fetchone()[
+                        0
+                    ],
+                    0,
+                )
+            with patch.object(broker, "commit_prevalidated_gpt_summary_bundle"):
+                self._publish()
+        self.assertEqual(self._status(), "published")
+
     def test_precommit_failure_and_postcommit_uncertainty_are_distinct(self):
         for committed, status in (
             (False, "failed-before-commit"),
