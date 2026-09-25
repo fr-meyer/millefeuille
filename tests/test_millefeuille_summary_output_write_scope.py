@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from millefeuille.clients.openclaw_model_client import OpenClawModelExecution
 from millefeuille.domain.live_receipts import (
     APPROVED_LIVE_RECEIPT_SCHEMA_VERSION,
     ApprovedLiveReceipt,
@@ -26,6 +27,9 @@ from millefeuille.domain.summary_execution_scope import (
     validate_gpt_summary_approval_preview,
 )
 from millefeuille.domain.summary_live_execution import TrustedGptSummaryOutcome
+from millefeuille.domain.summary_observed_usage_plan import (
+    plan_gpt_summary_observed_usage,
+)
 from millefeuille.domain.summary_output_plan import plan_gpt_summary_outputs
 from millefeuille.domain.summary_output_write_scope import (
     validate_gpt_summary_output_write_preview,
@@ -40,6 +44,7 @@ def _write_approval_pair(
     root: Path,
     *,
     manifest_sha256: str,
+    observed_usage_sha256: str,
     paper_id: str,
     run_id: str,
     approved_at: datetime | None = None,
@@ -83,6 +88,10 @@ def _write_approval_pair(
             destination,
             {"kind": "paper-id", "id": paper_id},
             {"kind": "summary-output-manifest", "id": manifest_sha256},
+            {
+                "kind": "summary-observed-usage-manifest",
+                "id": observed_usage_sha256,
+            },
         ],
         key=lambda row: (row["kind"], row["id"]),
     )
@@ -149,10 +158,23 @@ class TestGptSummaryOutputWriteScope(unittest.TestCase):
             **self.evidence, packet=execution_packet, receipt=execution_receipt
         )
         executions = tuple(
-            result_tests.TestSummaryResults._execution(
-                unit, result_tests.TestSummaryResults._output(unit)
+            OpenClawModelExecution(
+                result={
+                    **original.result,
+                    "usage": {
+                        "input_tokens": 100,
+                        "output_tokens": 20,
+                        "total_tokens": 120,
+                    },
+                },
+                output=original.output,
             )
-            for unit in batch.units
+            for original in (
+                result_tests.TestSummaryResults._execution(
+                    unit, result_tests.TestSummaryResults._output(unit)
+                )
+                for unit in batch.units
+            )
         )
         accepted = accept_summary_execution_batch(
             batch=batch,
@@ -178,9 +200,17 @@ class TestGptSummaryOutputWriteScope(unittest.TestCase):
             structure_evidence_path=self.evidence["structure_evidence_path"],
             preparation_path=self.evidence["preparation_path"],
         )
+        self.observed = plan_gpt_summary_observed_usage(
+            outcome=self.outcome,
+            run_id=self.run_id,
+            route_evidence_path=self.evidence["route_evidence_path"],
+            structure_evidence_path=self.evidence["structure_evidence_path"],
+            preparation_path=self.evidence["preparation_path"],
+        )
         self.packet, self.receipt = _write_approval_pair(
             self.root,
             manifest_sha256=self.plan.write_manifest_sha256,
+            observed_usage_sha256=self.observed.observed_usage_sha256,
             paper_id=self.plan.paper_id,
             run_id=self.run_id,
         )
@@ -205,6 +235,9 @@ class TestGptSummaryOutputWriteScope(unittest.TestCase):
         after = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         self.assertEqual(before, after)
         self.assertEqual(preview.write_manifest_sha256, self.plan.write_manifest_sha256)
+        self.assertEqual(
+            preview.observed_usage_sha256, self.observed.observed_usage_sha256
+        )
         self.assertEqual(len(preview.file_refs), len(self.plan.texts) + 3)
         self.assertIn(self.plan.write_manifest_ref, preview.file_refs)
         self.assertIn(self.plan.observed_usage_ref, preview.file_refs)
@@ -216,6 +249,7 @@ class TestGptSummaryOutputWriteScope(unittest.TestCase):
         wrong_packet, wrong_receipt = _write_approval_pair(
             self.root,
             manifest_sha256="sha256:" + "0" * 64,
+            observed_usage_sha256=self.observed.observed_usage_sha256,
             paper_id=self.plan.paper_id,
             run_id=self.run_id,
         )
@@ -237,3 +271,26 @@ class TestGptSummaryOutputWriteScope(unittest.TestCase):
             self._preview(outcome=replace(self.outcome, accepted=accepted))
         with self.assertRaises(MillefeuilleContractError):
             self._preview(source_pack_root=self.root.parent)
+
+    def test_missing_observed_usage_is_rejected(self):
+        first = self.outcome.executions[0]
+        missing = OpenClawModelExecution(
+            result={**first.result, "usage": None}, output=first.output
+        )
+        executions = (missing, *self.outcome.executions[1:])
+        accepted = accept_summary_execution_batch(
+            batch=self.outcome.batch,
+            executions={
+                (unit.stage, unit.unit_id): execution
+                for unit, execution in zip(
+                    self.outcome.batch.units, executions, strict=True
+                )
+            },
+            route_evidence_path=self.evidence["route_evidence_path"],
+            structure_evidence_path=self.evidence["structure_evidence_path"],
+            preparation_path=self.evidence["preparation_path"],
+        )
+        with self.assertRaisesRegex(MillefeuilleContractError, "unavailable"):
+            self._preview(
+                outcome=replace(self.outcome, executions=executions, accepted=accepted)
+            )

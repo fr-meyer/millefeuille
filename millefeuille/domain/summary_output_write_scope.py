@@ -24,6 +24,9 @@ from millefeuille.domain.operator_preflight import (
 )
 from millefeuille.domain.secure_io import read_bytes_no_follow
 from millefeuille.domain.summary_live_execution import TrustedGptSummaryOutcome
+from millefeuille.domain.summary_observed_usage_plan import (
+    plan_gpt_summary_observed_usage,
+)
 from millefeuille.domain.summary_output_plan import plan_gpt_summary_outputs
 
 _STOP_CONDITIONS = ("source-drift", "write-failure")
@@ -34,6 +37,7 @@ _DISPOSAL = ("not-applicable", "not-applicable", "delete-after-run")
 class SummaryOutputWritePreview:
     source_manifest_sha256: str
     write_manifest_sha256: str
+    observed_usage_sha256: str
     paper_id: str = field(repr=False)
     run_id: str = field(repr=False)
     file_refs: tuple[str, ...] = field(repr=False)
@@ -77,6 +81,18 @@ def validate_gpt_summary_output_write_preview(
         structure_evidence_path=structure_evidence_path,
         preparation_path=preparation_path,
     )
+    observed = plan_gpt_summary_observed_usage(
+        outcome=outcome,
+        run_id=run_id,
+        route_evidence_path=route_evidence_path,
+        structure_evidence_path=structure_evidence_path,
+        preparation_path=preparation_path,
+    )
+    if (
+        observed.write_manifest_sha256 != plan.write_manifest_sha256
+        or observed.observed_usage_ref != plan.observed_usage_ref
+    ):
+        raise MillefeuilleContractError("GPT summary observed usage plan drift")
     destination = LiveTarget("source-pack-root", compute_operator_root_target_id(root))
     expected_targets = tuple(
         sorted(
@@ -84,6 +100,10 @@ def validate_gpt_summary_output_write_preview(
                 destination,
                 LiveTarget("paper-id", plan.paper_id),
                 LiveTarget("summary-output-manifest", plan.write_manifest_sha256),
+                LiveTarget(
+                    "summary-observed-usage-manifest",
+                    observed.observed_usage_sha256,
+                ),
                 LiveTarget(
                     "preflight-scope",
                     compute_operator_authorization_context_digest(packet.to_dict()),
@@ -141,6 +161,7 @@ def validate_gpt_summary_output_write_preview(
     return SummaryOutputWritePreview(
         source_manifest_sha256=plan.source_manifest_sha256,
         write_manifest_sha256=plan.write_manifest_sha256,
+        observed_usage_sha256=observed.observed_usage_sha256,
         paper_id=plan.paper_id,
         run_id=run_id,
         file_refs=refs,
