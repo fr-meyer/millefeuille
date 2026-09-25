@@ -135,11 +135,17 @@ def serve_one_reservation(*, timeout_seconds: int = 120) -> None:
     model_user = pwd.getpwnam("node")
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
-            listener.bind(str(_BROKER_SOCKET_PATH))
-            os.chown(_BROKER_SOCKET_PATH, 0, model_user.pw_gid)
-            os.chmod(_BROKER_SOCKET_PATH, 0o660)
+            # Keep the new pathname inaccessible until listen() has completed.
+            # Callers use its permissions as the readiness signal.
+            previous_umask = os.umask(0o777)
+            try:
+                listener.bind(str(_BROKER_SOCKET_PATH))
+            finally:
+                os.umask(previous_umask)
             listener.listen(1)
             listener.settimeout(timeout_seconds)
+            os.chown(_BROKER_SOCKET_PATH, 0, model_user.pw_gid)
+            os.chmod(_BROKER_SOCKET_PATH, 0o660)
             with listener.accept()[0] as channel:
                 channel.settimeout(15)
                 _require_peer_uid(channel, model_user.pw_uid)

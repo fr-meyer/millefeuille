@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import stat
 import struct
 import sys
 import tempfile
@@ -47,9 +48,15 @@ def _broker_test_controls(control: Path):
 
 def _wait_for_socket(path: Path) -> None:
     deadline = time.monotonic() + 5
-    while not path.exists():
+    while True:
+        try:
+            detail = path.stat()
+            if stat.S_ISSOCK(detail.st_mode) and stat.S_IMODE(detail.st_mode) == 0o660:
+                return
+        except FileNotFoundError:
+            pass
         if time.monotonic() >= deadline:
-            raise AssertionError("broker socket did not appear")
+            raise AssertionError("broker socket did not become ready")
         time.sleep(0.01)
 
 
