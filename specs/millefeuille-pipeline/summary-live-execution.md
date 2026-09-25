@@ -14,7 +14,14 @@ zero incremental API cost before the next call. Any failure stops the batch;
 the already reserved receipt remains consumed and cannot be replayed.
 
 After all calls, the runner verifies the full source and result batch again.
-Accepted summary text is returned only in memory. This entry point writes no
+Accepted summary text and exact executor evidence are returned only in memory.
+`plan_gpt_summary_outputs` revalidates that complete evidence and maps it to a
+deterministic hierarchical summary record in immutable canonical bytes,
+private text refs, and a text-free prospective write fingerprint. The refs are scoped under
+`analyses/millefeuille/<run_id>/` so separate runs have disjoint destinations.
+The plan contains no final model-provenance
+record and cannot be published until that record and a separate durable-write
+receipt are validated. This entry point writes no
 summary, source pack, index, Zotero record, or paper card. Durable
 materialization remains a separate approval boundary.
 
