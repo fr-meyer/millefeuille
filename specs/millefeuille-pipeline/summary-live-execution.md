@@ -23,9 +23,15 @@ destinations. The write manifest's own path is fixed in its canonical bytes.
 `validate_gpt_summary_output_write_preview` rereads the source and validates
 an exact `source-pack.write` packet and MF-100 receipt against that manifest,
 one paper, and one run. It reports the prospective file refs without reserving
-the receipt or writing files. A future writer must independently verify a
-trusted administrator-owned approval, consume the receipt once, revalidate the
-source and output bytes, and publish without overwrites. The plan contains no
+the receipt or writing files. `validate_trusted_gpt_summary_output_write_approval`
+also requires a matching administrator-owned record at
+`/etc/millefeuille/gpt-summary-write-approval.json`. The privileged
+`reserve_trusted_gpt_summary_output_write_receipt` primitive then consumes
+that exact receipt in a separate root-owned replay ledger at
+`/etc/millefeuille/gpt-summary-write.sqlite3`. Both checks still write no
+paper output. A future broker and writer must keep the reservation and
+publication in one trusted boundary, revalidate the source and output bytes,
+and publish without overwrites. The plan contains no
 final model-provenance record. This entry point writes no summary, source pack,
 index, Zotero record, or paper card.
 
