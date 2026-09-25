@@ -27,6 +27,9 @@ from millefeuille.domain.summary_execution_scope import (
     validate_gpt_summary_approval_preview,
 )
 from millefeuille.domain.summary_live_execution import TrustedGptSummaryOutcome
+from millefeuille.domain.summary_model_provenance_plan import (
+    plan_gpt_summary_model_provenance,
+)
 from millefeuille.domain.summary_observed_usage_plan import (
     plan_gpt_summary_observed_usage,
 )
@@ -45,6 +48,7 @@ def _write_approval_pair(
     *,
     manifest_sha256: str,
     observed_usage_sha256: str,
+    provenance_manifest_sha256: str,
     paper_id: str,
     run_id: str,
     approved_at: datetime | None = None,
@@ -91,6 +95,10 @@ def _write_approval_pair(
             {
                 "kind": "summary-observed-usage-manifest",
                 "id": observed_usage_sha256,
+            },
+            {
+                "kind": "summary-model-provenance-manifest",
+                "id": provenance_manifest_sha256,
             },
         ],
         key=lambda row: (row["kind"], row["id"]),
@@ -207,10 +215,18 @@ class TestGptSummaryOutputWriteScope(unittest.TestCase):
             structure_evidence_path=self.evidence["structure_evidence_path"],
             preparation_path=self.evidence["preparation_path"],
         )
+        self.provenance = plan_gpt_summary_model_provenance(
+            outcome=self.outcome,
+            run_id=self.run_id,
+            route_evidence_path=self.evidence["route_evidence_path"],
+            structure_evidence_path=self.evidence["structure_evidence_path"],
+            preparation_path=self.evidence["preparation_path"],
+        )
         self.packet, self.receipt = _write_approval_pair(
             self.root,
             manifest_sha256=self.plan.write_manifest_sha256,
             observed_usage_sha256=self.observed.observed_usage_sha256,
+            provenance_manifest_sha256=self.provenance.provenance_manifest_sha256,
             paper_id=self.plan.paper_id,
             run_id=self.run_id,
         )
@@ -239,9 +255,19 @@ class TestGptSummaryOutputWriteScope(unittest.TestCase):
             preview.observed_usage_sha256, self.observed.observed_usage_sha256
         )
         self.assertEqual(
-            len(preview.file_refs),
-            len(self.plan.texts) + len(self.plan.source_inputs) + 3,
+            preview.provenance_manifest_sha256,
+            self.provenance.provenance_manifest_sha256,
         )
+        self.assertEqual(
+            len(preview.file_refs),
+            len(self.plan.texts)
+            + len(self.plan.source_inputs)
+            + len(self.provenance.records)
+            + 4,
+        )
+        self.assertIn(self.provenance.provenance_manifest_ref, preview.file_refs)
+        for record in self.provenance.records:
+            self.assertIn(record.ref, preview.file_refs)
         for source in self.plan.source_inputs:
             self.assertIn(source.ref, preview.file_refs)
         self.assertIn(self.plan.write_manifest_ref, preview.file_refs)
@@ -255,6 +281,7 @@ class TestGptSummaryOutputWriteScope(unittest.TestCase):
             self.root,
             manifest_sha256="sha256:" + "0" * 64,
             observed_usage_sha256=self.observed.observed_usage_sha256,
+            provenance_manifest_sha256=self.provenance.provenance_manifest_sha256,
             paper_id=self.plan.paper_id,
             run_id=self.run_id,
         )

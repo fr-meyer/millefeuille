@@ -24,6 +24,9 @@ from millefeuille.domain.operator_preflight import (
 )
 from millefeuille.domain.secure_io import read_bytes_no_follow
 from millefeuille.domain.summary_live_execution import TrustedGptSummaryOutcome
+from millefeuille.domain.summary_model_provenance_plan import (
+    plan_gpt_summary_model_provenance,
+)
 from millefeuille.domain.summary_observed_usage_plan import (
     plan_gpt_summary_observed_usage,
 )
@@ -38,6 +41,7 @@ class SummaryOutputWritePreview:
     source_manifest_sha256: str
     write_manifest_sha256: str
     observed_usage_sha256: str
+    provenance_manifest_sha256: str
     paper_id: str = field(repr=False)
     run_id: str = field(repr=False)
     file_refs: tuple[str, ...] = field(repr=False)
@@ -88,9 +92,19 @@ def validate_gpt_summary_output_write_preview(
         structure_evidence_path=structure_evidence_path,
         preparation_path=preparation_path,
     )
+    provenance = plan_gpt_summary_model_provenance(
+        outcome=outcome,
+        run_id=run_id,
+        route_evidence_path=route_evidence_path,
+        structure_evidence_path=structure_evidence_path,
+        preparation_path=preparation_path,
+    )
     if (
         observed.write_manifest_sha256 != plan.write_manifest_sha256
         or observed.observed_usage_ref != plan.observed_usage_ref
+        or provenance.write_manifest_sha256 != plan.write_manifest_sha256
+        or provenance.observed_usage_sha256 != observed.observed_usage_sha256
+        or provenance.provenance_manifest_ref != plan.provenance_manifest_ref
     ):
         raise MillefeuilleContractError("GPT summary observed usage plan drift")
     destination = LiveTarget("source-pack-root", compute_operator_root_target_id(root))
@@ -103,6 +117,10 @@ def validate_gpt_summary_output_write_preview(
                 LiveTarget(
                     "summary-observed-usage-manifest",
                     observed.observed_usage_sha256,
+                ),
+                LiveTarget(
+                    "summary-model-provenance-manifest",
+                    provenance.provenance_manifest_sha256,
                 ),
                 LiveTarget(
                     "preflight-scope",
@@ -151,6 +169,8 @@ def validate_gpt_summary_output_write_preview(
             (
                 plan.write_manifest_ref,
                 plan.observed_usage_ref,
+                provenance.provenance_manifest_ref,
+                *(record.ref for record in provenance.records),
                 plan.summary_record_ref,
                 *(text.ref for text in plan.texts),
                 *(source.ref for source in plan.source_inputs),
@@ -163,6 +183,7 @@ def validate_gpt_summary_output_write_preview(
         source_manifest_sha256=plan.source_manifest_sha256,
         write_manifest_sha256=plan.write_manifest_sha256,
         observed_usage_sha256=observed.observed_usage_sha256,
+        provenance_manifest_sha256=provenance.provenance_manifest_sha256,
         paper_id=plan.paper_id,
         run_id=run_id,
         file_refs=refs,
