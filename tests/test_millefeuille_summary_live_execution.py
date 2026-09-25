@@ -95,15 +95,16 @@ class TestTrustedGptSummaryExecution(unittest.TestCase):
         with patch.object(
             live, "request_gpt_summary_reservation", side_effect=reserve
         ) as broker:
-            accepted = self._run(client)
+            outcome = self._run(client)
         after = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         self.assertEqual(before, after)
         self.assertEqual(client.calls, self.preview.request_count)
         self.assertEqual(broker.call_count, 1)
         self.assertEqual(events[0][0], "auth")
         self.assertEqual(events[1], ("reserve",))
-        self.assertEqual(len(accepted.units), self.preview.request_count)
-        self.assertNotIn("Private accepted summary", repr(accepted))
+        self.assertEqual(len(outcome.accepted.units), self.preview.request_count)
+        self.assertEqual(len(outcome.executions), self.preview.request_count)
+        self.assertNotIn("Private accepted summary", repr(outcome))
 
     def test_missing_readiness_or_broker_never_dispatches(self):
         client = _FakeClient(self.plan.batch.units, [])

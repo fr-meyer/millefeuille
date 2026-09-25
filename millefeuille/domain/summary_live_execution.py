@@ -8,6 +8,7 @@ immutable planned prompt and a fresh source recheck.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -22,7 +23,9 @@ from millefeuille.domain.operator_preflight import (
     evaluate_operator_preflight,
 )
 from millefeuille.domain.summary_batch_plan import plan_grounded_gpt_summary_batch
+from millefeuille.domain.summary_dispatch import SummaryDispatchBatch
 from millefeuille.domain.summary_execution_scope import (
+    SummaryApprovalPreview,
     validate_gpt_summary_approval_preview,
 )
 from millefeuille.domain.summary_reservation_broker import (
@@ -34,6 +37,16 @@ from millefeuille.domain.summary_results import (
     accept_summary_execution_unit,
     validate_summary_unit_payload,
 )
+
+
+@dataclass(frozen=True)
+class TrustedGptSummaryOutcome:
+    """The complete transient evidence needed for a later write plan."""
+
+    approval: SummaryApprovalPreview
+    accepted: AcceptedSummaryBatch = field(repr=False)
+    batch: SummaryDispatchBatch = field(repr=False)
+    executions: tuple[OpenClawModelExecution, ...] = field(repr=False)
 
 
 def run_trusted_gpt_summary_batch(
@@ -48,8 +61,8 @@ def run_trusted_gpt_summary_batch(
     environment: Mapping[str, str] | None = None,
     now: datetime | None = None,
     client: OpenClawModelClient | None = None,
-) -> AcceptedSummaryBatch:
-    """Execute one approved GPT batch and retain validated text only in memory.
+) -> TrustedGptSummaryOutcome:
+    """Execute one approved GPT batch and retain all evidence only in memory.
 
     An interrupted or failed call leaves the broker reservation consumed.
     The caller must use a separate approval for any later durable write.
@@ -134,8 +147,16 @@ def run_trusted_gpt_summary_batch(
         accept_summary_execution_unit(unit=unit, execution=execution)
         executions[(unit.stage, unit.unit_id)] = execution
 
-    return accept_summary_execution_batch(
+    accepted = accept_summary_execution_batch(
         batch=plan.batch,
         executions=executions,
         **evidence,
+    )
+    return TrustedGptSummaryOutcome(
+        approval=reserved,
+        accepted=accepted,
+        batch=plan.batch,
+        executions=tuple(
+            executions[(unit.stage, unit.unit_id)] for unit in plan.batch.units
+        ),
     )
