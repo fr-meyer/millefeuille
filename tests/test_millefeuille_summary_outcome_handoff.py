@@ -87,6 +87,15 @@ class TestGptSummaryOutcomeHandoff(unittest.TestCase):
                 replace(original, executions=tuple(executions))
             )
 
+    def test_encoder_rejects_malformed_executor_result(self):
+        original = self.fixture.outcome
+        executions = list(original.executions)
+        executions[0] = replace(executions[0], result=[])
+        with self.assertRaises(MillefeuilleContractError):
+            encode_gpt_summary_outcome_handoff(
+                replace(original, executions=tuple(executions))
+            )
+
     @staticmethod
     def _canonical(payload):
         return (

@@ -20,7 +20,11 @@ from millefeuille.domain.summary_batch_plan import plan_grounded_gpt_summary_bat
 from millefeuille.domain.summary_dispatch import SummaryDispatchBatch
 from millefeuille.domain.summary_execution_scope import SummaryApprovalPreview
 from millefeuille.domain.summary_live_execution import TrustedGptSummaryOutcome
-from millefeuille.domain.summary_results import accept_summary_execution_batch
+from millefeuille.domain.summary_results import (
+    AcceptedSummaryBatch,
+    accept_summary_execution_batch,
+    accept_summary_execution_unit,
+)
 
 _SCHEMA = "millefeuille-gpt-summary-outcome-handoff/v0.1"
 _MAX_BYTES = 64 * 1024 * 1024
@@ -37,22 +41,33 @@ def encode_gpt_summary_outcome_handoff(outcome: TrustedGptSummaryOutcome) -> byt
         not isinstance(outcome, TrustedGptSummaryOutcome)
         or not isinstance(outcome.approval, SummaryApprovalPreview)
         or not isinstance(outcome.batch, SummaryDispatchBatch)
+        or not isinstance(outcome.accepted, AcceptedSummaryBatch)
         or not isinstance(outcome.executions, tuple)
         or len(outcome.executions) != len(outcome.batch.units)
     ):
         raise MillefeuilleContractError("GPT summary handoff outcome is invalid")
     executions: list[dict[str, Any]] = []
-    for execution in outcome.executions:
-        if not isinstance(execution, OpenClawModelExecution) or not isinstance(
-            execution.output, bytes
+    accepted_units = []
+    for unit, execution in zip(
+        outcome.batch.units, outcome.executions, strict=True
+    ):
+        if (
+            not isinstance(execution, OpenClawModelExecution)
+            or not isinstance(execution.result, dict)
+            or not isinstance(execution.output, bytes)
         ):
             raise MillefeuilleContractError("GPT summary handoff execution is invalid")
+        accepted_units.append(
+            accept_summary_execution_unit(unit=unit, execution=execution)
+        )
         executions.append(
             {
                 "result": execution.result,
                 "output_base64": base64.b64encode(execution.output).decode("ascii"),
             }
         )
+    if tuple(accepted_units) != outcome.accepted.units:
+        raise MillefeuilleContractError("GPT summary handoff accepted output drift")
     try:
         payload = {
             "schema_version": _SCHEMA,
