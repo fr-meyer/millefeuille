@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 import hashlib
 import json
+from pathlib import Path
 import re
 from typing import Any
 
@@ -21,12 +22,14 @@ from millefeuille.domain.model_executor import (
     validate_model_executor_result,
     verify_model_executor_input,
 )
+from millefeuille.domain.secure_io import read_bytes_no_follow
 from millefeuille.domain.summary_dispatch import (
     GPT_MODEL,
     SUMMARY_OUTPUT_CONTRACTS,
     SummaryDispatchBatch,
     SummaryDispatchUnit,
 )
+from millefeuille.domain.summary_preparation import verify_summary_preparation_package
 
 _OUTPUT_FIELDS = frozenset(
     {"schema_version", "paper_id", "stage", "unit_id", "summary", "source_locators"}
@@ -87,8 +90,11 @@ def accept_summary_execution_batch(
     *,
     batch: SummaryDispatchBatch,
     executions: Mapping[tuple[str, str], OpenClawModelExecution],
+    route_evidence_path: str | Path,
+    structure_evidence_path: str | Path,
+    preparation_path: str | Path,
 ) -> AcceptedSummaryBatch:
-    """Accept every expected result atomically in memory or reject the batch."""
+    """Reverify preparation and accept every expected result or reject all."""
 
     if not isinstance(batch, SummaryDispatchBatch) or not isinstance(
         executions, Mapping
@@ -104,6 +110,34 @@ def accept_summary_execution_batch(
         not isinstance(unit, SummaryDispatchUnit) for unit in batch.units
     ):
         raise MillefeuilleContractError("summary batch has invalid work units")
+    if {unit.stage for unit in batch.units} != set(SUMMARY_MODEL_STAGES):
+        raise MillefeuilleContractError("summary batch stage coverage drift")
+    package_path = Path(preparation_path)
+    before = read_bytes_no_follow(package_path, "summary preparation package")
+    preparation = verify_summary_preparation_package(
+        route_evidence_path=route_evidence_path,
+        structure_evidence_path=structure_evidence_path,
+        preparation_path=package_path,
+    )
+    after = read_bytes_no_follow(package_path, "summary preparation package")
+    if before != after:
+        raise MillefeuilleContractError("summary preparation changed during acceptance")
+    if (
+        batch.paper_id != preparation["paper_id"]
+        or batch.preparation_sha256 != "sha256:" + hashlib.sha256(after).hexdigest()
+        or "structure page coverage incomplete" in preparation["execution"]["blockers"]
+    ):
+        raise MillefeuilleContractError("summary batch preparation evidence drift")
+    expected_units = [
+        (stage, work_unit["unit_id"], tuple(work_unit["source_locators"]))
+        for stage in SUMMARY_MODEL_STAGES
+        for work_unit in preparation["work_units"][stage]
+    ]
+    actual_units = [
+        (unit.stage, unit.unit_id, unit.source_locators) for unit in batch.units
+    ]
+    if actual_units != expected_units:
+        raise MillefeuilleContractError("summary batch work unit coverage drift")
     keys = [(unit.stage, unit.unit_id) for unit in batch.units]
     if len(keys) != len(set(keys)) or set(executions) != set(keys):
         raise MillefeuilleContractError("summary batch execution coverage drift")

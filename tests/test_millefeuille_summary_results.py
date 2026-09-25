@@ -5,6 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 import hashlib
 import json
+from pathlib import Path
+import tempfile
 import unittest
 
 from millefeuille.clients.openclaw_model_client import OpenClawModelExecution
@@ -18,14 +20,40 @@ from millefeuille.domain.summary_dispatch import (
     SummaryDispatchBatch,
     SummaryDispatchUnit,
     _bind_prompt,
+    plan_verified_summary_dispatch,
 )
 from millefeuille.domain.summary_results import (
     accept_summary_execution_batch,
     validate_summary_unit_payload,
 )
+from tests import test_millefeuille_summary_dispatch as dispatch_tests
+from tests.platform_capabilities import requires_secure_nofollow_writes
 
 
+@requires_secure_nofollow_writes
 class TestSummaryResults(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        route, structure, preparation = dispatch_tests.TestSummaryDispatch()._fixture(
+            Path(temporary.name)
+        )
+        self.evidence = {
+            "route_evidence_path": route,
+            "structure_evidence_path": structure,
+            "preparation_path": preparation,
+        }
+        self.prepared_batch = plan_verified_summary_dispatch(
+            **self.evidence,
+            prompt_builder=dispatch_tests.TestSummaryDispatch._prompt,
+            output_contracts=dispatch_tests.CONTRACTS,
+        )
+
+    def _accept(self, batch, executions):
+        return accept_summary_execution_batch(
+            batch=batch, executions=executions, **self.evidence
+        )
+
     def _unit(
         self,
         stage: str,
@@ -113,14 +141,7 @@ class TestSummaryResults(unittest.TestCase):
         return OpenClawModelExecution(result=result, output=output)
 
     def _batch(self) -> SummaryDispatchBatch:
-        return SummaryDispatchBatch(
-            paper_id="zotero-ITEM1",
-            preparation_sha256="sha256:" + "a" * 64,
-            units=(
-                self._unit("summarize_page", "page-1", "p.1"),
-                self._unit("summarize_section", "section-s1", "p.1#s1"),
-            ),
-        )
+        return self.prepared_batch
 
     def test_accepts_exact_batch_without_exposing_private_text_in_repr(self):
         batch = self._batch()
@@ -128,8 +149,8 @@ class TestSummaryResults(unittest.TestCase):
             (unit.stage, unit.unit_id): self._execution(unit, self._output(unit))
             for unit in batch.units
         }
-        accepted = accept_summary_execution_batch(batch=batch, executions=executions)
-        self.assertEqual(len(accepted.units), 2)
+        accepted = self._accept(batch, executions)
+        self.assertEqual(len(accepted.units), 3)
         self.assertEqual(accepted.units[0].summary, "Private accepted summary.")
         self.assertEqual(accepted.units[1].source_locators, ("p.1#s1",))
         self.assertNotIn("Private accepted summary", repr(accepted))
@@ -143,14 +164,14 @@ class TestSummaryResults(unittest.TestCase):
         }
         first_key = (batch.units[0].stage, batch.units[0].unit_id)
         with self.assertRaisesRegex(MillefeuilleContractError, "coverage drift"):
-            accept_summary_execution_batch(
+            self._accept(
                 batch=batch,
                 executions={
                     key: value for key, value in executions.items() if key != first_key
                 },
             )
         with self.assertRaisesRegex(MillefeuilleContractError, "coverage drift"):
-            accept_summary_execution_batch(
+            self._accept(
                 batch=batch,
                 executions={
                     **executions,
@@ -162,7 +183,7 @@ class TestSummaryResults(unittest.TestCase):
             output=b"{}",
         )
         with self.assertRaisesRegex(MillefeuilleContractError, "output binding drift"):
-            accept_summary_execution_batch(
+            self._accept(
                 batch=batch,
                 executions={**executions, first_key: drifted},
             )
@@ -190,7 +211,7 @@ class TestSummaryResults(unittest.TestCase):
         batch = SummaryDispatchBatch(
             paper_id=original.paper_id,
             preparation_sha256=original.preparation_sha256,
-            units=(original.units[0], other),
+            units=(original.units[0], other, original.units[2]),
         )
         executions = {
             (unit.stage, unit.unit_id): self._execution(unit, self._output(unit))
@@ -199,7 +220,7 @@ class TestSummaryResults(unittest.TestCase):
         with self.assertRaisesRegex(
             MillefeuilleContractError, "preparation binding drift"
         ):
-            accept_summary_execution_batch(batch=batch, executions=executions)
+            self._accept(batch, executions)
 
     def test_rejects_whole_batch_when_later_unit_fails(self):
         batch = self._batch()
@@ -239,7 +260,7 @@ class TestSummaryResults(unittest.TestCase):
             result=failed, output=None
         )
         with self.assertRaisesRegex(MillefeuilleContractError, "did not succeed"):
-            accept_summary_execution_batch(batch=batch, executions=executions)
+            self._accept(batch, executions)
 
     def test_rejects_duplicate_json_fields_and_tampered_request(self):
         batch = self._batch()
@@ -254,7 +275,7 @@ class TestSummaryResults(unittest.TestCase):
         )
         key = (first.stage, first.unit_id)
         with self.assertRaisesRegex(MillefeuilleContractError, "strict JSON"):
-            accept_summary_execution_batch(
+            self._accept(
                 batch=batch,
                 executions={
                     **executions,
@@ -265,3 +286,39 @@ class TestSummaryResults(unittest.TestCase):
         drifted_unit.request["requested_model"] = "xai/grok-4.6"
         with self.assertRaises(MillefeuilleContractError):
             validate_summary_unit_payload(drifted_unit, json.loads(self._output(first)))
+
+    def test_rejects_a_batch_missing_an_entire_stage(self):
+        complete = self._batch()
+        partial = SummaryDispatchBatch(
+            paper_id=complete.paper_id,
+            preparation_sha256=complete.preparation_sha256,
+            units=complete.units[:-1],
+        )
+        executions = {
+            (unit.stage, unit.unit_id): self._execution(unit, self._output(unit))
+            for unit in partial.units
+        }
+        with self.assertRaisesRegex(MillefeuilleContractError, "stage coverage drift"):
+            self._accept(partial, executions)
+
+    def test_rejects_a_batch_with_changed_preparation_unit_identity(self):
+        complete = self._batch()
+        changed = self._unit(
+            "summarize_section",
+            "section-missing",
+            "p.1#s1",
+            preparation_digest=complete.preparation_sha256,
+        )
+        batch = SummaryDispatchBatch(
+            paper_id=complete.paper_id,
+            preparation_sha256=complete.preparation_sha256,
+            units=(complete.units[0], changed, complete.units[2]),
+        )
+        executions = {
+            (unit.stage, unit.unit_id): self._execution(unit, self._output(unit))
+            for unit in batch.units
+        }
+        with self.assertRaisesRegex(
+            MillefeuilleContractError, "work unit coverage drift"
+        ):
+            self._accept(batch, executions)
