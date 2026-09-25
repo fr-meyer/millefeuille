@@ -238,7 +238,12 @@ class TestGptSummaryOutputWriteScope(unittest.TestCase):
         self.assertEqual(
             preview.observed_usage_sha256, self.observed.observed_usage_sha256
         )
-        self.assertEqual(len(preview.file_refs), len(self.plan.texts) + 3)
+        self.assertEqual(
+            len(preview.file_refs),
+            len(self.plan.texts) + len(self.plan.source_inputs) + 3,
+        )
+        for source in self.plan.source_inputs:
+            self.assertIn(source.ref, preview.file_refs)
         self.assertIn(self.plan.write_manifest_ref, preview.file_refs)
         self.assertIn(self.plan.observed_usage_ref, preview.file_refs)
         self.assertIn(self.plan.summary_record_ref, preview.file_refs)
