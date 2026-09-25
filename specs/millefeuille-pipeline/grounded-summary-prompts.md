@@ -22,3 +22,10 @@ by the result validator, with citations drawn only from the prepared locators.
 
 This prompt template supplies source-scoped input for future exact batch
 manifests. It does not authorize provider calls or durable summary writes.
+
+`plan_grounded_gpt_summary_batch` is the no-call entry point for a verified
+preparation package. It uses these bundled prompt versions and exact output
+contracts, then re-verifies the batch to produce a text-free execution manifest.
+The returned batch remains transient in memory; a later approved executor must
+bind its receipt to the manifest and validate all outputs before materializing
+any private summary.
