@@ -97,9 +97,25 @@ accepts an output binding. The batch validator then rechecks every result's
 request identity, GPT-only OAuth provenance, output hash and byte count, strict
 JSON, task identity, and citations. It also rereads the route, structure, and
 preparation evidence and compares every planned unit with the verified package;
-the caller must supply all three evidence paths. Missing stages, missing or
-extra units within a stage, failed executions, or drifted units reject the
+the caller must supply all three evidence paths. Missing expected work units,
+extra units, failed executions, or drifted units reject the
 whole batch. It returns accepted text only in memory and does not
 publish a summary or advance acceptance/classification. A future approved
 orchestrator must supply the exact execution receipt and keep durable writes
 behind their separate gates.
+
+## No-call batch execution manifest
+
+`plan_summary_execution_manifest` rechecks the complete dispatch batch against
+its route, structure, and preparation evidence, then emits canonical JSON and
+its SHA-256 digest. The manifest records each work unit's stage, identity,
+locator hash, input hash and length, prompt/output contract, request hash, and
+idempotency key. It contains no prompt, paper text, source locator, provider
+response, or credential. The schema is
+`summary-execution-manifest.schema.json`.
+
+The manifest digest can be named in a future exact provider-execution packet.
+Planning neither authorizes nor performs a model call. The executor still needs
+an independently verified, single-use live receipt and a durable reservation
+before its first call. Accepted text remains private until a separate approved
+materialization step assigns durable output references for provenance.

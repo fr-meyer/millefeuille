@@ -96,58 +96,19 @@ def accept_summary_execution_batch(
 ) -> AcceptedSummaryBatch:
     """Reverify preparation and accept every expected result or reject all."""
 
-    if not isinstance(batch, SummaryDispatchBatch) or not isinstance(
-        executions, Mapping
-    ):
+    if not isinstance(executions, Mapping):
         raise MillefeuilleContractError("summary batch evidence is invalid")
-    if not isinstance(batch.paper_id, str) or not _PAPER_ID.fullmatch(batch.paper_id):
-        raise MillefeuilleContractError("summary batch paper identity is invalid")
-    if not isinstance(batch.preparation_sha256, str) or not re.fullmatch(
-        r"sha256:[0-9a-f]{64}", batch.preparation_sha256
-    ):
-        raise MillefeuilleContractError("summary batch preparation hash is invalid")
-    if not batch.units or any(
-        not isinstance(unit, SummaryDispatchUnit) for unit in batch.units
-    ):
-        raise MillefeuilleContractError("summary batch has invalid work units")
-    if {unit.stage for unit in batch.units} != set(SUMMARY_MODEL_STAGES):
-        raise MillefeuilleContractError("summary batch stage coverage drift")
-    package_path = Path(preparation_path)
-    before = read_bytes_no_follow(package_path, "summary preparation package")
-    preparation = verify_summary_preparation_package(
+    requests = verify_summary_dispatch_batch(
+        batch=batch,
         route_evidence_path=route_evidence_path,
         structure_evidence_path=structure_evidence_path,
-        preparation_path=package_path,
+        preparation_path=preparation_path,
     )
-    after = read_bytes_no_follow(package_path, "summary preparation package")
-    if before != after:
-        raise MillefeuilleContractError("summary preparation changed during acceptance")
-    if (
-        batch.paper_id != preparation["paper_id"]
-        or batch.preparation_sha256 != "sha256:" + hashlib.sha256(after).hexdigest()
-        or "structure page coverage incomplete" in preparation["execution"]["blockers"]
-    ):
-        raise MillefeuilleContractError("summary batch preparation evidence drift")
-    expected_units = [
-        (stage, work_unit["unit_id"], tuple(work_unit["source_locators"]))
-        for stage in SUMMARY_MODEL_STAGES
-        for work_unit in preparation["work_units"][stage]
-    ]
-    actual_units = [
-        (unit.stage, unit.unit_id, unit.source_locators) for unit in batch.units
-    ]
-    if actual_units != expected_units:
-        raise MillefeuilleContractError("summary batch work unit coverage drift")
     keys = [(unit.stage, unit.unit_id) for unit in batch.units]
-    if len(keys) != len(set(keys)) or set(executions) != set(keys):
+    if set(executions) != set(keys):
         raise MillefeuilleContractError("summary batch execution coverage drift")
     accepted: list[AcceptedSummaryUnit] = []
-    for unit in batch.units:
-        if unit.paper_id != batch.paper_id:
-            raise MillefeuilleContractError("summary batch paper identity drift")
-        request = _validated_unit_request(unit)
-        if _prompt_binding(unit) != batch.preparation_sha256:
-            raise MillefeuilleContractError("summary batch preparation binding drift")
+    for unit, request in zip(batch.units, requests, strict=True):
         execution = executions[(unit.stage, unit.unit_id)]
         if not isinstance(execution, OpenClawModelExecution):
             raise MillefeuilleContractError("summary batch execution is invalid")
@@ -188,6 +149,74 @@ def accept_summary_execution_batch(
         preparation_sha256=batch.preparation_sha256,
         units=tuple(accepted),
     )
+
+
+def verify_summary_dispatch_batch(
+    *,
+    batch: SummaryDispatchBatch,
+    route_evidence_path: str | Path,
+    structure_evidence_path: str | Path,
+    preparation_path: str | Path,
+) -> tuple[dict[str, Any], ...]:
+    """Check every planned GPT request against the current preparation."""
+
+    if not isinstance(batch, SummaryDispatchBatch):
+        raise MillefeuilleContractError("summary batch evidence is invalid")
+    if not isinstance(batch.paper_id, str) or not _PAPER_ID.fullmatch(batch.paper_id):
+        raise MillefeuilleContractError("summary batch paper identity is invalid")
+    if not isinstance(batch.preparation_sha256, str) or not re.fullmatch(
+        r"sha256:[0-9a-f]{64}", batch.preparation_sha256
+    ):
+        raise MillefeuilleContractError("summary batch preparation hash is invalid")
+    if not batch.units or any(
+        not isinstance(unit, SummaryDispatchUnit) for unit in batch.units
+    ):
+        raise MillefeuilleContractError("summary batch has invalid work units")
+    package_path = Path(preparation_path)
+    before = read_bytes_no_follow(package_path, "summary preparation package")
+    preparation = verify_summary_preparation_package(
+        route_evidence_path=route_evidence_path,
+        structure_evidence_path=structure_evidence_path,
+        preparation_path=package_path,
+    )
+    after = read_bytes_no_follow(package_path, "summary preparation package")
+    if before != after:
+        raise MillefeuilleContractError(
+            "summary preparation changed during verification"
+        )
+    if (
+        batch.paper_id != preparation["paper_id"]
+        or batch.preparation_sha256 != "sha256:" + hashlib.sha256(after).hexdigest()
+        or "structure page coverage incomplete" in preparation["execution"]["blockers"]
+    ):
+        raise MillefeuilleContractError("summary batch preparation evidence drift")
+    expected_units = [
+        (stage, work_unit["unit_id"], tuple(work_unit["source_locators"]))
+        for stage in SUMMARY_MODEL_STAGES
+        for work_unit in preparation["work_units"][stage]
+    ]
+    actual_units = [
+        (unit.stage, unit.unit_id, unit.source_locators) for unit in batch.units
+    ]
+    if actual_units != expected_units:
+        raise MillefeuilleContractError("summary batch work unit coverage drift")
+    keys = [(unit.stage, unit.unit_id) for unit in batch.units]
+    if len(keys) != len(set(keys)):
+        raise MillefeuilleContractError("summary batch work unit identity collision")
+    requests: list[dict[str, Any]] = []
+    request_ids: set[str] = set()
+    for unit in batch.units:
+        if unit.paper_id != batch.paper_id:
+            raise MillefeuilleContractError("summary batch paper identity drift")
+        request = _validated_unit_request(unit)
+        if _prompt_binding(unit) != batch.preparation_sha256:
+            raise MillefeuilleContractError("summary batch preparation binding drift")
+        request_id = request["idempotency_key"]
+        if request_id in request_ids:
+            raise MillefeuilleContractError("summary batch request identity collision")
+        request_ids.add(request_id)
+        requests.append(request)
+    return tuple(requests)
 
 
 def _validated_unit_request(unit: SummaryDispatchUnit) -> dict[str, Any]:
