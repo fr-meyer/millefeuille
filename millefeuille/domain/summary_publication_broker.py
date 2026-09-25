@@ -39,6 +39,10 @@ from millefeuille.domain.summary_publication_fs import (
 )
 
 
+class GptSummaryPublicationAuditUncertainError(MillefeuilleContractError):
+    """The receipt is consumed and the terminal audit state is unknown."""
+
+
 def publish_trusted_gpt_summary_handoff(
     *,
     encoded_outcome: bytes,
@@ -96,7 +100,7 @@ def publish_trusted_gpt_summary_handoff(
                 status="uncertain" if uncertain else "failed-before-commit",
             )
         except Exception as audit_exc:
-            raise MillefeuilleContractError(
+            raise GptSummaryPublicationAuditUncertainError(
                 "GPT publication audit finalization failed; outcome uncertain"
             ) from audit_exc
         raise
