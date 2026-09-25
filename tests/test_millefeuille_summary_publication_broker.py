@@ -92,7 +92,7 @@ class TestGptSummaryPublicationBroker(unittest.TestCase):
         self.assertEqual(self._status(), "published")
         self.assertFalse((self.root / "analyses").exists())
 
-    @unittest.skipUnless(os.geteuid() == 0, "requires Linux root")
+    @unittest.skipUnless(getattr(os, "geteuid", lambda: -1)() == 0, "requires Linux root")
     def test_full_fixture_publication_commits_exact_files_and_audit(self):
         bundle = plan_gpt_summary_publication_bundle(**self.evidence)
         with _trusted_control(self.control, self.approval):
