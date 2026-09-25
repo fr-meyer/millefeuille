@@ -211,6 +211,56 @@ def prepare_summary_execution_packages(
     )
 
 
+def verify_summary_preparation_package(
+    *,
+    route_evidence_path: str | Path,
+    structure_evidence_path: str | Path,
+    preparation_path: str | Path,
+) -> dict[str, Any]:
+    """Rebuild one preparation in memory and reject source or package drift.
+
+    This is the read-only boundary for future approved model execution. It
+    checks the current route, structure, selected Markdown, canonical model
+    plans, work units, and package bytes without making a provider call.
+    """
+
+    package_path = Path(preparation_path)
+    package_bytes = read_bytes_no_follow(package_path, "summary preparation package")
+    try:
+        package = json.loads(package_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise MillefeuilleContractError(
+            "summary preparation package is not valid JSON"
+        ) from exc
+    if not isinstance(package, dict):
+        raise MillefeuilleContractError("summary preparation package must be an object")
+    profile = package.get("profile")
+    if not isinstance(profile, str) or not profile:
+        raise MillefeuilleContractError(
+            "summary preparation package profile is invalid"
+        )
+    routes = load_route_selection_evidence_batch(route_evidence_path)
+    structures = load_structure_evidence_batch(structure_evidence_path)
+    if len(routes) != 1 or len(structures) != 1:
+        raise MillefeuilleContractError(
+            "summary dispatch requires one route and one structure record"
+        )
+    plans = {
+        stage: build_summary_execution_plan(profile=profile, stage=stage)
+        for stage in SUMMARY_MODEL_STAGES
+    }
+    expected = _prepare_document(
+        route=routes[0],
+        structure=structures[0],
+        output_root=package_path.parent,
+        profile=profile,
+        plans=plans,
+    )
+    if package_path != expected.package_path or package_bytes != expected.package_bytes:
+        raise MillefeuilleContractError("summary preparation package or source drift")
+    return package
+
+
 def _prepare_document(
     *,
     route: RouteSelectionFixtureEvidence,
