@@ -205,8 +205,9 @@ class TestGptSummaryOutputWriteScope(unittest.TestCase):
         after = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         self.assertEqual(before, after)
         self.assertEqual(preview.write_manifest_sha256, self.plan.write_manifest_sha256)
-        self.assertEqual(len(preview.file_refs), len(self.plan.texts) + 2)
+        self.assertEqual(len(preview.file_refs), len(self.plan.texts) + 3)
         self.assertIn(self.plan.write_manifest_ref, preview.file_refs)
+        self.assertIn(self.plan.observed_usage_ref, preview.file_refs)
         self.assertIn(self.plan.summary_record_ref, preview.file_refs)
         self.assertEqual(preview.files_written, 0)
         self.assertNotIn("Private accepted summary", repr(preview))
