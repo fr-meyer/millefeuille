@@ -12,6 +12,7 @@ import stat
 import struct
 import sys
 import tempfile
+from threading import Event
 import time
 from types import SimpleNamespace
 import unittest
@@ -154,6 +155,49 @@ class TestGptSummaryReservationBroker(unittest.TestCase):
                 future.result(timeout=5)
                 self.assertEqual(reply["status"], "denied")
                 reserve.assert_not_called()
+
+    def test_wrong_peer_does_not_consume_authorized_request(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "paper"
+            root.mkdir()
+            evidence, packet, receipt, _record = _case(root)
+            preview = validate_gpt_summary_approval_preview(
+                **evidence, packet=packet, receipt=receipt
+            )
+            control = Path(tempdir) / "control"
+            control.mkdir(mode=0o700)
+            rejected = Event()
+            original_require_peer_uid = broker._require_peer_uid
+
+            def reject_first_peer(channel, uid):
+                if not rejected.is_set():
+                    rejected.set()
+                    raise MillefeuilleContractError("wrong peer")
+                return original_require_peer_uid(channel, uid)
+
+            with (
+                _broker_test_controls(control),
+                patch.object(broker, "_require_peer_uid", reject_first_peer),
+                patch.object(
+                    broker, "reserve_trusted_gpt_summary_receipt", return_value=preview
+                ) as reserve,
+                ThreadPoolExecutor(max_workers=1) as pool,
+            ):
+                future = pool.submit(broker.serve_one_reservation, timeout_seconds=5)
+                path = control / "summary.sock"
+                _wait_for_socket(path)
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
+                    channel.connect(str(path))
+                self.assertTrue(rejected.wait(timeout=2))
+                self.assertFalse(future.done())
+                reserve.assert_not_called()
+                result = broker.request_gpt_summary_reservation(
+                    **evidence, packet=packet, receipt=receipt
+                )
+                future.result(timeout=5)
+                self.assertEqual(result, preview)
+                self.assertEqual(reserve.call_count, 1)
+                self.assertFalse(path.exists())
 
     def test_evidence_cannot_escape_source_root_or_follow_symlink(self):
         with tempfile.TemporaryDirectory() as tempdir:
