@@ -17,6 +17,9 @@ from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.summary_outcome_handoff import (
     encode_gpt_summary_outcome_handoff,
 )
+from millefeuille.domain.summary_publication_bundle import (
+    plan_gpt_summary_publication_bundle,
+)
 from millefeuille.domain.summary_publication_fs import (
     GptSummaryFilesystemCommit,
     GptSummaryPublicationError,
@@ -88,6 +91,25 @@ class TestGptSummaryPublicationBroker(unittest.TestCase):
         self.assertEqual(commit.call_count, 1)
         self.assertEqual(self._status(), "published")
         self.assertFalse((self.root / "analyses").exists())
+
+    @unittest.skipUnless(os.geteuid() == 0, "requires Linux root")
+    def test_full_fixture_publication_commits_exact_files_and_audit(self):
+        bundle = plan_gpt_summary_publication_bundle(**self.evidence)
+        with _trusted_control(self.control, self.approval):
+            result = self._publish()
+            with self.assertRaises(MillefeuilleContractError):
+                self._publish()
+        self.assertEqual(result.run_id, self.evidence["run_id"])
+        self.assertEqual(result.file_count, len(bundle.files))
+        self.assertEqual(result.total_bytes, bundle.total_bytes)
+        self.assertEqual(result.bundle_manifest_sha256, bundle.bundle_manifest_sha256)
+        self.assertEqual(self._status(), "published")
+        for planned in bundle.files:
+            with self.subTest(ref=planned.ref):
+                published = self.root / planned.ref
+                self.assertTrue(published.is_file())
+                self.assertEqual(published.read_bytes(), planned.data)
+        self.assertFalse(list(self.root.rglob(".gpt-summary-stage-*")))
 
     def test_missing_approval_fails_without_a_ledger_or_paper_write(self):
         self.approval.unlink()
