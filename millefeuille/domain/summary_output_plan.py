@@ -56,6 +56,7 @@ class SummaryOutputPlan:
     write_manifest_sha256: str
     write_manifest_ref: str
     observed_usage_ref: str
+    provenance_manifest_ref: str
     summary_record_ref: str
     write_manifest_json: bytes = field(repr=False)
     summary_record_json: bytes = field(repr=False)
@@ -113,6 +114,7 @@ def plan_gpt_summary_outputs(
     summary_dir = f"analyses/millefeuille/{run_id}/summaries"
     write_manifest_ref = f"{summary_dir}/write-manifest.json"
     observed_usage_ref = f"{summary_dir}/observed-usage.json"
+    provenance_manifest_ref = f"{summary_dir}/provenance-manifest.json"
     summary_record_ref = f"{summary_dir}/hierarchical-summary.json"
     for unit in accepted.units:
         summary_id = f"{unit.stage}-{unit.unit_id}"
@@ -139,6 +141,7 @@ def plan_gpt_summary_outputs(
             {
                 "summary_id": summary_id,
                 "text_ref": run_ref,
+                "provenance_ref": f"{summary_dir}/provenance/{summary_id}.json",
                 "text_sha256": text_sha256,
                 "executor_result_sha256": "sha256:"
                 + hashlib.sha256(result_bytes).hexdigest(),
@@ -157,6 +160,7 @@ def plan_gpt_summary_outputs(
         "source_manifest_sha256": outcome.approval.manifest_sha256,
         "write_manifest_ref": write_manifest_ref,
         "observed_usage_ref": observed_usage_ref,
+        "provenance_manifest_ref": provenance_manifest_ref,
         "summary_record_ref": summary_record_ref,
         "source_inputs": [
             {"ref": source.ref, "sha256": source.sha256} for source in source_inputs
@@ -174,6 +178,7 @@ def plan_gpt_summary_outputs(
         + hashlib.sha256(write_manifest_json).hexdigest(),
         write_manifest_ref=write_manifest_ref,
         observed_usage_ref=observed_usage_ref,
+        provenance_manifest_ref=provenance_manifest_ref,
         summary_record_ref=summary_record_ref,
         write_manifest_json=write_manifest_json,
         summary_record_json=summary_record_json,
