@@ -709,7 +709,17 @@ def _load_run_scoped_summary_check(
         notes=["hierarchical summary verified"]
         if status == AcceptanceCheckStatus.PASSED
         else ["summary identity drift"],
-        details={"summary_count": len(payload["summaries"])},
+        details={
+            "summary_count": len(payload["summaries"]),
+            **(
+                {
+                    "origin_run_id": payload["origin_run_id"],
+                    "summary_link_sha256": payload["summary_link_sha256"],
+                }
+                if "origin_run_id" in payload
+                else {}
+            ),
+        },
     )
 
 

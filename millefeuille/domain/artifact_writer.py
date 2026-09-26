@@ -782,9 +782,15 @@ def _resolve_summary_refs(
             "summary_artifact_ref": None,
             "summary_text_dir_ref": None,
         }
-    if not summary_path.is_file() or not summary_text_dir.is_dir():
+    if not summary_path.is_file():
         raise ValueError(f"incomplete summary fixture under {summary_path.parent}")
     payload = load_hierarchical_summary(summary_path)
+    from millefeuille.domain.published_summary_run_link import VIEW_SCHEMA_VERSION
+
+    if payload["schema_version"] == VIEW_SCHEMA_VERSION:
+        summary_text_dir = summary_path.parent / payload["summary_text_dir_ref"]
+    if not summary_text_dir.is_dir():
+        raise ValueError(f"incomplete summary fixture under {summary_path.parent}")
     if payload["paper_id"] != paper_id:
         raise ValueError(f"hierarchical summary paper_id drift at {summary_path}")
     if payload["run_id"] != run_id:

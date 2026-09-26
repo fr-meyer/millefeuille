@@ -1,0 +1,33 @@
+id: pr-mf-published-summary-run-link
+title: Reuse a verified immutable GPT summary in a distinct card run
+status: implementation
+branch: feat/pr-mf-published-summary-run-link
+base_branch: dev
+write_paths:
+  - README.md
+  - .speculoos/tasks/pr-mf-published-summary-run-link.yaml
+  - millefeuille/domain/published_summary_run_link.py
+  - millefeuille/domain/summary_published_handoff.py
+  - millefeuille/domain/summary_fixtures.py
+  - millefeuille/domain/artifact_writer.py
+  - millefeuille/domain/acceptance.py
+  - specs/millefeuille-pipeline/published-summary-run-link.md
+  - specs/millefeuille-pipeline/published-summary-run-link.schema.json
+  - tests/test_millefeuille_published_summary_run_link.py
+scope:
+  - Plan one metadata-only link to an immutable verified summary publication
+  - Expose a distinct consuming-run view with original generation and provenance
+  - Keep existing indexing, artifact references and acceptance readers compatible
+acceptance:
+  - Original summary and provenance bytes remain immutable with no text copies
+  - Identity, source, card content, provenance, traversal and symlink drift fail closed
+  - Views cannot be rematerialized as newly generated summaries
+  - Focused and full tests, Ruff, schema and metadata validation pass
+publication_boundary:
+  statement: Code, synthetic tests, public schema and documentation only; no credential lookup, provider call, production source or summary-link write, OCR, OpenKB indexing, classification, Zotero edit, release or approval bypass.
+branch_plan: Clean isolated worktree from synchronized dev, exact-head review and all CI checks before merging into dev.
+documentation_impact:
+  status: updated
+  rationale: Document the persisted link, derived view, read bounds, provenance and independent production gates.
+publish_authority: Existing user authorization covers routine feature-to-dev publication and review; production artifact writes retain their separate exact gates.
+private_data_scan: Required; metadata, public code and synthetic test fixtures only.

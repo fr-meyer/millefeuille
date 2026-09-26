@@ -217,7 +217,16 @@ def write_summaries_from_evidence(
 
 
 def load_hierarchical_summary(path: str | Path) -> dict[str, Any]:
-    payload = _load_json_object(path, "hierarchical summary")
+    payload = load_json_object_no_follow(
+        path, "hierarchical summary", max_bytes=4 * 1024 * 1024
+    )
+    from millefeuille.domain.published_summary_run_link import (
+        LINK_SCHEMA_VERSION,
+        load_published_summary_run_view,
+    )
+
+    if payload.get("schema_version") == LINK_SCHEMA_VERSION:
+        return load_published_summary_run_view(path)
     record = HierarchicalSummaryRecord.from_dict(payload)
     return record.to_dict()
 
@@ -285,6 +294,10 @@ def _materialize_summary_bundle(
     run_id: str,
     summary_output_path: Path,
 ) -> tuple[dict[str, Any], dict[Path, str]]:
+    if fixture_payload.get("schema_version") != SUMMARY_ARTIFACT_SCHEMA_VERSION:
+        raise MillefeuilleContractError(
+            "published summary views cannot be rematerialized as generated summaries"
+        )
     summary_record = HierarchicalSummaryRecord.from_dict(
         {
             "schema_version": SUMMARY_ARTIFACT_SCHEMA_VERSION,

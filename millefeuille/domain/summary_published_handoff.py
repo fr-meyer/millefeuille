@@ -76,6 +76,44 @@ class VerifiedPublishedGptSummaryInputs:
     summaries: tuple[dict[str, Any], ...] = field(repr=False)
 
 
+@dataclass(frozen=True)
+class VerifiedPublishedGptSummaryFile:
+    ref: str
+    data: bytes = field(repr=False)
+
+
+@dataclass(frozen=True)
+class VerifiedPublishedGptSummaryPackage:
+    handoff: PublishedGptSummaryHandoff
+    files: tuple[VerifiedPublishedGptSummaryFile, ...] = field(repr=False)
+
+
+def load_verified_published_gpt_summary_package(
+    *,
+    source_pack_root: str | Path,
+    route_evidence_path: str | Path,
+    structure_evidence_path: str | Path,
+    preparation_path: str | Path,
+    publication: GptSummaryPublicationIdentity,
+) -> VerifiedPublishedGptSummaryPackage:
+    """Hold the entire verified publication for provenance-preserving reuse.
+
+    No execution, write or acceptance authority is granted. Private bytes are
+    captured by the publication verifier and excluded from representations.
+    """
+    handoff, data = _verify_published_gpt_summary_data(
+        source_pack_root=source_pack_root,
+        route_evidence_path=route_evidence_path,
+        structure_evidence_path=structure_evidence_path,
+        preparation_path=preparation_path,
+        publication=publication,
+    )
+    return VerifiedPublishedGptSummaryPackage(
+        handoff,
+        tuple(VerifiedPublishedGptSummaryFile(ref, data[ref]) for ref in sorted(data)),
+    )
+
+
 def plan_published_gpt_summary_handoff(
     *,
     source_pack_root: str | Path,
