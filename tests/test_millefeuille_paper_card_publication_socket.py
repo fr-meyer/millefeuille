@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from contextlib import ExitStack
+import json
 import os
 from pathlib import Path
 import socket
 import stat
 import struct
+import subprocess
+import sys
 import tempfile
+import textwrap
 import threading
 import time
 from types import SimpleNamespace
@@ -130,6 +134,106 @@ class TestGptCardPublicationSocket(unittest.TestCase):
                 / self.fixture.plan.run_id
             ).exists()
         )
+
+    @unittest.skipUnless(sys.platform == "linux", "module server requires Linux")
+    def test_module_entrypoint_accepts_valid_request_in_subprocess(self):
+        """Run the actual __main__ path with isolated controls and a fake writer."""
+
+        bundle = plan_gpt_card_publication_bundle(**self.values)
+        bootstrap = textwrap.dedent(
+            """
+            import json
+            import os
+            from pathlib import Path
+            import pwd
+            import runpy
+            import sys
+            from types import SimpleNamespace
+            from millefeuille.domain.paper_card_publication_fs import (
+                GptCardFilesystemCommit,
+            )
+
+            values = json.loads(sys.argv[1])
+            uid, gid = os.getuid(), os.getgid()
+            commit = GptCardFilesystemCommit(**values['commit'])
+
+            def isolate_entrypoint(frame, event, arg):
+                if (event == 'call' and frame.f_code.co_name == 'serve_one_publication'
+                        and frame.f_globals.get('__name__') == '__main__'):
+                    # Patch only the test controls and writer at executable entry.
+                    # The module's definition order and request parser stay intact.
+                    namespace = frame.f_globals
+                    namespace['_CONTROL_DIR'] = Path(values['control'])
+                    namespace['_SOCKET_PATH'] = Path(values['socket'])
+                    namespace['_require_control_dir'] = lambda: None
+                    publisher = lambda **kwargs: commit
+                    namespace['publish_trusted_gpt_card_handoff'] = publisher
+                    os.geteuid = lambda: 0
+                    os.chown = lambda *args: None
+                    pwd.getpwnam = lambda name: SimpleNamespace(pw_uid=uid, pw_gid=gid)
+                    sys.settrace(None)
+                return isolate_entrypoint
+
+            sys.settrace(isolate_entrypoint)
+            runpy.run_module(
+                'millefeuille.domain.paper_card_publication_socket',
+                run_name='__main__',
+            )
+            """
+        )
+        values = {
+            "control": str(self.control),
+            "socket": str(self.socket_path),
+            "commit": {
+                "run_id": self.fixture.plan.run_id,
+                "file_count": len(bundle.files),
+                "total_bytes": bundle.total_bytes,
+                "bundle_manifest_sha256": bundle.bundle_manifest_sha256,
+                "source_pack_root": str(self.fixture.root),
+            },
+        }
+        server = subprocess.Popen(
+            [sys.executable, "-c", bootstrap, json.dumps(values)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            for _ in range(500):
+                if server.poll() is not None:
+                    stdout, stderr = server.communicate(timeout=2)
+                    self.fail(
+                        f"module server exited before readiness: {stdout} {stderr}"
+                    )
+                if (
+                    self.socket_path.exists()
+                    and stat.S_IMODE(self.socket_path.stat().st_mode) == 0o660
+                ):
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("module publication socket never became ready")
+            with ExitStack() as stack:
+                for context in self._patch_control():
+                    stack.enter_context(context)
+                ack = publication_socket.request_gpt_card_publication(**self.values)
+            stdout, stderr = server.communicate(timeout=6)
+            self.assertEqual(server.returncode, 0, f"{stdout} {stderr}")
+            self.assertEqual(ack.bundle_manifest_sha256, bundle.bundle_manifest_sha256)
+            self.assertEqual(ack.file_count, len(bundle.files))
+            self.assertFalse(self.socket_path.exists())
+            self.assertFalse(
+                (
+                    self.fixture.root
+                    / "analyses"
+                    / "millefeuille"
+                    / self.fixture.plan.run_id
+                ).exists()
+            )
+        finally:
+            if server.poll() is None:
+                server.kill()
+            server.communicate(timeout=6)
 
     def test_parser_rejects_noncanonical_or_wrong_approval_shape(self):
         with self.assertRaises((MillefeuilleContractError, ValueError)):

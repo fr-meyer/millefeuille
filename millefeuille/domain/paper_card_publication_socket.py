@@ -370,10 +370,6 @@ def _digest_matches(value: Any, expected: str) -> bool:
     return isinstance(value, str) and hmac.compare_digest(value, expected)
 
 
-if __name__ == "__main__":
-    serve_one_publication()
-
-
 def _parse_publication(value: Any) -> GptSummaryPublicationIdentity:
     if not isinstance(value, dict):
         raise MillefeuilleContractError("GPT card publication identity is invalid")
@@ -383,3 +379,7 @@ def _parse_publication(value: Any) -> GptSummaryPublicationIdentity:
         raise MillefeuilleContractError(
             "GPT card publication identity is invalid"
         ) from exc
+
+
+if __name__ == "__main__":
+    serve_one_publication()
