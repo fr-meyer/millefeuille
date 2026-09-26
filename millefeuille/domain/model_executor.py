@@ -32,6 +32,7 @@ ALLOWED_EXECUTOR_MODELS = frozenset(
 ALLOWED_EXECUTOR_TASKS = frozenset(
     {
         "structure",
+        "paper_card",
         "summarize_page",
         "summarize_section",
         "summarize_full_paper",
@@ -103,9 +104,7 @@ _TASK_FIELDS = frozenset(
         "source_locators_sha256",
     }
 )
-_AUTH_REQUEST_FIELDS = frozenset(
-    {"control_plane", "required_class", "api_key_allowed"}
-)
+_AUTH_REQUEST_FIELDS = frozenset({"control_plane", "required_class", "api_key_allowed"})
 _TEMPLATE_FIELDS = frozenset({"id", "version"})
 _HASHED_PAYLOAD_FIELDS = frozenset({"sha256", "bytes"})
 _OUTPUT_CONTRACT_FIELDS = frozenset({"schema_id", "schema_version"})
@@ -126,9 +125,7 @@ _ATTEMPT_FIELDS = frozenset(
     }
 )
 _FALLBACK_RESULT_FIELDS = frozenset({"used", "reason"})
-_SCHEMA_VALIDATION_FIELDS = frozenset(
-    {"status", "schema_id", "schema_version"}
-)
+_SCHEMA_VALIDATION_FIELDS = frozenset({"status", "schema_id", "schema_version"})
 _OUTPUT_RESULT_FIELDS = frozenset({"sha256", "bytes"})
 _USAGE_FIELDS = frozenset({"input_tokens", "output_tokens", "total_tokens"})
 _COST_FIELDS = frozenset({"currency", "micro_usd"})
@@ -463,9 +460,7 @@ def validate_model_executor_request(payload: dict[str, Any]) -> dict[str, Any]:
     output_contract = _required_object(
         request.get("output_contract"), "output_contract"
     )
-    _require_exact_fields(
-        output_contract, _OUTPUT_CONTRACT_FIELDS, "output_contract"
-    )
+    _require_exact_fields(output_contract, _OUTPUT_CONTRACT_FIELDS, "output_contract")
     output_schema_id = _safe_schema_id(
         output_contract.get("schema_id"), "output_contract.schema_id"
     )
@@ -544,9 +539,7 @@ def validate_model_executor_request(payload: dict[str, Any]) -> dict[str, Any]:
         "idempotency_key": idempotency_key,
     }
     if idempotency_key != _derived_idempotency_key(normalized):
-        raise MillefeuilleContractError(
-            "model executor request idempotency key drift"
-        )
+        raise MillefeuilleContractError("model executor request idempotency key drift")
     return normalized
 
 
@@ -610,9 +603,7 @@ def materialize_model_executor_result(
         "schema_validation": {
             "status": schema_validation_status,
             "schema_id": normalized_request["output_contract"]["schema_id"],
-            "schema_version": normalized_request["output_contract"][
-                "schema_version"
-            ],
+            "schema_version": normalized_request["output_contract"]["schema_version"],
         },
         "output": {"sha256": output_sha256, "bytes": output_bytes},
         "usage": usage,
@@ -672,11 +663,10 @@ def validate_model_executor_result(
     attempts = _validate_attempts(payload.get("attempts"), chain=chain)
     if len(attempts) > normalized_request["retry"]["max_attempts"]:
         raise MillefeuilleContractError("model executor attempt limit exceeded")
-    if (
-        _parse_timestamp(attempts[0]["started_at"])
-        < _parse_timestamp(started_at)
-        or _parse_timestamp(attempts[-1]["completed_at"])
-        > _parse_timestamp(completed_at)
+    if _parse_timestamp(attempts[0]["started_at"]) < _parse_timestamp(
+        started_at
+    ) or _parse_timestamp(attempts[-1]["completed_at"]) > _parse_timestamp(
+        completed_at
     ):
         raise MillefeuilleContractError(
             "model executor attempts exceed the result time bounds"
@@ -688,8 +678,7 @@ def validate_model_executor_result(
             raise MillefeuilleContractError("model executor attempts overlap")
         if (
             previous["status"] != "failed"
-            or previous["failure_code"]
-            not in normalized_request["retry"]["retry_on"]
+            or previous["failure_code"] not in normalized_request["retry"]["retry_on"]
         ):
             raise MillefeuilleContractError(
                 "model executor fallback transition was not authorized"
@@ -809,9 +798,7 @@ def _validate_attempts(value: object, *, chain: list[str]) -> list[dict[str, Any
         if attempt_status not in {"succeeded", "failed"}:
             raise MillefeuilleContractError("attempt status is unsupported")
         started_at = _timestamp(attempt.get("started_at"), "attempt started_at")
-        completed_at = _timestamp(
-            attempt.get("completed_at"), "attempt completed_at"
-        )
+        completed_at = _timestamp(attempt.get("completed_at"), "attempt completed_at")
         if _parse_timestamp(completed_at) < _parse_timestamp(started_at):
             raise MillefeuilleContractError("attempt time order is invalid")
         actual_model = attempt.get("actual_model")
@@ -867,9 +854,7 @@ def _validate_attempts(value: object, *, chain: list[str]) -> list[dict[str, Any
 
 def _validate_result_authentication(value: object) -> dict[str, str | None]:
     authentication = _required_object(value, "result authentication")
-    _require_exact_fields(
-        authentication, _AUTH_RESULT_FIELDS, "result authentication"
-    )
+    _require_exact_fields(authentication, _AUTH_RESULT_FIELDS, "result authentication")
     auth_class = authentication.get("class")
     profile_ref = authentication.get("profile_ref")
     if auth_class is None:
@@ -879,9 +864,7 @@ def _validate_result_authentication(value: object) -> dict[str, str | None]:
             )
         return {"class": None, "profile_ref": None}
     if auth_class != "subscription_oauth":
-        raise MillefeuilleContractError(
-            "result auth class must be subscription OAuth"
-        )
+        raise MillefeuilleContractError("result auth class must be subscription OAuth")
     return {"class": auth_class, "profile_ref": _profile_ref(profile_ref)}
 
 
@@ -889,18 +872,13 @@ def _validate_schema_validation(
     value: object, request: dict[str, Any]
 ) -> dict[str, str]:
     validation = _required_object(value, "schema_validation")
-    _require_exact_fields(
-        validation, _SCHEMA_VALIDATION_FIELDS, "schema_validation"
-    )
+    _require_exact_fields(validation, _SCHEMA_VALIDATION_FIELDS, "schema_validation")
     status = validation.get("status")
     if status not in {"passed", "failed", "not_run"}:
         raise MillefeuilleContractError("schema validation status is unsupported")
     if validation.get("schema_id") != request["output_contract"]["schema_id"]:
         raise MillefeuilleContractError("output schema identity drift")
-    if (
-        validation.get("schema_version")
-        != request["output_contract"]["schema_version"]
-    ):
+    if validation.get("schema_version") != request["output_contract"]["schema_version"]:
         raise MillefeuilleContractError("output schema version drift")
     return {
         "status": status,
@@ -1019,9 +997,7 @@ def _validate_retry_codes(value: object) -> list[str]:
     if any(code not in RETRYABLE_FAILURE_CODES for code in codes):
         raise MillefeuilleContractError("retry.retry_on contains an unsupported code")
     if codes != sorted(set(codes)):
-        raise MillefeuilleContractError(
-            "retry.retry_on must be sorted and unique"
-        )
+        raise MillefeuilleContractError("retry.retry_on must be sorted and unique")
     return codes
 
 
@@ -1094,9 +1070,7 @@ def _parse_timestamp(value: str) -> datetime:
         raise MillefeuilleContractError("timestamp is invalid") from exc
 
 
-def _bounded_integer(
-    value: object, label: str, *, minimum: int, maximum: int
-) -> int:
+def _bounded_integer(value: object, label: str, *, minimum: int, maximum: int) -> int:
     if (
         isinstance(value, bool)
         or not isinstance(value, int)
