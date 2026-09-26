@@ -26,6 +26,7 @@ from millefeuille.domain.secure_io import read_bytes_no_follow
 from millefeuille.domain.summary_execution_scope import (
     SummaryApprovalPreview,
     validate_gpt_summary_approval_preview,
+    validate_gpt_summary_evidence_paths,
 )
 from millefeuille.domain.summary_replay_reservation import (
     _CONTROL_DIR,
@@ -220,21 +221,11 @@ def _process_request(payload: Any) -> dict[str, Any]:
 
 
 def _require_evidence_paths(evidence: dict[str, str], source_pack_root: str) -> None:
-    root = Path(source_pack_root)
-    if not root.is_absolute() or os.path.normpath(source_pack_root) != source_pack_root:
-        raise MillefeuilleContractError("GPT summary source root is invalid")
+    validate_gpt_summary_evidence_paths(
+        evidence=evidence, source_pack_root=source_pack_root
+    )
     for value in evidence.values():
         path = Path(value)
-        if not path.is_absolute() or os.path.normpath(value) != value:
-            raise MillefeuilleContractError("GPT summary evidence path is invalid")
-        try:
-            relative = path.relative_to(root)
-        except ValueError as exc:
-            raise MillefeuilleContractError(
-                "GPT summary evidence path is outside its source root"
-            ) from exc
-        if not relative.parts:
-            raise MillefeuilleContractError("GPT summary evidence path is invalid")
         # This preflight read follows no path component. The preparation
         # verifier repeats no-follow reads during the privileged replan, so a
         # later pathname swap cannot turn this check into authorization.

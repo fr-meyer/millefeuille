@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from millefeuille.domain.live_receipts import (
     APPROVED_LIVE_RECEIPT_SCHEMA_VERSION,
@@ -248,3 +249,81 @@ class TestSummaryExecutionScope(unittest.TestCase):
                     packet=packet,
                     receipt=receipt,
                 )
+
+    def test_sibling_evidence_is_rejected_before_source_replan(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            parent = Path(tempdir)
+            prepared = parent / "prepared"
+            prepared.mkdir()
+            root = parent / "source-packs"
+            root.mkdir()
+            evidence, plan, _, _ = self._case(prepared)
+            packet, receipt = _approved_pair(
+                root, plan.manifest.sha256, plan.batch.paper_id, len(plan.batch.units)
+            )
+            with patch(
+                "millefeuille.domain.summary_execution_scope.plan_grounded_gpt_summary_batch"
+            ) as replan:
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "outside its source root"
+                ):
+                    validate_gpt_summary_approval_preview(
+                        **evidence,
+                        artifact_root=root,
+                        source_pack_root=root,
+                        packet=packet,
+                        receipt=receipt,
+                    )
+                replan.assert_not_called()
+
+    def test_each_evidence_path_must_be_normalized_absolute_and_below_root(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            evidence, _, packet, receipt = self._case(root)
+            for key in evidence:
+                for value in (
+                    "relative.json",
+                    str(root),
+                    str(root) + "/../outside.json",
+                    str(root.parent / (root.name + "-sibling") / "evidence.json"),
+                ):
+                    with (
+                        self.subTest(key=key, value=value),
+                        patch(
+                            "millefeuille.domain.summary_execution_scope.plan_grounded_gpt_summary_batch"
+                        ) as replan,
+                    ):
+                        with self.assertRaisesRegex(
+                            MillefeuilleContractError, "evidence path"
+                        ):
+                            validate_gpt_summary_approval_preview(
+                                **{**evidence, key: value},
+                                artifact_root=root,
+                                source_pack_root=root,
+                                packet=packet,
+                                receipt=receipt,
+                            )
+                        replan.assert_not_called()
+
+    def test_invalid_source_root_is_rejected_before_source_replan(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            evidence, _, packet, receipt = self._case(root)
+            for value in ("relative-root", str(root) + "/../source-packs"):
+                with (
+                    self.subTest(root=value),
+                    patch(
+                        "millefeuille.domain.summary_execution_scope.plan_grounded_gpt_summary_batch"
+                    ) as replan,
+                ):
+                    with self.assertRaisesRegex(
+                        MillefeuilleContractError, "source root"
+                    ):
+                        validate_gpt_summary_approval_preview(
+                            **evidence,
+                            artifact_root=root,
+                            source_pack_root=value,
+                            packet=packet,
+                            receipt=receipt,
+                        )
+                    replan.assert_not_called()

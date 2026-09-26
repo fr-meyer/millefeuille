@@ -5,6 +5,11 @@ accepts one exact MF-100 packet and receipt for a verified preparation package.
 It rechecks the GPT-only manifest and operator preflight, checks saved OAuth
 before consuming the receipt, and asks the administrator-owned one-use broker
 to reserve it. A missing broker or trusted approval prevents every model call.
+The no-effect approval preview first requires normalized absolute evidence
+paths below the declared source-pack root, matching the broker's path rules.
+Evidence prepared beside that root is rejected before source replanning or
+approval. The broker repeats containment validation and its no-follow reads
+before receiving the request.
 
 For each approved page, section, and full-paper unit, the runner replans the
 source and compares the entire manifest before dispatch. The OpenClaw adapter
