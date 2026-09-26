@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/paper-card-provenance.schema.json",
+  "title": "GPT paper-card provenance v0.1",
+  "$comment": "Metadata only. Consumers must additionally apply validate_published_gpt_paper_card_execution to recheck source, request, output hash and complete observed usage. This schema is not an approval or canonical paper acceptance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "paper_id",
+    "run_id",
+    "source_hash",
+    "summary_publication_manifest_sha256",
+    "request_plan_sha256",
+    "profile_id",
+    "task_kind",
+    "request",
+    "result",
+    "secret_material_persisted",
+    "paper_text_persisted"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-gpt-paper-card-provenance/v0.1"
+    },
+    "paper_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "source_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "summary_publication_manifest_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "request_plan_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "profile_id": {
+      "const": "research-default"
+    },
+    "task_kind": {
+      "const": "paper_card"
+    },
+    "request": {
+      "$ref": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/model-executor-request.schema.json"
+    },
+    "result": {
+      "$ref": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/model-executor-result.schema.json"
+    },
+    "secret_material_persisted": {
+      "const": false
+    },
+    "paper_text_persisted": {
+      "const": false
+    }
+  }
+}

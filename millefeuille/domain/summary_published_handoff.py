@@ -7,7 +7,7 @@ acceptance, indexing, or classification authority.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import json
 import os
@@ -66,6 +66,16 @@ class PublishedGptSummaryHandoff:
     writes_performed: int = 0
 
 
+@dataclass(frozen=True)
+class VerifiedPublishedGptSummaryInputs:
+    """Private bytes captured during the same verified publication read."""
+
+    handoff: PublishedGptSummaryHandoff
+    markdown: bytes = field(repr=False)
+    structure: bytes = field(repr=False)
+    summaries: tuple[dict[str, Any], ...] = field(repr=False)
+
+
 def plan_published_gpt_summary_handoff(
     *,
     source_pack_root: str | Path,
@@ -74,6 +84,82 @@ def plan_published_gpt_summary_handoff(
     preparation_path: str | Path,
     publication: GptSummaryPublicationIdentity,
 ) -> PublishedGptSummaryHandoff:
+    """Verify the immutable run and expose metadata only, without authority."""
+
+    handoff, _data = _verify_published_gpt_summary_data(
+        source_pack_root=source_pack_root,
+        route_evidence_path=route_evidence_path,
+        structure_evidence_path=structure_evidence_path,
+        preparation_path=preparation_path,
+        publication=publication,
+    )
+    return handoff
+
+
+def load_published_gpt_summary_card_inputs(
+    *,
+    source_pack_root: str | Path,
+    route_evidence_path: str | Path,
+    structure_evidence_path: str | Path,
+    preparation_path: str | Path,
+    publication: GptSummaryPublicationIdentity,
+) -> VerifiedPublishedGptSummaryInputs:
+    """Return bytes held by the hash verifier, with no unchecked second read.
+
+    This grants no execution, reservation, publication or acceptance authority.
+    Every snapshot and summary byte participates in the expected trusted bundle.
+    """
+
+    handoff, data = _verify_published_gpt_summary_data(
+        source_pack_root=source_pack_root,
+        route_evidence_path=route_evidence_path,
+        structure_evidence_path=structure_evidence_path,
+        preparation_path=preparation_path,
+        publication=publication,
+    )
+    record = HierarchicalSummaryRecord.from_dict(
+        _object(data[handoff.summary_record_ref])
+    ).to_dict()
+    prefix = handoff.summary_record_ref.rsplit("/", 1)[0]
+    expected_refs = set(handoff.summary_text_refs)
+    seen: set[str] = set()
+    summaries = []
+    for item in record["summaries"]:
+        summary_id = item["summary_id"]
+        relative = f"texts/{summary_id}.md"
+        ref = f"{prefix}/{relative}"
+        if item["text_ref"] != relative or ref not in expected_refs or ref in seen:
+            raise MillefeuilleContractError("GPT published summary input ref drift")
+        seen.add(ref)
+        try:
+            text = data[ref].decode("utf-8")
+        except UnicodeError as exc:
+            raise MillefeuilleContractError(
+                "GPT published summary is not UTF-8"
+            ) from exc
+        summaries.append(
+            {
+                "summary_id": summary_id,
+                "summary": text,
+                "source_locators": list(item["source_locators"]),
+            }
+        )
+    if seen != expected_refs:
+        raise MillefeuilleContractError("GPT published summary input coverage drift")
+    snapshots = {ref.rsplit("/", 1)[-1]: data[ref] for ref in handoff.source_input_refs}
+    return VerifiedPublishedGptSummaryInputs(
+        handoff, snapshots["selected.md"], snapshots["structure.json"], tuple(summaries)
+    )
+
+
+def _verify_published_gpt_summary_data(
+    *,
+    source_pack_root: str | Path,
+    route_evidence_path: str | Path,
+    structure_evidence_path: str | Path,
+    preparation_path: str | Path,
+    publication: GptSummaryPublicationIdentity,
+) -> tuple[PublishedGptSummaryHandoff, dict[str, bytes]]:
     """Verify an immutable publication before exposing downstream input refs.
 
     Publication identity is an expected fingerprint, not a self-issued
@@ -255,7 +341,7 @@ def plan_published_gpt_summary_handoff(
     }
     if _digest(_canonical(manifest)) != publication.bundle_manifest_sha256:
         raise MillefeuilleContractError("GPT published bundle identity drift")
-    return PublishedGptSummaryHandoff(
+    handoff = PublishedGptSummaryHandoff(
         publication,
         source_hash,
         source_pack_ref,
@@ -264,6 +350,8 @@ def plan_published_gpt_summary_handoff(
         tuple(source_refs),
         tuple(provenance_refs),
     )
+
+    return handoff, data
 
 
 def _digest(data: bytes) -> str:
