@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+import os
 from pathlib import Path
 
 from millefeuille.domain.live_receipts import (
@@ -67,6 +68,14 @@ def validate_gpt_summary_approval_preview(
         raise MillefeuilleContractError("summary approval evidence is invalid")
     packet = OperatorPreflightPacket.from_dict(packet.to_dict())
     receipt = ApprovedLiveReceipt.from_dict(receipt.to_dict())
+    validate_gpt_summary_evidence_paths(
+        evidence={
+            "route_evidence_path": str(route_evidence_path),
+            "structure_evidence_path": str(structure_evidence_path),
+            "preparation_path": str(preparation_path),
+        },
+        source_pack_root=str(source_pack_root),
+    )
     plan = plan_grounded_gpt_summary_batch(
         route_evidence_path=route_evidence_path,
         structure_evidence_path=structure_evidence_path,
@@ -137,3 +146,29 @@ def validate_gpt_summary_approval_preview(
         receipt_id=receipt.receipt_id,
         paper_id=plan.batch.paper_id,
     )
+
+
+def validate_gpt_summary_evidence_paths(
+    *, evidence: dict[str, str], source_pack_root: str
+) -> None:
+    """Reject unusable broker paths before replanning or approving a batch.
+
+    This checks lexical containment only. Source planning and the privileged
+    broker still perform their no-follow reads and authorization checks.
+    """
+
+    root = Path(source_pack_root)
+    if not root.is_absolute() or os.path.normpath(source_pack_root) != source_pack_root:
+        raise MillefeuilleContractError("GPT summary source root is invalid")
+    for value in evidence.values():
+        path = Path(value)
+        if not path.is_absolute() or os.path.normpath(value) != value:
+            raise MillefeuilleContractError("GPT summary evidence path is invalid")
+        try:
+            relative = path.relative_to(root)
+        except ValueError as exc:
+            raise MillefeuilleContractError(
+                "GPT summary evidence path is outside its source root"
+            ) from exc
+        if not relative.parts:
+            raise MillefeuilleContractError("GPT summary evidence path is invalid")
