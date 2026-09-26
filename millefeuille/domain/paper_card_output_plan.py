@@ -6,6 +6,7 @@ import html
 import json
 from pathlib import Path
 import re
+import string
 
 from millefeuille.domain.card_index_contract import canonical_json_bytes
 from millefeuille.domain.millefeuille import (
@@ -230,8 +231,16 @@ def _filename_identity(filename: str) -> tuple[str, int | None]:
     return title, year
 
 
+def _markdown_text(value: str) -> str:
+    """Keep arbitrary text in one inline context, with no active markup."""
+
+    escaped = html.escape(" ".join(value.split()), quote=False)
+    punctuation = set(string.punctuation) - {"&", ";"}
+    return "".join("\\" + char if char in punctuation else char for char in escaped)
+
+
 def _markdown(card: dict) -> str:
-    lines = ["# " + html.escape(card["identity"]["title"]), ""]
+    lines = ["# " + _markdown_text(card["identity"]["title"]), ""]
     for key, label in (
         ("one_line_thesis", "Thesis"),
         ("primary_contribution", "Contribution"),
@@ -241,14 +250,14 @@ def _markdown(card: dict) -> str:
         ("main_results", "Results"),
         ("limitations", "Limitations"),
     ):
-        lines.extend(["## " + label, "", html.escape(card[key]), ""])
+        lines.extend(["## " + label, "", _markdown_text(card[key]), ""])
     for key, label in (
         ("classification_clues", "Classification clues"),
         ("quality_warnings", "Quality notes"),
     ):
         if card.get(key):
             lines.extend(["## " + label, ""])
-            lines.extend("- " + html.escape(item) for item in card[key])
+            lines.extend("- " + _markdown_text(item) for item in card[key])
             lines.append("")
     lines.extend(["## Indexing", "", "OpenKB: pending. PageIndex: pending.", ""])
     return "\n".join(lines)

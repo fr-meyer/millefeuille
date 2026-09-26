@@ -8,10 +8,14 @@ import unittest
 from unittest.mock import patch
 
 from jsonschema import Draft202012Validator
+from markdown_it import MarkdownIt
 
 from millefeuille.domain import paper_card_live_execution as live
 from millefeuille.domain.millefeuille import MillefeuilleContractError, PaperCardRecord
-from millefeuille.domain.paper_card_output_plan import plan_gpt_paper_card_outputs
+from millefeuille.domain.paper_card_output_plan import (
+    _markdown,
+    plan_gpt_paper_card_outputs,
+)
 from tests import test_millefeuille_paper_card_live_execution as live_tests
 from tests.platform_capabilities import requires_secure_nofollow_writes
 
@@ -115,3 +119,44 @@ class TestGptCardOutputPlan(unittest.TestCase):
         path.write_text(json.dumps(source))
         with self.assertRaises(MillefeuilleContractError):
             self._plan()
+
+
+class TestGptCardMarkdownText(unittest.TestCase):
+    def test_titles_scalars_and_lists_cannot_inject_active_markdown(self):
+        hostile = (
+            "![track](https://attacker.example/track) [link](https://example.com)"
+            "\n# forged heading\n- forged list\n1. ordered list\n```html\n"
+            '<img src="https://attacker.example/html">\n```\n'
+            "**bold** _emphasis_ `code` \\ [ref]: https://example.com"
+        )
+        card = {
+            "identity": {"title": hostile},
+            **dict.fromkeys(
+                (
+                    "one_line_thesis",
+                    "primary_contribution",
+                    "problem_addressed",
+                    "method_or_approach",
+                    "data_modality_domain",
+                    "main_results",
+                    "limitations",
+                ),
+                hostile,
+            ),
+            "classification_clues": [hostile],
+            "quality_warnings": [hostile],
+        }
+        tokens = MarkdownIt("commonmark").parse(_markdown(card))
+        self.assertEqual(sum(t.type == "heading_open" for t in tokens), 11)
+        self.assertEqual(sum(t.type == "bullet_list_open" for t in tokens), 2)
+        self.assertFalse(
+            any(t.type in {"html_block", "fence", "code_block"} for t in tokens)
+        )
+        normalized = " ".join(hostile.split())
+        occurrences = 0
+        for token in tokens:
+            for child in token.children or []:
+                self.assertEqual(child.type, "text")
+                if child.content == normalized:
+                    occurrences += 1
+        self.assertEqual(occurrences, 10)
