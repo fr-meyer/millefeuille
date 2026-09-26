@@ -59,6 +59,7 @@
         "kind": {
           "enum": [
             "structure",
+            "paper_card",
             "summarize_page",
             "summarize_section",
             "summarize_full_paper"
