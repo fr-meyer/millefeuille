@@ -6,12 +6,16 @@ import json
 import unittest
 from unittest.mock import patch
 
-from millefeuille.clients.openclaw_model_client import OpenClawModelExecution
+from millefeuille.clients.openclaw_model_client import (
+    OpenClawModelClient,
+    OpenClawModelExecution,
+)
 from millefeuille.domain import paper_card_live_execution as live
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.paper_card_execution_scope import (
     validate_gpt_card_approval_preview,
 )
+from tests import test_millefeuille_openclaw_model_client as client_tests
 from tests import test_millefeuille_paper_card_execution_scope as scope_tests
 from tests import test_millefeuille_paper_card_results as result_tests
 from tests.platform_capabilities import requires_secure_nofollow_writes
@@ -99,6 +103,47 @@ class TestTrustedGptCardExecution(unittest.TestCase):
         )
         self.assertEqual(outcome.approval, self.preview)
         self.assertNotIn("Private", repr(outcome))
+
+    def test_real_adapter_unknown_cost_survives_one_call_through_card_validation(self):
+        calls = []
+        response = client_tests._model_response(
+            "openai", "gpt-5.6-sol", self.fixture.output.decode()
+        )
+        response["usage"] = {"input": 100, "output": 20, "total": 120}
+
+        def run(command, **kwargs):
+            if "models" in command:
+                return client_tests._completed(client_tests._auth_status("openai"))
+            calls.append(command)
+            return client_tests._completed(response)
+
+        client = OpenClawModelClient(command_runner=run)
+        root = self.values["source_pack_root"]
+        before = {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
+        with (
+            patch(
+                "millefeuille.clients.openclaw_model_client._has_agent_local_oauth_profile",
+                return_value=True,
+            ),
+            patch(
+                "millefeuille.clients.openclaw_model_client._write_oauth_access_snapshot"
+            ),
+            patch.object(
+                live, "request_gpt_card_reservation", return_value=self.preview
+            ) as broker,
+        ):
+            outcome = self._run(client)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(broker.call_count, 1)
+        self.assertIsNone(outcome.execution.result["cost"])
+        self.assertIsNone(outcome.validated.executor_result["cost"])
+        self.assertEqual(
+            outcome.validated.executor_result["usage"]["total_tokens"], 120
+        )
+        self.assertEqual(outcome.validated.incremental_cost["micro_usd"], 0)
+        self.assertEqual(
+            before, {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
+        )
 
     def test_missing_readiness_or_saved_auth_never_reserves_or_dispatches(self):
         for missing_marker in (True, False):

@@ -34,6 +34,7 @@ class ValidatedGptPaperCardExecution:
     content: ValidatedPaperCardContent = field(repr=False)
     executor_result: dict[str, Any] = field(repr=False)
     provenance_json: bytes = field(repr=False)
+    incremental_cost: dict[str, Any] = field(repr=False)
     provider_calls_performed: int = 0
     writes_performed: int = 0
 
@@ -75,11 +76,12 @@ def validate_published_gpt_paper_card_execution(
     )
     if result["status"] != "succeeded" or not isinstance(execution.output, bytes):
         raise MillefeuilleContractError("GPT paper-card execution did not succeed")
-    if result["usage"] is None or result["cost"] is None:
-        raise MillefeuilleContractError(
-            "GPT paper-card observed usage or cost is missing"
-        )
-    if result["cost"] != {"currency": "USD", "micro_usd": 0}:
+    if result["usage"] is None:
+        raise MillefeuilleContractError("GPT paper-card observed usage is missing")
+    if result["cost"] is not None and result["cost"] != {
+        "currency": "USD",
+        "micro_usd": 0,
+    }:
         raise MillefeuilleContractError(
             "GPT paper-card reported a nonzero provider cost"
         )
@@ -89,6 +91,15 @@ def validate_published_gpt_paper_card_execution(
     }:
         raise MillefeuilleContractError("GPT paper-card output binding drift")
     content = validate_v1_paper_card_content(execution.output, plan=fresh)
+    # The exact request/result validator already requires subscription OAuth,
+    # the pinned GPT route, and no fallback. This is the incremental API charge
+    # basis, not an observed provider bill or the subscription's total price.
+    # Preserve the raw result, including its unknown cost, without rewriting it.
+    incremental_cost = {
+        "currency": "USD",
+        "micro_usd": 0,
+        "basis": "subscription_oauth_no_incremental_api_charge",
+    }
     provenance = {
         "schema_version": CARD_PROVENANCE_SCHEMA_VERSION,
         "paper_id": fresh.paper_id,
@@ -100,6 +111,7 @@ def validate_published_gpt_paper_card_execution(
         "task_kind": "paper_card",
         "request": fresh.request,
         "result": result,
+        "incremental_cost": incremental_cost,
         "secret_material_persisted": False,
         "paper_text_persisted": False,
     }
@@ -113,6 +125,7 @@ def validate_published_gpt_paper_card_execution(
         content,
         result,
         encoded,
+        incremental_cost,
     )
 
 

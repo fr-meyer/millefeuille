@@ -1,0 +1,232 @@
+"""Offline root-broker state checks for exact GPT card publication."""
+
+from __future__ import annotations
+
+from contextlib import contextmanager
+import os
+from pathlib import Path
+import sqlite3
+import tempfile
+import unittest
+from unittest.mock import patch
+
+from millefeuille.domain import paper_card_output_replay_reservation as reservation
+from millefeuille.domain import paper_card_output_trusted_approval as trusted
+from millefeuille.domain import paper_card_publication_broker as broker
+from millefeuille.domain.millefeuille import MillefeuilleContractError
+from millefeuille.domain.paper_card_outcome_handoff import (
+    encode_gpt_card_outcome_handoff,
+)
+from millefeuille.domain.paper_card_publication_bundle import (
+    plan_gpt_card_publication_bundle,
+)
+from millefeuille.domain.paper_card_publication_fs import (
+    GptCardFilesystemCommit,
+    GptCardPublicationError,
+)
+from tests.platform_capabilities import requires_secure_nofollow_writes
+from tests.test_millefeuille_paper_card_output_controls import (
+    _case as _card_case,
+)
+from tests.test_millefeuille_paper_card_output_controls import (
+    _write_record,
+)
+
+
+def _case(owner):
+    fixture, _bundle, record = _card_case(owner)
+    return fixture.root, fixture.values, record
+
+
+@contextmanager
+def _trusted_control(control: Path, approval: Path):
+    with (
+        patch.object(broker.os, "geteuid", return_value=0),
+        patch.object(reservation, "_CONTROL_DIR", control),
+        patch.object(reservation, "_CONTROL_OWNER_UID", os.getuid()),
+        patch.object(broker, "_CONTROL_DIR", control),
+        patch.object(trusted, "_TRUSTED_APPROVAL_PATH", approval),
+        patch.object(trusted, "_TRUSTED_APPROVAL_OWNER_UID", os.getuid()),
+    ):
+        yield
+
+
+@requires_secure_nofollow_writes
+class TestGptCardPublicationBroker(unittest.TestCase):
+    def setUp(self):
+        root, evidence, record = _case(self)
+        self.root = root
+        self.evidence = evidence
+        self.record = record
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.control = Path(temporary.name) / "control"
+        self.control.mkdir(mode=0o700)
+        self.approval = self.control / "approval.json"
+        _write_record(self.approval, record)
+        self.handoff = encode_gpt_card_outcome_handoff(evidence["outcome"])
+
+    def _publish(self):
+        request = {k: v for k, v in self.evidence.items() if k != "outcome"}
+        return broker.publish_trusted_gpt_card_handoff(
+            encoded_outcome=self.handoff,
+            execution_approval=self.evidence["outcome"].approval,
+            **request,
+        )
+
+    def _status(self):
+        with sqlite3.connect(self.control / "gpt-card-write.sqlite3") as db:
+            return db.execute("SELECT status FROM publication_attempts").fetchone()[0]
+
+    def test_approved_handoff_reserves_once_and_audits_publication(self):
+        expected = GptCardFilesystemCommit(
+            run_id=self.evidence["outcome"].plan.run_id,
+            file_count=self.record["file_count"],
+            total_bytes=1,
+            bundle_manifest_sha256="sha256:" + "0" * 64,
+            source_pack_root=str(self.root),
+        )
+        with (
+            _trusted_control(self.control, self.approval),
+            patch.object(
+                broker, "commit_prevalidated_gpt_card_bundle", return_value=expected
+            ) as commit,
+        ):
+            self.assertEqual(self._publish(), expected)
+            with self.assertRaises(MillefeuilleContractError):
+                self._publish()
+        self.assertEqual(commit.call_count, 1)
+        self.assertEqual(self._status(), "published")
+        self.assertFalse(
+            (
+                self.root
+                / "analyses"
+                / "millefeuille"
+                / self.evidence["outcome"].plan.run_id
+            ).exists()
+        )
+
+    @unittest.skipUnless(
+        getattr(os, "geteuid", lambda: -1)() == 0, "requires Linux root"
+    )
+    def test_full_fixture_publication_commits_exact_files_and_audit(self):
+        bundle = plan_gpt_card_publication_bundle(**self.evidence)
+        with _trusted_control(self.control, self.approval):
+            result = self._publish()
+            with self.assertRaises(MillefeuilleContractError):
+                self._publish()
+        self.assertEqual(result.run_id, self.evidence["outcome"].plan.run_id)
+        self.assertEqual(result.file_count, len(bundle.files))
+        self.assertEqual(result.total_bytes, bundle.total_bytes)
+        self.assertEqual(result.bundle_manifest_sha256, bundle.bundle_manifest_sha256)
+        self.assertEqual(self._status(), "published")
+        for planned in bundle.files:
+            with self.subTest(ref=planned.ref):
+                published = self.root / planned.ref
+                self.assertTrue(published.is_file())
+                self.assertEqual(published.read_bytes(), planned.data)
+        self.assertFalse(list(self.root.rglob(".gpt-card-stage-*")))
+
+    def test_missing_approval_fails_without_a_ledger_or_paper_write(self):
+        self.approval.unlink()
+        with (
+            _trusted_control(self.control, self.approval),
+            patch.object(broker, "commit_prevalidated_gpt_card_bundle") as commit,
+            self.assertRaises(MillefeuilleContractError),
+        ):
+            self._publish()
+        commit.assert_not_called()
+        self.assertFalse((self.control / "gpt-card-write.sqlite3").exists())
+
+    def test_invalid_handoff_fails_before_receipt_reservation(self):
+        self.handoff = b"{}"
+        with (
+            _trusted_control(self.control, self.approval),
+            patch.object(broker, "commit_prevalidated_gpt_card_bundle") as commit,
+            self.assertRaises(MillefeuilleContractError),
+        ):
+            self._publish()
+        commit.assert_not_called()
+        self.assertFalse((self.control / "gpt-card-write.sqlite3").exists())
+
+    def test_postcommit_audit_failure_reports_uncertainty(self):
+        with (
+            _trusted_control(self.control, self.approval),
+            patch.object(broker, "commit_prevalidated_gpt_card_bundle"),
+            patch.object(broker, "_finish_attempt", side_effect=OSError("injected")),
+            self.assertRaises(GptCardPublicationError) as caught,
+        ):
+            self._publish()
+        self.assertTrue(caught.exception.committed)
+        self.assertEqual(self._status(), "committing")
+
+    def test_pending_audit_failure_rolls_back_receipt_reservation(self):
+        with _trusted_control(self.control, self.approval):
+            with (
+                patch.object(
+                    reservation,
+                    "_insert_publication_attempt",
+                    side_effect=OSError("injected"),
+                ),
+                patch.object(broker, "commit_prevalidated_gpt_card_bundle") as commit,
+                self.assertRaises(OSError),
+            ):
+                self._publish()
+            commit.assert_not_called()
+            with sqlite3.connect(self.control / "gpt-card-write.sqlite3") as db:
+                self.assertEqual(
+                    db.execute("SELECT COUNT(*) FROM approvals").fetchone()[0], 0
+                )
+                self.assertEqual(
+                    db.execute("SELECT COUNT(*) FROM publication_attempts").fetchone()[
+                        0
+                    ],
+                    0,
+                )
+            with patch.object(broker, "commit_prevalidated_gpt_card_bundle"):
+                self._publish()
+        self.assertEqual(self._status(), "published")
+
+    def test_precommit_failure_and_postcommit_uncertainty_are_distinct(self):
+        for committed, status in (
+            (False, "failed-before-commit"),
+            (True, "uncertain"),
+        ):
+            with self.subTest(committed=committed):
+                root, evidence, record = _case(self)
+                with tempfile.TemporaryDirectory() as tempdir:
+                    control = Path(tempdir) / "control"
+                    control.mkdir(mode=0o700)
+                    approval = control / "approval.json"
+                    _write_record(approval, record)
+                    handoff = encode_gpt_card_outcome_handoff(evidence["outcome"])
+                    request = {k: v for k, v in evidence.items() if k != "outcome"}
+                    with (
+                        _trusted_control(control, approval),
+                        patch.object(
+                            broker,
+                            "commit_prevalidated_gpt_card_bundle",
+                            side_effect=GptCardPublicationError(
+                                committed=committed, cleanup_complete=True
+                            ),
+                        ),
+                        self.assertRaises(GptCardPublicationError),
+                    ):
+                        broker.publish_trusted_gpt_card_handoff(
+                            encoded_outcome=handoff,
+                            execution_approval=evidence["outcome"].approval,
+                            **request,
+                        )
+                    with sqlite3.connect(control / "gpt-card-write.sqlite3") as db:
+                        actual = db.execute(
+                            "SELECT status FROM publication_attempts"
+                        ).fetchone()[0]
+                    self.assertEqual(actual, status)
+                    self.assertFalse(
+                        (
+                            root
+                            / "analyses"
+                            / "millefeuille"
+                            / evidence["outcome"].plan.run_id
+                        ).exists()
+                    )
