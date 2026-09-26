@@ -17,7 +17,8 @@
     "request",
     "result",
     "secret_material_persisted",
-    "paper_text_persisted"
+    "paper_text_persisted",
+    "incremental_cost"
   ],
   "properties": {
     "schema_version": {
@@ -60,6 +61,27 @@
     },
     "paper_text_persisted": {
       "const": false
+    },
+    "incremental_cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "micro_usd",
+        "basis"
+      ],
+      "properties": {
+        "currency": {
+          "const": "USD"
+        },
+        "micro_usd": {
+          "const": 0
+        },
+        "basis": {
+          "const": "subscription_oauth_no_incremental_api_charge"
+        }
+      },
+      "description": "Incremental API charge basis for the verified OAuth route; raw result.cost remains unknown unless observed. Excludes the subscription price."
     }
   }
 }

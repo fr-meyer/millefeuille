@@ -130,10 +130,9 @@ class TestGptPaperCardResults(unittest.TestCase):
             (validated.provider_calls_performed, validated.writes_performed), (0, 0)
         )
 
-    def test_rejects_missing_usage_cost_and_nonzero_cost(self):
+    def test_rejects_missing_usage_and_nonzero_cost(self):
         for key, value in (
             ("usage", None),
-            ("cost", None),
             ("cost", {"currency": "USD", "micro_usd": 1}),
         ):
             execution = self._execution()
@@ -146,6 +145,27 @@ class TestGptPaperCardResults(unittest.TestCase):
                 self._validate(
                     execution=OpenClawModelExecution(result, execution.output)
                 )
+
+    def test_unknown_provider_bill_is_preserved_with_explicit_oauth_cost_basis(self):
+        execution = self._execution()
+        result = deepcopy(execution.result)
+        result["cost"] = None
+        validated = self._validate(
+            execution=OpenClawModelExecution(result, execution.output)
+        )
+        self.assertIsNone(validated.executor_result["cost"])
+        self.assertIsNone(result["cost"])
+        self.assertEqual(
+            validated.incremental_cost,
+            {
+                "currency": "USD",
+                "micro_usd": 0,
+                "basis": "subscription_oauth_no_incremental_api_charge",
+            },
+        )
+        provenance = json.loads(validated.provenance_json)
+        self.assertIsNone(provenance["result"]["cost"])
+        self.assertEqual(provenance["incremental_cost"], validated.incremental_cost)
 
     def test_rejects_model_auth_usage_schema_and_request_drift(self):
         changes = (
