@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Verified published summary run link",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "paper_id",
+    "run_id",
+    "source_hash",
+    "summary_publication",
+    "evidence_refs",
+    "card_write_manifest_sha256",
+    "summary_record_ref",
+    "summary_record_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-published-summary-run-link/v0.1"
+    },
+    "paper_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "summary_publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paper_id",
+        "run_id",
+        "root_target_id",
+        "packet_digest",
+        "receipt_digest",
+        "source_manifest_sha256",
+        "write_manifest_sha256",
+        "observed_usage_sha256",
+        "provenance_manifest_sha256",
+        "bundle_manifest_sha256",
+        "file_count",
+        "total_bytes"
+      ],
+      "properties": {
+        "paper_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "root_target_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "packet_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "receipt_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "source_manifest_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "write_manifest_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "observed_usage_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "provenance_manifest_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "bundle_manifest_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "total_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "evidence_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route_evidence_ref",
+        "structure_evidence_ref",
+        "preparation_ref"
+      ],
+      "properties": {
+        "route_evidence_ref": {
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^[^/\\\\:\\u0000-\\u001f]+(?:/[^/\\\\:\\u0000-\\u001f]+)*$"
+            },
+            {
+              "not": {
+                "pattern": "(^|/)\\.{1,2}(/|$)"
+              }
+            }
+          ]
+        },
+        "structure_evidence_ref": {
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^[^/\\\\:\\u0000-\\u001f]+(?:/[^/\\\\:\\u0000-\\u001f]+)*$"
+            },
+            {
+              "not": {
+                "pattern": "(^|/)\\.{1,2}(/|$)"
+              }
+            }
+          ]
+        },
+        "preparation_ref": {
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^[^/\\\\:\\u0000-\\u001f]+(?:/[^/\\\\:\\u0000-\\u001f]+)*$"
+            },
+            {
+              "not": {
+                "pattern": "(^|/)\\.{1,2}(/|$)"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "card_write_manifest_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "summary_record_ref": {
+      "type": "string",
+      "minLength": 1,
+      "allOf": [
+        {
+          "pattern": "^[^/\\\\:\\u0000-\\u001f]+(?:/[^/\\\\:\\u0000-\\u001f]+)*$"
+        },
+        {
+          "not": {
+            "pattern": "(^|/)\\.{1,2}(/|$)"
+          }
+        }
+      ]
+    },
+    "summary_record_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

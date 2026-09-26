@@ -896,6 +896,12 @@ manifest plus existing structure sidecar, then writes
 `summarize` passed and exposes the summary bundle without calling model
 providers or writing OpenKB/index lanes.
 
+A separately published GPT summary can also be reused in a distinct paper-card
+run through a hash-verified metadata link. The derived view records both the
+consuming run and the original generation run, preserving original text and model
+provenance. Planning makes no provider call or write; saving the link keeps its
+operator approval gate. See [published summary reuse](specs/millefeuille-pipeline/published-summary-run-link.md).
+
 Once the summary bundle exists, the same dry-run path can stage paper-card
 fixture evidence:
 
