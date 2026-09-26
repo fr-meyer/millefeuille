@@ -56,33 +56,52 @@
   cost values are invented.
 - PRs #129-#130 add an exact no-write preview for run-scoped GPT summary output,
   a separate administrator-owned `source-pack.write` approval record, and a
-  root-only one-use write-receipt ledger. No live paper execution or summary
-  publication has occurred.
+  root-only one-use write-receipt ledger.
+- PRs #132-#140 complete live usage/provenance planning, transient outcome
+  handoff, the exact byte bundle, a root-only publication broker, pending and
+  terminal audit records, and atomic no-replace publication.
+- PRs #141-#143 add one-shot node-to-root publication transport, reject
+  unauthorized first peers without disabling either socket, and exercise the
+  complete root publication transaction with a synthetic integration fixture.
+- The 2026-09-26 Picard pilot completed all ten GPT requests (nine pages and
+  one full-paper summary). Exact output approval preceded publication of
+  26 files, including source snapshots, summaries, observed usage, and ten
+  provenance records. Read-only verification checked every saved hash,
+  root ownership, the terminal published audit, and single use of both
+  receipts. See `gpt-pilot-checkpoint-2026-09-26.md`.
+- PR #144 makes the no-call approval preview reject unusable evidence paths
+  before source planning and shares that rule with the reservation broker.
+- `plan_published_gpt_summary_handoff` now verifies a published summary
+  bundle against expected commit fingerprints, freshly verified preparation,
+  and the matching single-source pack. It exposes metadata and input refs
+  without calls, writes, receipt reservation, or downstream authorization.
 
-## Current GPT Pilot Path (2026-09-25)
+## Current GPT Pilot Path (2026-09-26)
 
-1. Complete the live provenance bridge from each validated OpenClaw executor
-   result to a run-scoped provenance record. Actual usage is retained when the
-   runtime reports a consistent count. If usage is unavailable, fail closed or
-   explicitly version the provenance contract; never invent counts or cost.
-2. Build the trusted summary-output broker and writer. It must revalidate the
-   source and canonical output bytes, match the exact administrator approval,
-   consume the one-use write receipt, publish the complete run-scoped bundle
-   without replacement, and record failures without treating a partial write
-   as a completed summary. The preview and replay ledger exist; publication
-   and broker integration remain.
-3. Run one bounded GPT paper pilot on GCP only after its exact MF-100 execution
-   packet, receipt, and administrator-owned trusted approval record are in
-   place. The resulting output requires its own exact `source-pack.write`
-   packet, receipt, and trusted approval. Validate the artifacts and provenance
-   before widening the pilot.
-4. Reconcile the live run with source-pack, paper-card, OpenKB/PageIndex,
-   acceptance, classification, and governed Zotero writeback flows. Each live
-   external read or write still follows the corresponding exact scope gate.
-5. Expand to the other prepared papers, complete the remaining Zotero/OCR
-   intake and model-boundary audits, then promote the tested `dev` state toward
-   release. Grok execution remains deferred while its OAuth subscription is
-   inactive.
+The first bounded summary execution and publication are complete. The pilot
+does not yet have a complete accepted paper-analysis run.
+
+1. Bridge the immutable published summary run into the canonical source-pack
+   and artifact-run metadata. Verify its exact source, output, usage, and
+   provenance identities before making it available to downstream consumers.
+   Preparation artifacts currently live separately from the durable per-paper
+   extraction/route/structure locations expected by fixture-stage consumers.
+2. Add a grounded GPT paper-card execution path. The v0.2 schema and offline
+   fixture writer exist; current live model requests and the receipt-bound
+   runner support only page, section, and full-paper summaries. A fixture card
+   must not be presented as live model-generated evidence.
+3. Materialize the verified card and reconciled run behind their exact write
+   scopes, then run acceptance. Reconcile explicitly scoped OpenKB/PageIndex
+   index evidence and duplicate checks; perform classification only after
+   acceptance. Zotero note/tag/collection writes retain their own scopes.
+4. Expand to the other four staged papers (156 prepared summary units), then
+   complete bounded Zotero intake, OCR and edge-case coverage, MF-114
+   multi-source card/index propagation, and actual model-boundary regression
+   checks. Keep production GPT only while Grok OAuth is inactive.
+5. Reconcile remaining Speculoos and Workboard metadata with merged and live
+   evidence, then stabilize `dev`, review promotion to `main`, and consider a
+   separately approved tag and package release. Optional worktree hygiene and
+   the old OpenClaw deployment reconciliation are separate operational work.
 
 ## Pipeline
 
@@ -178,9 +197,10 @@
       Reconciled observed OpenClaw usage now reaches the executor result when
       available. A no-write output preview and separate trusted write approval
       plus one-use ledger now bind the exact source and output manifest.
-      Remaining work is complete live provenance, the trusted publication
-      broker, separately approved durable materialization, acceptance, and
-      attaching validated provenance to verified run packages. Grok execution
+      The live provenance and trusted publication broker now exist and the
+      first real GPT pilot is published. Remaining work is downstream run
+      reconciliation, paper-card generation, acceptance, and attaching these
+      validated artifacts to complete source-pack/run packages. Grok execution
       is deferred while its OAuth subscription is inactive.
     - Manual gate: model/provider call approval.
 
