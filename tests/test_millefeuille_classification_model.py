@@ -3,6 +3,7 @@
 from copy import deepcopy
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -266,6 +267,39 @@ class ClassificationModelTests(unittest.TestCase):
             path.symlink_to(destination)
         except OSError:
             self.skipTest("symlinks unavailable")
+        with self.assertRaises(MillefeuilleContractError):
+            self.plan()
+
+    def test_published_summary_link_reuses_exact_saved_bytes_inside_corpus(self):
+        view_path = self.run / "summaries/hierarchical-summary.json"
+        view = json.loads(view_path.read_text())
+        unit = next(u for u in view["summaries"] if u["grain"] == "full-paper")
+        original = self.run / "summaries" / unit["text_ref"]
+        target = self.root / "analyses/millefeuille/prior-run/summaries/full-paper.md"
+        target.parent.mkdir(parents=True)
+        target.write_bytes(original.read_bytes())
+        unit["text_ref"] = Path(
+            os.path.relpath(target, self.run / "summaries")
+        ).as_posix()
+        view_path.write_text(json.dumps(view))
+        plan = self.plan()
+        self.assertEqual(
+            json.loads(plan.prompt)["full_paper_summary"],
+            target.read_bytes().decode("utf-8"),
+        )
+        self.assertTrue(any(f["path"] == str(target) for f in plan.input_files))
+        validate_classification_model_output(self.output(plan), plan=plan)
+
+    def test_published_summary_link_outside_corpus_is_rejected(self):
+        view_path = self.run / "summaries/hierarchical-summary.json"
+        view = json.loads(view_path.read_text())
+        unit = next(u for u in view["summaries"] if u["grain"] == "full-paper")
+        target = Path(self.temp.name) / "outside-corpus-summary.md"
+        target.write_bytes((self.run / "summaries" / unit["text_ref"]).read_bytes())
+        unit["text_ref"] = Path(
+            os.path.relpath(target, self.run / "summaries")
+        ).as_posix()
+        view_path.write_text(json.dumps(view))
         with self.assertRaises(MillefeuilleContractError):
             self.plan()
 

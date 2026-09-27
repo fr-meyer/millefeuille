@@ -9,6 +9,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 from typing import Any
@@ -160,7 +161,11 @@ def prepare_classification_model_plan(
         raise MillefeuilleContractError(
             "classification requires exactly one full-paper summary"
         )
-    summary_path = resolved.run_dir / "summaries" / full[0]["text_ref"]
+    # Published summary links may contain parent segments within the corpus.
+    # Normalize lexically; resolve() would follow a linked input before _read().
+    summary_path = Path(
+        os.path.abspath(resolved.run_dir / "summaries" / full[0]["text_ref"])
+    )
     try:
         summary_path.resolve().relative_to(root)
     except ValueError as exc:

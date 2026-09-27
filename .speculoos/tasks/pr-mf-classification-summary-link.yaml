@@ -1,0 +1,26 @@
+id: pr-mf-classification-summary-link
+title: Reuse accepted published summaries during classification planning
+status: implementation
+branch: fix/pr-mf-classification-summary-link-20260927
+base_branch: dev
+write_paths:
+  - README.md
+  - .speculoos/tasks/pr-mf-classification-summary-link.yaml
+  - millefeuille/domain/classification_model.py
+  - specs/millefeuille-pipeline/classification-model-boundary.md
+  - tests/test_millefeuille_classification_model.py
+scope:
+  - Normalize accepted published summary links lexically within the corpus
+  - Preserve secure no-follow reads and outside-corpus rejection
+  - Add meaningful prior-run reuse and outside-corpus regressions
+acceptance:
+  - Accepted synthetic prior-run summary reuse passes without effects
+  - Outside-corpus and symlink references fail closed
+  - Full suite, Ruff and Speculoos pass
+publication_boundary:
+  statement: Code, synthetic tests and documentation only; no provider, source pack, OpenKB, Zotero, OCR, credential, taxonomy promotion, release or approval bypass.
+documentation_impact:
+  status: updated
+  rationale: Explain safe reuse of an existing published summary within the same corpus.
+publish_authority: Existing user approval covers feature-to-dev publication; live execution retains independent exact receipts.
+private_data_scan: Required; synthetic evidence only.
