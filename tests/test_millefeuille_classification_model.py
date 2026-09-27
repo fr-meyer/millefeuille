@@ -2,12 +2,15 @@
 
 from copy import deepcopy
 import hashlib
+from io import StringIO
 import json
 import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
+from millefeuille.cli.stages import run_stage_cli
 from millefeuille.domain.acceptance import write_acceptance_summary
 from millefeuille.domain.classification_model import (
     OUTPUT_SCHEMA,
@@ -20,6 +23,7 @@ from millefeuille.domain.model_executor import (
     validate_model_executor_request,
     verify_model_executor_input,
 )
+from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
 from millefeuille.domain.summary_fixtures import load_hierarchical_summary
 from millefeuille.domain.taxonomy import create_taxonomy_lock, seal_taxonomy_registry
 from tests.test_millefeuille_stage_cli import (
@@ -153,6 +157,67 @@ class ClassificationModelTests(unittest.TestCase):
                 "primary_entry_id"
             ],
             "L2-TRAINING",
+        )
+
+    def test_cli_classification_profile_matches_the_real_request_boundary(self):
+        out, err = StringIO(), StringIO()
+        before = {str(p): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        self.assertEqual(run_stage_cli(["models", "--json"], stdout=out, stderr=err), 0)
+        profile = json.loads(out.getvalue())["profiles"]["research-default"]["classify"]
+        request = self.plan().executor_request()
+        self.assertEqual(profile["model"], request["requested_model"])
+        self.assertEqual(profile["reasoning_effort"], request["thinking"])
+        self.assertEqual(profile["fallback_policy"], request["fallback"]["policy"])
+        self.assertEqual(
+            profile["prompt_version"],
+            request["prompt_template"]["id"]
+            + "@"
+            + request["prompt_template"]["version"],
+        )
+        self.assertEqual(profile["auth_lane"], "openclaw-native-codex-oauth")
+        self.assertEqual(
+            request["authentication"],
+            {
+                "control_plane": "openclaw",
+                "required_class": "subscription_oauth",
+                "api_key_allowed": False,
+            },
+        )
+        self.assertTrue(profile["record_usage"])
+        self.assertTrue(profile["require_taxonomy_version"])
+        self.assertNotIn("temperature", profile)
+        self.assertEqual(
+            before,
+            {str(p): p.read_bytes() for p in self.root.rglob("*") if p.is_file()},
+        )
+
+    def test_profile_drift_is_rejected_before_planning_or_dispatch(self):
+        profile = DEFAULT_MODEL_PROFILE_BUNDLE["profiles"]["research-default"][
+            "classify"
+        ]
+        plan = self.plan()
+        before = {str(p): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        for changes in (
+            {"model": "gpt-5"},
+            {"model": "pageindex-tree-default"},
+            {"model": "gpt-4o-mini"},
+            {"model": "xai/grok-4.6"},
+            {"auth_lane": "api-key"},
+            {"fallback_policy": "auto"},
+            {"reasoning_effort": "high"},
+            {"fast_mode": "on"},
+            {"record_usage": False},
+            {"require_taxonomy_version": False},
+            {"temperature": 0.0},
+        ):
+            with self.subTest(changes=changes), patch.dict(profile, changes):
+                with self.assertRaisesRegex(MillefeuilleContractError, "profile drift"):
+                    self.plan()
+                with self.assertRaisesRegex(MillefeuilleContractError, "profile drift"):
+                    plan.executor_request()
+        self.assertEqual(
+            before,
+            {str(p): p.read_bytes() for p in self.root.rglob("*") if p.is_file()},
         )
 
     def test_exported_metadata_and_executor_snapshot_do_not_alias_plan(self):

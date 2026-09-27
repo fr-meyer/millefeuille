@@ -1,0 +1,28 @@
+id: pr-mf-research-gpt-default
+title: Align the generic classification preview with the pinned GPT request
+status: implementation
+branch: fix/pr-mf-research-gpt-default-20260927
+base_branch: dev
+write_paths:
+  - README.md
+  - .speculoos/tasks/pr-mf-research-gpt-default.yaml
+  - millefeuille/domain/classification_model.py
+  - millefeuille/domain/model_profiles.py
+  - specs/millefeuille-pipeline/classification-model-boundary.md
+  - tests/test_millefeuille_classification_model.py
+  - tests/test_millefeuille_stage_cli.py
+scope:
+  - Match research-default classify preview to GPT5.6sol xhigh subscription OAuth
+  - Reject profile drift at accepted-run planning and executor snapshot validation
+  - Verify exported CLI defaults against the actual request using synthetic fixtures
+acceptance:
+  - Preview and actual model prompt auth reasoning and fallback agree
+  - Foreign model API-key fallback temperature and usage drift fail before effects
+  - Full suite Ruff metadata and Speculoos pass
+publication_boundary:
+  statement: Code synthetic tests and documentation only; no provider source-pack OpenKB Zotero OCR credential taxonomy release or approval bypass.
+documentation_impact:
+  status: updated
+  rationale: Explain the aligned classification default and independent provider boundary.
+publish_authority: Existing user approval covers feature-to-dev publication; private model calls retain their exact approval gates.
+private_data_scan: Required; synthetic evidence only.
