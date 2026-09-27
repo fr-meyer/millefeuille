@@ -21,7 +21,7 @@ from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
     PaperCardRecord,
 )
-from millefeuille.domain.secure_io import read_bytes_no_follow
+from millefeuille.domain.secure_io import RootArtifactReader, read_bytes_no_follow
 from millefeuille.domain.stage_runtime import require_safe_package_id
 from millefeuille.domain.summary_published_handoff import (
     GptSummaryPublicationIdentity,
@@ -95,13 +95,21 @@ def plan_published_gpt_summary_run_link(
     return plan
 
 
-def load_published_summary_run_view(path: str | Path) -> dict[str, Any]:
+def load_published_summary_run_view(
+    path: str | Path, *, artifact_reader: RootArtifactReader | None = None
+) -> dict[str, Any]:
     """Reverify the link, source publication and card, then expose a read view.
 
     The view schema is distinct from generated summary records. ``run_id`` is
     its consuming card run; ``origin_run_id`` identifies the unchanged original
     generation. Text/provenance refs resolve to the original verified files.
     """
+
+    read_bytes = (
+        artifact_reader.read_bytes
+        if artifact_reader is not None
+        else read_bytes_no_follow
+    )
     target = Path(path).absolute()
     if str(target) != os.path.normpath(str(target)) or len(target.parts) < 6:
         raise MillefeuilleContractError("published summary link location is invalid")
@@ -116,7 +124,9 @@ def load_published_summary_run_view(path: str | Path) -> dict[str, Any]:
     ):
         raise MillefeuilleContractError("published summary link location is invalid")
     root = target.parents[4]
-    raw = read_bytes_no_follow(target, "published summary run link", max_bytes=32768)
+    if artifact_reader is not None and artifact_reader.root != root:
+        raise MillefeuilleContractError("published summary reader root drift")
+    raw = read_bytes(target, "published summary run link", max_bytes=32768)
     payload = _object(raw)
     if set(payload) != _LINK_FIELDS or payload["schema_version"] != LINK_SCHEMA_VERSION:
         raise MillefeuilleContractError("published summary link fields are invalid")
@@ -141,6 +151,7 @@ def load_published_summary_run_view(path: str | Path) -> dict[str, Any]:
         publication=publication,
         card_write_manifest_sha256=payload["card_write_manifest_sha256"],
         **evidence,
+        artifact_reader=artifact_reader,
     )
     if raw != plan.link_json:
         raise MillefeuilleContractError(
@@ -179,6 +190,7 @@ def _plan_and_load(
     route_evidence_path: str | Path,
     structure_evidence_path: str | Path,
     preparation_path: str | Path,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> tuple[PublishedSummaryRunLinkPlan, dict[str, Any]]:
     root = Path(source_pack_root)
     if not isinstance(publication, GptSummaryPublicationIdentity):
@@ -211,6 +223,7 @@ def _plan_and_load(
         source_pack_root=root,
         publication=publication,
         **evidence,
+        artifact_reader=artifact_reader,
     )
     held = {item.ref: item.data for item in package.files}
     record_ref = package.handoff.summary_record_ref
@@ -222,6 +235,7 @@ def _plan_and_load(
         publication=publication,
         source_hash=package.handoff.source_hash,
         expected_digest=card_write_manifest_sha256,
+        artifact_reader=artifact_reader,
     )
     payload = {
         "schema_version": LINK_SCHEMA_VERSION,
@@ -254,9 +268,15 @@ def _verify_card(
     publication: GptSummaryPublicationIdentity,
     source_hash: str,
     expected_digest: str,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> None:
+    read_bytes = (
+        artifact_reader.read_bytes
+        if artifact_reader is not None
+        else read_bytes_no_follow
+    )
     prefix = f"analyses/millefeuille/{run_id}/cards"
-    raw = read_bytes_no_follow(
+    raw = read_bytes(
         root / prefix / "write-manifest.json",
         "summary link card manifest",
         max_bytes=32768,
@@ -275,7 +295,7 @@ def _verify_card(
     }
     if any(manifest.get(key) != value for key, value in expected.items()):
         raise MillefeuilleContractError("summary link card/source identity drift")
-    source = read_bytes_no_follow(
+    source = read_bytes(
         root / f"zotero/{publication.paper_id}/manifest.json",
         "summary link source identity",
         max_bytes=1048576,
@@ -306,7 +326,7 @@ def _verify_card(
             or entry["bytes"] <= 0
         ):
             raise MillefeuilleContractError("summary link card file binding is invalid")
-        data = read_bytes_no_follow(
+        data = read_bytes(
             root / entry["ref"], "summary link card artifact", max_bytes=1048576
         )
         if entry["ref"].endswith("/paper-card.json"):

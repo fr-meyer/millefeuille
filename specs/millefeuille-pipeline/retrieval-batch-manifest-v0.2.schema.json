@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/retrieval-batch-manifest-v0.2.schema.json",
+  "title": "Millefeuille Retrieval Batch Manifest v0.2",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "batch_id",
+    "runs"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "millefeuille-retrieval-batch-manifest/v0.2"
+    },
+    "batch_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "not": {
+        "enum": [
+          ".",
+          ".."
+        ]
+      }
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/runLocator"
+      }
+    }
+  },
+  "$defs": {
+    "safePackageId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "not": {
+        "enum": [
+          ".",
+          ".."
+        ]
+      }
+    },
+    "runLocator": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/paperIdLocator"
+        },
+        {
+          "$ref": "#/$defs/itemKeyLocator"
+        },
+        {
+          "$ref": "#/$defs/slugLocator"
+        },
+        {
+          "$ref": "#/$defs/doiLocator"
+        },
+        {
+          "$ref": "#/$defs/titleLocator"
+        }
+      ]
+    },
+    "paperIdLocator": {
+      "type": "object",
+      "required": [
+        "paper_id",
+        "run_id",
+        "artifact_run_ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "paper_id": {
+          "$ref": "#/$defs/safePackageId"
+        },
+        "run_id": {
+          "$ref": "#/$defs/safePackageId"
+        },
+        "artifact_run_ref": {
+          "type": "string",
+          "pattern": "^analyses/millefeuille/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      }
+    },
+    "itemKeyLocator": {
+      "type": "object",
+      "required": [
+        "item_key",
+        "run_id",
+        "artifact_run_ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "item_key": {
+          "$ref": "#/$defs/safePackageId"
+        },
+        "run_id": {
+          "$ref": "#/$defs/safePackageId"
+        },
+        "artifact_run_ref": {
+          "type": "string",
+          "pattern": "^analyses/millefeuille/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      }
+    },
+    "slugLocator": {
+      "type": "object",
+      "required": [
+        "slug",
+        "run_id",
+        "artifact_run_ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "slug": {
+          "$ref": "#/$defs/safePackageId"
+        },
+        "run_id": {
+          "$ref": "#/$defs/safePackageId"
+        },
+        "artifact_run_ref": {
+          "type": "string",
+          "pattern": "^analyses/millefeuille/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      }
+    },
+    "doiLocator": {
+      "type": "object",
+      "required": [
+        "doi",
+        "run_id",
+        "artifact_run_ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "doi": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "\\S"
+        },
+        "run_id": {
+          "$ref": "#/$defs/safePackageId"
+        },
+        "artifact_run_ref": {
+          "type": "string",
+          "pattern": "^analyses/millefeuille/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      }
+    },
+    "titleLocator": {
+      "type": "object",
+      "required": [
+        "title",
+        "run_id",
+        "artifact_run_ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "\\S"
+        },
+        "run_id": {
+          "$ref": "#/$defs/safePackageId"
+        },
+        "artifact_run_ref": {
+          "type": "string",
+          "pattern": "^analyses/millefeuille/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      }
+    }
+  }
+}

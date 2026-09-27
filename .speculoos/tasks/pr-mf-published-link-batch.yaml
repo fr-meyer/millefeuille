@@ -1,0 +1,51 @@
+id: pr-mf-published-link-batch
+title: Retrieve verified published GPT summaries as deterministic protected batches
+status: implementation
+branch: feat/pr-mf-published-link-batch-20260928
+base_branch: dev
+write_paths:
+- README.md
+- .speculoos/tasks/pr-mf-published-link-batch.yaml
+- millefeuille/domain/published_summary_run_link.py
+- millefeuille/domain/retrieve.py
+- millefeuille/domain/route_fixtures.py
+- millefeuille/domain/structure_fixtures.py
+- millefeuille/domain/summary_batch_plan.py
+- millefeuille/domain/summary_dispatch.py
+- millefeuille/domain/summary_execution_manifest.py
+- millefeuille/domain/summary_preparation.py
+- millefeuille/domain/summary_published_handoff.py
+- millefeuille/domain/summary_results.py
+- specs/millefeuille-pipeline/published-summary-retrieval.md
+- specs/millefeuille-pipeline/remaining-work.md
+- specs/millefeuille-pipeline/retrieval-batch-manifest-v0.2.schema.json
+- specs/millefeuille-pipeline/retrieval-batch-result-v0.2.schema.json
+- tests/test_millefeuille_published_summary_batch.py
+scope:
+- Pass the explicit pinned-root reader through all original publication and preparation
+  reads
+- Preserve complete census snapshots and all-or-nothing input revalidation before
+  atomic publication
+- Add explicit published artifact-run refs and origin lineage in retrieval batch v0.2
+- Keep inline v0.1 contracts unchanged and reject invalid linked batch locators
+- Validate all five actual saved pilots without network or durable source-pack writes
+acceptance:
+- Eight new batch regressions and existing retrieval publication compatibility tests
+  pass
+- Mutation of each original publication preparation or card dependency prevents output
+- Actual five-pilot API CLI and reversed-order precommit validation preserves 166
+  refs and 704 input hashes
+- Full tracked tests Ruff metadata private scan Speculoos exact-head review and platform
+  CI pass
+publication_boundary:
+  statement: Source code synthetic tests schemas and scrubbed metadata only; no provider
+    calls production OpenKB Zotero OCR credential taxonomy source-pack release or
+    approval bypass changes.
+documentation_impact:
+  status: updated
+  rationale: Explain batch v0.2 explicit locators complete snapshots immutable lineage
+    and the distinction between synthetic publication and actual read-only preflight.
+publish_authority: Existing user approval covers GCP implementation acceptance and
+  feature-to-dev publication.
+private_data_scan: Required; no paper text prompts model outputs credentials or receipt
+  payloads in git.

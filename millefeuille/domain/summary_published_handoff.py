@@ -21,7 +21,7 @@ from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
 )
 from millefeuille.domain.operator_preflight import compute_operator_root_target_id
-from millefeuille.domain.secure_io import read_bytes_no_follow
+from millefeuille.domain.secure_io import RootArtifactReader, read_bytes_no_follow
 from millefeuille.domain.source_packs import (
     SOURCE_PACK_MANIFEST_SCHEMA_VERSION,
     parse_source_pack_manifest,
@@ -95,6 +95,7 @@ def load_verified_published_gpt_summary_package(
     structure_evidence_path: str | Path,
     preparation_path: str | Path,
     publication: GptSummaryPublicationIdentity,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> VerifiedPublishedGptSummaryPackage:
     """Hold the entire verified publication for provenance-preserving reuse.
 
@@ -107,6 +108,7 @@ def load_verified_published_gpt_summary_package(
         structure_evidence_path=structure_evidence_path,
         preparation_path=preparation_path,
         publication=publication,
+        artifact_reader=artifact_reader,
     )
     return VerifiedPublishedGptSummaryPackage(
         handoff,
@@ -197,6 +199,7 @@ def _verify_published_gpt_summary_data(
     structure_evidence_path: str | Path,
     preparation_path: str | Path,
     publication: GptSummaryPublicationIdentity,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> tuple[PublishedGptSummaryHandoff, dict[str, bytes]]:
     """Verify an immutable publication before exposing downstream input refs.
 
@@ -204,6 +207,12 @@ def _verify_published_gpt_summary_data(
     authorization. No receipt is reserved or checked for current expiry when
     reading an already published run.
     """
+
+    read_bytes = (
+        artifact_reader.read_bytes
+        if artifact_reader is not None
+        else read_bytes_no_follow
+    )
 
     if not isinstance(publication, GptSummaryPublicationIdentity):
         raise MillefeuilleContractError("GPT published identity is invalid")
@@ -220,6 +229,8 @@ def _verify_published_gpt_summary_data(
     ):
         raise MillefeuilleContractError("GPT published size is invalid")
     root = Path(source_pack_root)
+    if artifact_reader is not None and artifact_reader.root != root.absolute():
+        raise MillefeuilleContractError("GPT published reader root drift")
     evidence = {
         "route_evidence_path": str(route_evidence_path),
         "structure_evidence_path": str(structure_evidence_path),
@@ -228,8 +239,10 @@ def _verify_published_gpt_summary_data(
     validate_gpt_summary_evidence_paths(evidence=evidence, source_pack_root=str(root))
     if compute_operator_root_target_id(str(root)) != publication.root_target_id:
         raise MillefeuilleContractError("GPT published destination drift")
-    fresh = plan_grounded_gpt_summary_batch(**evidence)
-    prepared = verify_summary_preparation_package(**evidence)
+    fresh = plan_grounded_gpt_summary_batch(**evidence, artifact_reader=artifact_reader)
+    prepared = verify_summary_preparation_package(
+        **evidence, artifact_reader=artifact_reader
+    )
     if (
         fresh.batch.paper_id != publication.paper_id
         or fresh.manifest.sha256 != publication.source_manifest_sha256
@@ -238,7 +251,7 @@ def _verify_published_gpt_summary_data(
     source_pack_ref = f"zotero/{publication.paper_id}"
     source = parse_source_pack_manifest(
         _object(
-            read_bytes_no_follow(
+            read_bytes(
                 root / source_pack_ref / "manifest.json",
                 "GPT published source-pack manifest",
             )
@@ -268,7 +281,7 @@ def _verify_published_gpt_summary_data(
             raise MillefeuilleContractError("GPT published ref is outside its run")
         if any(part in {"", ".", ".."} for part in ref.split("/")):
             raise MillefeuilleContractError("GPT published ref is unsafe")
-        encoded = read_bytes_no_follow(root / ref, "GPT published artifact")
+        encoded = read_bytes(root / ref, "GPT published artifact")
         if _digest(encoded) != expected:
             raise MillefeuilleContractError("GPT published artifact hash drift")
         if ref in data:
@@ -350,14 +363,32 @@ def _verify_published_gpt_summary_data(
         provenance_refs.append(model_ref)
     run_dir = root / prefix
     actual_refs = set()
-    for directory, children, filenames in os.walk(run_dir, followlinks=False):
-        for name in [*children, *filenames]:
-            path = Path(directory) / name
-            if stat.S_ISLNK(path.lstat().st_mode):
-                raise MillefeuilleContractError("GPT published run contains a symlink")
-        actual_refs.update(
-            str((Path(directory) / name).relative_to(root)) for name in filenames
-        )
+    if artifact_reader is None:
+        for directory, children, filenames in os.walk(run_dir, followlinks=False):
+            for name in [*children, *filenames]:
+                path = Path(directory) / name
+                if stat.S_ISLNK(path.lstat().st_mode):
+                    raise MillefeuilleContractError(
+                        "GPT published run contains a symlink"
+                    )
+            actual_refs.update(
+                str((Path(directory) / name).relative_to(root)) for name in filenames
+            )
+    else:
+        pending = [run_dir]
+        while pending:
+            directory = pending.pop()
+            for name in artifact_reader.list_directory_names(
+                directory, "GPT published census"
+            ):
+                path = directory / name
+                if artifact_reader.is_directory(path, "GPT published census entry"):
+                    pending.append(path)
+                else:
+                    artifact_reader.verify_regular_file(
+                        path, "GPT published census entry"
+                    )
+                    actual_refs.add(path.relative_to(root).as_posix())
     if actual_refs != set(data) or len(data) != publication.file_count:
         raise MillefeuilleContractError("GPT published file coverage drift")
     if sum(map(len, data.values())) != publication.total_bytes:

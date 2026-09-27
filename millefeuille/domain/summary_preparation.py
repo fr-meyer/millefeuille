@@ -21,6 +21,7 @@ from millefeuille.domain.route_fixtures import (
     load_route_selection_evidence_batch,
 )
 from millefeuille.domain.secure_io import (
+    RootArtifactReader,
     read_bytes_no_follow,
     write_new_text_no_follow,
 )
@@ -216,6 +217,7 @@ def verify_summary_preparation_package(
     route_evidence_path: str | Path,
     structure_evidence_path: str | Path,
     preparation_path: str | Path,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> dict[str, Any]:
     """Rebuild one preparation in memory and reject source or package drift.
 
@@ -224,8 +226,14 @@ def verify_summary_preparation_package(
     plans, work units, and package bytes without making a provider call.
     """
 
+    read_bytes = (
+        artifact_reader.read_bytes
+        if artifact_reader is not None
+        else read_bytes_no_follow
+    )
+
     package_path = Path(preparation_path)
-    package_bytes = read_bytes_no_follow(package_path, "summary preparation package")
+    package_bytes = read_bytes(package_path, "summary preparation package")
     try:
         package = json.loads(package_bytes.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -239,8 +247,12 @@ def verify_summary_preparation_package(
         raise MillefeuilleContractError(
             "summary preparation package profile is invalid"
         )
-    routes = load_route_selection_evidence_batch(route_evidence_path)
-    structures = load_structure_evidence_batch(structure_evidence_path)
+    routes = load_route_selection_evidence_batch(
+        route_evidence_path, artifact_reader=artifact_reader
+    )
+    structures = load_structure_evidence_batch(
+        structure_evidence_path, artifact_reader=artifact_reader
+    )
     if len(routes) != 1 or len(structures) != 1:
         raise MillefeuilleContractError(
             "summary dispatch requires one route and one structure record"
@@ -255,6 +267,7 @@ def verify_summary_preparation_package(
         output_root=package_path.parent,
         profile=profile,
         plans=plans,
+        artifact_reader=artifact_reader,
     )
     if package_path != expected.package_path or package_bytes != expected.package_bytes:
         raise MillefeuilleContractError("summary preparation package or source drift")
@@ -268,7 +281,13 @@ def _prepare_document(
     output_root: Path,
     profile: str,
     plans: dict[str, dict[str, Any]],
+    artifact_reader: RootArtifactReader | None = None,
 ) -> _PreparedSummaryDocument:
+    read_bytes = (
+        artifact_reader.read_bytes
+        if artifact_reader is not None
+        else read_bytes_no_follow
+    )
     _validate_identity_join(route, structure)
     paper_id = route.paper_id or paper_id_for_zotero_item_key(route.item_key)
     structure_paper_id = structure.paper_id or paper_id_for_zotero_item_key(
@@ -281,11 +300,11 @@ def _prepare_document(
     if not re.fullmatch(r"[A-Za-z0-9._-]+", paper_id):
         raise MillefeuilleContractError("paper_id is not safe for summary preparation")
 
-    markdown_bytes = read_bytes_no_follow(
+    markdown_bytes = read_bytes(
         route.markdown_path,
         "selected markdown for summary preparation",
     )
-    structure_bytes = read_bytes_no_follow(
+    structure_bytes = read_bytes(
         structure.structure_path,
         "structure input for summary preparation",
     )

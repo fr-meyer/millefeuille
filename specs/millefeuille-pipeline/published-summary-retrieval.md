@@ -51,9 +51,53 @@ Synthetic regressions cover real publication/card fixtures, canonical index
 refresh, API/CLI parity, filters, original text/provenance/source/link tampering,
 origin boundaries, rejection of saved views and inline compatibility.
 
-Published-link batch publication remains unsupported because its complete
-publication-verification footprint is not enlisted in the batch's pinned-root
-input snapshot. It fails before publication; existing inline batch guarantees are
-preserved. Complete batch snapshot integration and generated query answers remain
-separate acceptance requirements. This repair performs no provider calls, native
-reindex, Zotero mutation, OCR operation or source-pack write.
+Published linked summaries are supported by the explicit batch v0.2 contract
+below. Batch v0.1 keeps its original inline format and rejects linked summaries.
+Generated query answers remain a separate acceptance requirement. Single-run
+retrieval performs no provider calls, native reindex, Zotero mutation, OCR
+operation or source-pack write.
+
+## Published summary batch v0.2
+
+Use millefeuille-retrieval-batch-manifest/v0.2 with the usual batch_id and runs.
+Every run requires exactly one paper_id, item_key, slug, DOI or title locator,
+its run_id, and artifact_run_ref equal to analyses/millefeuille followed by that
+run_id. The ref is relative to the selected source root and is a package locator;
+it cannot override identity. Absolute paths, traversal, a missing ref and a ref
+for another run are rejected. V0.2 requires verified published summary links;
+v0.1 continues to handle inline packages unchanged.
+
+The protected root reader is explicitly passed through preparation verification,
+route/structure evidence loading, bound source reads, dispatch verification,
+original publication/text/provenance verification and card verification. The
+original publication's complete directory census is captured through held root
+descriptors. Both every read input and the directory census are revalidated before
+the existing atomic no-replace commit. Adding an original publication file or
+changing any verified dependency after preflight prevents the result generation.
+No ambient reader state, provider dispatch or model output regeneration is used.
+
+The v0.2 result retains original summary_id and source_locators along with portable
+text refs into the original run. Optional model_provenance_ref is retained when
+present in the source record. Each consuming run also includes the single-run
+lineage fields above, with source_summary_ref normalized relative to the source
+root. Result sorting is deterministic, independently of manifest input order.
+The JSON/Markdown output contains refs and metadata, never source or summary text.
+
+Contracts: [manifest v0.2](retrieval-batch-manifest-v0.2.schema.json) and
+[result v0.2](retrieval-batch-result-v0.2.schema.json). Their v0.1 counterparts remain
+unchanged. The CLI uses retrieve --batch-manifest with the same contract as the API.
+Output publication uses the established cooperative lock, protected staging,
+complete input revalidation and atomic commit. Its documented trusted-owner or
+cooperative-writer boundary remains unchanged.
+
+Eight synthetic regressions exercise actual new batch publication and exact rerun,
+lineage with empty filters, duplicates and late missing runs, invalid run refs,
+explicit reader propagation, every linked dependency mutation, census additions,
+wrong roots and symlinks. The focused retrieval/publication suite passes 74 tests
+(1 skipped). Five actual pilot public batch API/CLI invocations pass complete
+precommit snapshot checks for all 166 summaries and five acceptance-pass packages,
+including reversed order, page and classification/index filters. Transports are
+blocked and all 704 source hashes remain unchanged. That actual acceptance run
+intercepts publication before commit: it performs zero durable source-pack writes.
+Actual combined-result publication and generated GPT query answers remain separate
+live acceptance work; synthetic transaction coverage is not claimed as a live write.

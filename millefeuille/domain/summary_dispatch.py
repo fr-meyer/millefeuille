@@ -17,7 +17,7 @@ from typing import Any
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.model_execution import SUMMARY_MODEL_STAGES
 from millefeuille.domain.model_executor import build_summary_work_unit_request
-from millefeuille.domain.secure_io import read_bytes_no_follow
+from millefeuille.domain.secure_io import RootArtifactReader, read_bytes_no_follow
 from millefeuille.domain.summary_preparation import verify_summary_preparation_package
 
 PromptBuilder = Callable[[str, str, tuple[str, ...], bytes, bytes], bytes]
@@ -56,6 +56,7 @@ def plan_verified_summary_dispatch(
     prompt_builder: PromptBuilder,
     output_contracts: Mapping[str, tuple[str, str]],
     timeout_seconds: int = 180,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> SummaryDispatchBatch:
     """Build every typed GPT request from one reverified preparation package.
 
@@ -63,6 +64,12 @@ def plan_verified_summary_dispatch(
     The caller must separately authorize execution and validate model outputs;
     this function cannot dispatch a provider call.
     """
+
+    read_bytes = (
+        artifact_reader.read_bytes
+        if artifact_reader is not None
+        else read_bytes_no_follow
+    )
 
     if not callable(prompt_builder):
         raise MillefeuilleContractError("summary prompt_builder must be callable")
@@ -85,16 +92,19 @@ def plan_verified_summary_dispatch(
         route_evidence_path=route_evidence_path,
         structure_evidence_path=structure_evidence_path,
         preparation_path=preparation_path,
+        artifact_reader=artifact_reader,
     )
     if "structure page coverage incomplete" in preparation["execution"]["blockers"]:
         raise MillefeuilleContractError(
             "summary dispatch requires complete structure page coverage"
         )
-    markdown = _read_bound_input(preparation["inputs"]["selected_markdown"])
-    structure = _read_bound_input(preparation["inputs"]["structure"])
-    prepared_bytes = read_bytes_no_follow(
-        Path(preparation_path), "summary preparation package"
+    markdown = _read_bound_input(
+        preparation["inputs"]["selected_markdown"], artifact_reader=artifact_reader
     )
+    structure = _read_bound_input(
+        preparation["inputs"]["structure"], artifact_reader=artifact_reader
+    )
+    prepared_bytes = read_bytes(Path(preparation_path), "summary preparation package")
     preparation_digest = "sha256:" + hashlib.sha256(prepared_bytes).hexdigest()
     units: list[SummaryDispatchUnit] = []
     request_ids: set[str] = set()
@@ -151,10 +161,14 @@ def plan_verified_summary_dispatch(
                 )
             )
     # A source changed during planning if the bound reads no longer match.
-    _read_bound_input(preparation["inputs"]["selected_markdown"])
-    _read_bound_input(preparation["inputs"]["structure"])
+    _read_bound_input(
+        preparation["inputs"]["selected_markdown"], artifact_reader=artifact_reader
+    )
+    _read_bound_input(
+        preparation["inputs"]["structure"], artifact_reader=artifact_reader
+    )
     if (
-        read_bytes_no_follow(Path(preparation_path), "summary preparation package")
+        read_bytes(Path(preparation_path), "summary preparation package")
         != prepared_bytes
     ):
         raise MillefeuilleContractError(
@@ -192,8 +206,15 @@ def _bind_prompt(
     return b"Millefeuille summary source binding v0.1\n" + binding + b"\n\n" + prompt
 
 
-def _read_bound_input(binding: dict[str, Any]) -> bytes:
-    payload = read_bytes_no_follow(Path(binding["path"]), "summary dispatch source")
+def _read_bound_input(
+    binding: dict[str, Any], *, artifact_reader: RootArtifactReader | None = None
+) -> bytes:
+    read_bytes = (
+        artifact_reader.read_bytes
+        if artifact_reader is not None
+        else read_bytes_no_follow
+    )
+    payload = read_bytes(Path(binding["path"]), "summary dispatch source")
     if (
         len(payload) != binding["bytes"]
         or hashlib.sha256(payload).hexdigest() != binding["sha256"]

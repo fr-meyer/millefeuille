@@ -22,7 +22,7 @@ from millefeuille.domain.model_executor import (
     validate_model_executor_result,
     verify_model_executor_input,
 )
-from millefeuille.domain.secure_io import read_bytes_no_follow
+from millefeuille.domain.secure_io import RootArtifactReader, read_bytes_no_follow
 from millefeuille.domain.summary_dispatch import (
     GPT_MODEL,
     SUMMARY_OUTPUT_CONTRACTS,
@@ -178,8 +178,15 @@ def verify_summary_dispatch_batch(
     route_evidence_path: str | Path,
     structure_evidence_path: str | Path,
     preparation_path: str | Path,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> tuple[dict[str, Any], ...]:
     """Check every planned GPT request against the current preparation."""
+
+    read_bytes = (
+        artifact_reader.read_bytes
+        if artifact_reader is not None
+        else read_bytes_no_follow
+    )
 
     if not isinstance(batch, SummaryDispatchBatch):
         raise MillefeuilleContractError("summary batch evidence is invalid")
@@ -194,13 +201,14 @@ def verify_summary_dispatch_batch(
     ):
         raise MillefeuilleContractError("summary batch has invalid work units")
     package_path = Path(preparation_path)
-    before = read_bytes_no_follow(package_path, "summary preparation package")
+    before = read_bytes(package_path, "summary preparation package")
     preparation = verify_summary_preparation_package(
         route_evidence_path=route_evidence_path,
         structure_evidence_path=structure_evidence_path,
         preparation_path=package_path,
+        artifact_reader=artifact_reader,
     )
-    after = read_bytes_no_follow(package_path, "summary preparation package")
+    after = read_bytes(package_path, "summary preparation package")
     if before != after:
         raise MillefeuilleContractError(
             "summary preparation changed during verification"
