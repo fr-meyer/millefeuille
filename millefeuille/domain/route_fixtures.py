@@ -555,6 +555,8 @@ def _normalize_sha256(value: str) -> str:
 
 def _normalize_source_hash(value: str) -> str:
     stripped = value.strip()
+    if re.fullmatch(r"sha256-aggregate:[0-9a-f]{64}", stripped):
+        return stripped
     if not stripped.startswith("sha256:"):
         raise MillefeuilleContractError("source_hash must use the sha256:<hex> form")
     _normalize_sha256(stripped)

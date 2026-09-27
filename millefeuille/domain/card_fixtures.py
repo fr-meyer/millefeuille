@@ -28,6 +28,12 @@ from millefeuille.domain.source_packs import (
     load_source_pack_manifest,
     paper_id_for_zotero_item_key,
 )
+from millefeuille.domain.source_scope import (
+    MultiSourceScope,
+    resolve_multi_source_pack,
+    validate_whole_pack_evidence_fields,
+    verify_multi_source_pack,
+)
 from millefeuille.domain.structure_fixtures import (
     STRUCTURE_EVIDENCE_REF,
     load_structure_sidecar,
@@ -38,6 +44,7 @@ from millefeuille.domain.summary_fixtures import (
 )
 
 CARD_FIXTURE_SCHEMA_VERSION = "millefeuille-card-fixture-evidence/v0.1"
+CARD_FIXTURE_SCHEMA_VERSION_V2 = "millefeuille-card-fixture-evidence/v0.2"
 PAPER_CARD_SCHEMA_VERSION = PAPER_CARD_SCHEMA_V2
 CARD_JSON_REF = Path("cards/paper-card.json")
 CARD_MARKDOWN_REF = Path("cards/paper-card.md")
@@ -46,26 +53,46 @@ CARD_MARKDOWN_REF = Path("cards/paper-card.md")
 @dataclass(frozen=True)
 class CardFixtureEvidence:
     item_key: str
-    attachment_key: str
-    canonical_filename: str
+    attachment_key: str | None
+    canonical_filename: str | None
     card_json_path: Path
     card_markdown_path: Path
-    expected_sha256: str
+    expected_sha256: str | None
     source_type: str = "zotero"
     schema_version: str = CARD_FIXTURE_SCHEMA_VERSION
     zotero_version: int | None = None
     paper_id: str | None = None
+    source_scope: MultiSourceScope | None = None
 
     def __post_init__(self) -> None:
         if self.source_type != "zotero":
             raise MillefeuilleContractError("source_type must be 'zotero'")
         object.__setattr__(self, "card_json_path", Path(self.card_json_path))
         object.__setattr__(self, "card_markdown_path", Path(self.card_markdown_path))
-        object.__setattr__(
-            self,
-            "expected_sha256",
-            _normalize_sha256(self.expected_sha256),
-        )
+        if self.schema_version == CARD_FIXTURE_SCHEMA_VERSION_V2:
+            if not isinstance(self.source_scope, MultiSourceScope) or any(
+                value is not None
+                for value in (
+                    self.attachment_key,
+                    self.canonical_filename,
+                    self.expected_sha256,
+                    self.zotero_version,
+                )
+            ):
+                raise MillefeuilleContractError(
+                    "v0.2 evidence requires only whole-pack source_scope"
+                )
+        elif (
+            self.schema_version == CARD_FIXTURE_SCHEMA_VERSION
+            and self.source_scope is None
+        ):
+            object.__setattr__(
+                self, "expected_sha256", _normalize_sha256(self.expected_sha256)
+            )
+        else:
+            raise MillefeuilleContractError(
+                "unsupported or mixed fixture evidence schema"
+            )
 
     @classmethod
     def from_dict(
@@ -80,6 +107,32 @@ class CardFixtureEvidence:
             payload.get("schema_version", CARD_FIXTURE_SCHEMA_VERSION),
             "schema_version",
         )
+        if schema_version == CARD_FIXTURE_SCHEMA_VERSION_V2:
+            validate_whole_pack_evidence_fields(
+                payload, {"card_json_path", "card_markdown_path"}
+            )
+            return cls(
+                item_key=_required_string(payload.get("item_key"), "item_key"),
+                attachment_key=None,
+                canonical_filename=None,
+                expected_sha256=None,
+                card_json_path=_resolve_optional_path(
+                    payload.get("card_json_path"),
+                    base_dir=base_dir,
+                    field_name="card_json_path",
+                ),
+                card_markdown_path=_resolve_optional_path(
+                    payload.get("card_markdown_path"),
+                    base_dir=base_dir,
+                    field_name="card_markdown_path",
+                ),
+                source_type=_required_string(
+                    payload.get("source_type", "zotero"), "source_type"
+                ),
+                paper_id=_optional_string(payload.get("paper_id"), "paper_id"),
+                schema_version=schema_version,
+                source_scope=MultiSourceScope.from_dict(payload["source_scope"]),
+            )
         if schema_version != CARD_FIXTURE_SCHEMA_VERSION:
             raise MillefeuilleContractError(
                 f"unsupported card fixture evidence schema_version {schema_version!r}"
@@ -94,6 +147,8 @@ class CardFixtureEvidence:
             base_dir=base_dir,
             field_name="card_markdown_path",
         )
+        if "source_scope" in payload:
+            raise MillefeuilleContractError("v0.1 evidence cannot contain source_scope")
         return cls(
             item_key=_required_string(payload.get("item_key"), "item_key"),
             attachment_key=_required_string(
@@ -153,6 +208,9 @@ class _PlannedCardWrite:
     card_markdown_output_path: Path
     expected_payload: dict[str, Any]
     expected_markdown: str
+    source_scope: MultiSourceScope | None = None
+    source_pack_dir: Path | None = None
+    item_key: str | None = None
 
 
 def load_card_fixture_evidence_batch(path: str | Path) -> list[CardFixtureEvidence]:
@@ -238,15 +296,23 @@ def _plan_card(
     *,
     artifact_run_dir: str | Path | None,
 ) -> _PlannedCardWrite:
-    source_pack_dir, source_hash = _resolve_source_pack_dir(
-        source_pack_root=source_pack_root,
-        item_key=evidence.item_key,
-        attachment_key=evidence.attachment_key,
-        canonical_filename=evidence.canonical_filename,
-        expected_sha256=evidence.expected_sha256,
-        zotero_version=evidence.zotero_version,
-        paper_id=evidence.paper_id,
-    )
+    if evidence.source_scope is not None:
+        source_pack_dir, source_hash = resolve_multi_source_pack(
+            source_pack_root=source_pack_root,
+            item_key=evidence.item_key,
+            paper_id=evidence.paper_id,
+            scope=evidence.source_scope,
+        )
+    else:
+        source_pack_dir, source_hash = _resolve_source_pack_dir(
+            source_pack_root=source_pack_root,
+            item_key=evidence.item_key,
+            attachment_key=evidence.attachment_key,
+            canonical_filename=evidence.canonical_filename,
+            expected_sha256=evidence.expected_sha256,
+            zotero_version=evidence.zotero_version,
+            paper_id=evidence.paper_id,
+        )
     paper_id = source_pack_dir.name
     run_dir = (
         Path(artifact_run_dir)
@@ -261,6 +327,13 @@ def _plan_card(
         source_hash=source_hash,
     )
     card_payload = _load_paper_card_fixture(evidence.card_json_path)
+    if (
+        evidence.source_scope is not None
+        and card_payload["schema_version"] != PAPER_CARD_SCHEMA_V2
+    ):
+        raise MillefeuilleContractError(
+            "whole-pack evidence requires a v0.2 paper card"
+        )
     expected_payload = _materialize_card_payload(
         fixture_payload=card_payload,
         item_key=evidence.item_key,
@@ -290,6 +363,9 @@ def _plan_card(
         card_markdown_output_path=card_markdown_output_path,
         expected_payload=expected_payload,
         expected_markdown=expected_markdown,
+        source_scope=evidence.source_scope,
+        source_pack_dir=source_pack_dir,
+        item_key=evidence.item_key,
     )
 
 
@@ -297,7 +373,7 @@ def _materialize_card_payload(
     *,
     fixture_payload: dict[str, Any],
     item_key: str,
-    canonical_filename: str,
+    canonical_filename: str | None,
     paper_id: str,
     run_id: str,
     source_hash: str,
@@ -447,6 +523,13 @@ def _require_observed_card_matches_planned_card(
 def _apply_planned_card_write(
     planned: _PlannedCardWrite,
 ) -> CardFixtureWriteResult:
+    if planned.source_scope is not None:
+        verify_multi_source_pack(
+            planned.source_pack_dir,
+            item_key=planned.item_key,
+            paper_id=planned.paper_id,
+            scope=planned.source_scope,
+        )
     if planned.status == "created":
         planned.card_json_output_path.parent.mkdir(parents=True, exist_ok=True)
         planned.card_json_output_path.write_bytes(
@@ -530,7 +613,16 @@ def _resolve_source_pack_dir(
 
 
 def _reject_duplicate_records(records: list[CardFixtureEvidence]) -> None:
-    seen: set[tuple[str, str]] = set()
+    whole_items = {
+        record.item_key for record in records if record.source_scope is not None
+    }
+    if any(
+        sum(record.item_key == item for record in records) > 1 for item in whole_items
+    ):
+        raise MillefeuilleContractError(
+            "whole-pack evidence conflicts with another item record"
+        )
+    seen: set[tuple[str, str | None]] = set()
     for record in records:
         key = (record.item_key, record.attachment_key)
         if key in seen:

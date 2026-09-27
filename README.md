@@ -1291,3 +1291,6 @@ The bundled `research-default.classify` preview matches the accepted-run GPT
 request: `openai/gpt-5.6-sol`, `xhigh`, subscription OAuth and no fallback.
 Planning and dispatch reject changed model, authentication or profile defaults
 before any provider call.
+
+Multi-PDF downstream card/index evidence is documented in
+[MF-114 whole-pack materialization](specs/millefeuille-pipeline/multi-source-materialization.md).
