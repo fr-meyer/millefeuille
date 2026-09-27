@@ -284,7 +284,8 @@ class ClassificationModelTests(unittest.TestCase):
         view_path.write_text(json.dumps(view))
         plan = self.plan()
         self.assertEqual(
-            json.loads(plan.prompt)["full_paper_summary"], target.read_text()
+            json.loads(plan.prompt)["full_paper_summary"],
+            target.read_bytes().decode("utf-8"),
         )
         self.assertTrue(any(f["path"] == str(target) for f in plan.input_files))
         validate_classification_model_output(self.output(plan), plan=plan)
