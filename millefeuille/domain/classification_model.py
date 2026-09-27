@@ -5,6 +5,7 @@ decisions, promotes a taxonomy, or writes Zotero. Those effects retain separate
 trusted approval and durable one-use boundaries.
 """
 
+from copy import deepcopy
 from dataclasses import dataclass
 import hashlib
 import json
@@ -64,6 +65,7 @@ class ClassificationModelPlan:
     source_locators: tuple[str, ...]
     input_files: tuple[dict[str, Any], ...]
     request: dict[str, Any]
+    request_sha256: str
     prompt: bytes
 
     def to_dict(self) -> dict[str, Any]:
@@ -77,11 +79,16 @@ class ClassificationModelPlan:
             "taxonomy_version": self.taxonomy_lock["taxonomy_version"],
             "taxonomy_lock_identity": self.taxonomy_lock["content_identity"],
             "source_locators": list(self.source_locators),
-            "input_files": list(self.input_files),
-            "request": self.request,
+            "input_files": deepcopy(list(self.input_files)),
+            "request": deepcopy(self.request),
+            "request_sha256": self.request_sha256,
             "planning_provider_calls": 0,
             "live_receipt_required": True,
         }
+
+    def executor_request(self) -> dict[str, Any]:
+        """Return a checked, independent request snapshot for the live boundary."""
+        return verify_classification_model_plan(self)
 
 
 def prepare_classification_model_plan(
@@ -102,13 +109,16 @@ def prepare_classification_model_plan(
         raise MillefeuilleContractError(
             "classification requires a selected-text snapshot hash"
         )
-    root = Path(source_pack_root).resolve()
+    root = Path(source_pack_root)
     resolved = resolve_run_artifacts(
         source_pack_root=root,
         run_id=run_id,
         paper_id=paper_id,
         artifact_root=artifact_root,
     )
+    # Preserve the recorded locator spelling during stage identity resolution.
+    # Windows resolve() expands short paths; use it only for containment below.
+    root = root.resolve()
     _require_passing_acceptance(resolved)
     lock_path = Path(taxonomy_lock_path)
     lock_wire = _read(lock_path)
@@ -248,16 +258,20 @@ def prepare_classification_model_plan(
         locators,
         commitments,
         request,
+        _hash(_canonical(request)),
         prompt,
     )
 
 
-def validate_classification_model_output(
-    value: Any, *, plan: ClassificationModelPlan
+def verify_classification_model_plan(
+    plan: ClassificationModelPlan,
 ) -> dict[str, Any]:
-    """Validate exact identity, taxonomy membership, page refs and review routing."""
-    validate_model_executor_request(plan.request)
-    verify_model_executor_input(plan.request, plan.prompt)
+    """Check the entire original request and prompt; grant no live authority."""
+    request = deepcopy(plan.request)
+    if _hash(_canonical(request)) != plan.request_sha256:
+        raise MillefeuilleContractError("classification request commitment drift")
+    validate_model_executor_request(request)
+    verify_model_executor_input(request, plan.prompt)
     validate_taxonomy_lock(plan.taxonomy_lock)
     packet = json.loads(plan.prompt)
     identity = {
@@ -268,7 +282,7 @@ def validate_classification_model_output(
         "taxonomy_lock_identity": plan.taxonomy_lock["content_identity"],
     }
     if (
-        plan.request["task"]["kind"] != "classify"
+        request["task"]["kind"] != "classify"
         or packet["identity"] != identity
         or packet["taxonomy"] != plan.taxonomy_lock["registry_snapshot"]
         or packet["source_locators"] != list(plan.source_locators)
@@ -278,6 +292,14 @@ def validate_classification_model_output(
         raise MillefeuilleContractError(
             "classification plan changed after input binding"
         )
+    return request
+
+
+def validate_classification_model_output(
+    value: Any, *, plan: ClassificationModelPlan
+) -> dict[str, Any]:
+    """Validate exact identity, taxonomy membership, page refs and review routing."""
+    verify_classification_model_plan(plan)
     fields = {
         "schema_version",
         "paper_id",

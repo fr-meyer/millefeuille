@@ -14,7 +14,11 @@ from millefeuille.domain.classification_model import (
     validate_classification_model_output,
 )
 from millefeuille.domain.millefeuille import MillefeuilleContractError
-from millefeuille.domain.model_executor import verify_model_executor_input
+from millefeuille.domain.model_executor import (
+    build_model_executor_request,
+    validate_model_executor_request,
+    verify_model_executor_input,
+)
 from millefeuille.domain.summary_fixtures import load_hierarchical_summary
 from millefeuille.domain.taxonomy import create_taxonomy_lock, seal_taxonomy_registry
 from tests.test_millefeuille_stage_cli import (
@@ -150,6 +154,69 @@ class ClassificationModelTests(unittest.TestCase):
             "L2-TRAINING",
         )
 
+    def test_exported_metadata_and_executor_snapshot_do_not_alias_plan(self):
+        plan = self.plan()
+        before = deepcopy(plan.request)
+        exported = plan.to_dict()
+        exported["request"]["timeout_seconds"] = 1
+        exported["input_files"][0]["sha256"] = "changed"
+        snapshot = plan.executor_request()
+        snapshot["retry"]["max_attempts"] = 2
+        self.assertEqual(plan.request, before)
+        self.assertNotEqual(plan.input_files[0]["sha256"], "changed")
+        self.assertEqual(plan.executor_request(), before)
+        validate_classification_model_output(self.output(plan), plan=plan)
+
+    def test_generically_valid_rebound_request_mutations_are_rejected(self):
+        for changes in (
+            {"requested_model": "xai/grok-4.6"},
+            {"timeout_seconds": 300},
+            {"prompt_template_id": "another-template"},
+            {"prompt_template_version": "0.2"},
+            {"output_schema_id": "another-output"},
+            {"output_schema_version": "0.2"},
+            {"unit_id": "another-unit"},
+            {"source_locators": ["p.999"]},
+            {"task_kind": "paper_card"},
+            {
+                "max_attempts": 2,
+                "retry_on": ["timeout"],
+                "fallback_models": ["xai/grok-4.6"],
+            },
+        ):
+            with self.subTest(changes=changes):
+                plan = self.plan()
+                args = {
+                    "task_kind": "classify",
+                    "unit_id": "classification",
+                    "source_locators": list(plan.source_locators),
+                    "requested_model": "openai/gpt-5.6-sol",
+                    "thinking": "xhigh",
+                    "prompt_template_id": "millefeuille-classification",
+                    "prompt_template_version": "0.1",
+                    "input_payload": plan.prompt,
+                    "output_schema_id": "millefeuille-classification-model-output",
+                    "output_schema_version": "0.1",
+                    "timeout_seconds": 600,
+                    "max_attempts": 1,
+                    "retry_on": [],
+                    "fallback_models": [],
+                }
+                args.update(changes)
+                rebound = build_model_executor_request(**args)
+                validate_model_executor_request(rebound)
+                verify_model_executor_input(rebound, plan.prompt)
+                plan.request.clear()
+                plan.request.update(rebound)
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "request commitment drift"
+                ):
+                    plan.executor_request()
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "request commitment drift"
+                ):
+                    validate_classification_model_output(self.output(plan), plan=plan)
+
     def test_missing_or_failed_saved_acceptance_rejects(self):
         path = self.run / "reports/acceptance-summary.json"
         payload = json.loads(path.read_text())
@@ -180,7 +247,10 @@ class ClassificationModelTests(unittest.TestCase):
     def test_symlinked_taxonomy_is_rejected(self):
         external = Path(self.temp.name) / "external-lock.json"
         self.lock_path.rename(external)
-        self.lock_path.symlink_to(external)
+        try:
+            self.lock_path.symlink_to(external)
+        except OSError:
+            self.skipTest("symlinks unavailable")
         with self.assertRaises(MillefeuilleContractError):
             self.plan()
 
@@ -192,7 +262,10 @@ class ClassificationModelTests(unittest.TestCase):
         path = self.run / "summaries" / unit["text_ref"]
         destination = path.with_name("original-summary.md")
         path.rename(destination)
-        path.symlink_to(destination)
+        try:
+            path.symlink_to(destination)
+        except OSError:
+            self.skipTest("symlinks unavailable")
         with self.assertRaises(MillefeuilleContractError):
             self.plan()
 

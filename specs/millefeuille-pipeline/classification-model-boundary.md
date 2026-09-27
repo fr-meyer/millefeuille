@@ -23,7 +23,13 @@ checks additionally bind exact paper/run/source/taxonomy identities, active
 level-2 membership, a distinct active alternative when provided, valid page
 locators, nonempty claims and rationale, and explicit review reasons for low
 confidence or a taxonomy gap. Validation also rechecks the input binding and
-taxonomy snapshot, rejecting mutated plan state.
+taxonomy snapshot, rejecting mutated plan state. A fixed canonical SHA-256 binds
+every request field, including model, thinking, timeout, retry/fallback policy,
+template/output contract and task/source locators. Generically valid requests
+with recomputed idempotency keys still fail when their original commitment drifts.
+Exported metadata uses independent nested copies. Live callers obtain the checked
+request snapshot through `plan.executor_request()` immediately before verifying
+the exact receipt; output validation repeats the same complete plan check.
 
 The result is a model proposal. Membership checks cannot establish scientific
 correctness. Source-based QA must assess the rationale, evidence claims,
