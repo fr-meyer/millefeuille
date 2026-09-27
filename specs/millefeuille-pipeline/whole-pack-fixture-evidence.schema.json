@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Whole-pack card/index fixture evidence v0.2",
+  "description": "Runtime also verifies canonical strings, unique member keys and refs, the aggregate digest, exact manifest member equality, and every stored PDF hash. Synthetic downstream evidence is not proof of live upstream generation.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "item_key",
+        "source_scope",
+        "card_json_path",
+        "card_markdown_path"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "millefeuille-card-fixture-evidence/v0.2"
+        },
+        "source_type": {
+          "const": "zotero"
+        },
+        "item_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paper_id": {
+          "type": "string",
+          "pattern": "^(?!\\.{1,2}$)[A-Za-z0-9._-]+$"
+        },
+        "source_scope": {
+          "$ref": "#/$defs/sourceScope"
+        },
+        "card_json_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "card_markdown_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "item_key",
+        "source_scope",
+        "index_status_path"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "millefeuille-index-fixture-evidence/v0.2"
+        },
+        "source_type": {
+          "const": "zotero"
+        },
+        "item_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paper_id": {
+          "type": "string",
+          "pattern": "^(?!\\.{1,2}$)[A-Za-z0-9._-]+$"
+        },
+        "source_scope": {
+          "$ref": "#/$defs/sourceScope"
+        },
+        "index_status_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attachment_key",
+        "canonical_filename",
+        "sha256",
+        "source_ref"
+      ],
+      "properties": {
+        "attachment_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_filename": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^/\\\\\\u0000]+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_ref": {
+          "type": "string",
+          "pattern": "^sources/[A-Za-z0-9._-]+\\.pdf$"
+        },
+        "zotero_version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "sourceScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "source_hash",
+        "sources"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "millefeuille-source-scope/v0.1"
+        },
+        "source_hash": {
+          "type": "string",
+          "pattern": "^sha256-aggregate:[0-9a-f]{64}$"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/member"
+          }
+        }
+      }
+    }
+  }
+}

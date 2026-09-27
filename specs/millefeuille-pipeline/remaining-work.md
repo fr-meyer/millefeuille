@@ -86,7 +86,9 @@ not a claim that the whole product or release is complete.
 
 1. Finish broader source intake, scanned/OCR and edge-case coverage, using the
    rolling `mistral-ocr-latest` default and recording actual resolved provenance.
-2. Complete MF-114 multi-source card/index propagation.
+2. Exercise live multi-source upstream extraction and generation; MF-114
+   [whole-pack card/index materialization](multi-source-materialization.md) is
+   implemented with synthetic downstream acceptance coverage.
 3. Maintain the explicit [component model boundaries](component-model-boundaries.md)
    and operation-specific request/actual model evidence. Keep production GPT only
    while Grok OAuth is inactive; vendor API defaults cannot substitute for OAuth.
@@ -205,9 +207,9 @@ not a claim that the whole product or release is complete.
     - The v0.2 contract materializes planned/pending lanes before indexing and
       permits only a controlled post-index refresh to observed canonical lane
       outcomes. Existing v0.1 cards remain readable but immutable.
-    - v0.2 accepts aggregate source identities, but multi-source pack
-      propagation through card/index fixture materialization remains MF-114;
-      this lifecycle repair does not claim end-to-end multi-PDF support.
+    - MF-114 whole-pack evidence propagates verified multi-source manifests
+      through card/index materialization with full member checks and aggregate
+      identities. Live multi-PDF upstream generation remains to be exercised.
     - Manual gate: model/provider call approval when the card is model-made.
 
 12. **Retrieval And Index Layer**

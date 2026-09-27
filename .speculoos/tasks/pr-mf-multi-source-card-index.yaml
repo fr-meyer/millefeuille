@@ -1,0 +1,38 @@
+id: pr-mf-multi-source-card-index
+title: Propagate verified multi-source packs through cards and indexes
+status: implementation
+branch: feat/pr-mf-multi-source-card-index-20260928
+base_branch: dev
+write_paths:
+- README.md
+- .speculoos/tasks/pr-mf-multi-source-card-index.yaml
+- millefeuille/domain/source_scope.py
+- millefeuille/domain/card_fixtures.py
+- millefeuille/domain/index_fixtures.py
+- millefeuille/domain/route_fixtures.py
+- millefeuille/domain/structure_fixtures.py
+- specs/millefeuille-pipeline/whole-pack-fixture-evidence.schema.json
+- specs/millefeuille-pipeline/multi-source-materialization.md
+- specs/millefeuille-pipeline/remaining-work.md
+- tests/test_millefeuille_multi_source_materialization.py
+scope:
+- Add immutable typed whole-pack evidence and secure member revalidation
+- Materialize aggregate card/index identity without a primary filename
+- Preserve single-source compatibility and controlled observed card refresh
+- Document synthetic downstream coverage and remaining live upstream limits
+acceptance:
+- Real two-PDF intake passes downstream creation observed refresh and exact rerun
+- Incomplete duplicate unsafe drifted members fail and batch preflight preserves earlier
+  outputs
+- Concurrent card mutation rollback retains edits and recovery evidence
+- Full tracked-file suite Ruff metadata and Speculoos pass
+publication_boundary:
+  statement: Code synthetic tests and documentation only; no provider calls production
+    OpenKB Zotero OCR credential taxonomy release or approval bypass.
+documentation_impact:
+  status: updated
+  rationale: Describe v0.2 whole-pack evidence and preserve the live upstream acceptance
+    boundary.
+publish_authority: Existing user approval covers GCP implementation and feature-to-dev
+  repository publication.
+private_data_scan: Required; synthetic fixtures only.
