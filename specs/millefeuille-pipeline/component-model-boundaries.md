@@ -11,8 +11,8 @@ Millefeuille job used that model. Configuration inspection performs no model cal
 | Millefeuille page, section, whole-paper summaries, cards and classification | `openai/gpt-5.6-sol`, `xhigh` | Typed requests require subscription OAuth, reject API keys and have no fallback. GPT-only dispatch rejects foreign profile defaults before transport. |
 | Millefeuille native pilot index materialization | No new model call | The five completed pilots reuse verified saved summaries and structure. They do not invoke vendor compilation, `build_index`, concept/entity generation or an embedding model. This does not establish live generated-query coverage. |
 | OpenKB installed package | `0.4.5` | Active `openkb-mvp` environment resolves to the dated `openkb-0.4.5-pageindex-0.3.0.dev3` runtime. |
-| OpenKB native compile and native query | `mistral/mistral-medium-3-5` | The separate `docai-main/.openkb/config.yaml` names this model. `openkb/indexer.py:183-203` passes the selected model to PageIndex; package fallback is `gpt-5.4`. This is not the Millefeuille OAuth route. |
-| OpenKB separate OAuth query | `openai/gpt-5.6-sol`, `xhigh` | `docai-main/.openkb/openclaw-oauth-query.json`; a separate adapter uses its selected OAuth executor. Native configuration does not describe this adapter. |
+| OpenKB native compile and native query | `mistral/mistral-medium-3-5` | The separate `.openkb/config.yaml` names this model. `openkb/indexer.py:183-203` passes the selected model to PageIndex; package fallback is `gpt-5.4`. This is not the Millefeuille OAuth route. |
+| OpenKB separate OAuth query | `openai/gpt-5.6-sol`, `xhigh` | `.openkb/openclaw-oauth-query.json`; a separate adapter uses its selected OAuth executor. Native configuration does not describe this adapter. |
 | PageIndex installed package | `0.3.0.dev3` | Active package metadata. |
 | Standalone PageIndex local indexing default | `gpt-4o-2024-11-20` | `pageindex/config.py:12-37`; node summaries and document description are enabled by default. `index/pipeline.py:72-119` can therefore generate even for a Markdown level tree. Disabling those flags is insufficient for PDF content-based structure, which can still call a model. |
 | PageIndex local retrieval | Explicit retrieval model, otherwise selected index model | `backend/local.py:26-39`; the model flows through the owning client. A hosted PageIndex service controls its own server-side generation; its API key is not OpenClaw subscription OAuth. |
@@ -21,6 +21,9 @@ Millefeuille job used that model. Configuration inspection performs no model cal
 | Historical ChatIndex sandbox | `openkb-qwen` | Older project memory describes earlier Qwen jobs. It is superseded as a current wrapper default; no `openkb-qwen` alias was present in the current inspected model list. Saved historical jobs remain historical evidence. |
 | OCR | `mistral-ocr-latest` | Current research profile and user preference use the rolling alias. Resolved dated IDs belong in observed provenance. Older pilot approval metadata may record a dated model; it is not a current default. OCR remains separate from non-OCR generation. |
 | Embeddings, reranking, concept/entity enrichment | No such call in the verified pilot materialization | Do not infer a selected model from package presence. These future operations require explicit operation-specific planning and observed evidence. |
+
+Configuration paths in the inventory refer to the active research KB. The dated
+private audit manifest retains the exact host paths and source hashes.
 
 No private configuration values, keys, paper text, prompts or model outputs are
 included here. Mutable configuration must be rechecked before an approved live job.
