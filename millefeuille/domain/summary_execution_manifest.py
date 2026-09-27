@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from millefeuille.domain.model_executor import model_executor_request_sha256
+from millefeuille.domain.secure_io import RootArtifactReader
 from millefeuille.domain.summary_dispatch import GPT_MODEL, SummaryDispatchBatch
 from millefeuille.domain.summary_results import verify_summary_dispatch_batch
 
@@ -33,6 +34,7 @@ def plan_summary_execution_manifest(
     route_evidence_path: str | Path,
     structure_evidence_path: str | Path,
     preparation_path: str | Path,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> SummaryExecutionManifest:
     """Reverify all work units and fingerprint their exact no-call requests."""
 
@@ -41,6 +43,7 @@ def plan_summary_execution_manifest(
         route_evidence_path=route_evidence_path,
         structure_evidence_path=structure_evidence_path,
         preparation_path=preparation_path,
+        artifact_reader=artifact_reader,
     )
     units: list[dict[str, Any]] = []
     for unit, request in zip(batch.units, requests, strict=True):

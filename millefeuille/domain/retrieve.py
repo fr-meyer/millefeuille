@@ -67,6 +67,8 @@ _SAFE_REF_PART = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,255}\Z")
 
 RETRIEVAL_BATCH_MANIFEST_SCHEMA = "millefeuille-retrieval-batch-manifest/v0.1"
 RETRIEVAL_BATCH_RESULT_SCHEMA = "millefeuille-retrieval-batch-result/v0.1"
+RETRIEVAL_BATCH_MANIFEST_SCHEMA_V2 = "millefeuille-retrieval-batch-manifest/v0.2"
+RETRIEVAL_BATCH_RESULT_SCHEMA_V2 = "millefeuille-retrieval-batch-result/v0.2"
 RETRIEVAL_BATCH_ROOT_REF = Path("batches/millefeuille")
 RETRIEVAL_BATCH_RESULT_REF = Path("retrieval/batch-retrieval-result.json")
 RETRIEVAL_BATCH_REPORT_REF = Path("retrieval/batch-retrieval-report.md")
@@ -142,6 +144,10 @@ def write_retrieval_batch_result(
     batch_id, locators, batch_manifest_bytes = _load_retrieval_batch_manifest(
         batch_manifest_target
     )
+    published_batch = (
+        json.loads(batch_manifest_bytes)["schema_version"]
+        == RETRIEVAL_BATCH_MANIFEST_SCHEMA_V2
+    )
     # Keep argument validation portable and deterministic even when this host
     # cannot provide the stronger filesystem primitives required to publish.
     _normalize_retrieval_filters(
@@ -173,6 +179,10 @@ def write_retrieval_batch_result(
                 evidence_need=evidence_need,
                 strict_filters=True,
                 artifact_reader=artifact_reader,
+                artifact_root=(
+                    root / locator["artifact_run_ref"] if published_batch else None
+                ),
+                published_summary_links=published_batch,
             )
             for locator in locators
         ]
@@ -206,7 +216,11 @@ def write_retrieval_batch_result(
             "writeback_previews": sum("writeback_preview_ref" in run for run in runs),
         }
         result: dict[str, Any] = {
-            "schema_version": RETRIEVAL_BATCH_RESULT_SCHEMA,
+            "schema_version": (
+                RETRIEVAL_BATCH_RESULT_SCHEMA_V2
+                if published_batch
+                else RETRIEVAL_BATCH_RESULT_SCHEMA
+            ),
             "batch_id": batch_id,
             "status": "retrieved",
             "counts": counts,
@@ -262,6 +276,7 @@ def _prepare_retrieval(
     artifact_reader: RootArtifactReader | None = None,
     artifact_root: str | Path | None = None,
     stage_manifest: str | Path | None = None,
+    published_summary_links: bool = False,
 ) -> _PreparedRetrieval:
     filters, normalized_section = _normalize_retrieval_filters(
         summary_scope=summary_scope,
@@ -297,8 +312,14 @@ def _prepare_retrieval(
     )
     summary_path = resolved.run_dir / SUMMARY_ARTIFACT_REF
     summary_payload, verified_origin_dir = _load_retrieval_summary(
-        resolved, artifact_reader=artifact_reader
+        resolved,
+        artifact_reader=artifact_reader,
+        allow_published_summary_links=published_summary_links,
     )
+    if published_summary_links and verified_origin_dir is None:
+        raise MillefeuilleContractError(
+            "v0.2 retrieval batch requires verified published summary links"
+        )
     _require_identity(
         payload=summary_payload,
         label="hierarchical summary",
@@ -313,6 +334,7 @@ def _prepare_retrieval(
                 origin_dir=verified_origin_dir,
                 entry=entry,
                 entry_index=entry_index,
+                artifact_reader=artifact_reader,
             )
         else:
             _validate_summary_entry_refs(
@@ -495,6 +517,7 @@ def _load_retrieval_summary(
     resolved: ResolvedRunArtifacts,
     *,
     artifact_reader: RootArtifactReader | None,
+    allow_published_summary_links: bool = False,
 ) -> tuple[dict[str, Any], Path | None]:
     from millefeuille.domain.published_summary_run_link import (
         LINK_SCHEMA_VERSION,
@@ -512,9 +535,8 @@ def _load_retrieval_summary(
         )
     if payload.get("schema_version") != LINK_SCHEMA_VERSION:
         return HierarchicalSummaryRecord.from_dict(payload).to_dict(), None
-    if artifact_reader is not None:
-        # Batch publication promises complete pinned-root input snapshots. The
-        # existing publication verifier does not yet enlist its full footprint.
+    if artifact_reader is not None and not allow_published_summary_links:
+        # Published layouts and lineage require the explicit v0.2 contract.
         raise MillefeuilleContractError(
             "published summary link batch retrieval requires complete input snapshots"
         )
@@ -524,14 +546,19 @@ def _load_retrieval_summary(
         raise MillefeuilleContractError(
             "published summary link escapes the selected source root"
         )
-    view = load_published_summary_run_view(path)
+    view = load_published_summary_run_view(path, artifact_reader=artifact_reader)
     require_safe_package_id(view["origin_run_id"], "summary origin_run_id")
     origin = root / "analyses/millefeuille" / view["origin_run_id"]
     return view, origin
 
 
 def _validate_published_summary_entry_refs(
-    *, summary_dir: Path, origin_dir: Path, entry: dict[str, Any], entry_index: int
+    *,
+    summary_dir: Path,
+    origin_dir: Path,
+    entry: dict[str, Any],
+    entry_index: int,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> None:
     # Only the verified reader above can authorize cross-run references. The
     # legacy inline resolver keeps its traversal rejection unchanged.
@@ -558,7 +585,10 @@ def _validate_published_summary_entry_refs(
             raise MillefeuilleContractError(
                 f"{label} escapes the verified origin publication"
             ) from exc
-        _require_regular_artifact(target, label, root=origin_dir)
+        if artifact_reader is not None:
+            artifact_reader.verify_regular_file(target, label)
+        else:
+            _require_regular_artifact(target, label, root=origin_dir)
 
 
 def _load_retrieval_json(
@@ -719,7 +749,10 @@ def _load_retrieval_batch_manifest(
         raise MillefeuilleContractError(
             "retrieval batch schema_version must be a string"
         )
-    if schema_version != RETRIEVAL_BATCH_MANIFEST_SCHEMA:
+    if schema_version not in {
+        RETRIEVAL_BATCH_MANIFEST_SCHEMA,
+        RETRIEVAL_BATCH_MANIFEST_SCHEMA_V2,
+    }:
         raise MillefeuilleContractError(
             f"unsupported retrieval batch schema_version {schema_version!r}"
         )
@@ -744,7 +777,10 @@ def _load_retrieval_batch_manifest(
             raise MillefeuilleContractError(
                 f"retrieval batch run {index} must be an object"
             )
-        unexpected = sorted(set(entry) - (locator_fields | {"run_id"}))
+        allowed_run_fields = locator_fields | {"run_id"}
+        if schema_version == RETRIEVAL_BATCH_MANIFEST_SCHEMA_V2:
+            allowed_run_fields.add("artifact_run_ref")
+        unexpected = sorted(set(entry) - allowed_run_fields)
         if unexpected:
             raise MillefeuilleContractError(
                 f"retrieval batch run {index} has unsupported fields: "
@@ -802,7 +838,16 @@ def _load_retrieval_batch_manifest(
                     f"retrieval batch run {index} title is too long"
                 )
             _normalize_text(locator_value, f"retrieval batch run {index} title")
-        locators.append({"run_id": run_id, locator_field: locator_value})
+        locator = {"run_id": run_id, locator_field: locator_value}
+        if schema_version == RETRIEVAL_BATCH_MANIFEST_SCHEMA_V2:
+            expected_ref = f"analyses/millefeuille/{run_id}"
+            if entry.get("artifact_run_ref") != expected_ref:
+                raise MillefeuilleContractError(
+                    f"retrieval batch run {index} artifact_run_ref "
+                    "must match its published run"
+                )
+            locator["artifact_run_ref"] = expected_ref
+        locators.append(locator)
     return batch_id, locators, manifest_bytes
 
 
@@ -932,6 +977,7 @@ def _portable_batch_run(
             entry_index=entry_index,
             summary_dir=summary_dir,
             root=root,
+            published="summary_origin_run_id" in payload,
         )
         for entry_index, source_entry in enumerate(
             payload["summary_entries"],
@@ -978,6 +1024,22 @@ def _portable_batch_run(
             run[field_name] = _portable_ref(path, root=root)
     if "acceptance_status" in payload:
         run["acceptance_status"] = payload["acceptance_status"]
+    if "summary_origin_run_id" in payload:
+        for key in (
+            "summary_schema_version",
+            "summary_origin_run_id",
+            "summary_link_sha256",
+            "source_summary_sha256",
+        ):
+            run[key] = payload[key]
+        run["source_summary_ref"] = _portable_ref(
+            Path(
+                os.path.normpath(
+                    os.fspath(resolved.run_dir / payload["source_summary_ref"])
+                )
+            ),
+            root=root,
+        )
     return run
 
 
@@ -987,18 +1049,36 @@ def _portable_summary_entry(
     entry_index: int,
     summary_dir: Path,
     root: Path,
+    published: bool = False,
 ) -> dict[str, Any]:
-    text_path = _resolve_safe_relative_artifact_ref(
-        base_dir=summary_dir,
-        ref=source_entry["text_ref"],
-        label=f"summary entry {entry_index} text_ref",
-        verify=False,
-    )
-    return {
+    if published:
+        # Ref bytes have already been derived and confined by the source verifier.
+        text_path = Path(
+            os.path.normpath(os.fspath(summary_dir / source_entry["text_ref"]))
+        )
+    else:
+        text_path = _resolve_safe_relative_artifact_ref(
+            base_dir=summary_dir,
+            ref=source_entry["text_ref"],
+            label=f"summary entry {entry_index} text_ref",
+            verify=False,
+        )
+    result = {
         "grain": source_entry["grain"],
         "scope": source_entry["scope"],
         "text_ref": _portable_ref(text_path, root=root),
     }
+    if published:
+        result["summary_id"] = source_entry["summary_id"]
+        result["source_locators"] = list(source_entry["source_locators"])
+        if "model_provenance_ref" in source_entry:
+            path = Path(
+                os.path.normpath(
+                    os.fspath(summary_dir / source_entry["model_provenance_ref"])
+                )
+            )
+            result["model_provenance_ref"] = _portable_ref(path, root=root)
+    return result
 
 
 def _portable_index_lane(source_entry: dict[str, Any]) -> dict[str, Any]:

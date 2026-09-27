@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from millefeuille.domain.secure_io import RootArtifactReader
 from millefeuille.domain.summary_dispatch import (
     SUMMARY_OUTPUT_CONTRACTS,
     SummaryDispatchBatch,
@@ -35,6 +36,7 @@ def plan_grounded_gpt_summary_batch(
     route_evidence_path: str | Path,
     structure_evidence_path: str | Path,
     preparation_path: str | Path,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> GroundedSummaryBatchPlan:
     """Plan every prepared unit with the bundled GPT-only v1 prompt contract."""
 
@@ -47,6 +49,9 @@ def plan_grounded_gpt_summary_batch(
         **evidence,
         prompt_builder=build_v1_summary_prompt,
         output_contracts=SUMMARY_OUTPUT_CONTRACTS,
+        artifact_reader=artifact_reader,
     )
-    manifest = plan_summary_execution_manifest(batch=batch, **evidence)
+    manifest = plan_summary_execution_manifest(
+        batch=batch, artifact_reader=artifact_reader, **evidence
+    )
     return GroundedSummaryBatchPlan(manifest=manifest, batch=batch)

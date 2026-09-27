@@ -1298,3 +1298,8 @@ Multi-PDF downstream card/index evidence is documented in
 Verified published summaries are available through
 [read-only retrieval](specs/millefeuille-pipeline/published-summary-retrieval.md),
 with original generation lineage and source integrity checks.
+
+Published GPT summary batches use retrieval manifest/result v0.2 with explicit
+published-run refs and complete pinned-root source/publication snapshots. Original
+summary identity, locators and lineage are retained; v0.1 inline batches remain
+compatible. See [published summary retrieval](specs/millefeuille-pipeline/published-summary-retrieval.md).

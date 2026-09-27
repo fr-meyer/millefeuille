@@ -20,7 +20,7 @@ from millefeuille.domain.millefeuille import (
     RouteEvidenceRecord,
     RouteSelection,
 )
-from millefeuille.domain.secure_io import read_text_no_follow
+from millefeuille.domain.secure_io import RootArtifactReader, read_text_no_follow
 from millefeuille.domain.source_packs import (
     load_source_pack_manifest,
     paper_id_for_zotero_item_key,
@@ -165,9 +165,16 @@ class _PlannedRouteWrite:
 
 def load_route_selection_evidence_batch(
     path: str | Path,
+    *,
+    artifact_reader: RootArtifactReader | None = None,
 ) -> list[RouteSelectionFixtureEvidence]:
+    read_text = (
+        artifact_reader.read_text
+        if artifact_reader is not None
+        else read_text_no_follow
+    )
     evidence_path = Path(path)
-    text = read_text_no_follow(evidence_path, "route selection evidence")
+    text = read_text(evidence_path, "route selection evidence")
 
     if evidence_path.suffix == ".jsonl":
         records: list[RouteSelectionFixtureEvidence] = []
