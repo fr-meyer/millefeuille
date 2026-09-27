@@ -296,27 +296,31 @@ def _prepare_retrieval(
         artifact_reader=artifact_reader,
     )
     summary_path = resolved.run_dir / SUMMARY_ARTIFACT_REF
-    summary_payload = HierarchicalSummaryRecord.from_dict(
-        _load_retrieval_json(
-            summary_path,
-            "hierarchical summary",
-            artifact_reader=artifact_reader,
-        )
-    ).to_dict()
+    summary_payload, verified_origin_dir = _load_retrieval_summary(
+        resolved, artifact_reader=artifact_reader
+    )
     _require_identity(
         payload=summary_payload,
         label="hierarchical summary",
         paper_id=resolved.paper_id,
         run_id=resolved.run_id,
-        source_hash=None,
+        source_hash=resolved.source_hash if verified_origin_dir is not None else None,
     )
     for entry_index, entry in enumerate(summary_payload["summaries"], start=1):
-        _validate_summary_entry_refs(
-            resolved,
-            entry,
-            entry_index=entry_index,
-            artifact_reader=artifact_reader,
-        )
+        if verified_origin_dir is not None:
+            _validate_published_summary_entry_refs(
+                summary_dir=summary_path.parent,
+                origin_dir=verified_origin_dir,
+                entry=entry,
+                entry_index=entry_index,
+            )
+        else:
+            _validate_summary_entry_refs(
+                resolved,
+                entry,
+                entry_index=entry_index,
+                artifact_reader=artifact_reader,
+            )
     summaries = [
         dict(entry)
         for entry in summary_payload["summaries"]
@@ -387,6 +391,15 @@ def _prepare_retrieval(
         ),
         "index_lanes": lanes,
     }
+    if verified_origin_dir is not None:
+        result["summary_schema_version"] = summary_payload["schema_version"]
+        result["summary_origin_run_id"] = summary_payload["origin_run_id"]
+        result["summary_link_sha256"] = summary_payload["summary_link_sha256"]
+        result["source_summary_sha256"] = summary_payload["source_summary_sha256"]
+        result["source_summary_ref"] = relative_ref(
+            resolved.source_pack_root / summary_payload["source_summary_ref"],
+            resolved.run_dir,
+        )
     if filters:
         result["filters"] = filters
     acceptance_path = resolved.run_dir / ACCEPTANCE_SUMMARY_REF
@@ -476,6 +489,76 @@ def _prepare_retrieval(
             resolved.run_dir,
         )
     return _PreparedRetrieval(resolved=resolved, payload=result)
+
+
+def _load_retrieval_summary(
+    resolved: ResolvedRunArtifacts,
+    *,
+    artifact_reader: RootArtifactReader | None,
+) -> tuple[dict[str, Any], Path | None]:
+    from millefeuille.domain.published_summary_run_link import (
+        LINK_SCHEMA_VERSION,
+        VIEW_SCHEMA_VERSION,
+        load_published_summary_run_view,
+    )
+
+    path = resolved.run_dir / SUMMARY_ARTIFACT_REF
+    payload = _load_retrieval_json(
+        path, "hierarchical summary", artifact_reader=artifact_reader
+    )
+    if payload.get("schema_version") == VIEW_SCHEMA_VERSION:
+        raise MillefeuilleContractError(
+            "retrieval requires the source-verified summary link"
+        )
+    if payload.get("schema_version") != LINK_SCHEMA_VERSION:
+        return HierarchicalSummaryRecord.from_dict(payload).to_dict(), None
+    if artifact_reader is not None:
+        # Batch publication promises complete pinned-root input snapshots. The
+        # existing publication verifier does not yet enlist its full footprint.
+        raise MillefeuilleContractError(
+            "published summary link batch retrieval requires complete input snapshots"
+        )
+    root = resolved.source_pack_root.absolute()
+    absolute = path.absolute()
+    if len(absolute.parents) < 5 or absolute.parents[4] != root:
+        raise MillefeuilleContractError(
+            "published summary link escapes the selected source root"
+        )
+    view = load_published_summary_run_view(path)
+    require_safe_package_id(view["origin_run_id"], "summary origin_run_id")
+    origin = root / "analyses/millefeuille" / view["origin_run_id"]
+    return view, origin
+
+
+def _validate_published_summary_entry_refs(
+    *, summary_dir: Path, origin_dir: Path, entry: dict[str, Any], entry_index: int
+) -> None:
+    # Only the verified reader above can authorize cross-run references. The
+    # legacy inline resolver keeps its traversal rejection unchanged.
+    for field in ("text_ref", "model_provenance_ref"):
+        if field == "model_provenance_ref" and field not in entry:
+            continue
+        ref = entry.get(field)
+        label = f"published summary entry {entry_index} {field}"
+        if (
+            not isinstance(ref, str)
+            or not ref
+            or ref != ref.strip()
+            or "\\" in ref
+            or ":" in ref
+            or any(ord(c) < 32 for c in ref)
+            or PurePosixPath(ref).is_absolute()
+            or PurePosixPath(ref).as_posix() != ref
+        ):
+            raise MillefeuilleContractError(f"{label} must be a portable relative ref")
+        target = Path(os.path.normpath(os.fspath(summary_dir / ref)))
+        try:
+            target.relative_to(origin_dir)
+        except ValueError as exc:
+            raise MillefeuilleContractError(
+                f"{label} escapes the verified origin publication"
+            ) from exc
+        _require_regular_artifact(target, label, root=origin_dir)
 
 
 def _load_retrieval_json(

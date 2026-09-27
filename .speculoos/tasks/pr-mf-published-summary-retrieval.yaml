@@ -1,0 +1,36 @@
+id: pr-mf-published-summary-retrieval
+title: Retrieve verified published summary links with original lineage
+status: implementation
+branch: feat/pr-mf-pilot-retrieval-acceptance-20260928
+base_branch: dev
+write_paths:
+- README.md
+- .speculoos/tasks/pr-mf-published-summary-retrieval.yaml
+- millefeuille/domain/retrieve.py
+- specs/millefeuille-pipeline/published-summary-retrieval.md
+- specs/millefeuille-pipeline/remaining-work.md
+- tests/test_millefeuille_published_summary_retrieval.py
+scope:
+- Reuse the existing full publication verifier in single-run artifact retrieval
+- Validate source identity and original-run reference boundaries without copying text
+- Expose original generation fingerprints and preserve inline compatibility
+- Exercise actual saved pilots and API CLI filters with transport denied
+- Preserve batch snapshot guarantees and document unsupported linked batch publication
+acceptance:
+- All five real pilot retrievals preserve 166 summary refs and 704 input-file hashes
+- Actual API and CLI agree and identity/filter checks pass without network access
+- Synthetic tampering escaped-ref saved-view and inline compatibility regressions
+  pass
+- Full tracked-file tests Ruff metadata private scan and Speculoos pass
+publication_boundary:
+  statement: Source code synthetic tests and scrubbed metadata only; no provider calls
+    production OpenKB Zotero OCR credential taxonomy source-pack release or approval
+    bypass changes.
+documentation_impact:
+  status: updated
+  rationale: Explain verified link retrieval lineage published layouts and remaining
+    batch/query acceptance.
+publish_authority: Existing user approval covers GCP implementation acceptance and
+  feature-to-dev publication.
+private_data_scan: Required; no paper text prompts original model outputs credentials
+  or private receipt payloads in git.
