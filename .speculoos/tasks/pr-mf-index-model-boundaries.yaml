@@ -1,0 +1,30 @@
+id: pr-mf-index-model-boundaries
+title: Align local structure preview and verify component model boundaries
+status: implementation
+branch: fix/pr-mf-index-model-boundaries-20260928
+base_branch: dev
+write_paths:
+  - README.md
+  - .speculoos/tasks/pr-mf-index-model-boundaries.yaml
+  - millefeuille/domain/model_profiles.py
+  - millefeuille/clients/pageindex_client.py
+  - specs/millefeuille-pipeline/component-model-boundaries.md
+  - specs/millefeuille-pipeline/remaining-work.md
+  - tests/test_millefeuille_component_boundaries.py
+scope:
+  - Align structure preview with the actual provider-free local builder
+  - Record current installed and configured OpenKB PageIndex ChatIndex routes
+  - Reject component generation defaults in actual grounded request planning
+  - Exercise the real fixture pipeline with vendor imports and transports denied
+  - Reconcile the bounded five-pilot completion with remaining product work
+acceptance:
+  - Model preview matches actual structure backend and no-call behavior
+  - Actual summary card and classification requests remain GPT OAuth xhigh no fallback
+  - Full unit suite Ruff metadata and Speculoos pass
+publication_boundary:
+  statement: Code synthetic tests and scrubbed inventory documentation only; no provider calls or source-pack OpenKB Zotero OCR credential taxonomy release or approval bypass.
+documentation_impact:
+  status: updated
+  rationale: Separate component defaults from actual selected models and current pilot completion.
+publish_authority: Existing user approval covers the audit and feature-to-dev repository repair.
+private_data_scan: Required; synthetic fixtures and model metadata only.

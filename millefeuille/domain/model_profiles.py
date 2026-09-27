@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from millefeuille.domain.local_structure import LOCAL_STRUCTURE_BACKEND
+
 DEFAULT_MODEL_PROFILE_BUNDLE: dict[str, Any] = {
     "schema_version": "millefeuille-model-profile/v0.1",
     "default_profile": "research-default",
@@ -16,10 +18,12 @@ DEFAULT_MODEL_PROFILE_BUNDLE: dict[str, Any] = {
                 "record_usage": True,
             },
             "structure": {
-                "backend": "pageindex-tree",
-                "model": "pageindex-tree-default",
-                "provider": "pageindex",
-                "record_usage": True,
+                "backend": LOCAL_STRUCTURE_BACKEND,
+                "model": "none",
+                "provider": "none",
+                "auth_lane": "none",
+                "fallback_policy": "none",
+                "record_usage": False,
             },
             "summarize_page": {
                 "backend": "chat",

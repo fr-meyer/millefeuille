@@ -824,6 +824,11 @@ millefeuille structure-prepare \
   --json
 ```
 
+The research model preview identifies structure as the local
+`local-markdown-headings-v0.1` builder with no model or authentication.
+See [component model boundaries](specs/millefeuille-pipeline/component-model-boundaries.md)
+for the separate OpenKB, PageIndex and ChatIndex generation routes.
+
 `structure-prepare` detects explicit `# Page N` markers, Markdown headings,
 tables, figures, and numbered references. It emits structure JSON, an outline,
 and fixture-compatible evidence with source locators and coverage warnings.
