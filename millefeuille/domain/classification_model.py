@@ -26,6 +26,7 @@ from millefeuille.domain.model_executor import (
     validate_model_executor_request,
     verify_model_executor_input,
 )
+from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
 from millefeuille.domain.secure_io import read_bytes_no_follow
 from millefeuille.domain.stage_runtime import resolve_run_artifacts
 from millefeuille.domain.summary_fixtures import load_hierarchical_summary
@@ -34,6 +35,26 @@ from millefeuille.domain.taxonomy import load_taxonomy_lock, validate_taxonomy_l
 OUTPUT_SCHEMA = "millefeuille-classification-model-output/v0.1"
 PLAN_SCHEMA = "millefeuille-classification-model-plan/v0.1"
 _MAX_INPUT = 2 * 1024 * 1024
+
+
+def _require_gpt_classification_profile() -> None:
+    profiles = DEFAULT_MODEL_PROFILE_BUNDLE.get("profiles")
+    research = profiles.get("research-default") if isinstance(profiles, dict) else None
+    profile = research.get("classify") if isinstance(research, dict) else None
+    expected = {
+        "backend": "chat",
+        "model": "openai/gpt-5.6-sol",
+        "provider": "openai",
+        "auth_lane": "openclaw-native-codex-oauth",
+        "fallback_policy": "none",
+        "reasoning_effort": "xhigh",
+        "fast_mode": "off",
+        "prompt_version": "millefeuille-classification@0.1",
+        "require_taxonomy_version": True,
+        "record_usage": True,
+    }
+    if profile != expected:
+        raise MillefeuilleContractError("GPT classification profile drift")
 
 
 def _canonical(value: Any) -> bytes:
@@ -103,6 +124,7 @@ def prepare_classification_model_plan(
     artifact_root: str | Path | None = None,
 ) -> ClassificationModelPlan:
     """Freeze one accepted paper and its released single-run taxonomy in memory."""
+    _require_gpt_classification_profile()
     if (
         not isinstance(expected_selected_text_sha256, str)
         or re.fullmatch(r"sha256:[0-9a-f]{64}", expected_selected_text_sha256) is None
@@ -272,6 +294,7 @@ def verify_classification_model_plan(
     plan: ClassificationModelPlan,
 ) -> dict[str, Any]:
     """Check the entire original request and prompt; grant no live authority."""
+    _require_gpt_classification_profile()
     request = deepcopy(plan.request)
     if _hash(_canonical(request)) != plan.request_sha256:
         raise MillefeuilleContractError("classification request commitment drift")

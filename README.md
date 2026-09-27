@@ -1281,3 +1281,8 @@ Verified duplicate dispositions are described in the
 ### Classification model request boundary
 
 See [Classification model request boundary](specs/millefeuille-pipeline/classification-model-boundary.md) for accepted-run planning, reuse of published summaries, locked-taxonomy joins and strict transient output validation.
+
+The bundled `research-default.classify` preview matches the accepted-run GPT
+request: `openai/gpt-5.6-sol`, `xhigh`, subscription OAuth and no fallback.
+Planning and dispatch reject changed model, authentication or profile defaults
+before any provider call.

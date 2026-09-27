@@ -4,6 +4,13 @@ The read-only planner prepares a genuine `classify` executor task for one
 accepted paper. It pins openai/gpt-5.6-sol, xhigh, subscription OAuth, one
 attempt and no fallback. It does not execute the request or publish a decision.
 
+The bundled `research-default.classify` preview reports the same pinned model,
+OAuth lane, reasoning effort, prompt template and no-fallback policy. Planning
+and executor snapshot validation reject a changed or missing classification
+profile, including API-key authentication, foreign model defaults and ignored
+temperature controls. Explicit accepted-run requests remain independent of
+OpenKB, PageIndex and ChatIndex generation defaults.
+
 ## Inputs and joins
 
 A released taxonomy lock must have scope_type single-run and the exact run ID.
