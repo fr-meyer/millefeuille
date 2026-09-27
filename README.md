@@ -1277,3 +1277,7 @@ For major changes, please open an issue first to discuss what you would like to 
 
 Verified duplicate dispositions are described in the
 [reviewed duplicate profile contract](specs/millefeuille-pipeline/duplicate-profile-review.md).
+
+### Classification model request boundary
+
+See [Classification model request boundary](specs/millefeuille-pipeline/classification-model-boundary.md) for accepted-run planning, locked-taxonomy joins and strict transient output validation.

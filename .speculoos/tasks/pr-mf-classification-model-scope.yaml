@@ -1,0 +1,30 @@
+id: pr-mf-classification-model-scope
+title: Bind genuine GPT classification requests to accepted papers and locked taxonomy
+status: implementation
+branch: feat/pr-mf-classification-model-scope-20260927
+base_branch: dev
+write_paths:
+  - README.md
+  - .speculoos/tasks/pr-mf-classification-model-scope.yaml
+  - millefeuille/domain/classification_model.py
+  - millefeuille/domain/model_executor.py
+  - specs/millefeuille-pipeline/model-executor-request.schema.json
+  - specs/millefeuille-pipeline/classification-model-output.schema.json
+  - specs/millefeuille-pipeline/classification-model-boundary.md
+  - tests/test_millefeuille_classification_model.py
+scope:
+  - Add a genuine classify task to the reviewed generic OAuth executor contract
+  - Prepare a read-only request from actual accepted paper evidence and one released taxonomy lock
+  - Validate exact output lineage, active taxonomy membership, paper locators and uncertainty routing
+acceptance:
+  - Existing full accepted-run fixture joins pass without filesystem or provider effects
+  - Cached-pass source drift, taxonomy scope/symlink/draft and mutated plan fail closed
+  - Output identity, active node, page evidence and review routing regressions pass
+  - Full suite, Ruff, schemas, metadata and Speculoos checks pass
+publication_boundary:
+  statement: Code, synthetic tests, schemas and documentation only; no provider call, production taxonomy promotion, source/index mutation, Zotero change, credential, release or approval bypass.
+documentation_impact:
+  status: updated
+  rationale: Explain hash-bound read-only classification planning and the separate fresh live execution and publication gates.
+publish_authority: Existing user approval covers routine feature-to-dev publication; production classification remains independently receipt-governed.
+private_data_scan: Required; synthetic evidence only.

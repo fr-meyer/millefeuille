@@ -33,6 +33,7 @@ ALLOWED_EXECUTOR_TASKS = frozenset(
     {
         "structure",
         "paper_card",
+        "classify",
         "summarize_page",
         "summarize_section",
         "summarize_full_paper",

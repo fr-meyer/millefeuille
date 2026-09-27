@@ -62,7 +62,8 @@
             "paper_card",
             "summarize_page",
             "summarize_section",
-            "summarize_full_paper"
+            "summarize_full_paper",
+            "classify"
           ]
         },
         "unit_id": {"$ref": "#/$defs/safeId"},
