@@ -14,7 +14,10 @@ summary/index generation evidence, never a new hash of potentially changed text.
 The planner compares actual bytes to that binding. It reads selected full text,
 structure, the validated card and the verified
 full-paper summary. Corpus evidence must resolve inside the selected source-pack
-root; no-follow bounded reads refuse symlinked input files.
+root; no-follow bounded reads refuse symlinked input files. Accepted published
+summary links may reuse a prior run inside that corpus. Their parent segments
+are normalized lexically before the secure read; normalization does not follow
+symlinks or permit a reference outside the corpus.
 The prompt includes the entire locked registry, all selected text and page
 locators. Hash-bound metadata excludes private prompt content.
 

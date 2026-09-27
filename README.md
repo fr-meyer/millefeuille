@@ -1280,4 +1280,4 @@ Verified duplicate dispositions are described in the
 
 ### Classification model request boundary
 
-See [Classification model request boundary](specs/millefeuille-pipeline/classification-model-boundary.md) for accepted-run planning, locked-taxonomy joins and strict transient output validation.
+See [Classification model request boundary](specs/millefeuille-pipeline/classification-model-boundary.md) for accepted-run planning, reuse of published summaries, locked-taxonomy joins and strict transient output validation.
