@@ -76,32 +76,26 @@
   and the matching single-source pack. It exposes metadata and input refs
   without calls, writes, receipt reservation, or downstream authorization.
 
-## Current GPT Pilot Path (2026-09-26)
+## Current GPT Pilot Path (2026-09-27 UTC)
 
-The first bounded summary execution and publication are complete. The pilot
-does not yet have a complete accepted paper-analysis run.
+All five staged pilots, Picard, Cheng, Liao, Kolt and Zabounidis, have completed
+their bounded pipeline: 166 summaries, grounded cards, verified native indexes,
+acceptance, source-reviewed classification and actual Zotero readback. Original
+model evidence and consumed receipts are preserved. This is bounded pilot evidence,
+not a claim that the whole product or release is complete.
 
-1. Bridge the immutable published summary run into the canonical source-pack
-   and artifact-run metadata. Verify its exact source, output, usage, and
-   provenance identities before making it available to downstream consumers.
-   Preparation artifacts currently live separately from the durable per-paper
-   extraction/route/structure locations expected by fixture-stage consumers.
-2. Add a grounded GPT paper-card execution path. The v0.2 schema and offline
-   fixture writer exist; current live model requests and the receipt-bound
-   runner support only page, section, and full-paper summaries. A fixture card
-   must not be presented as live model-generated evidence.
-3. Materialize the verified card and reconciled run behind their exact write
-   scopes, then run acceptance. Reconcile explicitly scoped OpenKB/PageIndex
-   index evidence and duplicate checks; perform classification only after
-   acceptance. Zotero note/tag/collection writes retain their own scopes.
-4. Expand to the other four staged papers (156 prepared summary units), then
-   complete bounded Zotero intake, OCR and edge-case coverage, MF-114
-   multi-source card/index propagation, and actual model-boundary regression
-   checks. Keep production GPT only while Grok OAuth is inactive.
-5. Reconcile remaining Speculoos and Workboard metadata with merged and live
-   evidence, then stabilize `dev`, review promotion to `main`, and consider a
-   separately approved tag and package release. Optional worktree hygiene and
-   the old OpenClaw deployment reconciliation are separate operational work.
+1. Finish broader source intake, scanned/OCR and edge-case coverage, using the
+   rolling `mistral-ocr-latest` default and recording actual resolved provenance.
+2. Complete MF-114 multi-source card/index propagation.
+3. Maintain the explicit [component model boundaries](component-model-boundaries.md)
+   and operation-specific request/actual model evidence. Keep production GPT only
+   while Grok OAuth is inactive; vendor API defaults cannot substitute for OAuth.
+4. Complete actual retrieval/query, ambiguity/waiver, version conflict, partial
+   external failure and governance acceptance coverage.
+5. Reconcile remaining Speculoos and Workboard metadata with merged/live evidence.
+6. Stabilize version and changelog, review promotion to `main`, then consider a
+   separately approved tag and package release. Optional worktree hygiene and old
+   OpenClaw deployment reconciliation remain separate operational work.
 
 ## Pipeline
 

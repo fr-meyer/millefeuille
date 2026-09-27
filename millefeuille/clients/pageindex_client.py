@@ -13,12 +13,6 @@ from typing import Any
 
 import requests
 
-# Optional SDK import at module level
-try:
-    from pageindex import PageIndexClient as PageIndexSDK
-except ImportError:
-    PageIndexSDK = None  # SDK not installed, will be checked at runtime
-
 from ..domain.config import PageIndexOCRConfig
 from ..domain.models import PageContent, UploadedDocument
 from .exceptions import PageIndexAPIError, PageIndexOCRError, PageIndexUploadError
@@ -69,15 +63,17 @@ class PageIndexClient(OCRClient):
 
             # Conditional initialization based on use_sdk flag
             if config.use_sdk:
-                # Check if SDK is available
-                if PageIndexSDK is None:
+                # Load the optional vendor SDK only for an explicit SDK client.
+                try:
+                    from pageindex import PageIndexClient as PageIndexSDK
+                except ImportError as exc:
                     error_msg = (
                         "PageIndex SDK is not installed. "
                         "Install it with: pip install pageindex. "
                         "Alternatively, set use_sdk=False to use HTTP API mode."
                     )
                     logger.error(error_msg)
-                    raise PageIndexAPIError(error_msg)
+                    raise PageIndexAPIError(error_msg, original_exception=exc) from exc
 
                 # Initialize PageIndex SDK client
                 self._sdk_client = PageIndexSDK(api_key=config.api_key)
