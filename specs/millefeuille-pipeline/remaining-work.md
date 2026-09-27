@@ -92,8 +92,10 @@ not a claim that the whole product or release is complete.
 3. Maintain the explicit [component model boundaries](component-model-boundaries.md)
    and operation-specific request/actual model evidence. Keep production GPT only
    while Grok OAuth is inactive; vendor API defaults cannot substitute for OAuth.
-4. Complete actual retrieval/query, ambiguity/waiver, version conflict, partial
-   external failure and governance acceptance coverage.
+4. Complete generated query answers, published-link batch snapshots, ambiguity/waiver,
+   version conflict, partial external failure and governance acceptance coverage.
+   [Single-run published-summary retrieval](published-summary-retrieval.md) now
+   reuses verified pilot publications and preserves original generation lineage.
 5. Reconcile remaining Speculoos and Workboard metadata with merged/live evidence.
 6. Stabilize version and changelog, review promotion to `main`, then consider a
    separately approved tag and package release. Optional worktree hygiene and old

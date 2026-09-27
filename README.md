@@ -1294,3 +1294,7 @@ before any provider call.
 
 Multi-PDF downstream card/index evidence is documented in
 [MF-114 whole-pack materialization](specs/millefeuille-pipeline/multi-source-materialization.md).
+
+Verified published summaries are available through
+[read-only retrieval](specs/millefeuille-pipeline/published-summary-retrieval.md),
+with original generation lineage and source integrity checks.
