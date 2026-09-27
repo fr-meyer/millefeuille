@@ -1,0 +1,29 @@
+id: pr-mf-reviewed-duplicate-profile
+title: Recognize a verified reviewed duplicate as a retained separate profile
+status: implementation
+branch: feat/pr-mf-duplicate-review-20260927
+base_branch: dev
+write_paths:
+  - README.md
+  - .speculoos/tasks/pr-mf-reviewed-duplicate-profile.yaml
+  - millefeuille/domain/duplicate_review.py
+  - millefeuille/domain/acceptance.py
+  - specs/millefeuille-pipeline/duplicate-profile-review.md
+  - specs/millefeuille-pipeline/duplicate-profile-review.schema.json
+  - tests/test_millefeuille_duplicate_review.py
+scope:
+  - Keep the actual historical duplicate match visible in acceptance evidence
+  - Bind a reviewed separate profile to source, run, current index and selected texts
+  - Verify provider-free receipt and consumed audit without replay or live authority
+acceptance:
+  - Missing evidence preserves needs-review; malformed or drifted evidence fails closed
+  - Reviewed distinct profiles pass without erasing the historical match
+  - Full acceptance integration, evidence drift and symlink tests pass
+  - Full suite, Ruff, schema, metadata and Speculoos checks pass
+publication_boundary:
+  statement: Code, synthetic tests, schema and documentation only; no model call, index mutation, production review write, Zotero change, release or approval bypass.
+documentation_impact:
+  status: updated
+  rationale: Explain canonical reviewed-duplicate evidence, strict lineage and separate live authority.
+publish_authority: Existing user approval covers routine feature-to-dev publication; real review materialization remains governed by its own exact receipt.
+private_data_scan: Required; synthetic evidence only.

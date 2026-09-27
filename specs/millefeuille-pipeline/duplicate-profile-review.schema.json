@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "current_profile": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "type": "string"
+        },
+        "selected_text_ref": {
+          "description": "Traversal-free path relative to the source-pack root.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "selected_text_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "source_hash": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "selected_text_ref",
+        "selected_text_sha256",
+        "source_hash"
+      ],
+      "type": "object"
+    },
+    "decision": {
+      "const": "retain-separate-profile"
+    },
+    "duplicate_scan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "existing_profile": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "type": "string"
+        },
+        "selected_text_ref": {
+          "description": "Traversal-free path relative to the source-pack root.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "selected_text_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "source_hash": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "selected_text_ref",
+        "selected_text_sha256",
+        "source_hash"
+      ],
+      "type": "object"
+    },
+    "index_status_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "paper_id": {
+      "minLength": 1,
+      "pattern": "\\S",
+      "type": "string"
+    },
+    "reason": {
+      "minLength": 1,
+      "pattern": "\\S",
+      "type": "string"
+    },
+    "reviewer_id": {
+      "minLength": 1,
+      "pattern": "\\S",
+      "type": "string"
+    },
+    "run_id": {
+      "minLength": 1,
+      "pattern": "\\S",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "millefeuille-duplicate-profile-review/v0.1"
+    },
+    "source_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "paper_id",
+    "run_id",
+    "source_hash",
+    "decision",
+    "reviewer_id",
+    "reason",
+    "duplicate_scan_sha256",
+    "index_status_sha256",
+    "existing_profile",
+    "current_profile"
+  ],
+  "title": "Reviewed Duplicate Text Profile",
+  "type": "object"
+}

@@ -12,6 +12,7 @@ from millefeuille.domain.card_index_contract import (
     load_and_validate_canonical_card_index,
     validate_paper_card_identity,
 )
+from millefeuille.domain.duplicate_review import load_duplicate_profile_review
 from millefeuille.domain.extraction_fixtures import (
     NATIVE_EVIDENCE_REF,
     OCR_EVIDENCE_REF,
@@ -594,18 +595,27 @@ def _build_duplicate_scan_context(
             duplicate_scan = dict(matches[0])
             duplicate_scan["match_count"] = len(matches)
     matched_existing = bool(duplicate_scan.get("matched_existing"))
-    if matched_existing:
+    review = load_duplicate_profile_review(
+        resolved=resolved, duplicate_scan=duplicate_scan
+    )
+    unresolved_match = matched_existing and review is None
+    if unresolved_match:
         review_reasons.append("duplicate scan flagged an existing match")
     check_status = (
         AcceptanceCheckStatus.NEEDS_REVIEW
-        if matched_existing
+        if unresolved_match
         else AcceptanceCheckStatus.PASSED
     )
     notes = (
         ["duplicate scan flagged an existing match"]
-        if matched_existing
+        if unresolved_match
+        else ["duplicate match retained as a verified separate profile"]
+        if review is not None
         else ["duplicate scan indicates no blocking duplicate"]
     )
+    if review is not None:
+        refs.extend(review["refs"])
+        duplicate_scan["review"] = review
     return {
         "details": duplicate_scan,
         "check": AcceptanceCheckRecord(

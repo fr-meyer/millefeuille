@@ -1274,3 +1274,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Contributions are welcome! Please feel free to submit a Pull Request or open an Issue on GitHub.
 
 For major changes, please open an issue first to discuss what you would like to change.
+
+Verified duplicate dispositions are described in the
+[reviewed duplicate profile contract](specs/millefeuille-pipeline/duplicate-profile-review.md).
