@@ -76,13 +76,21 @@
   and the matching single-source pack. It exposes metadata and input refs
   without calls, writes, receipt reservation, or downstream authorization.
 
-## Current GPT Pilot Path (2026-09-27 UTC)
+## Current GPT Pilot Path (2026-09-28 KST)
 
 All five staged pilots, Picard, Cheng, Liao, Kolt and Zabounidis, have completed
 their bounded pipeline: 166 summaries, grounded cards, verified native indexes,
 acceptance, source-reviewed classification and actual Zotero readback. Original
-model evidence and consumed receipts are preserved. This is bounded pilot evidence,
-not a claim that the whole product or release is complete.
+model evidence and consumed receipts are preserved. PRs #158-#161 added the
+component model audit, downstream whole-pack card/index materialization, verified
+single-run published-summary retrieval and pinned-input batch v0.2 retrieval.
+The actual combined five-pilot batch was published privately on GCP with 166
+summary refs; readback and an idempotent rerun passed, with all 704 original
+files unchanged. Five approved GPT contribution/limitation queries then ran once
+each with saved OAuth, `openai/gpt-5.6-sol`, `xhigh` and no fallback. All five
+answers cited indexed evidence and passed source review across 14 cited
+summary/page sections. This is bounded pilot evidence, not a claim that the
+whole product or release is complete.
 
 1. Finish broader source intake, scanned/OCR and edge-case coverage, using the
    rolling `mistral-ocr-latest` default and recording actual resolved provenance.
@@ -92,13 +100,13 @@ not a claim that the whole product or release is complete.
 3. Maintain the explicit [component model boundaries](component-model-boundaries.md)
    and operation-specific request/actual model evidence. Keep production GPT only
    while Grok OAuth is inactive; vendor API defaults cannot substitute for OAuth.
-4. Complete generated query answers, actual combined-result publication,
-   ambiguity/waiver, version conflict, partial external failure and governance
-   acceptance coverage. [Published-summary retrieval](published-summary-retrieval.md)
-   supports single-run reads and explicit batch v0.2 with complete original-input
-   snapshots. Five actual pilots pass read-only batch precommit checks; synthetic
-   fixtures exercise atomic publication and rerun. Live combined publication
-   remains separate.
+4. Complete ambiguity/waiver, version-conflict, partial external failure and
+   governance acceptance coverage. Generated query answers and actual combined
+   retrieval publication are complete for the five pilots. [Published-summary
+   retrieval](published-summary-retrieval.md) supports single-run reads and
+   explicit batch v0.2 with complete original-input snapshots; the real batch
+   passed publication/readback, while synthetic fixtures exercise atomic
+   publication and rerun failure paths.
 5. Reconcile remaining Speculoos and Workboard metadata with merged/live evidence.
 6. Stabilize version and changelog, review promotion to `main`, then consider a
    separately approved tag and package release. Optional worktree hygiene and old
