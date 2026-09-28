@@ -100,6 +100,28 @@ def prepare_summary_execution_packages(
             "at least one structure evidence path is required"
         )
     profile_name = profile or _default_profile()
+    if len(route_evidence_paths) == 1:
+        try:
+            candidate = json.loads(
+                read_bytes_no_follow(
+                    Path(route_evidence_paths[0]), "summary route evidence"
+                )
+            )
+        except (UnicodeError, ValueError):
+            candidate = None
+        if isinstance(candidate, dict) and candidate.get("schema_version") == (
+            "millefeuille-route-selection-evidence/v0.2"
+        ):
+            if len(structure_evidence_paths) != 1:
+                raise MillefeuilleContractError(
+                    "multi-source summary preparation requires one structure record"
+                )
+            return _prepare_multi_source_batch(
+                route_evidence_path=route_evidence_paths[0],
+                structure_evidence_path=structure_evidence_paths[0],
+                output_dir=output_dir,
+                profile=profile_name,
+            )
     plans = {
         stage: build_summary_execution_plan(profile=profile_name, stage=stage)
         for stage in SUMMARY_MODEL_STAGES
@@ -247,6 +269,25 @@ def verify_summary_preparation_package(
         raise MillefeuilleContractError(
             "summary preparation package profile is invalid"
         )
+    if package.get("schema_version") == "millefeuille-summary-preparation/v0.2":
+        from millefeuille.domain.multi_source_summary import (
+            build_multi_source_summary_package,
+        )
+
+        expected_path, expected_bytes, _counts, _blockers = (
+            build_multi_source_summary_package(
+                route_evidence_path=route_evidence_path,
+                structure_evidence_path=structure_evidence_path,
+                output_dir=package_path.parent,
+                profile=profile,
+                artifact_reader=artifact_reader,
+            )
+        )
+        if package_path != expected_path or package_bytes != expected_bytes:
+            raise MillefeuilleContractError(
+                "multi-source summary preparation package or source drift"
+            )
+        return package
     routes = load_route_selection_evidence_batch(
         route_evidence_path, artifact_reader=artifact_reader
     )
@@ -616,6 +657,75 @@ def _preflight_output(path: Path, expected: bytes) -> str:
     if existing != expected:
         raise MillefeuilleContractError(f"summary preparation output drift: {path}")
     return "existing"
+
+
+def _prepare_multi_source_batch(
+    *,
+    route_evidence_path: str | Path,
+    structure_evidence_path: str | Path,
+    output_dir: str | Path,
+    profile: str,
+) -> SummaryPreparationBatchResult:
+    from millefeuille.domain.multi_source_summary import (
+        build_multi_source_summary_package,
+    )
+
+    output_root = Path(output_dir)
+    package_path, package_bytes, counts, blockers = build_multi_source_summary_package(
+        route_evidence_path=route_evidence_path,
+        structure_evidence_path=structure_evidence_path,
+        output_dir=output_root,
+        profile=profile,
+    )
+    paper_id = package_path.name.removesuffix(".summary-preparation.json")
+    summary_path = output_root / "summary.json"
+    summary_bytes = _canonical_json_bytes(
+        {
+            "schema_version": SUMMARY_PREPARATION_BATCH_SCHEMA_VERSION,
+            "status": "prepared-no-call",
+            "profile": profile,
+            "output_dir": str(output_root),
+            "documents": [
+                {
+                    "paper_id": paper_id,
+                    "package_path": package_path.name,
+                    "work_unit_counts": counts,
+                    "blockers": list(blockers),
+                }
+            ],
+            "totals": {
+                "documents": 1,
+                "requested_stages": len(SUMMARY_MODEL_STAGES),
+                "work_units": sum(counts.values()),
+                "summary_outputs_generated": 0,
+            },
+            "provider_calls": 0,
+            "source_pack_writes": 0,
+            "zotero_writes": 0,
+        }
+    )
+    package_status = _preflight_output(package_path, package_bytes)
+    summary_status = _preflight_output(summary_path, summary_bytes)
+    _write_new_output(package_path, package_bytes)
+    _write_new_output(summary_path, summary_bytes)
+    document = SummaryPreparationDocumentResult(
+        paper_id=paper_id,
+        status=package_status,
+        package_path=package_path,
+        profile=profile,
+        requested_stages=tuple(SUMMARY_MODEL_STAGES),
+        work_unit_counts=counts,
+        blockers=blockers,
+    )
+    return SummaryPreparationBatchResult(
+        status="existing"
+        if package_status == summary_status == "existing"
+        else "created",
+        output_dir=output_root,
+        summary_path=summary_path,
+        profile=profile,
+        documents=(document,),
+    )
 
 
 def _write_new_output(path: Path, expected: bytes) -> None:
