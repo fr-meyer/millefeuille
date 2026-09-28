@@ -1,6 +1,6 @@
 id: pr-mf-multi-source-upstream
 title: Plan verified multi-PDF native upstream artifacts
-status: implementation
+status: in-progress
 branch: feat/pr-mf-multi-source-upstream-20260928
 base_branch: dev
 write_paths:
@@ -12,7 +12,9 @@ write_paths:
   - tests/test_millefeuille_multi_source_upstream.py
 github:
   issue: null
-  pull_request: null
+  pull_request: 165
+  url: https://github.com/fr-meyer/millefeuille/pull/165
+  head_sha: null
 scope:
   - reverify every member of a v0.2 Zotero source pack and each native Markdown hash
   - plan per-source native text, combined route with attachment page map, and local structure
