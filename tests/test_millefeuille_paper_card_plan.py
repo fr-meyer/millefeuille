@@ -144,6 +144,25 @@ class TestGptPaperCardPlan(unittest.TestCase):
                 plan = plan_gpt_paper_card_request(**{**inputs, **changes})
                 self.assertNotEqual(original, plan.manifest_sha256)
 
+    def test_aggregate_source_hash_binds_two_source_request_and_content(self):
+        inputs = self._inputs()
+        single_plan = plan_gpt_paper_card_request(**inputs)
+        inputs["source_hash"] = "sha256-aggregate:" + "a" * 64
+        plan = plan_gpt_paper_card_request(**inputs)
+        self.assertEqual(plan.source_hash, inputs["source_hash"])
+        self.assertNotEqual(single_plan.manifest_sha256, plan.manifest_sha256)
+        verify_model_executor_input(plan.request, plan.input_payload)
+        content = self._content(plan)
+        schema = json.loads((SPEC_DIR / "paper-card-content.schema.json").read_text())
+        Draft202012Validator(schema).validate(content)
+        self.assertEqual(
+            validate_v1_paper_card_content(
+                json.dumps(content).encode(), plan=plan
+            ).source_hash,
+            inputs["source_hash"],
+        )
+        self.assertEqual((plan.provider_calls_performed, plan.writes_performed), (0, 0))
+
     def test_rejects_profile_drift_and_preserves_summary_stage_boundary(self):
         profile = DEFAULT_MODEL_PROFILE_BUNDLE["profiles"]["research-default"]
         for changes in (
@@ -168,7 +187,11 @@ class TestGptPaperCardPlan(unittest.TestCase):
             {"paper_id": "../other"},
             {"run_id": "bad/run"},
             {"source_hash": "bad"},
+            {"source_hash": "sha256-aggregate:" + "A" * 64},
+            {"source_hash": "sha256-aggregate:" + "a" * 63},
+            {"source_hash": "sha256-aggregate:" + "a" * 64 + "\n"},
             {"publication_manifest_sha256": "bad"},
+            {"publication_manifest_sha256": "sha256-aggregate:" + "b" * 64},
             {"markdown": b""},
             {"markdown": b"\xff"},
             {"markdown": b"x" * (512 * 1024 + 1)},

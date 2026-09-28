@@ -22,6 +22,7 @@ from millefeuille.domain.summary_prompts import _validated_structure
 CARD_PROMPT_VERSION = "paper-card-v1"
 CARD_CONTENT_SCHEMA_ID = "millefeuille-paper-card-content"
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
+_SOURCE_HASH = re.compile(r"sha256(?:-aggregate)?:[0-9a-f]{64}\Z")
 _CONTENT_FIELDS = (
     "one_line_thesis",
     "primary_contribution",
@@ -88,9 +89,11 @@ def plan_gpt_paper_card_request(
 
     require_safe_package_id(paper_id, "paper_id")
     require_safe_package_id(run_id, "run_id")
-    if any(
-        not isinstance(value, str) or not _DIGEST.fullmatch(value)
-        for value in (source_hash, publication_manifest_sha256)
+    if (
+        not isinstance(source_hash, str)
+        or not _SOURCE_HASH.fullmatch(source_hash)
+        or not isinstance(publication_manifest_sha256, str)
+        or not _DIGEST.fullmatch(publication_manifest_sha256)
     ):
         raise MillefeuilleContractError("paper-card source fingerprint is invalid")
     if not isinstance(markdown, bytes) or not 0 < len(markdown) <= 512 * 1024:
