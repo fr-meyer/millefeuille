@@ -31,6 +31,7 @@ from millefeuille.domain.card_index_contract import (
 from millefeuille.domain.card_index_contract import (
     validate_observed_card_index_state as _validate_observed_card_index_state,
 )
+from millefeuille.domain.local_structure import build_local_markdown_structure
 from millefeuille.domain.millefeuille import (
     PAPER_CARD_SCHEMA_V1,
     PAPER_CARD_SCHEMA_V2,
@@ -1470,6 +1471,61 @@ def _validate_multi_source_index_dependencies(
     )
     if route.get("output_markdown_sha256") != hashlib.sha256(selected).hexdigest():
         raise MillefeuilleContractError("multi-source index selected text hash drift")
+    page_map = route.get("page_map")
+    if not isinstance(page_map, list) or len(page_map) != page_count:
+        raise MillefeuilleContractError("multi-source index route page_map drift")
+    members = {member.attachment_key: member for member in scope.sources}
+    local_page_counts = dict.fromkeys(members, 0)
+    for global_page, row in enumerate(page_map, start=1):
+        if not isinstance(row, dict):
+            raise MillefeuilleContractError("multi-source index route page_map drift")
+        key = row.get("attachment_key")
+        member = members.get(key) if isinstance(key, str) else None
+        if member is None:
+            raise MillefeuilleContractError("multi-source index route attachment drift")
+        local_page_counts[key] += 1
+        if (
+            set(row)
+            != {
+                "global_locator",
+                "attachment_locator",
+                "attachment_key",
+                "source_ref",
+                "character_count",
+                "text_sha256",
+            }
+            or row["global_locator"] != f"p.{global_page}"
+            or row["attachment_locator"]
+            != f"attachment:{key}/p.{local_page_counts[key]}"
+            or row["source_ref"] != member.source_ref
+            or type(row["character_count"]) is not int
+            or row["character_count"] < 0
+            or not isinstance(row["text_sha256"], str)
+            or re.fullmatch(r"[0-9a-f]{64}", row["text_sha256"]) is None
+        ):
+            raise MillefeuilleContractError("multi-source index route page_map drift")
+    if (
+        any(count == 0 for count in local_page_counts.values())
+        or route.get("native_evidence_ref") != "extractions/native/evidence.json"
+    ):
+        raise MillefeuilleContractError("multi-source index route page_map drift")
+    try:
+        selected_text = selected.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise MillefeuilleContractError(
+            "multi-source index selected text must be UTF-8"
+        ) from exc
+    rebuilt, _outline, counts, warnings = build_local_markdown_structure(
+        selected_text, expected_page_count=page_count
+    )
+    if (
+        counts["pages"] != page_count
+        or structure.get("structure") != rebuilt
+        or structure.get("counts") != counts
+        or structure.get("warnings") != warnings
+        or structure.get("outline_markdown_ref") != "structure/outline.md"
+    ):
+        raise MillefeuilleContractError("multi-source index structure page drift")
 
 
 def _validate_route_dependency(*, source_pack_dir: Path, source_hash: str) -> None:

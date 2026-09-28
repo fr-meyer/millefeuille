@@ -23,6 +23,7 @@ from millefeuille.domain.index_fixtures import (
     IndexFixtureEvidence,
     write_indexes_from_evidence,
 )
+from millefeuille.domain.local_structure import build_local_markdown_structure
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.route_fixtures import (
     ROUTE_EVIDENCE_REF,
@@ -226,9 +227,22 @@ class MultiSourceMaterializationTests(unittest.TestCase):
             root, pack, run, _card_e, index_e = case
             self.assertEqual(_cards(case)[0].status, "created")
             scope = json.loads(index_e.read_bytes())["source_scope"]
+            selected_text = (
+                "# Synthetic two-source text\n"
+                "## Page 1\n"
+                "# Source: ATT1 (ATT1)\n"
+                "Synthetic main text.\n"
+                "## Page 2\n"
+                "# Source: ATT2 (ATT2)\n"
+                "Synthetic supplementary text.\n"
+            )
+            (pack / ROUTE_MARKDOWN_REF).write_text(selected_text, encoding="utf-8")
             selected_hash = hashlib.sha256(
                 (pack / ROUTE_MARKDOWN_REF).read_bytes()
             ).hexdigest()
+            rebuilt, _outline, counts, warnings = build_local_markdown_structure(
+                selected_text, expected_page_count=2
+            )
             common = {
                 "paper_id": pack.name,
                 "item_key": "ITEM1",
@@ -243,9 +257,28 @@ class MultiSourceMaterializationTests(unittest.TestCase):
                 "selected_route": "native",
                 "output_markdown_ref": ROUTE_MARKDOWN_REF.as_posix(),
                 "output_markdown_sha256": selected_hash,
+                "native_evidence_ref": "extractions/native/evidence.json",
                 "page_map": [
-                    {"attachment_key": "ATT1", "global_locator": "p.1"},
-                    {"attachment_key": "ATT2", "global_locator": "p.2"},
+                    {
+                        "attachment_key": "ATT1",
+                        "source_ref": scope["sources"][0]["source_ref"],
+                        "global_locator": "p.1",
+                        "attachment_locator": "attachment:ATT1/p.1",
+                        "character_count": len("Synthetic main text."),
+                        "text_sha256": hashlib.sha256(
+                            b"Synthetic main text."
+                        ).hexdigest(),
+                    },
+                    {
+                        "attachment_key": "ATT2",
+                        "source_ref": scope["sources"][1]["source_ref"],
+                        "global_locator": "p.2",
+                        "attachment_locator": "attachment:ATT2/p.1",
+                        "character_count": len("Synthetic supplementary text."),
+                        "text_sha256": hashlib.sha256(
+                            b"Synthetic supplementary text."
+                        ).hexdigest(),
+                    },
                 ],
             }
             structure = {
@@ -254,7 +287,10 @@ class MultiSourceMaterializationTests(unittest.TestCase):
                 "selected_route": "native",
                 "source_markdown_ref": ROUTE_MARKDOWN_REF.as_posix(),
                 "route_evidence_ref": ROUTE_EVIDENCE_REF.as_posix(),
-                "structure": {"pages": [{"page": 1}, {"page": 2}]},
+                "outline_markdown_ref": "structure/outline.md",
+                "counts": counts,
+                "warnings": warnings,
+                "structure": rebuilt,
             }
             _write_json(pack / ROUTE_EVIDENCE_REF, route)
             _write_json(pack / STRUCTURE_EVIDENCE_REF, structure)
@@ -272,6 +308,42 @@ class MultiSourceMaterializationTests(unittest.TestCase):
                 (run / "index/index-status.json").read_bytes(), index_bytes
             )
             self.assertEqual((run / "cards/paper-card.json").read_bytes(), card_bytes)
+
+            bad_cases = (
+                ("missing page map", "route", "page_map", None),
+                ("short page map", "route", "page_map", route["page_map"][:1]),
+                ("wrong attachment", "route", "attachment_key", "UNKNOWN"),
+                ("wrong source ref", "route", "source_ref", "sources/other.pdf"),
+                ("wrong locator", "route", "attachment_locator", "attachment:ATT2/p.2"),
+                ("empty structure", "structure", "structure", {}),
+                ("missing page", "structure", "pages", rebuilt["pages"][:1]),
+                ("wrong count", "structure", "counts", {**counts, "pages": 1}),
+            )
+            route["output_markdown_sha256"] = selected_hash
+            for label, target, field, value in bad_cases:
+                with self.subTest(label=label):
+                    bad_route = copy.deepcopy(route)
+                    bad_structure = copy.deepcopy(structure)
+                    if target == "route" and field in (
+                        "attachment_key", "source_ref", "attachment_locator"
+                    ):
+                        bad_route["page_map"][1][field] = value
+                    elif target == "structure" and field == "pages":
+                        bad_structure["structure"]["pages"] = value
+                    elif target == "route":
+                        bad_route[field] = value
+                    else:
+                        bad_structure[field] = value
+                    _write_json(pack / ROUTE_EVIDENCE_REF, bad_route)
+                    _write_json(pack / STRUCTURE_EVIDENCE_REF, bad_structure)
+                    with self.assertRaises(MillefeuilleContractError):
+                        _indexes(case)
+                    self.assertEqual(
+                        (run / "index/index-status.json").read_bytes(), index_bytes
+                    )
+                    self.assertEqual(
+                        (run / "cards/paper-card.json").read_bytes(), card_bytes
+                    )
 
     def test_json_schema_and_runtime_accept_both_whole_pack_formats(self):
         schema = json.loads(
