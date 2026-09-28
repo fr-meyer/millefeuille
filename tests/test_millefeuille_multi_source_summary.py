@@ -33,6 +33,7 @@ from millefeuille.domain.summary_preparation import (
     verify_summary_preparation_package,
 )
 from millefeuille.domain.summary_published_handoff import _source_hash_for_preparation
+from tests.platform_capabilities import requires_secure_nofollow_writes
 
 
 def _pack(root: Path) -> Path:
@@ -118,6 +119,7 @@ def _pack(root: Path) -> Path:
 
 
 class MultiSourceSummaryTests(unittest.TestCase):
+    @requires_secure_nofollow_writes
     def test_whole_pack_preparation_dispatch_and_idempotence(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
