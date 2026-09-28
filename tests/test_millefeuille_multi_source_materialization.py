@@ -218,6 +218,61 @@ class MultiSourceMaterializationTests(unittest.TestCase):
             self.assertEqual(len(list((pack / "sources").glob("*.pdf"))), 2)
             self.assertFalse((pack / "source.pdf").exists())
 
+    def test_live_v02_route_and_structure_sidecars_index_without_weakening_identity(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tempdir:
+            case = _prepare(tempdir)
+            root, pack, run, _card_e, index_e = case
+            self.assertEqual(_cards(case)[0].status, "created")
+            scope = json.loads(index_e.read_bytes())["source_scope"]
+            selected_hash = hashlib.sha256(
+                (pack / ROUTE_MARKDOWN_REF).read_bytes()
+            ).hexdigest()
+            common = {
+                "paper_id": pack.name,
+                "item_key": "ITEM1",
+                "source_hash": scope["source_hash"],
+                "source_scope": scope,
+                "page_count": 2,
+                "provider_calls": 0,
+            }
+            route = {
+                **common,
+                "schema_version": "millefeuille-route-selection-evidence/v0.2",
+                "selected_route": "native",
+                "output_markdown_ref": ROUTE_MARKDOWN_REF.as_posix(),
+                "output_markdown_sha256": selected_hash,
+                "page_map": [
+                    {"attachment_key": "ATT1", "global_locator": "p.1"},
+                    {"attachment_key": "ATT2", "global_locator": "p.2"},
+                ],
+            }
+            structure = {
+                **common,
+                "schema_version": "millefeuille-structure-evidence/v0.2",
+                "selected_route": "native",
+                "source_markdown_ref": ROUTE_MARKDOWN_REF.as_posix(),
+                "route_evidence_ref": ROUTE_EVIDENCE_REF.as_posix(),
+                "structure": {"pages": [{"page": 1}, {"page": 2}]},
+            }
+            _write_json(pack / ROUTE_EVIDENCE_REF, route)
+            _write_json(pack / STRUCTURE_EVIDENCE_REF, structure)
+            self.assertEqual(_indexes(case)[0].status, "created")
+            index_bytes = (run / "index/index-status.json").read_bytes()
+            card_bytes = (run / "cards/paper-card.json").read_bytes()
+
+            route["output_markdown_sha256"] = "0" * 64
+            _write_json(pack / ROUTE_EVIDENCE_REF, route)
+            with self.assertRaisesRegex(
+                MillefeuilleContractError, "selected text hash drift"
+            ):
+                _indexes(case)
+            self.assertEqual(
+                (run / "index/index-status.json").read_bytes(), index_bytes
+            )
+            self.assertEqual((run / "cards/paper-card.json").read_bytes(), card_bytes)
+
     def test_json_schema_and_runtime_accept_both_whole_pack_formats(self):
         schema = json.loads(
             (
