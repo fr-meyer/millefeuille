@@ -228,12 +228,12 @@ class MultiSourceMaterializationTests(unittest.TestCase):
             self.assertEqual(_cards(case)[0].status, "created")
             scope = json.loads(index_e.read_bytes())["source_scope"]
             selected_text = (
-                "# Synthetic two-source text\n"
-                "## Page 1\n"
-                "# Source: ATT1 (ATT1)\n"
-                "Synthetic main text.\n"
-                "## Page 2\n"
-                "# Source: ATT2 (ATT2)\n"
+                "# Synthetic two-source text\n\n"
+                "## Page 1\n\n"
+                "# Source: ATT1 (ATT1)\n\n"
+                "Synthetic main text.\n\n"
+                "## Page 2\n\n"
+                "# Source: ATT2 (ATT2)\n\n"
                 "Synthetic supplementary text.\n"
             )
             (pack / ROUTE_MARKDOWN_REF).write_text(selected_text, encoding="utf-8")
@@ -315,6 +315,9 @@ class MultiSourceMaterializationTests(unittest.TestCase):
                 ("wrong attachment", "route", "attachment_key", "UNKNOWN"),
                 ("wrong source ref", "route", "source_ref", "sources/other.pdf"),
                 ("wrong locator", "route", "attachment_locator", "attachment:ATT2/p.2"),
+                ("swapped valid sources", "route", "swap_sources", None),
+                ("fabricated page hash", "route", "text_sha256", "f" * 64),
+                ("fabricated character count", "route", "character_count", 999),
                 ("empty structure", "structure", "structure", {}),
                 ("missing page", "structure", "pages", rebuilt["pages"][:1]),
                 ("wrong count", "structure", "counts", {**counts, "pages": 1}),
@@ -325,9 +328,19 @@ class MultiSourceMaterializationTests(unittest.TestCase):
                     bad_route = copy.deepcopy(route)
                     bad_structure = copy.deepcopy(structure)
                     if target == "route" and field in (
-                        "attachment_key", "source_ref", "attachment_locator"
+                        "attachment_key", "source_ref", "attachment_locator",
+                        "text_sha256", "character_count",
                     ):
                         bad_route["page_map"][1][field] = value
+                    elif target == "route" and field == "swap_sources":
+                        for page, key, member in (
+                            (0, "ATT2", scope["sources"][1]),
+                            (1, "ATT1", scope["sources"][0]),
+                        ):
+                            row = bad_route["page_map"][page]
+                            row["attachment_key"] = key
+                            row["source_ref"] = member["source_ref"]
+                            row["attachment_locator"] = f"attachment:{key}/p.1"
                     elif target == "structure" and field == "pages":
                         bad_structure["structure"]["pages"] = value
                     elif target == "route":

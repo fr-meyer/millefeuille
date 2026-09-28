@@ -42,6 +42,7 @@ from millefeuille.domain.millefeuille import (
 from millefeuille.domain.multi_source_upstream import (
     ROUTE_MULTI_SCHEMA,
     STRUCTURE_MULTI_SCHEMA,
+    _split_pages,
 )
 from millefeuille.domain.route_fixtures import (
     ROUTE_EVIDENCE_REF,
@@ -1474,8 +1475,23 @@ def _validate_multi_source_index_dependencies(
     page_map = route.get("page_map")
     if not isinstance(page_map, list) or len(page_map) != page_count:
         raise MillefeuilleContractError("multi-source index route page_map drift")
+    try:
+        selected_text = selected.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise MillefeuilleContractError(
+            "multi-source index selected text must be UTF-8"
+        ) from exc
+    first_page = re.search(r"(?m)^## Page 1[ \t]*\r?$", selected_text)
+    if first_page is None:
+        raise MillefeuilleContractError("multi-source index selected pages drift")
+    selected_pages = _split_pages(
+        selected_text[first_page.start() :], expected_count=page_count
+    )
     members = {member.attachment_key: member for member in scope.sources}
+    source_order = tuple(members)
     local_page_counts = dict.fromkeys(members, 0)
+    active_key = None
+    sources_seen = 0
     for global_page, row in enumerate(page_map, start=1):
         if not isinstance(row, dict):
             raise MillefeuilleContractError("multi-source index route page_map drift")
@@ -1504,17 +1520,36 @@ def _validate_multi_source_index_dependencies(
             or re.fullmatch(r"[0-9a-f]{64}", row["text_sha256"]) is None
         ):
             raise MillefeuilleContractError("multi-source index route page_map drift")
+        page_text = selected_pages[global_page - 1]
+        if key != active_key:
+            if sources_seen >= len(source_order) or key != source_order[sources_seen]:
+                raise MillefeuilleContractError(
+                    "multi-source index route attachment order drift"
+                )
+            source_heading = re.match(
+                r"\A# Source: [^\r\n]+ \(" + re.escape(key) + r"\)\n\n",
+                page_text,
+            )
+            if source_heading is None:
+                raise MillefeuilleContractError(
+                    "multi-source index selected source marker drift"
+                )
+            page_text = page_text[source_heading.end() :].strip()
+            active_key = key
+            sources_seen += 1
+        if (
+            row["character_count"] != len(page_text)
+            or row["text_sha256"]
+            != hashlib.sha256(page_text.encode("utf-8")).hexdigest()
+        ):
+            raise MillefeuilleContractError(
+                "multi-source index route page content drift"
+            )
     if (
         any(count == 0 for count in local_page_counts.values())
         or route.get("native_evidence_ref") != "extractions/native/evidence.json"
     ):
         raise MillefeuilleContractError("multi-source index route page_map drift")
-    try:
-        selected_text = selected.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise MillefeuilleContractError(
-            "multi-source index selected text must be UTF-8"
-        ) from exc
     rebuilt, _outline, counts, warnings = build_local_markdown_structure(
         selected_text, expected_page_count=page_count
     )
