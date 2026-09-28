@@ -130,6 +130,24 @@ class TestGptPaperCardResults(unittest.TestCase):
             (validated.provider_calls_performed, validated.writes_performed), (0, 0)
         )
 
+    def test_provenance_schema_accepts_aggregate_source_hash_only_in_source_field(self):
+        validated = self._validate()
+        provenance = json.loads(validated.provenance_json)
+        schema = json.loads(
+            (SPEC_DIR / "paper-card-provenance.schema.json").read_text()
+        )
+        resources = []
+        for name in ("model-executor-request", "model-executor-result"):
+            referenced = json.loads((SPEC_DIR / f"{name}.schema.json").read_text())
+            resources.append((referenced["$id"], Resource.from_contents(referenced)))
+        validator = Draft202012Validator(
+            schema, registry=Registry().with_resources(resources)
+        )
+        provenance["source_hash"] = "sha256-aggregate:" + "a" * 64
+        validator.validate(provenance)
+        provenance["summary_publication_manifest_sha256"] = provenance["source_hash"]
+        self.assertFalse(validator.is_valid(provenance))
+
     def test_rejects_missing_usage_and_nonzero_cost(self):
         for key, value in (
             ("usage", None),
