@@ -1,8 +1,13 @@
 id: pr-mf-published-link-batch
 title: Retrieve verified published GPT summaries as deterministic protected batches
-status: implementation
+status: merged
 branch: feat/pr-mf-published-link-batch-20260928
 base_branch: dev
+github:
+  pull_request: 161
+  url: https://github.com/fr-meyer/millefeuille/pull/161
+  head_sha: 356f85db7efd84f154bfe801ca7e306ed7868d51
+  merge_commit: f6a5891613f56eb69b48651937f9784c4656f2c8
 write_paths:
 - README.md
 - .speculoos/tasks/pr-mf-published-link-batch.yaml

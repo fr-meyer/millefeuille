@@ -1,8 +1,13 @@
 id: pr-mf-multi-source-card-index
 title: Propagate verified multi-source packs through cards and indexes
-status: implementation
+status: merged
 branch: feat/pr-mf-multi-source-card-index-20260928
 base_branch: dev
+github:
+  pull_request: 159
+  url: https://github.com/fr-meyer/millefeuille/pull/159
+  head_sha: 055a10008767d722e93811419f6cd7ed5707b864
+  merge_commit: 40cc8b6efa6a3b9d25be3802c8ecaf2b015792eb
 write_paths:
 - README.md
 - .speculoos/tasks/pr-mf-multi-source-card-index.yaml

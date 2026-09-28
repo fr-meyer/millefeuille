@@ -1,8 +1,13 @@
 id: pr-mf-published-summary-run-link
 title: Reuse a verified immutable GPT summary in a distinct card run
-status: implementation
+status: merged
 branch: feat/pr-mf-published-summary-run-link
 base_branch: dev
+github:
+  pull_request: 153
+  url: https://github.com/fr-meyer/millefeuille/pull/153
+  head_sha: f27583a484cd90777752d0e90a2306a15e47b986
+  merge_commit: 1a9969daa2f0b7923a95ae00fe74bf5d17f35c02
 write_paths:
   - README.md
   - .speculoos/tasks/pr-mf-published-summary-run-link.yaml

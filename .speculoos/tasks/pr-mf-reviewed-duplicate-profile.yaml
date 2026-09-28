@@ -1,8 +1,13 @@
 id: pr-mf-reviewed-duplicate-profile
 title: Recognize a verified reviewed duplicate as a retained separate profile
-status: implementation
+status: merged
 branch: feat/pr-mf-duplicate-review-20260927
 base_branch: dev
+github:
+  pull_request: 154
+  url: https://github.com/fr-meyer/millefeuille/pull/154
+  head_sha: aa1470621879ac745d9487a13539a059252d1d31
+  merge_commit: 04c0515b551fcd20c73f2021c9b168ed58c4abe2
 write_paths:
   - README.md
   - .speculoos/tasks/pr-mf-reviewed-duplicate-profile.yaml
