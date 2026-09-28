@@ -245,6 +245,21 @@ class MultiSourceUpstreamTests(unittest.TestCase):
             ):
                 _plan(pack_root, scope, (inputs[0], updated))
 
+    def test_empty_and_marker_free_markdown_raise_contract_error(self):
+        for markdown in ("", "Native text without page markers.\n"):
+            with self.subTest(markdown=markdown), tempfile.TemporaryDirectory() as temp:
+                pack_root, _pack, scope, inputs = _fixture(Path(temp))
+                path = inputs[1].markdown_path
+                path.write_text(markdown, encoding="utf-8")
+                updated = replace(
+                    inputs[1],
+                    markdown_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                )
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "page-marker coverage"
+                ):
+                    _plan(pack_root, scope, (inputs[0], updated))
+
     def test_pack_byte_drift_refused_before_output(self):
         with tempfile.TemporaryDirectory() as temp:
             pack_root, pack, scope, inputs = _fixture(Path(temp))

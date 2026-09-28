@@ -286,7 +286,11 @@ def plan_multi_source_native_upstream(
 
 def _split_pages(markdown: str, *, expected_count: int) -> list[str]:
     markers = list(_PAGE_MARKER.finditer(markdown))
-    if len(markers) != expected_count or markdown[: markers[0].start()].strip():
+    if (
+        not markers
+        or len(markers) != expected_count
+        or markdown[: markers[0].start()].strip()
+    ):
         raise MillefeuilleContractError("native Markdown page-marker coverage drift")
     pages: list[str] = []
     for index, marker in enumerate(markers):
