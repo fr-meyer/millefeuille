@@ -56,6 +56,8 @@ missing or changed PDFs, symlinks, batch preflight, mutation after planning and
 concurrent card rollback. Existing single-source tests remain the compatibility
 baseline. These operations make zero provider calls.
 
-The live multi-PDF extraction/summary request and publication path remains a
-separate acceptance requirement. Raw production paper text, provider prompts,
+The [whole-pack native upstream planner](multi-source-upstream.md) has a live
+CollaGAN no-write checkpoint. Publication of that upstream bundle, the live
+multi-PDF summary request, and end-to-end materialization remain separate
+acceptance requirements. Raw production paper text, provider prompts,
 credentials and live receipts do not belong in repository fixtures.
