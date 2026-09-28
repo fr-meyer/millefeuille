@@ -1,8 +1,13 @@
 id: pr-mf-published-summary-retrieval
 title: Retrieve verified published summary links with original lineage
-status: implementation
+status: merged
 branch: feat/pr-mf-pilot-retrieval-acceptance-20260928
 base_branch: dev
+github:
+  pull_request: 160
+  url: https://github.com/fr-meyer/millefeuille/pull/160
+  head_sha: f2fe6bd2775791b4a971d4babcd8d260c951773e
+  merge_commit: 1d28270acb59361e10c6307dac96d014a473bcc8
 write_paths:
 - README.md
 - .speculoos/tasks/pr-mf-published-summary-retrieval.yaml

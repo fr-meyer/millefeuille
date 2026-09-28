@@ -1,8 +1,13 @@
 id: pr-mf-classification-model-scope
 title: Bind genuine GPT classification requests to accepted papers and locked taxonomy
-status: implementation
+status: merged
 branch: feat/pr-mf-classification-model-scope-20260927
 base_branch: dev
+github:
+  pull_request: 155
+  url: https://github.com/fr-meyer/millefeuille/pull/155
+  head_sha: a928b0de55818ba8e98e522326f217aa05dcd393
+  merge_commit: 689f41792a1c79bec3d3adb071752bdf55fb289e
 write_paths:
   - README.md
   - .speculoos/tasks/pr-mf-classification-model-scope.yaml

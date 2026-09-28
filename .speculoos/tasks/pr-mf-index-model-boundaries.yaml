@@ -1,8 +1,13 @@
 id: pr-mf-index-model-boundaries
 title: Align local structure preview and verify component model boundaries
-status: implementation
+status: merged
 branch: fix/pr-mf-index-model-boundaries-20260928
 base_branch: dev
+github:
+  pull_request: 158
+  url: https://github.com/fr-meyer/millefeuille/pull/158
+  head_sha: 630640d51aed6b3ad2d5cace106389c53825e115
+  merge_commit: 27762eb73b0a7d11663df8cd23ad6a12398c5748
 write_paths:
   - README.md
   - .speculoos/tasks/pr-mf-index-model-boundaries.yaml

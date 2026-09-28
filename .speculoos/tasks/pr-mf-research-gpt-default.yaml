@@ -1,8 +1,13 @@
 id: pr-mf-research-gpt-default
 title: Align the generic classification preview with the pinned GPT request
-status: implementation
+status: merged
 branch: fix/pr-mf-research-gpt-default-20260927
 base_branch: dev
+github:
+  pull_request: 157
+  url: https://github.com/fr-meyer/millefeuille/pull/157
+  head_sha: 948cf23848d0c74dd7e9c12505e55cba0a7836e9
+  merge_commit: fe6c51ebf68ba228a51edea3f25869c62bb9dc04
 write_paths:
   - README.md
   - .speculoos/tasks/pr-mf-research-gpt-default.yaml

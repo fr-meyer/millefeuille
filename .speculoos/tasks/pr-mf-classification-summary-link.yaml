@@ -1,8 +1,13 @@
 id: pr-mf-classification-summary-link
 title: Reuse accepted published summaries during classification planning
-status: implementation
+status: merged
 branch: fix/pr-mf-classification-summary-link-20260927
 base_branch: dev
+github:
+  pull_request: 156
+  url: https://github.com/fr-meyer/millefeuille/pull/156
+  head_sha: 3b554263b91d2c3f8566d9f84b5c22993659c2f4
+  merge_commit: 931d04afcc9285d0ff1f7b3dd1f89256d7ef75d5
 write_paths:
   - README.md
   - .speculoos/tasks/pr-mf-classification-summary-link.yaml
