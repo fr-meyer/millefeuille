@@ -236,7 +236,7 @@ class MultiSourceMaterializationTests(unittest.TestCase):
                 "# Source: ATT2 (ATT2)\n\n"
                 "Synthetic supplementary text.\n"
             )
-            (pack / ROUTE_MARKDOWN_REF).write_text(selected_text, encoding="utf-8")
+            (pack / ROUTE_MARKDOWN_REF).write_bytes(selected_text.encode("utf-8"))
             selected_hash = hashlib.sha256(
                 (pack / ROUTE_MARKDOWN_REF).read_bytes()
             ).hexdigest()
