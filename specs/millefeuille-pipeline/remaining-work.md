@@ -92,6 +92,30 @@ answers cited indexed evidence and passed source review across 14 cited
 summary/page sections. This is bounded pilot evidence, not a claim that the
 whole product or release is complete.
 
+Private GCP acceptance records (no paper text or credentials are committed):
+
+- Under `/home/frmeyer/.openclaw/workspace-franck/.openclaw/tmp/millefeuille-retrieval-publication-20260928/`, `publication-preview.json`
+  (SHA-256 `38e97daf0f2142cfc4adcfa42623d130aa1f5f872546cddbdadd4e4181b002ca`)
+  carries the complete 704-file original-input hash snapshot; `publication-intent.json`
+  (`ec968dbf1047b3b122b51e88a2cf1687f54ac1d3964570932ca7e5c8bea7542f`)
+  binds the two exact output refs. `publication-terminal.json`
+  (`0a4204d51553fd7cfe747b2f1f94861012836fe16e482d79d4e16e4455fa8521`)
+  records readback, an idempotent rerun, unchanged originals and zero provider calls.
+- The read-only publication under `/home/frmeyer/.openclaw/private/millefeuille-2b-20260826/source-packs/batches/millefeuille/batch-pilot-retrieval-preflight-20260928/retrieval/`
+  contains `batch-retrieval-result.json`
+  (`61e57df64eb20231435d19d1afa2262dddf451394e6f2d3b44165a6227d02288`)
+  and `batch-retrieval-report.md`
+  (`8090c6ce9869d22b683c5a0ae95f6e03e8713bd0936c5e49f6d17929afd3a0b0`).
+- Under `/home/frmeyer/.openclaw/workspace-franck/.openclaw/tmp/millefeuille-gpt-query-acceptance-20260928/`,
+  `plan.json` (`ad57fdec1d640138ee295258195daaf896216371d219041fee59d4175f8d6aec`)
+  binds all five exact questions, inputs and model settings; `execution-report.json`
+  (`584c9fa901f8d63abdb4b2b15781dacc72d2f6e97f386aeaae63c277517abf94`)
+  records five one-attempt calls and citation/model checks; `source-review-report.json`
+  (`0b70b3d2e728c7813f5774d26d2f832c87843a55bcfab5eef49781dfabea32a2`)
+  records the five source-review verdicts and cited-section hashes. Workboard card
+  `e280f8de-ea2b-41c2-9014-2f77ff3acdc3` is complete. This review checks
+  the indexed evidence; it does not independently re-extract the PDFs.
+
 1. Finish broader source intake, scanned/OCR and edge-case coverage, using the
    rolling `mistral-ocr-latest` default and recording actual resolved provenance.
 2. Exercise live multi-source upstream extraction and generation; MF-114
