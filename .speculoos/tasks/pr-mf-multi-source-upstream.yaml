@@ -1,0 +1,33 @@
+id: pr-mf-multi-source-upstream
+title: Plan verified multi-PDF native upstream artifacts
+status: in-progress
+branch: feat/pr-mf-multi-source-upstream-20260928
+base_branch: dev
+write_paths:
+  - .speculoos/tasks/pr-mf-multi-source-upstream.yaml
+  - millefeuille/domain/multi_source_upstream.py
+  - specs/millefeuille-pipeline/multi-source-upstream.md
+  - specs/millefeuille-pipeline/multi-source-materialization.md
+  - specs/millefeuille-pipeline/remaining-work.md
+  - tests/test_millefeuille_multi_source_upstream.py
+github:
+  issue: null
+  pull_request: 165
+  url: https://github.com/fr-meyer/millefeuille/pull/165
+  head_sha: null
+scope:
+  - reverify every member of a v0.2 Zotero source pack and each native Markdown hash
+  - plan per-source native text, combined route with attachment page map, and local structure
+  - expose a no-text preview of exact planned output refs, sizes, and hashes
+  - validate the real CollaGAN main paper and supplement in a private GCP no-write run
+acceptance:
+  - synthetic two-PDF fixture covers full membership, order invariance, page locators and drift refusal
+  - live CollaGAN preview covers 19 pages from two verified attachments with no warnings
+  - full offline suite, Ruff, metadata, private-data scan, and GitHub checks pass
+publication_boundary:
+  statement: Source code, synthetic tests and scrubbed metadata only. No production paper text, prompts, credentials or receipts in Git. Durable source-pack publication and GPT calls each require separate exact MF-100 approval. This change does not call Zotero, OCR, OpenKB or providers, and does not cut a release.
+documentation_impact:
+  status: updated
+  rationale: Explain no-write upstream planning, live preview evidence, and remaining publication and generation work.
+publish_authority: Existing user approval covers GCP implementation and feature-to-dev repository publication.
+private_data_scan: Required; synthetic fixtures and metadata only.

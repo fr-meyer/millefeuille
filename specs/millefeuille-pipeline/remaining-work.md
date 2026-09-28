@@ -118,9 +118,13 @@ Private GCP acceptance records (no paper text or credentials are committed):
 
 1. Finish broader source intake, scanned/OCR and edge-case coverage, using the
    rolling `mistral-ocr-latest` default and recording actual resolved provenance.
-2. Exercise live multi-source upstream extraction and generation; MF-114
-   [whole-pack card/index materialization](multi-source-materialization.md) is
-   implemented with synthetic downstream acceptance coverage.
+2. Complete live multi-source upstream publication and GPT generation. The
+   verified CollaGAN main paper and supplement were natively extracted on GCP
+   (19 pages), and a [whole-pack upstream plan](multi-source-upstream.md) passed
+   live no-write validation. Its seven planned files are not yet in the durable
+   pack. MF-114 [whole-pack card/index materialization](multi-source-materialization.md)
+   has synthetic downstream acceptance coverage; live end-to-end acceptance
+   remains open.
 3. Maintain the explicit [component model boundaries](component-model-boundaries.md)
    and operation-specific request/actual model evidence. Keep production GPT only
    while Grok OAuth is inactive; vendor API defaults cannot substitute for OAuth.
