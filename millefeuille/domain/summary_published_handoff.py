@@ -24,8 +24,10 @@ from millefeuille.domain.operator_preflight import compute_operator_root_target_
 from millefeuille.domain.secure_io import RootArtifactReader, read_bytes_no_follow
 from millefeuille.domain.source_packs import (
     SOURCE_PACK_MANIFEST_SCHEMA_VERSION,
+    SOURCE_PACK_MULTI_MANIFEST_SCHEMA_VERSION,
     parse_source_pack_manifest,
 )
+from millefeuille.domain.source_scope import MultiSourceScope, verify_multi_source_pack
 from millefeuille.domain.stage_runtime import require_safe_package_id
 from millefeuille.domain.summary_batch_plan import plan_grounded_gpt_summary_batch
 from millefeuille.domain.summary_execution_scope import (
@@ -257,21 +259,13 @@ def _verify_published_gpt_summary_data(
             )
         )
     )
-    if source["schema_version"] != SOURCE_PACK_MANIFEST_SCHEMA_VERSION:
-        raise MillefeuilleContractError(
-            "GPT published handoff requires a single-source pack"
-        )
-    identity = prepared["identity"]
-    source_hash = "sha256:" + identity["expected_sha256"]
-    if (
-        source["paper_id"] != publication.paper_id
-        or source["source_hash"] != source_hash
-        or source["source_type"] != identity["source_type"]
-        or source["identity"]["zotero_item_key"] != identity["item_key"]
-        or source["identity"]["zotero_attachment_key"] != identity["attachment_key"]
-        or source["identity"]["canonical_filename"] != identity["canonical_filename"]
-    ):
-        raise MillefeuilleContractError("GPT published source-pack identity drift")
+    source_hash = _source_hash_for_preparation(
+        source=source,
+        prepared=prepared,
+        root=root,
+        source_pack_ref=source_pack_ref,
+        paper_id=publication.paper_id,
+    )
     prefix = f"analyses/millefeuille/{publication.run_id}"
     summaries = f"{prefix}/summaries"
     data: dict[str, bytes] = {}
@@ -421,6 +415,55 @@ def _verify_published_gpt_summary_data(
     )
 
     return handoff, data
+
+
+def _source_hash_for_preparation(
+    *,
+    source: dict[str, Any],
+    prepared: dict[str, Any],
+    root: Path,
+    source_pack_ref: str,
+    paper_id: str,
+) -> str:
+    identity = prepared["identity"]
+    if prepared.get("schema_version") == "millefeuille-summary-preparation/v0.2":
+        if source["schema_version"] != SOURCE_PACK_MULTI_MANIFEST_SCHEMA_VERSION:
+            raise MillefeuilleContractError(
+                "GPT published multi-source manifest schema drift"
+            )
+        scope = MultiSourceScope.from_dict(identity["source_scope"])
+        source_hash = scope.source_hash
+        verify_multi_source_pack(
+            root / source_pack_ref,
+            item_key=identity["item_key"],
+            paper_id=paper_id,
+            scope=scope,
+        )
+        if (
+            source["paper_id"] != paper_id
+            or source["source_hash"] != source_hash
+            or source["source_type"] != identity["source_type"]
+            or source["identity"]["zotero_item_key"] != identity["item_key"]
+            or source["identity"]["pdf_count"] != len(scope.sources)
+        ):
+            raise MillefeuilleContractError("GPT published source-pack identity drift")
+    else:
+        if source["schema_version"] != SOURCE_PACK_MANIFEST_SCHEMA_VERSION:
+            raise MillefeuilleContractError(
+                "GPT published handoff requires a single-source pack"
+            )
+        source_hash = "sha256:" + identity["expected_sha256"]
+        if (
+            source["paper_id"] != paper_id
+            or source["source_hash"] != source_hash
+            or source["source_type"] != identity["source_type"]
+            or source["identity"]["zotero_item_key"] != identity["item_key"]
+            or source["identity"]["zotero_attachment_key"] != identity["attachment_key"]
+            or source["identity"]["canonical_filename"]
+            != identity["canonical_filename"]
+        ):
+            raise MillefeuilleContractError("GPT published source-pack identity drift")
+    return source_hash
 
 
 def _digest(data: bytes) -> str:

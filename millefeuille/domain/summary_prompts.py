@@ -136,6 +136,23 @@ def build_v1_summary_prompt(
 def _validated_structure(
     value: Any, lines: list[str]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    if isinstance(value, dict) and value.get("schema_version") == (
+        "millefeuille-structure-evidence/v0.2"
+    ):
+        inner = value.get("structure")
+        pages = inner.get("pages") if isinstance(inner, dict) else None
+        counts = value.get("counts")
+        if (
+            value.get("selected_route") != "native"
+            or not isinstance(pages, list)
+            or not isinstance(counts, dict)
+            or value.get("page_count") != len(pages)
+            or counts.get("pages") != value.get("page_count")
+        ):
+            raise MillefeuilleContractError(
+                "summary prompt multi-source structure drift"
+            )
+        value = inner
     if (
         not isinstance(value, dict)
         or value.get("backend") != LOCAL_STRUCTURE_BACKEND

@@ -19,7 +19,11 @@ from millefeuille.domain.paper_card_results import (
     validate_published_gpt_paper_card_execution,
 )
 from millefeuille.domain.secure_io import read_bytes_no_follow
-from millefeuille.domain.source_packs import parse_source_pack_manifest
+from millefeuille.domain.source_packs import (
+    SOURCE_PACK_MULTI_MANIFEST_SCHEMA_VERSION,
+    parse_source_pack_manifest,
+)
+from millefeuille.domain.source_scope import MultiSourceScope, verify_multi_source_pack
 from millefeuille.domain.summary_preparation import verify_summary_preparation_package
 from millefeuille.domain.summary_published_handoff import GptSummaryPublicationIdentity
 
@@ -101,30 +105,63 @@ def plan_gpt_paper_card_outputs(
         preparation_path=preparation_path,
     )
     expected = prepared["identity"]
-    if (
-        source["paper_id"] != plan.paper_id
-        or source["source_hash"] != plan.source_hash
-        or source["source_type"] != expected["source_type"]
-        or source["identity"]["zotero_item_key"] != expected["item_key"]
-        or source["identity"]["zotero_attachment_key"] != expected["attachment_key"]
-        or source["identity"]["canonical_filename"] != expected["canonical_filename"]
-    ):
-        raise MillefeuilleContractError("GPT card source identity drift")
-    filename = source["identity"]["canonical_filename"]
-    title, year = _filename_identity(filename)
-    identity = {
-        "title": title,
-        "source_hash": plan.source_hash,
-        "zotero_item_key": source["identity"]["zotero_item_key"],
-        "canonical_filename": filename,
-    }
-    if year is not None:
-        identity["year"] = year
+    if prepared.get("schema_version") == "millefeuille-summary-preparation/v0.2":
+        scope = MultiSourceScope.from_dict(expected["source_scope"])
+        verify_multi_source_pack(
+            root / f"zotero/{plan.paper_id}",
+            item_key=expected["item_key"],
+            paper_id=plan.paper_id,
+            scope=scope,
+        )
+        if (
+            source["schema_version"] != SOURCE_PACK_MULTI_MANIFEST_SCHEMA_VERSION
+            or source["paper_id"] != plan.paper_id
+            or source["source_hash"] != scope.source_hash
+            or plan.source_hash != scope.source_hash
+            or source["source_type"] != expected["source_type"]
+            or source["identity"]["zotero_item_key"] != expected["item_key"]
+            or source["identity"]["pdf_count"] != len(scope.sources)
+        ):
+            raise MillefeuilleContractError("GPT card source identity drift")
+        title = source["identity"].get("item_title") or plan.paper_id
+        if not isinstance(title, str) or not title.strip():
+            raise MillefeuilleContractError("GPT card source title drift")
+        identity = {
+            "title": title,
+            "source_hash": plan.source_hash,
+            "zotero_item_key": expected["item_key"],
+        }
+        identity_warning = (
+            "Bibliographic identity is derived from the verified source-pack item "
+            "title; Zotero metadata reconciliation is pending."
+        )
+    else:
+        if (
+            source["paper_id"] != plan.paper_id
+            or source["source_hash"] != plan.source_hash
+            or source["source_type"] != expected["source_type"]
+            or source["identity"]["zotero_item_key"] != expected["item_key"]
+            or source["identity"]["zotero_attachment_key"] != expected["attachment_key"]
+            or source["identity"]["canonical_filename"]
+            != expected["canonical_filename"]
+        ):
+            raise MillefeuilleContractError("GPT card source identity drift")
+        filename = source["identity"]["canonical_filename"]
+        title, year = _filename_identity(filename)
+        identity = {
+            "title": title,
+            "source_hash": plan.source_hash,
+            "zotero_item_key": source["identity"]["zotero_item_key"],
+            "canonical_filename": filename,
+        }
+        if year is not None:
+            identity["year"] = year
+        identity_warning = (
+            "Bibliographic identity is derived from the verified canonical "
+            "filename; Zotero metadata reconciliation is pending."
+        )
     content = validated.content.content
-    warnings = list(content["quality_warnings"]) + [
-        "Bibliographic identity is derived from the verified canonical filename; "
-        "Zotero metadata reconciliation is pending."
-    ]
+    warnings = list(content["quality_warnings"]) + [identity_warning]
     evidence = [
         f"analyses/millefeuille/{publication.run_id}/structure/inputs/selected.md#{locator}"
         for locator in validated.content.source_locators
