@@ -76,13 +76,45 @@
   and the matching single-source pack. It exposes metadata and input refs
   without calls, writes, receipt reservation, or downstream authorization.
 
-## Current GPT Pilot Path (2026-09-27 UTC)
+## Current GPT Pilot Path (2026-09-28 KST)
 
 All five staged pilots, Picard, Cheng, Liao, Kolt and Zabounidis, have completed
 their bounded pipeline: 166 summaries, grounded cards, verified native indexes,
 acceptance, source-reviewed classification and actual Zotero readback. Original
-model evidence and consumed receipts are preserved. This is bounded pilot evidence,
-not a claim that the whole product or release is complete.
+model evidence and consumed receipts are preserved. PRs #158-#161 added the
+component model audit, downstream whole-pack card/index materialization, verified
+single-run published-summary retrieval and pinned-input batch v0.2 retrieval.
+The actual combined five-pilot batch was published privately on GCP with 166
+summary refs; readback and an idempotent rerun passed, with all 704 original
+files unchanged. Five approved GPT contribution/limitation queries then ran once
+each with saved OAuth, `openai/gpt-5.6-sol`, `xhigh` and no fallback. All five
+answers cited indexed evidence and passed source review across 14 cited
+summary/page sections. This is bounded pilot evidence, not a claim that the
+whole product or release is complete.
+
+Private GCP acceptance records (no paper text or credentials are committed):
+
+- Under `/home/frmeyer/.openclaw/workspace-franck/.openclaw/tmp/millefeuille-retrieval-publication-20260928/`, `publication-preview.json`
+  (SHA-256 `38e97daf0f2142cfc4adcfa42623d130aa1f5f872546cddbdadd4e4181b002ca`)
+  carries the complete 704-file original-input hash snapshot; `publication-intent.json`
+  (`ec968dbf1047b3b122b51e88a2cf1687f54ac1d3964570932ca7e5c8bea7542f`)
+  binds the two exact output refs. `publication-terminal.json`
+  (`0a4204d51553fd7cfe747b2f1f94861012836fe16e482d79d4e16e4455fa8521`)
+  records readback, an idempotent rerun, unchanged originals and zero provider calls.
+- The read-only publication under `/home/frmeyer/.openclaw/private/millefeuille-2b-20260826/source-packs/batches/millefeuille/batch-pilot-retrieval-preflight-20260928/retrieval/`
+  contains `batch-retrieval-result.json`
+  (`61e57df64eb20231435d19d1afa2262dddf451394e6f2d3b44165a6227d02288`)
+  and `batch-retrieval-report.md`
+  (`8090c6ce9869d22b683c5a0ae95f6e03e8713bd0936c5e49f6d17929afd3a0b0`).
+- Under `/home/frmeyer/.openclaw/workspace-franck/.openclaw/tmp/millefeuille-gpt-query-acceptance-20260928/`,
+  `plan.json` (`ad57fdec1d640138ee295258195daaf896216371d219041fee59d4175f8d6aec`)
+  binds all five exact questions, inputs and model settings; `execution-report.json`
+  (`584c9fa901f8d63abdb4b2b15781dacc72d2f6e97f386aeaae63c277517abf94`)
+  records five one-attempt calls and citation/model checks; `source-review-report.json`
+  (`0b70b3d2e728c7813f5774d26d2f832c87843a55bcfab5eef49781dfabea32a2`)
+  records the five source-review verdicts and cited-section hashes. Workboard card
+  `e280f8de-ea2b-41c2-9014-2f77ff3acdc3` is complete. This review checks
+  the indexed evidence; it does not independently re-extract the PDFs.
 
 1. Finish broader source intake, scanned/OCR and edge-case coverage, using the
    rolling `mistral-ocr-latest` default and recording actual resolved provenance.
@@ -92,13 +124,13 @@ not a claim that the whole product or release is complete.
 3. Maintain the explicit [component model boundaries](component-model-boundaries.md)
    and operation-specific request/actual model evidence. Keep production GPT only
    while Grok OAuth is inactive; vendor API defaults cannot substitute for OAuth.
-4. Complete generated query answers, actual combined-result publication,
-   ambiguity/waiver, version conflict, partial external failure and governance
-   acceptance coverage. [Published-summary retrieval](published-summary-retrieval.md)
-   supports single-run reads and explicit batch v0.2 with complete original-input
-   snapshots. Five actual pilots pass read-only batch precommit checks; synthetic
-   fixtures exercise atomic publication and rerun. Live combined publication
-   remains separate.
+4. Complete ambiguity/waiver, version-conflict, partial external failure and
+   governance acceptance coverage. Generated query answers and actual combined
+   retrieval publication are complete for the five pilots. [Published-summary
+   retrieval](published-summary-retrieval.md) supports single-run reads and
+   explicit batch v0.2 with complete original-input snapshots; the real batch
+   passed publication/readback, while synthetic fixtures exercise atomic
+   publication and rerun failure paths.
 5. Reconcile remaining Speculoos and Workboard metadata with merged/live evidence.
 6. Stabilize version and changelog, review promotion to `main`, then consider a
    separately approved tag and package release. Optional worktree hygiene and old

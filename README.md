@@ -971,9 +971,11 @@ them requires trusted ownership, cooperative writers, or stronger immutable
 storage.
 
 The v0.2 card schema and runtime accept both `sha256:<hex>` and
-`sha256-aggregate:<hex>` identities. This slice does not make the single-source
-card/index fixture evidence resolvers multi-source aware: downstream
-materialization from v0.2 multi-PDF packs remains roadmap item MF-114.
+`sha256-aggregate:<hex>` identities. The card/index fixture evidence resolvers
+now accept a verified whole-pack v0.2 scope for multi-PDF packs; see
+[MF-114 whole-pack materialization](specs/millefeuille-pipeline/multi-source-materialization.md).
+Live multi-PDF upstream extraction, OCR, and summary generation still require
+separate acceptance.
 
 ### Command-Line Configuration
 
