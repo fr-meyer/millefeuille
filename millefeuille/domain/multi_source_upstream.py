@@ -28,7 +28,7 @@ ROUTE_MULTI_SCHEMA = "millefeuille-route-selection-evidence/v0.2"
 STRUCTURE_MULTI_SCHEMA = "millefeuille-structure-evidence/v0.2"
 UPSTREAM_PREVIEW_SCHEMA = "millefeuille-multi-source-upstream-preview/v0.1"
 MAX_MARKDOWN_BYTES = 2 * 1024 * 1024
-_PAGE_MARKER = re.compile(r"^## Page ([1-9][0-9]*)[ \t]*$", re.MULTILINE)
+_PAGE_MARKER = re.compile(r"^## Page ([1-9][0-9]*)[ \t]*\r?$", re.MULTILINE)
 _HEX_64 = re.compile(r"[0-9a-f]{64}\Z")
 
 

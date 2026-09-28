@@ -181,6 +181,30 @@ class MultiSourceUpstreamTests(unittest.TestCase):
             self.assertEqual(structure["source_hash"], scope.source_hash)
             self.assertEqual(structure["page_count"], 3)
 
+    def test_crlf_native_markdown_keeps_complete_page_coverage(self):
+        with tempfile.TemporaryDirectory() as temp:
+            pack_root, _pack, scope, inputs = _fixture(Path(temp))
+            normalized = []
+            for record in inputs:
+                raw = (
+                    record.markdown_path.read_bytes()
+                    .replace(b"\r\n", b"\n")
+                    .replace(b"\n", b"\r\n")
+                )
+                record.markdown_path.write_bytes(raw)
+                normalized.append(
+                    replace(record, markdown_sha256=hashlib.sha256(raw).hexdigest())
+                )
+            plan = _plan(pack_root, scope, tuple(normalized))
+            self.assertEqual(plan.page_count, 3)
+            route = json.loads(
+                next(x.content for x in plan.outputs if x.ref == "selected/route.json")
+            )
+            self.assertEqual(
+                route["page_map"][-1]["attachment_locator"],
+                "attachment:SUPP5678/p.1",
+            )
+
     def test_missing_duplicate_and_wrong_member_refused(self):
         with tempfile.TemporaryDirectory() as temp:
             pack_root, _pack, scope, inputs = _fixture(Path(temp))
