@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 from typing import Any
 
@@ -534,7 +534,9 @@ def _build_acceptance_summary(
 
 
 def _load_multi_source_upstream_checks(
-    resolved: ResolvedRunArtifacts, *, profile: str,
+    resolved: ResolvedRunArtifacts,
+    *,
+    profile: str,
 ) -> tuple[list[AcceptanceCheckRecord], dict[str, int]]:
     """Recheck every PDF and page attribution before accepting v0.2 evidence."""
 
@@ -556,9 +558,7 @@ def _load_multi_source_upstream_checks(
         AcceptanceCheckRecord(
             name=name,
             status=AcceptanceCheckStatus.PASSED,
-            refs=[
-                relative_ref(resolved.source_pack_dir / ref, resolved.run_dir)
-            ],
+            refs=[relative_ref(resolved.source_pack_dir / ref, resolved.run_dir)],
             notes=["verified whole-pack source and page attribution"],
         )
         for name, ref in (
@@ -599,7 +599,27 @@ def _load_verified_multi_source_profile(resolved: ResolvedRunArtifacts) -> str:
     ):
         raise MillefeuilleContractError("multi-source summary link identity drift")
     preparation_ref = link["evidence_refs"]["preparation_ref"]
-    preparation_path = resolved.source_pack_root / preparation_ref
+    if (
+        not isinstance(preparation_ref, str)
+        or not preparation_ref
+        or "\\" in preparation_ref
+        or ":" in preparation_ref
+        or any(ord(char) < 32 for char in preparation_ref)
+    ):
+        raise MillefeuilleContractError("multi-source preparation ref is unsafe")
+    relative = PurePosixPath(preparation_ref)
+    if (
+        relative.is_absolute()
+        or relative.as_posix() != preparation_ref
+        or any(part in {".", ".."} for part in preparation_ref.split("/"))
+    ):
+        raise MillefeuilleContractError("multi-source preparation ref is unsafe")
+    source_root = resolved.source_pack_root.resolve(strict=True)
+    preparation_path = source_root.joinpath(*relative.parts)
+    if not preparation_path.resolve().is_relative_to(source_root):
+        raise MillefeuilleContractError(
+            "multi-source preparation ref escapes source root"
+        )
     prepared = verify_summary_preparation_package(
         route_evidence_path=resolved.source_pack_dir / ROUTE_EVIDENCE_REF,
         structure_evidence_path=resolved.source_pack_dir / STRUCTURE_EVIDENCE_REF,

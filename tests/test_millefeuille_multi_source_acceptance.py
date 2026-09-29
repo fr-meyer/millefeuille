@@ -89,9 +89,7 @@ class MultiSourceAcceptanceTests(unittest.TestCase):
             source = sorted((pack / "extractions/native/sources").glob("*.md"))[0]
             source.write_bytes(source.read_bytes() + b"tampered")
             with self.assertRaisesRegex(MillefeuilleContractError, "hash drift"):
-                _load_multi_source_upstream_checks(
-                    resolved, profile="research-default"
-                )
+                _load_multi_source_upstream_checks(resolved, profile="research-default")
 
     @requires_secure_nofollow_writes
     def test_non_default_profile_comes_from_verified_preparation(self):
@@ -152,6 +150,53 @@ class MultiSourceAcceptanceTests(unittest.TestCase):
                 resolved, profile=profile
             )
             self.assertEqual(checks[0].status, AcceptanceCheckStatus.PASSED)
+
+    def test_preparation_ref_cannot_escape_source_pack_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source_root = Path(temp) / "source-packs"
+            run = source_root / "analyses/millefeuille/run-card"
+            (run / "summaries").mkdir(parents=True)
+            link_path = run / "summaries/hierarchical-summary.json"
+            resolved = SimpleNamespace(
+                source_pack_root=source_root,
+                source_pack_dir=source_root / "zotero/item",
+                run_dir=run,
+                paper_id="paper",
+                run_id="run-card",
+                source_hash="sha256:" + "a" * 64,
+            )
+            for unsafe_ref in (
+                str(Path(temp) / "outside.json"),
+                "../outside.json",
+                "prepared/../outside.json",
+            ):
+                with self.subTest(unsafe_ref=unsafe_ref):
+                    link_path.write_text(
+                        json.dumps(
+                            {
+                                "schema_version": LINK_SCHEMA_VERSION,
+                                "evidence_refs": {"preparation_ref": unsafe_ref},
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    view = {
+                        "summary_link_sha256": "sha256:"
+                        + hashlib.sha256(link_path.read_bytes()).hexdigest(),
+                        "paper_id": resolved.paper_id,
+                        "run_id": resolved.run_id,
+                        "source_hash": resolved.source_hash,
+                    }
+                    with (
+                        patch(
+                            "millefeuille.domain.acceptance.load_published_summary_run_view",
+                            return_value=view,
+                        ),
+                        self.assertRaisesRegex(
+                            MillefeuilleContractError, "preparation ref is unsafe"
+                        ),
+                    ):
+                        _load_verified_multi_source_profile(resolved)
 
 
 if __name__ == "__main__":
