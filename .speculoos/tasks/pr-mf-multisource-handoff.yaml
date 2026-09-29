@@ -1,0 +1,28 @@
+id: pr-mf-multisource-handoff
+title: Bind two-source handoff evidence in acceptance
+status: in-progress
+branch: feat/pr-mf-multisource-run-package-20260929
+base_branch: dev
+write_paths:
+  - .speculoos/tasks/pr-mf-multisource-handoff.yaml
+  - millefeuille/domain/acceptance.py
+  - tests/test_millefeuille_multi_source_handoff.py
+github:
+  issue: null
+  pull_request: null
+  url: null
+  head_sha: null
+scope:
+  - Require one matching handoff row for each verified v0.2 source attachment
+  - Bind item, attachment, filename, available PDF hash and size evidence
+  - Preserve the existing single-source handoff path
+acceptance:
+  - Synthetic two-PDF handoff passes and missing, duplicate or drifted attachments require review
+  - Full offline suite, Ruff, metadata and private-data checks pass
+publication_boundary:
+  statement: Code, synthetic tests and task metadata only. No model, OCR, Zotero, OpenKB, source-pack, index, credential or release write. Live run-package materialization and acceptance output remain separate exact gates.
+documentation_impact:
+  status: none
+  rationale: The existing multi-source materialization spec already describes the two-source identity contract; this adds acceptance checks for its existing handoff evidence.
+publish_authority: Existing user approval covers isolated GCP implementation and feature-to-dev repository publication.
+private_data_scan: Required; test fixtures are synthetic.
