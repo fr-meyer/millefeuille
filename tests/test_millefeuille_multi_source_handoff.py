@@ -83,6 +83,18 @@ class MultiSourceHandoffTests(unittest.TestCase):
                     {k: v for k, v in rows[1].items() if k != "file_size_bytes"},
                 ],
                 "null-size": [rows[0], {**rows[1], "file_size_bytes": None}],
+                "missing-verification": [
+                    rows[0],
+                    {k: v for k, v in rows[1].items() if k != "verification_strength"},
+                ],
+                "null-verification": [
+                    rows[0],
+                    {**rows[1], "verification_strength": None},
+                ],
+                "weak-verification": [
+                    rows[0],
+                    {**rows[1], "verification_strength": "hash-only"},
+                ],
                 "wrong-filename": [
                     rows[0],
                     {**rows[1], "canonical_filename": "another.pdf"},
