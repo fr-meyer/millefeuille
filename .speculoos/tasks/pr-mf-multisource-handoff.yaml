@@ -1,7 +1,7 @@
 id: pr-mf-multisource-handoff
 title: Bind two-source handoff evidence in acceptance
 status: in-progress
-branch: feat/pr-mf-multisource-run-package-20260929
+branch: feat/pr-mf-multisource-handoff-20260929
 base_branch: dev
 write_paths:
   - .speculoos/tasks/pr-mf-multisource-handoff.yaml
