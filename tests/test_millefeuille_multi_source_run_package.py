@@ -15,6 +15,7 @@ from millefeuille.domain.multi_source_run_package import (
     publish_multi_source_run_package,
     recover_partial_multi_source_run_package,
 )
+from millefeuille.domain.published_summary_run_link import VIEW_SCHEMA_VERSION
 from millefeuille.domain.stage_runtime import resolve_run_artifacts
 from tests.platform_capabilities import requires_secure_nofollow_writes
 from tests.test_millefeuille_multi_source_summary import _pack
@@ -38,8 +39,18 @@ def _saved_run(root: Path) -> tuple[Path, Path]:
     return pack, run
 
 
-def _saved_output_refs():
+def _saved_output_refs(pack: Path, *, source_hash: str | None = None):
+    expected_hash = json.loads((pack / "manifest.json").read_bytes())["source_hash"]
     return (
+        patch(
+            "millefeuille.domain.multi_source_run_package.load_hierarchical_summary",
+            return_value={
+                "schema_version": VIEW_SCHEMA_VERSION,
+                "paper_id": "zotero-ITEM1234",
+                "run_id": "run-two-source",
+                "source_hash": source_hash or expected_hash,
+            },
+        ),
         patch(
             "millefeuille.domain.multi_source_run_package._resolve_summary_refs",
             return_value={
@@ -72,9 +83,11 @@ class MultiSourceRunPackageTests(unittest.TestCase):
     def test_plan_is_read_only_and_publication_is_exact_and_append_only(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            _, run = _saved_run(root)
-            summary_patch, card_patch, index_patch = _saved_output_refs()
-            with summary_patch, card_patch, index_patch:
+            pack, run = _saved_run(root)
+            summary_loader_patch, summary_patch, card_patch, index_patch = (
+                _saved_output_refs(pack)
+            )
+            with summary_loader_patch, summary_patch, card_patch, index_patch:
                 plan = plan_multi_source_run_package(
                     source_pack_root=root / "source-packs",
                     item_key="ITEM1234",
@@ -119,6 +132,54 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                     )
 
     @requires_secure_nofollow_writes
+    def test_saved_summary_with_matching_ids_but_stale_source_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            pack, run = _saved_run(root)
+            loader, summary, card, index = _saved_output_refs(
+                pack, source_hash="sha256-aggregate:" + "0" * 64
+            )
+            with (
+                loader,
+                summary,
+                card,
+                index,
+                self.assertRaisesRegex(
+                    MillefeuilleContractError, "summary source lineage drift"
+                ),
+            ):
+                plan_multi_source_run_package(
+                    source_pack_root=root / "source-packs",
+                    item_key="ITEM1234",
+                    run_id=run.name,
+                )
+            self.assertFalse((run / "stage-manifest.json").exists())
+
+    @requires_secure_nofollow_writes
+    def test_ocr_or_mixed_route_is_not_labeled_native(self):
+        for selected_route in ("ocr", "merged-dual"):
+            with (
+                self.subTest(selected_route=selected_route),
+                tempfile.TemporaryDirectory() as temp,
+            ):
+                root = Path(temp)
+                pack, run = _saved_run(root)
+                for ref in ("selected/route.json", "structure/structure.json"):
+                    path = pack / ref
+                    evidence = json.loads(path.read_bytes())
+                    evidence["selected_route"] = selected_route
+                    path.write_text(json.dumps(evidence))
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "route or structure ref drift"
+                ):
+                    plan_multi_source_run_package(
+                        source_pack_root=root / "source-packs",
+                        item_key="ITEM1234",
+                        run_id=run.name,
+                    )
+                self.assertFalse((run / "stage-manifest.json").exists())
+
+    @requires_secure_nofollow_writes
     def test_changed_supplement_pdf_blocks_planning(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -143,14 +204,15 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                     run_id=run.name,
                 )
 
-
     @requires_secure_nofollow_writes
     def test_forged_plan_cannot_change_approved_bytes_or_destination(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            _, run = _saved_run(root)
-            summary_patch, card_patch, index_patch = _saved_output_refs()
-            with summary_patch, card_patch, index_patch:
+            pack, run = _saved_run(root)
+            summary_loader_patch, summary_patch, card_patch, index_patch = (
+                _saved_output_refs(pack)
+            )
+            with summary_loader_patch, summary_patch, card_patch, index_patch:
                 plan = plan_multi_source_run_package(
                     source_pack_root=root / "source-packs",
                     item_key="ITEM1234",
@@ -179,9 +241,11 @@ class MultiSourceRunPackageTests(unittest.TestCase):
     def test_saved_summary_change_after_approval_blocks_publication(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            _, run = _saved_run(root)
-            summary_patch, card_patch, index_patch = _saved_output_refs()
-            with summary_patch, card_patch, index_patch:
+            pack, run = _saved_run(root)
+            summary_loader_patch, summary_patch, card_patch, index_patch = (
+                _saved_output_refs(pack)
+            )
+            with summary_loader_patch, summary_patch, card_patch, index_patch:
                 plan = plan_multi_source_run_package(
                     source_pack_root=root / "source-packs",
                     item_key="ITEM1234",
@@ -200,9 +264,11 @@ class MultiSourceRunPackageTests(unittest.TestCase):
     def test_partial_publication_requires_verified_explicit_recovery(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            _, run = _saved_run(root)
-            summary_patch, card_patch, index_patch = _saved_output_refs()
-            with summary_patch, card_patch, index_patch:
+            pack, run = _saved_run(root)
+            summary_loader_patch, summary_patch, card_patch, index_patch = (
+                _saved_output_refs(pack)
+            )
+            with summary_loader_patch, summary_patch, card_patch, index_patch:
                 plan = plan_multi_source_run_package(
                     source_pack_root=root / "source-packs",
                     item_key="ITEM1234",
@@ -220,9 +286,7 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                         "millefeuille.domain.multi_source_run_package.write_new_text_no_follow",
                         side_effect=fail_second,
                     ),
-                    self.assertRaisesRegex(
-                        OSError, "synthetic second-write failure"
-                    ),
+                    self.assertRaisesRegex(OSError, "synthetic second-write failure"),
                 ):
                     publish_multi_source_run_package(
                         plan, expected_preview_sha256=plan.preview_sha256

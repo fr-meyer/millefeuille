@@ -287,6 +287,9 @@ def build_multi_source_summary_package(
             "source_hash": scope.source_hash,
             "source_count": len(scope.sources),
             "page_count": page_count,
+            "selected_route": route["selected_route"],
+            "structure_route": structure["selected_route"],
+            "native_evidence_ref": route["native_evidence_ref"],
         }
 
     if not isinstance(profile, str) or not profile.strip():

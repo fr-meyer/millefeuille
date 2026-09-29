@@ -24,6 +24,7 @@ from millefeuille.domain.millefeuille import (
     StageStatus,
 )
 from millefeuille.domain.multi_source_summary import build_multi_source_summary_package
+from millefeuille.domain.published_summary_run_link import VIEW_SCHEMA_VERSION
 from millefeuille.domain.secure_io import read_bytes_no_follow, write_new_text_no_follow
 from millefeuille.domain.source_packs import (
     load_source_pack_manifest,
@@ -34,6 +35,7 @@ from millefeuille.domain.stage_runtime import (
     relative_ref,
     require_safe_package_id,
 )
+from millefeuille.domain.summary_fixtures import load_hierarchical_summary
 
 
 @dataclass(frozen=True)
@@ -189,7 +191,25 @@ def plan_multi_source_run_package(
         or upstream["source_count"] != source_count
     ):
         raise MillefeuilleContractError("multi-source upstream evidence drift")
+    if (
+        upstream.get("selected_route") != "native"
+        or upstream.get("structure_route") != "native"
+        or upstream.get("native_evidence_ref") != "extractions/native/evidence.json"
+    ):
+        raise MillefeuilleContractError(
+            "run package requires verified native-only extraction"
+        )
     summary = _resolve_summary_refs(run_dir=run, paper_id=paper_id, run_id=run_id)
+    summary_payload = load_hierarchical_summary(
+        run / "summaries/hierarchical-summary.json"
+    )
+    if (
+        summary_payload.get("schema_version") != VIEW_SCHEMA_VERSION
+        or summary_payload.get("paper_id") != paper_id
+        or summary_payload.get("run_id") != run_id
+        or summary_payload.get("source_hash") != source_hash
+    ):
+        raise MillefeuilleContractError("multi-source summary source lineage drift")
     card = _resolve_card_refs(
         run_dir=run,
         paper_id=paper_id,
@@ -416,12 +436,8 @@ def publish_multi_source_run_package(
     )
     if any(path.exists() or path.is_symlink() for path in paths):
         raise MillefeuilleContractError("run-package target already exists")
-    write_new_text_no_follow(
-        paths[0], refreshed.stage_manifest_text, "stage manifest"
-    )
-    write_new_text_no_follow(
-        paths[1], refreshed.artifact_index_text, "artifact index"
-    )
+    write_new_text_no_follow(paths[0], refreshed.stage_manifest_text, "stage manifest")
+    write_new_text_no_follow(paths[1], refreshed.artifact_index_text, "artifact index")
     return paths
 
 
