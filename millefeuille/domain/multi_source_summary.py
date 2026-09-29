@@ -37,7 +37,7 @@ def build_multi_source_summary_package(
     route_evidence_path: str | Path,
     structure_evidence_path: str | Path,
     output_dir: str | Path,
-    profile: str,
+    profile: str | None = None,
     artifact_reader: RootArtifactReader | None = None,
     validation_only: bool = False,
 ) -> tuple[Path, bytes, dict[str, int], tuple[str, ...]] | dict[str, Any]:
@@ -288,6 +288,11 @@ def build_multi_source_summary_package(
             "source_count": len(scope.sources),
             "page_count": page_count,
         }
+
+    if not isinstance(profile, str) or not profile.strip():
+        raise MillefeuilleContractError(
+            "multi-source summary generation requires a profile"
+        )
 
     # The existing dispatcher only needs unit ids and global locators. The
     # complete attachment mapping remains bound in the preparation identity.

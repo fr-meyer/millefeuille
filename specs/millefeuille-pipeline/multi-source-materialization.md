@@ -57,7 +57,10 @@ concurrent card rollback. Existing single-source tests remain the compatibility
 baseline. These operations make zero provider calls.
 
 The [whole-pack native upstream planner](multi-source-upstream.md) has a live
-CollaGAN no-write checkpoint. Publication of that upstream bundle, the live
-multi-PDF summary request, and end-to-end materialization remain separate
-acceptance requirements. Raw production paper text, provider prompts,
-credentials and live receipts do not belong in repository fixtures.
+CollaGAN publication. Its two verified PDFs, 19 native pages, 23 saved GPT
+summaries, paper card and native index are preserved in the private source
+packs. The [existing multi-source run-package plan](multi-source-run-package.md)
+checks these outputs without a provider call; permanent package publication,
+two-row handoff, acceptance and duplicate review remain separate gates. Raw
+production paper text, provider prompts, credentials and live receipts do not
+belong in repository fixtures.
