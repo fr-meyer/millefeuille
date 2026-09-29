@@ -212,6 +212,106 @@ class MultiSourceRunPackageTests(unittest.TestCase):
             self.assertFalse((second_run / "stage-manifest.json").exists())
 
     @requires_secure_nofollow_writes
+    def test_replaced_run_directory_is_rejected_at_write(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            pack, run = _saved_run(root)
+            loader, summary, card, index = _saved_output_refs(pack)
+            from millefeuille.domain.secure_io import write_new_text_no_follow
+
+            with loader, summary, card, index:
+                plan = plan_multi_source_run_package(
+                    source_pack_root=root / "source-packs",
+                    item_key="ITEM1234",
+                    run_id=run.name,
+                )
+
+                def replace_parent(path, text, label, **kwargs):
+                    displaced = run.with_name("displaced-run")
+                    run.rename(displaced)
+                    run.mkdir()
+                    write_new_text_no_follow(path, text, label, **kwargs)
+
+                with (
+                    patch(
+                        "millefeuille.domain.multi_source_run_package.write_new_text_no_follow",
+                        side_effect=replace_parent,
+                    ),
+                    self.assertRaisesRegex(
+                        MillefeuilleContractError,
+                        "parent directory changed after approval",
+                    ),
+                ):
+                    publish_multi_source_run_package(
+                        plan, expected_preview_sha256=plan.preview_sha256
+                    )
+            self.assertFalse((run / "stage-manifest.json").exists())
+            self.assertFalse(
+                (run.with_name("displaced-run") / "stage-manifest.json").exists()
+            )
+
+    @requires_secure_nofollow_writes
+    def test_input_change_during_write_rolls_back_new_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            pack, run = _saved_run(root)
+            loader, summary, card, index = _saved_output_refs(pack)
+            from millefeuille.domain.secure_io import write_new_text_no_follow
+
+            with loader, summary, card, index:
+                plan = plan_multi_source_run_package(
+                    source_pack_root=root / "source-packs",
+                    item_key="ITEM1234",
+                    run_id=run.name,
+                )
+
+                def mutate_after_first(path, text, label, **kwargs):
+                    write_new_text_no_follow(path, text, label, **kwargs)
+                    if Path(path).name == "stage-manifest.json":
+                        (run / "summaries/texts/part.md").write_text("changed")
+
+                with (
+                    patch(
+                        "millefeuille.domain.multi_source_run_package.write_new_text_no_follow",
+                        side_effect=mutate_after_first,
+                    ),
+                    self.assertRaisesRegex(
+                        MillefeuilleContractError,
+                        "input snapshot changed during publication",
+                    ),
+                ):
+                    publish_multi_source_run_package(
+                        plan, expected_preview_sha256=plan.preview_sha256
+                    )
+            self.assertFalse((run / "stage-manifest.json").exists())
+            self.assertFalse((run / "artifact-index.json").exists())
+
+    @requires_secure_nofollow_writes
+    def test_excessive_empty_directory_depth_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            pack, run = _saved_run(root)
+            cursor = run / "summaries"
+            for number in range(18):
+                cursor = cursor / f"empty-{number}"
+                cursor.mkdir()
+            loader, summary, card, index = _saved_output_refs(pack)
+            with (
+                loader,
+                summary,
+                card,
+                index,
+                self.assertRaisesRegex(
+                    MillefeuilleContractError, "node or depth limit"
+                ),
+            ):
+                plan_multi_source_run_package(
+                    source_pack_root=root / "source-packs",
+                    item_key="ITEM1234",
+                    run_id=run.name,
+                )
+
+    @requires_secure_nofollow_writes
     def test_changed_supplement_pdf_blocks_planning(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -261,7 +361,8 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                     )
                 changed_destination = replace(plan, run_dir=run / "other")
                 with self.assertRaisesRegex(
-                    MillefeuilleContractError, "fingerprint drift"
+                    MillefeuilleContractError,
+                    "approved run-package directory not found",
                 ):
                     publish_multi_source_run_package(
                         changed_destination,
@@ -308,10 +409,10 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                 )
                 from millefeuille.domain.secure_io import write_new_text_no_follow
 
-                def fail_second(path, text, label):
+                def fail_second(path, text, label, **kwargs):
                     if Path(path).name == "artifact-index.json":
                         raise OSError("synthetic second-write failure")
-                    write_new_text_no_follow(path, text, label)
+                    write_new_text_no_follow(path, text, label, **kwargs)
 
                 with (
                     patch(
