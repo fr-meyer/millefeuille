@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 import tempfile
@@ -12,6 +13,7 @@ from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.multi_source_run_package import (
     plan_multi_source_run_package,
     publish_multi_source_run_package,
+    recover_partial_multi_source_run_package,
 )
 from millefeuille.domain.stage_runtime import resolve_run_artifacts
 from tests.platform_capabilities import requires_secure_nofollow_writes
@@ -23,6 +25,16 @@ def _saved_run(root: Path) -> tuple[Path, Path]:
     source_root = root / "source-packs"
     run = source_root / "analyses/millefeuille/run-two-source"
     run.mkdir(parents=True)
+    for ref, body in (
+        ("summaries/hierarchical-summary.json", "{}\n"),
+        ("summaries/texts/part.md", "saved section\n"),
+        ("cards/paper-card.json", "{}\n"),
+        ("cards/paper-card.md", "saved card\n"),
+        ("index/index-status.json", "{}\n"),
+    ):
+        target = run / ref
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(body)
     return pack, run
 
 
@@ -130,6 +142,112 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                     item_key="ITEM1234",
                     run_id=run.name,
                 )
+
+
+    @requires_secure_nofollow_writes
+    def test_forged_plan_cannot_change_approved_bytes_or_destination(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            _, run = _saved_run(root)
+            summary_patch, card_patch, index_patch = _saved_output_refs()
+            with summary_patch, card_patch, index_patch:
+                plan = plan_multi_source_run_package(
+                    source_pack_root=root / "source-packs",
+                    item_key="ITEM1234",
+                    run_id=run.name,
+                )
+                changed_text = replace(
+                    plan, stage_manifest_text=plan.stage_manifest_text + " "
+                )
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "fingerprint drift"
+                ):
+                    publish_multi_source_run_package(
+                        changed_text, expected_preview_sha256=plan.preview_sha256
+                    )
+                changed_destination = replace(plan, run_dir=run / "other")
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "fingerprint drift"
+                ):
+                    publish_multi_source_run_package(
+                        changed_destination,
+                        expected_preview_sha256=plan.preview_sha256,
+                    )
+            self.assertFalse((run / "stage-manifest.json").exists())
+
+    @requires_secure_nofollow_writes
+    def test_saved_summary_change_after_approval_blocks_publication(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            _, run = _saved_run(root)
+            summary_patch, card_patch, index_patch = _saved_output_refs()
+            with summary_patch, card_patch, index_patch:
+                plan = plan_multi_source_run_package(
+                    source_pack_root=root / "source-packs",
+                    item_key="ITEM1234",
+                    run_id=run.name,
+                )
+                (run / "summaries/texts/part.md").write_text("changed section\n")
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "evidence changed after planning"
+                ):
+                    publish_multi_source_run_package(
+                        plan, expected_preview_sha256=plan.preview_sha256
+                    )
+            self.assertFalse((run / "stage-manifest.json").exists())
+
+    @requires_secure_nofollow_writes
+    def test_partial_publication_requires_verified_explicit_recovery(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            _, run = _saved_run(root)
+            summary_patch, card_patch, index_patch = _saved_output_refs()
+            with summary_patch, card_patch, index_patch:
+                plan = plan_multi_source_run_package(
+                    source_pack_root=root / "source-packs",
+                    item_key="ITEM1234",
+                    run_id=run.name,
+                )
+                from millefeuille.domain.secure_io import write_new_text_no_follow
+
+                def fail_second(path, text, label):
+                    if Path(path).name == "artifact-index.json":
+                        raise OSError("synthetic second-write failure")
+                    write_new_text_no_follow(path, text, label)
+
+                with (
+                    patch(
+                        "millefeuille.domain.multi_source_run_package.write_new_text_no_follow",
+                        side_effect=fail_second,
+                    ),
+                    self.assertRaisesRegex(
+                        OSError, "synthetic second-write failure"
+                    ),
+                ):
+                    publish_multi_source_run_package(
+                        plan, expected_preview_sha256=plan.preview_sha256
+                    )
+                first = run / "stage-manifest.json"
+                second = run / "artifact-index.json"
+                self.assertTrue(first.is_file())
+                self.assertFalse(second.exists())
+                first.write_text("tampered")
+                with self.assertRaises(MillefeuilleContractError):
+                    recover_partial_multi_source_run_package(
+                        plan, expected_preview_sha256=plan.preview_sha256
+                    )
+                first.write_text(plan.stage_manifest_text)
+                paths = recover_partial_multi_source_run_package(
+                    plan, expected_preview_sha256=plan.preview_sha256
+                )
+                self.assertEqual(paths, (first, second))
+                self.assertEqual(second.read_text(), plan.artifact_index_text)
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError, "target already exists"
+                ):
+                    recover_partial_multi_source_run_package(
+                        plan, expected_preview_sha256=plan.preview_sha256
+                    )
 
 
 if __name__ == "__main__":

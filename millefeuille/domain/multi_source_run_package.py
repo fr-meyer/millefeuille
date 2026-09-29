@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import stat
 
 from millefeuille.domain.artifact_writer import (
     _resolve_card_refs,
@@ -23,7 +24,7 @@ from millefeuille.domain.millefeuille import (
     StageStatus,
 )
 from millefeuille.domain.multi_source_summary import build_multi_source_summary_package
-from millefeuille.domain.secure_io import write_new_text_no_follow
+from millefeuille.domain.secure_io import read_bytes_no_follow, write_new_text_no_follow
 from millefeuille.domain.source_packs import (
     load_source_pack_manifest,
     paper_id_for_zotero_item_key,
@@ -43,12 +44,17 @@ class MultiSourceRunPackagePlan:
     run_dir: Path
     stage_manifest_text: str
     artifact_index_text: str
+    verified_inputs: tuple[tuple[str, int, str], ...]
     preview_sha256: str
 
     def preview(self) -> dict[str, object]:
         return {
             "paper_id": paper_id_for_zotero_item_key(self.item_key),
             "run_id": self.run_id,
+            "verified_inputs": [
+                {"ref": ref, "byte_size": size, "sha256": digest}
+                for ref, size, digest in self.verified_inputs
+            ],
             "files": [
                 {
                     "ref": str(self.run_dir / name),
@@ -78,6 +84,68 @@ def _artifact(
         "stage": stage.value,
         "private_content": private,
     }
+
+
+_MAX_INPUT_FILES = 4096
+_MAX_INPUT_FILE_BYTES = 64 * 1024 * 1024
+_MAX_INPUT_TOTAL_BYTES = 512 * 1024 * 1024
+
+
+def _inventory_inputs(
+    root: Path, pack: Path, run: Path
+) -> tuple[tuple[str, int, str], ...]:
+    """Bind every saved source and consumed run artifact to the approval."""
+    entries: list[tuple[str, int, str]] = []
+    total_bytes = 0
+    for tree in (pack, run / "summaries", run / "cards", run / "index"):
+        pending = [tree]
+        while pending:
+            current = pending.pop()
+            ensure_no_follow_directory(
+                current, "run-package input directory", root=root
+            )
+            try:
+                children = sorted(current.iterdir(), key=lambda child: child.name)
+            except OSError as exc:
+                raise MillefeuilleContractError(
+                    f"could not list run-package input directory: {current}"
+                ) from exc
+            for child in children:
+                try:
+                    mode = child.lstat().st_mode
+                except OSError as exc:
+                    raise MillefeuilleContractError(
+                        f"could not inspect run-package input: {child}"
+                    ) from exc
+                if stat.S_ISDIR(mode):
+                    pending.append(child)
+                elif stat.S_ISREG(mode):
+                    if len(entries) >= _MAX_INPUT_FILES:
+                        raise MillefeuilleContractError(
+                            "run-package input file count exceeds limit"
+                        )
+                    payload = read_bytes_no_follow(
+                        child,
+                        "run-package input",
+                        max_bytes=_MAX_INPUT_FILE_BYTES,
+                    )
+                    total_bytes += len(payload)
+                    if total_bytes > _MAX_INPUT_TOTAL_BYTES:
+                        raise MillefeuilleContractError(
+                            "run-package input byte count exceeds limit"
+                        )
+                    entries.append(
+                        (
+                            child.relative_to(root).as_posix(),
+                            len(payload),
+                            hashlib.sha256(payload).hexdigest(),
+                        )
+                    )
+                else:
+                    raise MillefeuilleContractError(
+                        f"run-package input is not a regular file or directory: {child}"
+                    )
+    return tuple(sorted(entries))
 
 
 def plan_multi_source_run_package(
@@ -292,6 +360,7 @@ def plan_multi_source_run_package(
     artifact_index = ArtifactIndex.from_dict(artifact_index.to_dict())
     stage_text = _json_text(stage_manifest.to_dict())
     index_text = _json_text(artifact_index.to_dict())
+    verified_inputs = _inventory_inputs(root, pack, run)
     plan = MultiSourceRunPackagePlan(
         source_pack_root=root,
         item_key=item_key,
@@ -299,6 +368,7 @@ def plan_multi_source_run_package(
         run_dir=run,
         stage_manifest_text=stage_text,
         artifact_index_text=index_text,
+        verified_inputs=verified_inputs,
         preview_sha256="",
     )
     digest = hashlib.sha256(_json_text(plan.preview()).encode("utf-8")).hexdigest()
@@ -309,26 +379,70 @@ def plan_multi_source_run_package(
         run_dir=run,
         stage_manifest_text=stage_text,
         artifact_index_text=index_text,
+        verified_inputs=verified_inputs,
         preview_sha256=digest,
     )
 
 
-def publish_multi_source_run_package(
-    plan: MultiSourceRunPackagePlan, *, expected_preview_sha256: str
-) -> tuple[Path, Path]:
-    """Append two exact planned files after an external approval gate."""
-    if expected_preview_sha256 != plan.preview_sha256:
+def _approved_fresh_plan(
+    plan: MultiSourceRunPackagePlan, expected_preview_sha256: str
+) -> MultiSourceRunPackagePlan:
+    actual_fingerprint = hashlib.sha256(
+        _json_text(plan.preview()).encode("utf-8")
+    ).hexdigest()
+    if (
+        expected_preview_sha256 != plan.preview_sha256
+        or actual_fingerprint != expected_preview_sha256
+    ):
         raise MillefeuilleContractError("run-package preview fingerprint drift")
     refreshed = plan_multi_source_run_package(
         source_pack_root=plan.source_pack_root,
         item_key=plan.item_key,
         run_id=plan.run_id,
     )
-    if refreshed.preview_sha256 != plan.preview_sha256:
+    if refreshed != plan:
         raise MillefeuilleContractError("run-package evidence changed after planning")
-    paths = (plan.run_dir / "stage-manifest.json", plan.run_dir / "artifact-index.json")
+    return refreshed
+
+
+def publish_multi_source_run_package(
+    plan: MultiSourceRunPackagePlan, *, expected_preview_sha256: str
+) -> tuple[Path, Path]:
+    """Append two exact planned files after an external approval gate."""
+    refreshed = _approved_fresh_plan(plan, expected_preview_sha256)
+    paths = (
+        refreshed.run_dir / "stage-manifest.json",
+        refreshed.run_dir / "artifact-index.json",
+    )
     if any(path.exists() or path.is_symlink() for path in paths):
         raise MillefeuilleContractError("run-package target already exists")
-    write_new_text_no_follow(paths[0], plan.stage_manifest_text, "stage manifest")
-    write_new_text_no_follow(paths[1], plan.artifact_index_text, "artifact index")
+    write_new_text_no_follow(
+        paths[0], refreshed.stage_manifest_text, "stage manifest"
+    )
+    write_new_text_no_follow(
+        paths[1], refreshed.artifact_index_text, "artifact index"
+    )
+    return paths
+
+
+def recover_partial_multi_source_run_package(
+    plan: MultiSourceRunPackagePlan, *, expected_preview_sha256: str
+) -> tuple[Path, Path]:
+    """Complete a verified first-file-only publication after recovery approval."""
+    refreshed = _approved_fresh_plan(plan, expected_preview_sha256)
+    paths = (
+        refreshed.run_dir / "stage-manifest.json",
+        refreshed.run_dir / "artifact-index.json",
+    )
+    if paths[1].exists() or paths[1].is_symlink():
+        raise MillefeuilleContractError("run-package recovery target already exists")
+    expected_first = refreshed.stage_manifest_text.encode("utf-8")
+    actual_first = read_bytes_no_follow(
+        paths[0], "partial stage manifest", max_bytes=len(expected_first)
+    )
+    if actual_first != expected_first:
+        raise MillefeuilleContractError("partial stage manifest differs from approval")
+    write_new_text_no_follow(
+        paths[1], refreshed.artifact_index_text, "artifact index recovery"
+    )
     return paths
