@@ -31,6 +31,7 @@ from millefeuille.domain.card_index_contract import (
 from millefeuille.domain.card_index_contract import (
     validate_observed_card_index_state as _validate_observed_card_index_state,
 )
+from millefeuille.domain.local_structure import build_local_markdown_structure
 from millefeuille.domain.millefeuille import (
     PAPER_CARD_SCHEMA_V1,
     PAPER_CARD_SCHEMA_V2,
@@ -38,12 +39,21 @@ from millefeuille.domain.millefeuille import (
     PaperCardRecord,
     RetrievalIndexRecord,
 )
+from millefeuille.domain.multi_source_upstream import (
+    ROUTE_MULTI_SCHEMA,
+    STRUCTURE_MULTI_SCHEMA,
+    _split_pages,
+)
 from millefeuille.domain.route_fixtures import (
     ROUTE_EVIDENCE_REF,
     ROUTE_MARKDOWN_REF,
+    ROUTE_SELECTION_EVIDENCE_SCHEMA_VERSION,
     load_route_selection_sidecar,
 )
-from millefeuille.domain.secure_io import load_json_object_no_follow
+from millefeuille.domain.secure_io import (
+    load_json_object_no_follow,
+    read_bytes_no_follow,
+)
 from millefeuille.domain.source_packs import (
     load_source_pack_manifest,
     paper_id_for_zotero_item_key,
@@ -352,11 +362,30 @@ def _plan_index(
         if artifact_run_dir is not None
         else source_pack_dir / "analyses" / "millefeuille" / run_id
     )
-    _validate_route_dependency(source_pack_dir=source_pack_dir, source_hash=source_hash)
     if evidence.source_scope is not None:
-        structure = load_structure_sidecar(source_pack_dir / STRUCTURE_EVIDENCE_REF)
-        if structure["source_hash"] != source_hash:
-            raise MillefeuilleContractError("structure evidence source_hash drift")
+        route = load_json_object_no_follow(
+            source_pack_dir / ROUTE_EVIDENCE_REF,
+            "multi-source index route evidence",
+            max_bytes=4 * 1024 * 1024,
+        )
+        if route.get("schema_version") == ROUTE_SELECTION_EVIDENCE_SCHEMA_VERSION:
+            _validate_route_dependency(
+                source_pack_dir=source_pack_dir, source_hash=source_hash
+            )
+            structure = load_structure_sidecar(source_pack_dir / STRUCTURE_EVIDENCE_REF)
+            if structure["source_hash"] != source_hash:
+                raise MillefeuilleContractError("structure evidence source_hash drift")
+        else:
+            _validate_multi_source_index_dependencies(
+                source_pack_dir=source_pack_dir,
+                source_hash=source_hash,
+                item_key=evidence.item_key,
+                scope=evidence.source_scope,
+            )
+    else:
+        _validate_route_dependency(
+            source_pack_dir=source_pack_dir, source_hash=source_hash
+        )
     _validate_summary_dependency(
         run_dir=run_dir,
         paper_id=paper_id,
@@ -1392,6 +1421,146 @@ def _resolve_source_pack_dir(
             f"source-pack source hash drift for {resolved_paper_id}"
         )
     return source_pack_dir, source_hash
+
+
+def _validate_multi_source_index_dependencies(
+    *, source_pack_dir: Path, source_hash: str, item_key: str, scope: MultiSourceScope
+) -> None:
+    """Accept the verified upstream v0.2 sidecars without relaxing v0.1 readers."""
+    route = load_json_object_no_follow(
+        source_pack_dir / ROUTE_EVIDENCE_REF,
+        "multi-source index route evidence",
+        max_bytes=4 * 1024 * 1024,
+    )
+    structure = load_json_object_no_follow(
+        source_pack_dir / STRUCTURE_EVIDENCE_REF,
+        "multi-source index structure evidence",
+        max_bytes=4 * 1024 * 1024,
+    )
+    if (
+        route.get("schema_version") != ROUTE_MULTI_SCHEMA
+        or structure.get("schema_version") != STRUCTURE_MULTI_SCHEMA
+    ):
+        raise MillefeuilleContractError("multi-source index sidecar schema drift")
+    for record in (route, structure):
+        if (
+            record.get("paper_id") != source_pack_dir.name
+            or record.get("item_key") != item_key
+            or record.get("source_hash") != source_hash
+            or record.get("provider_calls") != 0
+            or MultiSourceScope.from_dict(record.get("source_scope")) != scope
+        ):
+            raise MillefeuilleContractError(
+                "multi-source index whole-pack identity drift"
+            )
+    page_count = route.get("page_count")
+    if (
+        type(page_count) is not int
+        or page_count < 1
+        or structure.get("page_count") != page_count
+        or route.get("selected_route") != "native"
+        or structure.get("selected_route") != "native"
+        or route.get("output_markdown_ref") != ROUTE_MARKDOWN_REF.as_posix()
+        or structure.get("source_markdown_ref") != ROUTE_MARKDOWN_REF.as_posix()
+        or structure.get("route_evidence_ref") != ROUTE_EVIDENCE_REF.as_posix()
+    ):
+        raise MillefeuilleContractError("multi-source index route/structure drift")
+    selected = read_bytes_no_follow(
+        source_pack_dir / ROUTE_MARKDOWN_REF,
+        "multi-source index selected text",
+        max_bytes=2 * 1024 * 1024,
+    )
+    if route.get("output_markdown_sha256") != hashlib.sha256(selected).hexdigest():
+        raise MillefeuilleContractError("multi-source index selected text hash drift")
+    page_map = route.get("page_map")
+    if not isinstance(page_map, list) or len(page_map) != page_count:
+        raise MillefeuilleContractError("multi-source index route page_map drift")
+    try:
+        selected_text = selected.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise MillefeuilleContractError(
+            "multi-source index selected text must be UTF-8"
+        ) from exc
+    first_page = re.search(r"(?m)^## Page 1[ \t]*\r?$", selected_text)
+    if first_page is None:
+        raise MillefeuilleContractError("multi-source index selected pages drift")
+    selected_pages = _split_pages(
+        selected_text[first_page.start() :], expected_count=page_count
+    )
+    members = {member.attachment_key: member for member in scope.sources}
+    source_order = tuple(members)
+    local_page_counts = dict.fromkeys(members, 0)
+    active_key = None
+    sources_seen = 0
+    for global_page, row in enumerate(page_map, start=1):
+        if not isinstance(row, dict):
+            raise MillefeuilleContractError("multi-source index route page_map drift")
+        key = row.get("attachment_key")
+        member = members.get(key) if isinstance(key, str) else None
+        if member is None:
+            raise MillefeuilleContractError("multi-source index route attachment drift")
+        local_page_counts[key] += 1
+        if (
+            set(row)
+            != {
+                "global_locator",
+                "attachment_locator",
+                "attachment_key",
+                "source_ref",
+                "character_count",
+                "text_sha256",
+            }
+            or row["global_locator"] != f"p.{global_page}"
+            or row["attachment_locator"]
+            != f"attachment:{key}/p.{local_page_counts[key]}"
+            or row["source_ref"] != member.source_ref
+            or type(row["character_count"]) is not int
+            or row["character_count"] < 0
+            or not isinstance(row["text_sha256"], str)
+            or re.fullmatch(r"[0-9a-f]{64}", row["text_sha256"]) is None
+        ):
+            raise MillefeuilleContractError("multi-source index route page_map drift")
+        page_text = selected_pages[global_page - 1]
+        if key != active_key:
+            if sources_seen >= len(source_order) or key != source_order[sources_seen]:
+                raise MillefeuilleContractError(
+                    "multi-source index route attachment order drift"
+                )
+            source_heading = re.match(
+                r"\A# Source: [^\r\n]+ \(" + re.escape(key) + r"\)\n\n",
+                page_text,
+            )
+            if source_heading is None:
+                raise MillefeuilleContractError(
+                    "multi-source index selected source marker drift"
+                )
+            page_text = page_text[source_heading.end() :].strip()
+            active_key = key
+            sources_seen += 1
+        if (
+            row["character_count"] != len(page_text)
+            or row["text_sha256"]
+            != hashlib.sha256(page_text.encode("utf-8")).hexdigest()
+        ):
+            raise MillefeuilleContractError(
+                "multi-source index route page content drift"
+            )
+    if (
+        any(count == 0 for count in local_page_counts.values())
+        or route.get("native_evidence_ref") != "extractions/native/evidence.json"
+    ):
+        raise MillefeuilleContractError("multi-source index route page_map drift")
+    rebuilt, _outline, counts, warnings = build_local_markdown_structure(
+        selected_text, expected_page_count=page_count
+    )
+    if (
+        counts["pages"] != page_count
+        or structure.get("structure") != rebuilt
+        or structure.get("counts") != counts
+        or structure.get("warnings") != warnings
+        or structure.get("outline_markdown_ref") != "structure/outline.md"
+    ):
+        raise MillefeuilleContractError("multi-source index structure page drift")
 
 
 def _validate_route_dependency(*, source_pack_dir: Path, source_hash: str) -> None:

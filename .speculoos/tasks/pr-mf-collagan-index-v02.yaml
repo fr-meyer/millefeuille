@@ -1,0 +1,30 @@
+id: pr-mf-collagan-index-v02
+title: Read verified v0.2 multi-source route and structure evidence during indexing
+status: in-progress
+branch: fix/pr-mf-collagan-index-v02-20260928
+base_branch: dev
+post_merge_expected:
+  pull_request: 168
+  base_branch: dev
+  head_branch: fix/pr-mf-collagan-index-v02-20260928
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
+write_paths:
+  - .speculoos/tasks/pr-mf-collagan-index-v02.yaml
+  - millefeuille/domain/index_fixtures.py
+  - tests/test_millefeuille_multi_source_materialization.py
+scope:
+  - Accept native v0.2 route and structure sidecars for whole-pack index status
+  - Preserve legacy v0.1 multi-source sidecar behavior
+  - Reject selected-text or source identity drift before any card or index output
+acceptance:
+  - Live CollaGAN no-write index plan resolves two PDFs and 23 saved summaries
+  - Full offline unit suite and Speculoos publication checks pass
+publication_boundary:
+  statement: Code, synthetic test, and task metadata only; no model, Zotero, OCR, OpenKB, credential, source-pack, index, or release write.
+documentation_impact:
+  status: none
+  rationale: The existing multi-source materialization spec already describes the v0.2 contract.
+publish_authority: Existing user approval covers this GCP repair and feature-to-dev repository publication.
+private_data_scan: Required; committed fixtures are synthetic only.
