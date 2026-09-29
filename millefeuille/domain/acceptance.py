@@ -585,11 +585,22 @@ def _load_verified_multi_source_profile(resolved: ResolvedRunArtifacts) -> str:
     raw = read_bytes_no_follow(
         link_path, "multi-source published summary link", max_bytes=32768
     )
-    link = json.loads(raw.decode("utf-8"))
+    try:
+        link = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise MillefeuilleContractError(
+            "multi-source published summary link is invalid JSON"
+        ) from exc
     if not isinstance(link, dict) or link.get("schema_version") != LINK_SCHEMA_VERSION:
         raise MillefeuilleContractError(
             "multi-source acceptance requires a published summary run link"
         )
+    evidence_refs = link.get("evidence_refs")
+    if not isinstance(evidence_refs, dict) or "preparation_ref" not in evidence_refs:
+        raise MillefeuilleContractError(
+            "multi-source published summary link evidence refs are invalid"
+        )
+    preparation_ref = evidence_refs["preparation_ref"]
     view = load_published_summary_run_view(link_path)
     if (
         view.get("summary_link_sha256") != "sha256:" + hashlib.sha256(raw).hexdigest()
@@ -598,7 +609,6 @@ def _load_verified_multi_source_profile(resolved: ResolvedRunArtifacts) -> str:
         or view.get("source_hash") != resolved.source_hash
     ):
         raise MillefeuilleContractError("multi-source summary link identity drift")
-    preparation_ref = link["evidence_refs"]["preparation_ref"]
     if (
         not isinstance(preparation_ref, str)
         or not preparation_ref

@@ -198,6 +198,47 @@ class MultiSourceAcceptanceTests(unittest.TestCase):
                     ):
                         _load_verified_multi_source_profile(resolved)
 
+    def test_malformed_preparation_link_fails_with_contract_error(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source_root = Path(temp) / "source-packs"
+            run = source_root / "analyses/millefeuille/run-card"
+            (run / "summaries").mkdir(parents=True)
+            link_path = run / "summaries/hierarchical-summary.json"
+            resolved = SimpleNamespace(
+                source_pack_root=source_root,
+                run_dir=run,
+                paper_id="paper",
+                run_id="run-card",
+                source_hash="sha256:" + "a" * 64,
+            )
+            cases = (
+                (b"{", "invalid JSON"),
+                (b"\xff", "invalid JSON"),
+                (
+                    json.dumps({"schema_version": LINK_SCHEMA_VERSION}).encode(),
+                    "evidence refs are invalid",
+                ),
+                (
+                    json.dumps(
+                        {"schema_version": LINK_SCHEMA_VERSION, "evidence_refs": []}
+                    ).encode(),
+                    "evidence refs are invalid",
+                ),
+                (
+                    json.dumps(
+                        {"schema_version": LINK_SCHEMA_VERSION, "evidence_refs": {}}
+                    ).encode(),
+                    "evidence refs are invalid",
+                ),
+            )
+            for raw, expected_error in cases:
+                with self.subTest(raw=raw):
+                    link_path.write_bytes(raw)
+                    with self.assertRaisesRegex(
+                        MillefeuilleContractError, expected_error
+                    ):
+                        _load_verified_multi_source_profile(resolved)
+
 
 if __name__ == "__main__":
     unittest.main()
