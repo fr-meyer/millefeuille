@@ -668,6 +668,15 @@ def _build_handoff_context(
         }
 
     rows = load_jsonl_records(handoff_path, "handoff evidence")
+    if resolved.source_pack_manifest.get("schema_version") == (
+        "millefeuille-source-pack-manifest/v0.2"
+    ):
+        return _build_multi_source_handoff_context(
+            resolved=resolved,
+            rows=rows,
+            handoff_path=Path(handoff_path),
+            review_reasons=review_reasons,
+        )
     source_identity = resolved.artifact_index.source_identity
     attachment_key = source_identity.get("zotero_attachment_key")
     matches = [
@@ -704,6 +713,74 @@ def _build_handoff_context(
             notes=["matched handoff evidence"]
             if matched
             else ["handoff drift detected"],
+        ),
+    }
+
+
+def _build_multi_source_handoff_context(
+    *,
+    resolved: ResolvedRunArtifacts,
+    rows: list[dict[str, Any]],
+    handoff_path: Path,
+    review_reasons: list[str],
+) -> dict[str, Any]:
+    """Require one matching handoff row for every verified source PDF."""
+
+    manifest = resolved.source_pack_manifest
+    sources = manifest["sources"]
+    item_key = manifest["identity"]["zotero_item_key"]
+    source_identity = resolved.artifact_index.source_identity
+    expected = {
+        source["identity"]["zotero_attachment_key"]: source for source in sources
+    }
+    item_rows = [row for row in rows if row.get("item_key") == item_key]
+    actual = {
+        row["attachment_key"]: row
+        for row in item_rows
+        if isinstance(row.get("attachment_key"), str)
+    }
+    matched = (
+        source_identity.get("zotero_item_key") == item_key
+        and source_identity.get("pdf_count") == len(sources)
+        and len(expected) == len(sources)
+        and len(item_rows) == len(sources)
+        and set(actual) == set(expected)
+        and all(
+            actual[key].get("is_pdf") is True
+            and actual[key].get("verification_strength") == "full"
+            and actual[key].get("canonical_filename")
+            == source["identity"]["canonical_filename"]
+            and actual[key].get("sha256") == source["sha256"]
+            and actual[key].get("file_size_bytes") == source["byte_size"]
+            for key, source in expected.items()
+        )
+    )
+    if not matched:
+        review_reasons.append(
+            f"handoff evidence does not match all {len(sources)} source attachments"
+        )
+    details = {
+        "matched": matched,
+        "match_count": len(item_rows),
+        "source_count": len(sources),
+        "attachment_keys": sorted(expected),
+        "sha256_present": bool(item_rows)
+        and all(row.get("sha256") is not None for row in item_rows),
+    }
+    return {
+        "count": len(item_rows),
+        "details": details,
+        "check": AcceptanceCheckRecord(
+            name="handoff",
+            status=(
+                AcceptanceCheckStatus.PASSED
+                if matched
+                else AcceptanceCheckStatus.NEEDS_REVIEW
+            ),
+            refs=[relative_ref(handoff_path, resolved.run_dir)],
+            notes=["matched every source attachment in handoff evidence"]
+            if matched
+            else ["multi-source handoff drift detected"],
         ),
     }
 
