@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 from pathlib import Path
 import re
 from typing import Any
@@ -37,11 +39,16 @@ from millefeuille.domain.millefeuille import (
 from millefeuille.domain.multi_source_summary import (
     build_multi_source_summary_package,
 )
+from millefeuille.domain.published_summary_run_link import (
+    LINK_SCHEMA_VERSION,
+    load_published_summary_run_view,
+)
 from millefeuille.domain.route_fixtures import (
     ROUTE_EVIDENCE_REF,
     ROUTE_MARKDOWN_REF,
     load_route_selection_sidecar,
 )
+from millefeuille.domain.secure_io import read_bytes_no_follow
 from millefeuille.domain.stage_runtime import (
     ResolvedRunArtifacts,
     load_json_object,
@@ -63,6 +70,7 @@ from millefeuille.domain.summary_fixtures import (
     SUMMARY_ARTIFACT_REF,
     load_hierarchical_summary,
 )
+from millefeuille.domain.summary_preparation import verify_summary_preparation_package
 
 ACCEPTANCE_SUMMARY_REF = Path("reports/acceptance-summary.json")
 ACCEPTANCE_SUMMARY_MARKDOWN_REF = Path("reports/acceptance-summary.md")
@@ -409,7 +417,10 @@ def _build_acceptance_summary(
     if resolved.source_pack_manifest.get("schema_version") == (
         "millefeuille-source-pack-manifest/v0.2"
     ):
-        multi_checks, multi_counts = _load_multi_source_upstream_checks(resolved)
+        multi_checks, multi_counts = _load_multi_source_upstream_checks(
+            resolved,
+            profile=_load_verified_multi_source_profile(resolved),
+        )
         checks.extend(multi_checks)
         counts.update(multi_counts)
     else:
@@ -523,7 +534,7 @@ def _build_acceptance_summary(
 
 
 def _load_multi_source_upstream_checks(
-    resolved: ResolvedRunArtifacts,
+    resolved: ResolvedRunArtifacts, *, profile: str,
 ) -> tuple[list[AcceptanceCheckRecord], dict[str, int]]:
     """Recheck every PDF and page attribution before accepting v0.2 evidence."""
 
@@ -531,7 +542,7 @@ def _load_multi_source_upstream_checks(
         route_evidence_path=resolved.source_pack_dir / ROUTE_EVIDENCE_REF,
         structure_evidence_path=resolved.source_pack_dir / STRUCTURE_EVIDENCE_REF,
         output_dir=resolved.run_dir,
-        profile="research-default",
+        profile=profile,
         validation_only=True,
     )
     if (
@@ -565,6 +576,44 @@ def _load_multi_source_upstream_checks(
     )
     counts = {"native_extraction": 1, "ocr_extraction": 0, "route": 1, "structure": 1}
     return checks, counts
+
+
+def _load_verified_multi_source_profile(resolved: ResolvedRunArtifacts) -> str:
+    """Read the profile from the run's verified published-summary preparation."""
+
+    link_path = resolved.run_dir / SUMMARY_ARTIFACT_REF
+    raw = read_bytes_no_follow(
+        link_path, "multi-source published summary link", max_bytes=32768
+    )
+    link = json.loads(raw.decode("utf-8"))
+    if not isinstance(link, dict) or link.get("schema_version") != LINK_SCHEMA_VERSION:
+        raise MillefeuilleContractError(
+            "multi-source acceptance requires a published summary run link"
+        )
+    view = load_published_summary_run_view(link_path)
+    if (
+        view.get("summary_link_sha256") != "sha256:" + hashlib.sha256(raw).hexdigest()
+        or view.get("paper_id") != resolved.paper_id
+        or view.get("run_id") != resolved.run_id
+        or view.get("source_hash") != resolved.source_hash
+    ):
+        raise MillefeuilleContractError("multi-source summary link identity drift")
+    preparation_ref = link["evidence_refs"]["preparation_ref"]
+    preparation_path = resolved.source_pack_root / preparation_ref
+    prepared = verify_summary_preparation_package(
+        route_evidence_path=resolved.source_pack_dir / ROUTE_EVIDENCE_REF,
+        structure_evidence_path=resolved.source_pack_dir / STRUCTURE_EVIDENCE_REF,
+        preparation_path=preparation_path,
+    )
+    identity = prepared.get("identity")
+    if (
+        prepared.get("schema_version") != "millefeuille-summary-preparation/v0.2"
+        or prepared.get("paper_id") != resolved.paper_id
+        or not isinstance(identity, dict)
+        or identity.get("source_hash") != resolved.source_hash
+    ):
+        raise MillefeuilleContractError("multi-source preparation identity drift")
+    return prepared["profile"]
 
 
 def _build_handoff_context(
