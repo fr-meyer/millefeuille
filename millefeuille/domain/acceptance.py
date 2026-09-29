@@ -34,6 +34,9 @@ from millefeuille.domain.millefeuille import (
     StageName,
     StageStatus,
 )
+from millefeuille.domain.multi_source_summary import (
+    build_multi_source_summary_package,
+)
 from millefeuille.domain.route_fixtures import (
     ROUTE_EVIDENCE_REF,
     ROUTE_MARKDOWN_REF,
@@ -403,49 +406,58 @@ def _build_acceptance_summary(
     checks.append(handoff["check"])
     counts["handoff_rows"] = int(handoff["count"])
 
-    native_check, native_present = _load_optional_check(
-        name="extract-native",
-        run_dir=resolved.run_dir,
-        target_path=resolved.source_pack_dir / NATIVE_EVIDENCE_REF,
-        loader=load_native_extraction_sidecar,
-        source_hash=resolved.source_hash,
-    )
-    checks.append(native_check)
-    counts["native_extraction"] = int(native_present)
+    if resolved.source_pack_manifest.get("schema_version") == (
+        "millefeuille-source-pack-manifest/v0.2"
+    ):
+        multi_checks, multi_counts = _load_multi_source_upstream_checks(resolved)
+        checks.extend(multi_checks)
+        counts.update(multi_counts)
+    else:
+        native_check, native_present = _load_optional_check(
+            name="extract-native",
+            run_dir=resolved.run_dir,
+            target_path=resolved.source_pack_dir / NATIVE_EVIDENCE_REF,
+            loader=load_native_extraction_sidecar,
+            source_hash=resolved.source_hash,
+        )
+        checks.append(native_check)
+        counts["native_extraction"] = int(native_present)
 
-    ocr_check, ocr_present = _load_optional_check(
-        name="extract-ocr",
-        run_dir=resolved.run_dir,
-        target_path=resolved.source_pack_dir / OCR_EVIDENCE_REF,
-        loader=load_ocr_extraction_sidecar,
-        source_hash=resolved.source_hash,
-    )
-    checks.append(ocr_check)
-    counts["ocr_extraction"] = int(ocr_present)
-    if not native_present and not ocr_present:
-        review_reasons.append("no extraction evidence is available")
+        ocr_check, ocr_present = _load_optional_check(
+            name="extract-ocr",
+            run_dir=resolved.run_dir,
+            target_path=resolved.source_pack_dir / OCR_EVIDENCE_REF,
+            loader=load_ocr_extraction_sidecar,
+            source_hash=resolved.source_hash,
+        )
+        checks.append(ocr_check)
+        counts["ocr_extraction"] = int(ocr_present)
+        if not native_present and not ocr_present:
+            review_reasons.append("no extraction evidence is available")
 
-    route_check = _load_required_check(
-        name="route",
-        run_dir=resolved.run_dir,
-        target_path=resolved.source_pack_dir / ROUTE_EVIDENCE_REF,
-        loader=load_route_selection_sidecar,
-        source_hash=resolved.source_hash,
-        review_reasons=review_reasons,
-    )
-    checks.append(route_check)
-    counts["route"] = int(route_check.status == AcceptanceCheckStatus.PASSED)
+        route_check = _load_required_check(
+            name="route",
+            run_dir=resolved.run_dir,
+            target_path=resolved.source_pack_dir / ROUTE_EVIDENCE_REF,
+            loader=load_route_selection_sidecar,
+            source_hash=resolved.source_hash,
+            review_reasons=review_reasons,
+        )
+        checks.append(route_check)
+        counts["route"] = int(route_check.status == AcceptanceCheckStatus.PASSED)
 
-    structure_check = _load_required_check(
-        name="structure",
-        run_dir=resolved.run_dir,
-        target_path=resolved.source_pack_dir / STRUCTURE_EVIDENCE_REF,
-        loader=load_structure_sidecar,
-        source_hash=resolved.source_hash,
-        review_reasons=review_reasons,
-    )
-    checks.append(structure_check)
-    counts["structure"] = int(structure_check.status == AcceptanceCheckStatus.PASSED)
+        structure_check = _load_required_check(
+            name="structure",
+            run_dir=resolved.run_dir,
+            target_path=resolved.source_pack_dir / STRUCTURE_EVIDENCE_REF,
+            loader=load_structure_sidecar,
+            source_hash=resolved.source_hash,
+            review_reasons=review_reasons,
+        )
+        checks.append(structure_check)
+        counts["structure"] = int(
+            structure_check.status == AcceptanceCheckStatus.PASSED
+        )
 
     summary_check = _load_run_scoped_summary_check(
         resolved=resolved,
@@ -508,6 +520,51 @@ def _build_acceptance_summary(
         duplicate_scan=duplicate_scan["details"],
         review_reasons=review_reasons,
     )
+
+
+def _load_multi_source_upstream_checks(
+    resolved: ResolvedRunArtifacts,
+) -> tuple[list[AcceptanceCheckRecord], dict[str, int]]:
+    """Recheck every PDF and page attribution before accepting v0.2 evidence."""
+
+    verified = build_multi_source_summary_package(
+        route_evidence_path=resolved.source_pack_dir / ROUTE_EVIDENCE_REF,
+        structure_evidence_path=resolved.source_pack_dir / STRUCTURE_EVIDENCE_REF,
+        output_dir=resolved.run_dir,
+        profile="research-default",
+        validation_only=True,
+    )
+    if (
+        not isinstance(verified, dict)
+        or verified["paper_id"] != resolved.paper_id
+        or verified["source_hash"] != resolved.source_hash
+        or verified["source_count"] < 2
+    ):
+        raise MillefeuilleContractError("multi-source acceptance identity drift")
+    checks = [
+        AcceptanceCheckRecord(
+            name=name,
+            status=AcceptanceCheckStatus.PASSED,
+            refs=[
+                relative_ref(resolved.source_pack_dir / ref, resolved.run_dir)
+            ],
+            notes=["verified whole-pack source and page attribution"],
+        )
+        for name, ref in (
+            ("extract-native", NATIVE_EVIDENCE_REF),
+            ("route", ROUTE_EVIDENCE_REF),
+            ("structure", STRUCTURE_EVIDENCE_REF),
+        )
+    ]
+    checks.append(
+        AcceptanceCheckRecord(
+            name="extract-ocr",
+            status=AcceptanceCheckStatus.SKIPPED,
+            notes=["verified native text selected for all source PDFs"],
+        )
+    )
+    counts = {"native_extraction": 1, "ocr_extraction": 0, "route": 1, "structure": 1}
+    return checks, counts
 
 
 def _build_handoff_context(
