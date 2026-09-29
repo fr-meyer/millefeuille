@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import stat
@@ -161,7 +162,8 @@ def plan_multi_source_run_package(
     if re.fullmatch(r"[A-Za-z0-9]+", item_key) is None:
         raise MillefeuilleContractError("unsafe item_key")
     require_safe_package_id(run_id, "run_id")
-    root = Path(source_pack_root)
+    # Freeze relative caller paths before previewing destination and inputs.
+    root = Path(os.path.abspath(source_pack_root))
     ensure_no_follow_directory(root, "source-pack root")
     paper_id = paper_id_for_zotero_item_key(item_key)
     pack = root / "zotero" / paper_id

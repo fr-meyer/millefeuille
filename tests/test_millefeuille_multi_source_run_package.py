@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -178,6 +179,37 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                         run_id=run.name,
                     )
                 self.assertFalse((run / "stage-manifest.json").exists())
+
+    @requires_secure_nofollow_writes
+    def test_relative_root_cannot_retarget_publication_after_chdir(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "first").mkdir()
+            (root / "second").mkdir()
+            first_pack, first_run = _saved_run(root / "first")
+            _, second_run = _saved_run(root / "second")
+            loader, summary, card, index = _saved_output_refs(first_pack)
+            initial_cwd = Path.cwd()
+            try:
+                os.chdir(root / "first")
+                with loader, summary, card, index:
+                    plan = plan_multi_source_run_package(
+                        source_pack_root="source-packs",
+                        item_key="ITEM1234",
+                        run_id=first_run.name,
+                    )
+                    self.assertEqual(
+                        plan.source_pack_root, (root / "first/source-packs").absolute()
+                    )
+                    os.chdir(root / "second")
+                    paths = publish_multi_source_run_package(
+                        plan, expected_preview_sha256=plan.preview_sha256
+                    )
+            finally:
+                os.chdir(initial_cwd)
+            self.assertEqual(paths[0], first_run / "stage-manifest.json")
+            self.assertTrue(paths[0].is_file())
+            self.assertFalse((second_run / "stage-manifest.json").exists())
 
     @requires_secure_nofollow_writes
     def test_changed_supplement_pdf_blocks_planning(self):

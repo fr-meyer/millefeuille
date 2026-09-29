@@ -9,7 +9,9 @@ with byte counts, SHA-256 hashes and a combined preview fingerprint. The
 preview also records the size and SHA-256 of every regular file in the source
 pack and the saved run's summaries, cards and index trees. Symlinks and
 unexpected file types fail closed. These input hashes bind the approved preview
-to the saved evidence, not just to the two proposed output files.
+to the saved evidence, not just to the two proposed output files. The source
+root is anchored to an absolute path before the preview is computed, so changing
+the caller's working directory cannot redirect an approved publication.
 
 The run package records the native extraction source directory, selected full
 text, structure, published summaries, card and index by their verified refs.
