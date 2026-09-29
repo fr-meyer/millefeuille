@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+import hashlib
+import json
+from pathlib import Path, PurePosixPath
 import re
 from typing import Any
 
@@ -34,11 +36,19 @@ from millefeuille.domain.millefeuille import (
     StageName,
     StageStatus,
 )
+from millefeuille.domain.multi_source_summary import (
+    build_multi_source_summary_package,
+)
+from millefeuille.domain.published_summary_run_link import (
+    LINK_SCHEMA_VERSION,
+    load_published_summary_run_view,
+)
 from millefeuille.domain.route_fixtures import (
     ROUTE_EVIDENCE_REF,
     ROUTE_MARKDOWN_REF,
     load_route_selection_sidecar,
 )
+from millefeuille.domain.secure_io import read_bytes_no_follow
 from millefeuille.domain.stage_runtime import (
     ResolvedRunArtifacts,
     load_json_object,
@@ -60,6 +70,7 @@ from millefeuille.domain.summary_fixtures import (
     SUMMARY_ARTIFACT_REF,
     load_hierarchical_summary,
 )
+from millefeuille.domain.summary_preparation import verify_summary_preparation_package
 
 ACCEPTANCE_SUMMARY_REF = Path("reports/acceptance-summary.json")
 ACCEPTANCE_SUMMARY_MARKDOWN_REF = Path("reports/acceptance-summary.md")
@@ -403,49 +414,61 @@ def _build_acceptance_summary(
     checks.append(handoff["check"])
     counts["handoff_rows"] = int(handoff["count"])
 
-    native_check, native_present = _load_optional_check(
-        name="extract-native",
-        run_dir=resolved.run_dir,
-        target_path=resolved.source_pack_dir / NATIVE_EVIDENCE_REF,
-        loader=load_native_extraction_sidecar,
-        source_hash=resolved.source_hash,
-    )
-    checks.append(native_check)
-    counts["native_extraction"] = int(native_present)
+    if resolved.source_pack_manifest.get("schema_version") == (
+        "millefeuille-source-pack-manifest/v0.2"
+    ):
+        multi_checks, multi_counts = _load_multi_source_upstream_checks(
+            resolved,
+            profile=_load_verified_multi_source_profile(resolved),
+        )
+        checks.extend(multi_checks)
+        counts.update(multi_counts)
+    else:
+        native_check, native_present = _load_optional_check(
+            name="extract-native",
+            run_dir=resolved.run_dir,
+            target_path=resolved.source_pack_dir / NATIVE_EVIDENCE_REF,
+            loader=load_native_extraction_sidecar,
+            source_hash=resolved.source_hash,
+        )
+        checks.append(native_check)
+        counts["native_extraction"] = int(native_present)
 
-    ocr_check, ocr_present = _load_optional_check(
-        name="extract-ocr",
-        run_dir=resolved.run_dir,
-        target_path=resolved.source_pack_dir / OCR_EVIDENCE_REF,
-        loader=load_ocr_extraction_sidecar,
-        source_hash=resolved.source_hash,
-    )
-    checks.append(ocr_check)
-    counts["ocr_extraction"] = int(ocr_present)
-    if not native_present and not ocr_present:
-        review_reasons.append("no extraction evidence is available")
+        ocr_check, ocr_present = _load_optional_check(
+            name="extract-ocr",
+            run_dir=resolved.run_dir,
+            target_path=resolved.source_pack_dir / OCR_EVIDENCE_REF,
+            loader=load_ocr_extraction_sidecar,
+            source_hash=resolved.source_hash,
+        )
+        checks.append(ocr_check)
+        counts["ocr_extraction"] = int(ocr_present)
+        if not native_present and not ocr_present:
+            review_reasons.append("no extraction evidence is available")
 
-    route_check = _load_required_check(
-        name="route",
-        run_dir=resolved.run_dir,
-        target_path=resolved.source_pack_dir / ROUTE_EVIDENCE_REF,
-        loader=load_route_selection_sidecar,
-        source_hash=resolved.source_hash,
-        review_reasons=review_reasons,
-    )
-    checks.append(route_check)
-    counts["route"] = int(route_check.status == AcceptanceCheckStatus.PASSED)
+        route_check = _load_required_check(
+            name="route",
+            run_dir=resolved.run_dir,
+            target_path=resolved.source_pack_dir / ROUTE_EVIDENCE_REF,
+            loader=load_route_selection_sidecar,
+            source_hash=resolved.source_hash,
+            review_reasons=review_reasons,
+        )
+        checks.append(route_check)
+        counts["route"] = int(route_check.status == AcceptanceCheckStatus.PASSED)
 
-    structure_check = _load_required_check(
-        name="structure",
-        run_dir=resolved.run_dir,
-        target_path=resolved.source_pack_dir / STRUCTURE_EVIDENCE_REF,
-        loader=load_structure_sidecar,
-        source_hash=resolved.source_hash,
-        review_reasons=review_reasons,
-    )
-    checks.append(structure_check)
-    counts["structure"] = int(structure_check.status == AcceptanceCheckStatus.PASSED)
+        structure_check = _load_required_check(
+            name="structure",
+            run_dir=resolved.run_dir,
+            target_path=resolved.source_pack_dir / STRUCTURE_EVIDENCE_REF,
+            loader=load_structure_sidecar,
+            source_hash=resolved.source_hash,
+            review_reasons=review_reasons,
+        )
+        checks.append(structure_check)
+        counts["structure"] = int(
+            structure_check.status == AcceptanceCheckStatus.PASSED
+        )
 
     summary_check = _load_run_scoped_summary_check(
         resolved=resolved,
@@ -508,6 +531,119 @@ def _build_acceptance_summary(
         duplicate_scan=duplicate_scan["details"],
         review_reasons=review_reasons,
     )
+
+
+def _load_multi_source_upstream_checks(
+    resolved: ResolvedRunArtifacts,
+    *,
+    profile: str,
+) -> tuple[list[AcceptanceCheckRecord], dict[str, int]]:
+    """Recheck every PDF and page attribution before accepting v0.2 evidence."""
+
+    verified = build_multi_source_summary_package(
+        route_evidence_path=resolved.source_pack_dir / ROUTE_EVIDENCE_REF,
+        structure_evidence_path=resolved.source_pack_dir / STRUCTURE_EVIDENCE_REF,
+        output_dir=resolved.run_dir,
+        profile=profile,
+        validation_only=True,
+    )
+    if (
+        not isinstance(verified, dict)
+        or verified["paper_id"] != resolved.paper_id
+        or verified["source_hash"] != resolved.source_hash
+        or verified["source_count"] < 2
+    ):
+        raise MillefeuilleContractError("multi-source acceptance identity drift")
+    checks = [
+        AcceptanceCheckRecord(
+            name=name,
+            status=AcceptanceCheckStatus.PASSED,
+            refs=[relative_ref(resolved.source_pack_dir / ref, resolved.run_dir)],
+            notes=["verified whole-pack source and page attribution"],
+        )
+        for name, ref in (
+            ("extract-native", NATIVE_EVIDENCE_REF),
+            ("route", ROUTE_EVIDENCE_REF),
+            ("structure", STRUCTURE_EVIDENCE_REF),
+        )
+    ]
+    checks.append(
+        AcceptanceCheckRecord(
+            name="extract-ocr",
+            status=AcceptanceCheckStatus.SKIPPED,
+            notes=["verified native text selected for all source PDFs"],
+        )
+    )
+    counts = {"native_extraction": 1, "ocr_extraction": 0, "route": 1, "structure": 1}
+    return checks, counts
+
+
+def _load_verified_multi_source_profile(resolved: ResolvedRunArtifacts) -> str:
+    """Read the profile from the run's verified published-summary preparation."""
+
+    link_path = resolved.run_dir / SUMMARY_ARTIFACT_REF
+    raw = read_bytes_no_follow(
+        link_path, "multi-source published summary link", max_bytes=32768
+    )
+    try:
+        link = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise MillefeuilleContractError(
+            "multi-source published summary link is invalid JSON"
+        ) from exc
+    if not isinstance(link, dict) or link.get("schema_version") != LINK_SCHEMA_VERSION:
+        raise MillefeuilleContractError(
+            "multi-source acceptance requires a published summary run link"
+        )
+    evidence_refs = link.get("evidence_refs")
+    if not isinstance(evidence_refs, dict) or "preparation_ref" not in evidence_refs:
+        raise MillefeuilleContractError(
+            "multi-source published summary link evidence refs are invalid"
+        )
+    preparation_ref = evidence_refs["preparation_ref"]
+    view = load_published_summary_run_view(link_path)
+    if (
+        view.get("summary_link_sha256") != "sha256:" + hashlib.sha256(raw).hexdigest()
+        or view.get("paper_id") != resolved.paper_id
+        or view.get("run_id") != resolved.run_id
+        or view.get("source_hash") != resolved.source_hash
+    ):
+        raise MillefeuilleContractError("multi-source summary link identity drift")
+    if (
+        not isinstance(preparation_ref, str)
+        or not preparation_ref
+        or "\\" in preparation_ref
+        or ":" in preparation_ref
+        or any(ord(char) < 32 for char in preparation_ref)
+    ):
+        raise MillefeuilleContractError("multi-source preparation ref is unsafe")
+    relative = PurePosixPath(preparation_ref)
+    if (
+        relative.is_absolute()
+        or relative.as_posix() != preparation_ref
+        or any(part in {".", ".."} for part in preparation_ref.split("/"))
+    ):
+        raise MillefeuilleContractError("multi-source preparation ref is unsafe")
+    source_root = resolved.source_pack_root.resolve(strict=True)
+    preparation_path = source_root.joinpath(*relative.parts)
+    if not preparation_path.resolve().is_relative_to(source_root):
+        raise MillefeuilleContractError(
+            "multi-source preparation ref escapes source root"
+        )
+    prepared = verify_summary_preparation_package(
+        route_evidence_path=resolved.source_pack_dir / ROUTE_EVIDENCE_REF,
+        structure_evidence_path=resolved.source_pack_dir / STRUCTURE_EVIDENCE_REF,
+        preparation_path=preparation_path,
+    )
+    identity = prepared.get("identity")
+    if (
+        prepared.get("schema_version") != "millefeuille-summary-preparation/v0.2"
+        or prepared.get("paper_id") != resolved.paper_id
+        or not isinstance(identity, dict)
+        or identity.get("source_hash") != resolved.source_hash
+    ):
+        raise MillefeuilleContractError("multi-source preparation identity drift")
+    return prepared["profile"]
 
 
 def _build_handoff_context(

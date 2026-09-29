@@ -39,7 +39,8 @@ def build_multi_source_summary_package(
     output_dir: str | Path,
     profile: str,
     artifact_reader: RootArtifactReader | None = None,
-) -> tuple[Path, bytes, dict[str, int], tuple[str, ...]]:
+    validation_only: bool = False,
+) -> tuple[Path, bytes, dict[str, int], tuple[str, ...]] | dict[str, Any]:
     """Return a deterministic package in memory after whole-pack verification."""
 
     reader = (
@@ -279,6 +280,14 @@ def build_multi_source_summary_package(
         row["global_locator"] for row in page_map
     ]:
         raise MillefeuilleContractError("multi-source summary structure page map drift")
+
+    if validation_only:
+        return {
+            "paper_id": paper_id,
+            "source_hash": scope.source_hash,
+            "source_count": len(scope.sources),
+            "page_count": page_count,
+        }
 
     # The existing dispatcher only needs unit ids and global locators. The
     # complete attachment mapping remains bound in the preparation identity.

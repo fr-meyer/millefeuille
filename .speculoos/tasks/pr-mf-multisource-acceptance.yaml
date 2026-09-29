@@ -1,0 +1,30 @@
+id: pr-mf-multisource-acceptance
+title: Validate verified v0.2 whole-pack upstream evidence in acceptance
+status: in-progress
+branch: feat/pr-mf-multisource-acceptance-20260929
+base_branch: dev
+write_paths:
+  - .speculoos/tasks/pr-mf-multisource-acceptance.yaml
+  - millefeuille/domain/acceptance.py
+  - millefeuille/domain/multi_source_summary.py
+  - tests/test_millefeuille_multi_source_acceptance.py
+github:
+  issue: null
+  pull_request: null
+  url: null
+  head_sha: null
+scope:
+  - Reuse whole-pack PDF, native, route, page-map and structure validation without model planning or writes
+  - Preserve the existing single-source acceptance path
+  - Reject changed native Markdown and source identity before acceptance
+acceptance:
+  - Synthetic two-PDF acceptance tests pass for verified and changed source bytes
+  - Live CollaGAN no-write upstream checks pass for both PDFs and all 19 pages
+  - Full offline suite, Ruff, metadata and private-data checks pass
+publication_boundary:
+  statement: Code, synthetic tests and task metadata only. No model, OCR, Zotero, OpenKB, source-pack, index, credential or release write. Live run-package materialization and acceptance output remain separate exact gates.
+documentation_impact:
+  status: none
+  rationale: The existing multi-source materialization spec keeps live whole-paper acceptance open until a complete run package is saved and verified.
+publish_authority: Existing user approval covers isolated GCP implementation and feature-to-dev repository publication.
+private_data_scan: Required; test fixtures are synthetic.
