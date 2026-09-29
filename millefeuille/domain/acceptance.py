@@ -749,9 +749,8 @@ def _build_multi_source_handoff_context(
             actual[key].get("is_pdf") is True
             and actual[key].get("canonical_filename")
             == source["identity"]["canonical_filename"]
-            and actual[key].get("sha256") in (None, source["sha256"])
-            and actual[key].get("file_size_bytes")
-            in (None, source["byte_size"])
+            and actual[key].get("sha256") == source["sha256"]
+            and actual[key].get("file_size_bytes") == source["byte_size"]
             for key, source in expected.items()
         )
     )

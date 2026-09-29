@@ -44,9 +44,7 @@ def _fixture(root: Path):
 
 def _check(root: Path, resolved, rows):
     path = root / "handoff.jsonl"
-    path.write_text(
-        "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
-    )
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
     reasons = []
     result = _build_handoff_context(
         resolved=resolved, handoff_path=path, review_reasons=reasons
@@ -74,6 +72,17 @@ class MultiSourceHandoffTests(unittest.TestCase):
             cases = {
                 "missing": rows[:1],
                 "wrong-hash": [rows[0], {**rows[1], "sha256": "0" * 64}],
+                "missing-hash": [
+                    rows[0],
+                    {k: v for k, v in rows[1].items() if k != "sha256"},
+                ],
+                "null-hash": [rows[0], {**rows[1], "sha256": None}],
+                "wrong-size": [rows[0], {**rows[1], "file_size_bytes": 0}],
+                "missing-size": [
+                    rows[0],
+                    {k: v for k, v in rows[1].items() if k != "file_size_bytes"},
+                ],
+                "null-size": [rows[0], {**rows[1], "file_size_bytes": None}],
                 "wrong-filename": [
                     rows[0],
                     {**rows[1], "canonical_filename": "another.pdf"},
