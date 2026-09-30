@@ -4,7 +4,7 @@ status: in-progress
 branch: feat/pr-mf-multisource-package-v02-compliant-20260930
 base_branch: dev
 post_merge_expected:
-  pull_request: null  # Bind the actual replacement PR number before exact-head review.
+  pull_request: 172
   base_branch: dev
   head_branch: feat/pr-mf-multisource-package-v02-compliant-20260930
   head_sha: merge-plan-exact-head
