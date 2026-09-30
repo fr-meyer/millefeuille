@@ -34,7 +34,7 @@ acceptance:
 publication_boundary:
   statement: Repository code, synthetic tests and docs only. The live private run-package write requires a separate exact-output approval. This PR makes no GPT, OCR, Zotero, OpenKB, source-pack, index or release write.
 documentation_impact:
-  status: updated
-  rationale: The new plan and append-only publication contract is documented for live multi-source runs.
+  status: none
+  rationale: The pipeline specifications retain the reviewed run-package contract; this replacement changes only task branch and closeout metadata, with no README or docs/ user-facing surface change.
 publish_authority: Existing user approval covers isolated GCP implementation and feature-to-dev repository publication.
 private_data_scan: Required; test fixtures are synthetic.
