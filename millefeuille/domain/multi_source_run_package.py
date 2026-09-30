@@ -27,9 +27,14 @@ from millefeuille.domain.millefeuille import (
     StageStatus,
 )
 from millefeuille.domain.multi_source_summary import build_multi_source_summary_package
-from millefeuille.domain.published_summary_run_link import VIEW_SCHEMA_VERSION
+from millefeuille.domain.published_summary_run_link import (
+    LINK_SCHEMA_VERSION,
+    VIEW_SCHEMA_VERSION,
+    _safe_ref,
+)
 from millefeuille.domain.secure_io import (
     _open_directory_path_no_follow,
+    load_json_object_no_follow,
     read_bytes_no_follow,
     write_new_text_no_follow,
 )
@@ -104,14 +109,74 @@ _MAX_INPUT_FILE_BYTES = 64 * 1024 * 1024
 _MAX_INPUT_TOTAL_BYTES = 512 * 1024 * 1024
 
 
+def _published_summary_inventory_paths(
+    root: Path, run: Path
+) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+    link = load_json_object_no_follow(
+        run / "summaries/hierarchical-summary.json",
+        "run-package summary link",
+        max_bytes=32768,
+    )
+    if link.get("schema_version") != LINK_SCHEMA_VERSION:
+        return (), ()
+    publication = link.get("summary_publication")
+    evidence = link.get("evidence_refs")
+    if not isinstance(publication, dict) or not isinstance(evidence, dict):
+        raise MillefeuilleContractError("run-package summary link is incomplete")
+    origin_id = publication.get("run_id")
+    if not isinstance(origin_id, str):
+        raise MillefeuilleContractError("run-package summary origin is invalid")
+    require_safe_package_id(origin_id, "summary origin run_id")
+    if origin_id == run.name:
+        raise MillefeuilleContractError("run-package summary origin is not distinct")
+    origin = root / "analyses/millefeuille" / origin_id / "summaries"
+    if (
+        _safe_ref(link.get("summary_record_ref"))
+        != (origin / "hierarchical-summary.json").relative_to(root).as_posix()
+    ):
+        raise MillefeuilleContractError("run-package summary origin ref drift")
+    expected_refs = {"route_evidence_ref", "structure_evidence_ref", "preparation_ref"}
+    if set(evidence) != expected_refs:
+        raise MillefeuilleContractError("run-package summary evidence refs drift")
+    return (origin,), tuple(root / _safe_ref(evidence[key]) for key in sorted(evidence))
+
+
 def _inventory_inputs(
     root: Path, pack: Path, run: Path
 ) -> tuple[tuple[str, int, str], ...]:
     """Bind every saved source and consumed run artifact to the approval."""
     entries: list[tuple[str, int, str]] = []
+    seen_files: set[Path] = set()
     total_bytes = 0
     discovered_nodes = 0
-    for tree in (pack, run / "summaries", run / "cards", run / "index"):
+    origin_trees, evidence_files = _published_summary_inventory_paths(root, run)
+
+    def record_file(child: Path) -> None:
+        nonlocal total_bytes
+        if child in seen_files:
+            return
+        if len(entries) >= _MAX_INPUT_FILES:
+            raise MillefeuilleContractError(
+                "run-package input file count exceeds limit"
+            )
+        payload = read_bytes_no_follow(
+            child, "run-package input", max_bytes=_MAX_INPUT_FILE_BYTES
+        )
+        total_bytes += len(payload)
+        if total_bytes > _MAX_INPUT_TOTAL_BYTES:
+            raise MillefeuilleContractError(
+                "run-package input byte count exceeds limit"
+            )
+        entries.append(
+            (
+                child.relative_to(root).as_posix(),
+                len(payload),
+                hashlib.sha256(payload).hexdigest(),
+            )
+        )
+        seen_files.add(child)
+
+    for tree in (pack, run / "summaries", run / "cards", run / "index", *origin_trees):
         pending = [(tree, 0)]
         discovered_nodes += 1
         while pending:
@@ -146,31 +211,18 @@ def _inventory_inputs(
                 if stat.S_ISDIR(mode):
                     pending.append((child, depth + 1))
                 elif stat.S_ISREG(mode):
-                    if len(entries) >= _MAX_INPUT_FILES:
-                        raise MillefeuilleContractError(
-                            "run-package input file count exceeds limit"
-                        )
-                    payload = read_bytes_no_follow(
-                        child,
-                        "run-package input",
-                        max_bytes=_MAX_INPUT_FILE_BYTES,
-                    )
-                    total_bytes += len(payload)
-                    if total_bytes > _MAX_INPUT_TOTAL_BYTES:
-                        raise MillefeuilleContractError(
-                            "run-package input byte count exceeds limit"
-                        )
-                    entries.append(
-                        (
-                            child.relative_to(root).as_posix(),
-                            len(payload),
-                            hashlib.sha256(payload).hexdigest(),
-                        )
-                    )
+                    record_file(child)
                 else:
                     raise MillefeuilleContractError(
                         f"run-package input is not a regular file or directory: {child}"
                     )
+    for path in evidence_files:
+        discovered_nodes += 1
+        if discovered_nodes > _MAX_INPUT_NODES:
+            raise MillefeuilleContractError(
+                "run-package input traversal exceeds node limit"
+            )
+        record_file(path)
     return tuple(sorted(entries))
 
 
@@ -492,6 +544,37 @@ def _assert_inputs_unchanged(plan: MultiSourceRunPackagePlan) -> None:
         )
 
 
+def _assert_destination_unchanged(plan: MultiSourceRunPackagePlan) -> None:
+    rebound_fd = _open_directory_path_no_follow(
+        plan.run_dir, label="run-package destination"
+    )
+    try:
+        rebound = os.fstat(rebound_fd)
+        if (rebound.st_dev, rebound.st_ino) != plan.run_dir_identity:
+            raise MillefeuilleContractError(
+                "run-package destination changed during publication"
+            )
+    finally:
+        os.close(rebound_fd)
+
+
+def _assert_outputs_unchanged(
+    plan: MultiSourceRunPackagePlan, outputs: tuple[tuple[str, str], ...]
+) -> None:
+    """Recheck the output pair and its approved destination before success."""
+    _assert_destination_unchanged(plan)
+    for name, text in outputs:
+        expected = text.encode("utf-8")
+        actual = read_bytes_no_follow(
+            plan.run_dir / name, "run-package output", max_bytes=len(expected)
+        )
+        if actual != expected:
+            raise MillefeuilleContractError(
+                "run-package output changed during publication"
+            )
+    _assert_destination_unchanged(plan)
+
+
 def _rollback_exact_outputs(run_fd: int, outputs: tuple[tuple[str, str], ...]) -> None:
     """Remove only our exact new files when the input snapshot drifts."""
     for name, text in reversed(outputs):
@@ -548,6 +631,7 @@ def publish_multi_source_run_package(
         )
         try:
             _assert_inputs_unchanged(refreshed)
+            _assert_outputs_unchanged(refreshed, outputs[:1])
         except MillefeuilleContractError:
             _rollback_exact_outputs(run_fd, outputs[:1])
             raise
@@ -559,6 +643,7 @@ def publish_multi_source_run_package(
         )
         try:
             _assert_inputs_unchanged(refreshed)
+            _assert_outputs_unchanged(refreshed, outputs)
         except MillefeuilleContractError:
             _rollback_exact_outputs(run_fd, outputs)
             raise
@@ -595,6 +680,13 @@ def recover_partial_multi_source_run_package(
         )
         try:
             _assert_inputs_unchanged(refreshed)
+            _assert_outputs_unchanged(
+                refreshed,
+                (
+                    ("stage-manifest.json", refreshed.stage_manifest_text),
+                    ("artifact-index.json", refreshed.artifact_index_text),
+                ),
+            )
         except MillefeuilleContractError:
             _rollback_exact_outputs(
                 run_fd, (("artifact-index.json", refreshed.artifact_index_text),)

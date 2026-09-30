@@ -8,8 +8,12 @@ nothing. It proposes exactly `stage-manifest.json` and `artifact-index.json`,
 with byte counts, SHA-256 hashes and a combined preview fingerprint. The
 preview also records the size and SHA-256 of every regular file in the source
 pack and the saved run's summaries, cards and index trees. Symlinks and
-unexpected file types fail closed. These input hashes bind the approved preview
-to the saved evidence, not just to the two proposed output files. The source
+unexpected file types fail closed. Published-summary links also bind the
+original generation's complete summaries tree and the exact route, structure
+and preparation evidence refs. All these inputs share the same file, node,
+depth and byte limits; repeated file refs are inventoried once. These input
+hashes bind the approved preview to the saved evidence, not just to the two
+proposed output files. The source
 root is anchored to an absolute path before the preview is computed, so changing
 the caller's working directory cannot redirect an approved publication.
 
@@ -24,6 +28,15 @@ recorded only when the saved index status proves it.
 its separate operator approval. It recomputes the caller's fingerprint, replans
 against all current input bytes, requires the complete canonical plan to match,
 and writes only the refreshed paths and texts with no-follow, exclusive writes.
+Publication holds an advisory POSIX lock on the pinned run directory. After
+each write it rechecks the saved inputs, reads back every completed output with
+the exact approved bytes, and rebinds the current directory to its approved
+device/inode identity. Recovery also reads back the existing first output after
+writing the second. A replaced directory, missing output or changed output
+fails closed; rollback removes only exact new outputs through the pinned
+directory and preserves an altered file for operator resolution. Writers that
+share these artifacts must coordinate with the advisory lock; the checks do
+not make an entire mutable tree an atomic filesystem snapshot.
 Existing targets are never replaced. If publication stops between the two
 writes, `recover_partial_multi_source_run_package` requires a separate explicit
 recovery approval for the same fingerprint, rechecks every input and the exact

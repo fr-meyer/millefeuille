@@ -7,6 +7,7 @@ write_paths:
   - .speculoos/tasks/pr-mf-multisource-package-v02.yaml
   - millefeuille/domain/multi_source_summary.py
   - millefeuille/domain/multi_source_run_package.py
+  - millefeuille/domain/secure_io.py
   - tests/test_millefeuille_multi_source_run_package.py
   - specs/millefeuille-pipeline/multi-source-materialization.md
   - specs/millefeuille-pipeline/multi-source-run-package.md

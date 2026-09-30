@@ -6,6 +6,7 @@ from dataclasses import replace
 import json
 import os
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -16,7 +17,10 @@ from millefeuille.domain.multi_source_run_package import (
     publish_multi_source_run_package,
     recover_partial_multi_source_run_package,
 )
-from millefeuille.domain.published_summary_run_link import VIEW_SCHEMA_VERSION
+from millefeuille.domain.published_summary_run_link import (
+    LINK_SCHEMA_VERSION,
+    VIEW_SCHEMA_VERSION,
+)
 from millefeuille.domain.stage_runtime import resolve_run_artifacts
 from tests.platform_capabilities import requires_secure_nofollow_writes
 from tests.test_millefeuille_multi_source_summary import _pack
@@ -80,6 +84,195 @@ def _saved_output_refs(pack: Path, *, source_hash: str | None = None):
 
 
 class MultiSourceRunPackageTests(unittest.TestCase):
+    @requires_secure_nofollow_writes
+    def test_linked_origin_text_change_during_write_rolls_back_new_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            pack, run = _saved_run(root)
+            source_root = root / "source-packs"
+            origin = source_root / "analyses/millefeuille/run-origin/summaries"
+            origin.mkdir(parents=True)
+            original_text = origin / "part.md"
+            original_text.write_text("approved original text")
+            preparation = source_root / "preparation.json"
+            preparation.write_text("{}")
+            (run / "summaries/hierarchical-summary.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": LINK_SCHEMA_VERSION,
+                        "summary_publication": {"run_id": "run-origin"},
+                        "summary_record_ref": (
+                            "analyses/millefeuille/run-origin/summaries/"
+                            "hierarchical-summary.json"
+                        ),
+                        "evidence_refs": {
+                            "route_evidence_ref": (pack / "selected/route.json")
+                            .relative_to(source_root)
+                            .as_posix(),
+                            "structure_evidence_ref": (
+                                pack / "structure/structure.json"
+                            )
+                            .relative_to(source_root)
+                            .as_posix(),
+                            "preparation_ref": "preparation.json",
+                        },
+                    }
+                )
+            )
+            loader, summary, card, index = _saved_output_refs(pack)
+            from millefeuille.domain.secure_io import write_new_text_no_follow
+
+            with loader, summary, card, index:
+                plan = plan_multi_source_run_package(
+                    source_pack_root=source_root,
+                    item_key="ITEM1234",
+                    run_id=run.name,
+                )
+
+                def mutate_origin(path, text, label, **kwargs):
+                    write_new_text_no_follow(path, text, label, **kwargs)
+                    original_text.write_text("unapproved original text")
+
+                with (
+                    patch(
+                        "millefeuille.domain.multi_source_run_package.write_new_text_no_follow",
+                        side_effect=mutate_origin,
+                    ),
+                    self.assertRaisesRegex(
+                        MillefeuilleContractError, "input snapshot changed"
+                    ),
+                ):
+                    publish_multi_source_run_package(
+                        plan, expected_preview_sha256=plan.preview_sha256
+                    )
+            self.assertFalse((run / "stage-manifest.json").exists())
+            self.assertFalse((run / "artifact-index.json").exists())
+
+    @requires_secure_nofollow_writes
+    def test_real_published_link_inventory_binds_original_summary_and_preparation(self):
+        from millefeuille.domain.multi_source_run_package import _inventory_inputs
+        from millefeuille.domain.summary_fixtures import load_hierarchical_summary
+        from tests.test_millefeuille_published_summary_run_link import (
+            TestPublishedSummaryRunLink,
+        )
+
+        fixture = TestPublishedSummaryRunLink(
+            "test_view_keeps_original_generation_and_uses_verified_original_files"
+        )
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        fixture._publish_fixture_link()
+        (fixture.run / "index").mkdir()
+        view = load_hierarchical_summary(fixture.link)
+        raw_link = json.loads(fixture.link.read_bytes())
+        pack = fixture.root / "zotero" / fixture.plan.paper_id
+        before = _inventory_inputs(fixture.root, pack, fixture.run)
+        refs = {ref for ref, _, _ in before}
+        self.assertIn(view["source_summary_ref"], refs)
+        self.assertTrue(set(raw_link["evidence_refs"].values()).issubset(refs))
+        original_text = Path(
+            os.path.abspath(fixture.link.parent / view["summaries"][0]["text_ref"])
+        )
+        self.assertIn(original_text.relative_to(fixture.root).as_posix(), refs)
+        original_text.write_bytes(original_text.read_bytes() + b"changed")
+        self.assertNotEqual(before, _inventory_inputs(fixture.root, pack, fixture.run))
+
+    @requires_secure_nofollow_writes
+    def test_destination_replacement_during_final_check_rolls_back_pinned_outputs(self):
+        for recovery in (False, True):
+            with self.subTest(recovery=recovery), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                pack, run = _saved_run(root)
+                loader, summary, card, index = _saved_output_refs(pack)
+                import millefeuille.domain.multi_source_run_package as package
+
+                with loader, summary, card, index:
+                    plan = plan_multi_source_run_package(
+                        source_pack_root=root / "source-packs",
+                        item_key="ITEM1234",
+                        run_id=run.name,
+                    )
+                    if recovery:
+                        (run / "stage-manifest.json").write_text(
+                            plan.stage_manifest_text
+                        )
+                    original_inventory = package._inventory_inputs
+                    displaced = run.with_name("displaced-run")
+
+                    def replace_destination(
+                        *args,
+                        run=run,
+                        displaced=displaced,
+                        original_inventory=original_inventory,
+                    ):
+                        if (run / "artifact-index.json").exists():
+                            run.rename(displaced)
+                            shutil.copytree(
+                                displaced,
+                                run,
+                                ignore=shutil.ignore_patterns(
+                                    "stage-manifest.json", "artifact-index.json"
+                                ),
+                            )
+                        return original_inventory(*args)
+
+                    publish = (
+                        recover_partial_multi_source_run_package
+                        if recovery
+                        else publish_multi_source_run_package
+                    )
+                    with (
+                        patch.object(package, "_inventory_inputs", replace_destination),
+                        self.assertRaisesRegex(
+                            MillefeuilleContractError, "destination changed"
+                        ),
+                    ):
+                        publish(plan, expected_preview_sha256=plan.preview_sha256)
+                self.assertFalse((run / "stage-manifest.json").exists())
+                self.assertFalse((run / "artifact-index.json").exists())
+                self.assertFalse((displaced / "artifact-index.json").exists())
+                self.assertEqual((displaced / "stage-manifest.json").exists(), recovery)
+
+    @requires_secure_nofollow_writes
+    def test_changed_first_output_during_second_write_blocks_success(self):
+        for recovery in (False, True):
+            with self.subTest(recovery=recovery), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                pack, run = _saved_run(root)
+                loader, summary, card, index = _saved_output_refs(pack)
+                from millefeuille.domain.secure_io import write_new_text_no_follow
+
+                with loader, summary, card, index:
+                    plan = plan_multi_source_run_package(
+                        source_pack_root=root / "source-packs",
+                        item_key="ITEM1234",
+                        run_id=run.name,
+                    )
+                    first = run / "stage-manifest.json"
+                    if recovery:
+                        first.write_text(plan.stage_manifest_text)
+
+                    def tamper_first(path, text, label, *, first=first, **kwargs):
+                        write_new_text_no_follow(path, text, label, **kwargs)
+                        if Path(path).name == "artifact-index.json":
+                            first.write_text("unapproved output bytes")
+
+                    publish = (
+                        recover_partial_multi_source_run_package
+                        if recovery
+                        else publish_multi_source_run_package
+                    )
+                    with (
+                        patch(
+                            "millefeuille.domain.multi_source_run_package.write_new_text_no_follow",
+                            side_effect=tamper_first,
+                        ),
+                        self.assertRaises(MillefeuilleContractError),
+                    ):
+                        publish(plan, expected_preview_sha256=plan.preview_sha256)
+                self.assertEqual(first.read_text(), "unapproved output bytes")
+                self.assertFalse((run / "artifact-index.json").exists())
+
     @requires_secure_nofollow_writes
     def test_plan_is_read_only_and_publication_is_exact_and_append_only(self):
         with tempfile.TemporaryDirectory() as temp:
