@@ -501,9 +501,7 @@ def _open_windows_locked_regular_file_fd(
     if handle == invalid_handle_value:
         error = ctypes.get_last_error()
         detail = ctypes.FormatError(error).strip()
-        raise MillefeuilleContractError(
-            f"could not open {label} {path}: {detail}"
-        )
+        raise MillefeuilleContractError(f"could not open {label} {path}: {detail}")
 
     crt_flags = os.O_RDONLY
     if hasattr(os, "O_BINARY"):
@@ -1228,6 +1226,7 @@ def write_new_text_no_follow(
     label: str,
     *,
     forbidden_ancestor_markers: frozenset[str] = frozenset(),
+    expected_parent_identity: tuple[int, int] | None = None,
 ) -> None:
     """Create one new UTF-8 file through pinned no-follow descriptors.
 
@@ -1250,6 +1249,18 @@ def write_new_text_no_follow(
         forbidden_ancestor_markers=forbidden_ancestor_markers,
     )
     parent_identity = os.fstat(parent_fd)
+    if (
+        expected_parent_identity is not None
+        and (
+            parent_identity.st_dev,
+            parent_identity.st_ino,
+        )
+        != expected_parent_identity
+    ):
+        os.close(parent_fd)
+        raise MillefeuilleContractError(
+            f"{label} parent directory changed after approval: {target.parent}"
+        )
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
     if hasattr(os, "O_CLOEXEC"):
         flags |= os.O_CLOEXEC
