@@ -29,12 +29,14 @@ scope:
   - Require an exact preview hash and unchanged inputs for append-only publication
 acceptance:
   - Synthetic PDF mutation, unsafe run identity and overwrite cases fail closed
+  - Failed publication and recovery preserve created or substituted outputs without automatic deletion or a blocking FIFO read
+  - The planner independently rejects non-native upstream results before proposing native-only stage metadata
   - The saved two-PDF CollaGAN run plans without permanent writes and resolves as a complete package in memory
   - Focused tests, Ruff, metadata and private-data checks pass
 publication_boundary:
   statement: Repository code, synthetic tests and docs only. The live private run-package write requires a separate exact-output approval. This PR makes no GPT, OCR, Zotero, OpenKB, source-pack, index or release write.
 documentation_impact:
   status: none
-  rationale: The pipeline specifications retain the reviewed run-package contract; this replacement changes only task branch and closeout metadata, with no README or docs/ user-facing surface change.
+  rationale: The pipeline specification documents preservation of outputs after a failed write and the native-only provenance boundary. No README or docs/ user-facing surface changes.
 publish_authority: Existing user approval covers isolated GCP implementation and feature-to-dev repository publication.
 private_data_scan: Required; test fixtures are synthetic.

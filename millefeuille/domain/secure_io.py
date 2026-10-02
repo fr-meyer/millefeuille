@@ -1227,12 +1227,15 @@ def write_new_text_no_follow(
     *,
     forbidden_ancestor_markers: frozenset[str] = frozenset(),
     expected_parent_identity: tuple[int, int] | None = None,
+    preserve_created_on_failure: bool = False,
 ) -> None:
     """Create one new UTF-8 file through pinned no-follow descriptors.
 
     Existing outputs are never replaced. Missing parent directories are made
     descriptor-relatively, and the parent plus final name are rebound after the
     write so a concurrent rename or symlink substitution fails closed.
+    Callers requiring operator resolution can preserve created entries on
+    failure instead of attempting name-based cleanup.
     """
 
     if not _supports_no_follow():
@@ -1338,7 +1341,11 @@ def write_new_text_no_follow(
             os.close(rebound_parent_fd)
         os.fsync(parent_fd)
     except Exception as exc:
-        if fd is not None and opened_identity is not None:
+        if (
+            not preserve_created_on_failure
+            and fd is not None
+            and opened_identity is not None
+        ):
             try:
                 named_stat = os.stat(
                     target.name,

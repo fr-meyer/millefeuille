@@ -21,7 +21,9 @@ The run package records the native extraction source directory, selected full
 text, structure, published summaries, card and index by their verified refs.
 It marks the handoff, acceptance and later classification/writeback stages as
 not started until their own evidence is supplied. The OCR stage is skipped
-because the selected upstream route is native text. A written OpenKB lane is
+because the selected upstream route is native text. Both the upstream builder
+and the run-package planner reject OCR or mixed routes; they never label those
+routes as native or propose native-only stage metadata for them. A written OpenKB lane is
 recorded only when the saved index status proves it.
 
 `publish_multi_source_run_package` accepts the exact preview fingerprint after
@@ -33,8 +35,10 @@ each write it rechecks the saved inputs, reads back every completed output with
 the exact approved bytes, and rebinds the current directory to its approved
 device/inode identity. Recovery also reads back the existing first output after
 writing the second. A replaced directory, missing output or changed output
-fails closed; rollback removes only exact new outputs through the pinned
-directory and preserves an altered file for operator resolution. Writers that
+fails closed. Failed publication and recovery preserve all created or substituted
+entries, including outputs in a displaced directory. They never automatically
+unlink outputs: a name-based identity check cannot prevent replacement before
+deletion. Nonregular outputs are rejected without a blocking read. Writers that
 share these artifacts must coordinate with the advisory lock; the checks do
 not make an entire mutable tree an atomic filesystem snapshot.
 Existing targets are never replaced. If publication stops between the two
@@ -42,7 +46,10 @@ writes, `recover_partial_multi_source_run_package` requires a separate explicit
 recovery approval for the same fingerprint, rechecks every input and the exact
 first-file bytes, and then creates only the missing second file. A changed first
 file or an existing second file fails closed. The standard `resolve_run_artifacts`
-reader then checks the package identity.
+reader then checks the package identity. An input drift, altered or missing
+output, or failed publication with both outputs present requires separate
+operator resolution; this recovery function does not remove, overwrite or
+declare those states successful. Restoring inputs does not grant a new approval.
 
 The CollaGAN main paper and supplement have a read-only plan and in-memory
 resolver check. Permanent publication, a verified two-row handoff report,

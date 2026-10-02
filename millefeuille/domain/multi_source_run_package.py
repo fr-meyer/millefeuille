@@ -575,43 +575,11 @@ def _assert_outputs_unchanged(
     _assert_destination_unchanged(plan)
 
 
-def _rollback_exact_outputs(run_fd: int, outputs: tuple[tuple[str, str], ...]) -> None:
-    """Remove only our exact new files when the input snapshot drifts."""
-    for name, text in reversed(outputs):
-        flags = os.O_RDONLY | os.O_NOFOLLOW
-        if hasattr(os, "O_CLOEXEC"):
-            flags |= os.O_CLOEXEC
-        try:
-            fd = os.open(name, flags, dir_fd=run_fd)
-        except FileNotFoundError:
-            continue
-        try:
-            record = os.fstat(fd)
-            expected = text.encode("utf-8")
-            if (
-                not stat.S_ISREG(record.st_mode)
-                or record.st_nlink != 1
-                or record.st_size != len(expected)
-                or os.read(fd, len(expected) + 1) != expected
-            ):
-                raise MillefeuilleContractError(
-                    "run-package output changed before rollback"
-                )
-            named = os.stat(name, dir_fd=run_fd, follow_symlinks=False)
-            if (named.st_dev, named.st_ino) != (record.st_dev, record.st_ino):
-                raise MillefeuilleContractError(
-                    "run-package output identity changed before rollback"
-                )
-            os.unlink(name, dir_fd=run_fd)
-        finally:
-            os.close(fd)
-
-
 def publish_multi_source_run_package(
     plan: MultiSourceRunPackagePlan, *, expected_preview_sha256: str
 ) -> tuple[Path, Path]:
-    """Append two exact planned files after an external approval gate."""
-    with _locked_approved_run(plan) as run_fd:
+    """Append approved files; preserve created entries if verification fails."""
+    with _locked_approved_run(plan):
         refreshed = _approved_fresh_plan(plan, expected_preview_sha256)
         paths = (
             refreshed.run_dir / "stage-manifest.json",
@@ -628,25 +596,22 @@ def publish_multi_source_run_package(
             refreshed.stage_manifest_text,
             "stage manifest",
             expected_parent_identity=refreshed.run_dir_identity,
+            preserve_created_on_failure=True,
         )
-        try:
-            _assert_inputs_unchanged(refreshed)
-            _assert_outputs_unchanged(refreshed, outputs[:1])
-        except MillefeuilleContractError:
-            _rollback_exact_outputs(run_fd, outputs[:1])
-            raise
+        # An advisory lock cannot prevent another writer replacing an entry
+        # between an identity check and unlink. Leave failed outputs intact for
+        # separately approved recovery or operator resolution.
+        _assert_inputs_unchanged(refreshed)
+        _assert_outputs_unchanged(refreshed, outputs[:1])
         write_new_text_no_follow(
             paths[1],
             refreshed.artifact_index_text,
             "artifact index",
             expected_parent_identity=refreshed.run_dir_identity,
+            preserve_created_on_failure=True,
         )
-        try:
-            _assert_inputs_unchanged(refreshed)
-            _assert_outputs_unchanged(refreshed, outputs)
-        except MillefeuilleContractError:
-            _rollback_exact_outputs(run_fd, outputs)
-            raise
+        _assert_inputs_unchanged(refreshed)
+        _assert_outputs_unchanged(refreshed, outputs)
         return paths
 
 
@@ -654,7 +619,7 @@ def recover_partial_multi_source_run_package(
     plan: MultiSourceRunPackagePlan, *, expected_preview_sha256: str
 ) -> tuple[Path, Path]:
     """Complete a verified first-file-only publication after recovery approval."""
-    with _locked_approved_run(plan) as run_fd:
+    with _locked_approved_run(plan):
         refreshed = _approved_fresh_plan(plan, expected_preview_sha256)
         paths = (
             refreshed.run_dir / "stage-manifest.json",
@@ -677,19 +642,14 @@ def recover_partial_multi_source_run_package(
             refreshed.artifact_index_text,
             "artifact index recovery",
             expected_parent_identity=refreshed.run_dir_identity,
+            preserve_created_on_failure=True,
         )
-        try:
-            _assert_inputs_unchanged(refreshed)
-            _assert_outputs_unchanged(
-                refreshed,
-                (
-                    ("stage-manifest.json", refreshed.stage_manifest_text),
-                    ("artifact-index.json", refreshed.artifact_index_text),
-                ),
-            )
-        except MillefeuilleContractError:
-            _rollback_exact_outputs(
-                run_fd, (("artifact-index.json", refreshed.artifact_index_text),)
-            )
-            raise
+        _assert_inputs_unchanged(refreshed)
+        _assert_outputs_unchanged(
+            refreshed,
+            (
+                ("stage-manifest.json", refreshed.stage_manifest_text),
+                ("artifact-index.json", refreshed.artifact_index_text),
+            ),
+        )
         return paths

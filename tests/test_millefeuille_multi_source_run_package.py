@@ -7,6 +7,8 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
+import stat
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -17,6 +19,7 @@ from millefeuille.domain.multi_source_run_package import (
     publish_multi_source_run_package,
     recover_partial_multi_source_run_package,
 )
+from millefeuille.domain.multi_source_summary import build_multi_source_summary_package
 from millefeuille.domain.published_summary_run_link import (
     LINK_SCHEMA_VERSION,
     VIEW_SCHEMA_VERSION,
@@ -85,7 +88,7 @@ def _saved_output_refs(pack: Path, *, source_hash: str | None = None):
 
 class MultiSourceRunPackageTests(unittest.TestCase):
     @requires_secure_nofollow_writes
-    def test_linked_origin_text_change_during_write_rolls_back_new_output(self):
+    def test_linked_origin_text_change_during_write_preserves_new_output(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             pack, run = _saved_run(root)
@@ -145,7 +148,9 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                     publish_multi_source_run_package(
                         plan, expected_preview_sha256=plan.preview_sha256
                     )
-            self.assertFalse((run / "stage-manifest.json").exists())
+            self.assertEqual(
+                (run / "stage-manifest.json").read_text(), plan.stage_manifest_text
+            )
             self.assertFalse((run / "artifact-index.json").exists())
 
     @requires_secure_nofollow_writes
@@ -178,7 +183,7 @@ class MultiSourceRunPackageTests(unittest.TestCase):
         self.assertNotEqual(before, _inventory_inputs(fixture.root, pack, fixture.run))
 
     @requires_secure_nofollow_writes
-    def test_destination_replacement_during_final_check_rolls_back_pinned_outputs(self):
+    def test_destination_replacement_during_final_check_preserves_pinned_outputs(self):
         for recovery in (False, True):
             with self.subTest(recovery=recovery), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
@@ -230,13 +235,27 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                         publish(plan, expected_preview_sha256=plan.preview_sha256)
                 self.assertFalse((run / "stage-manifest.json").exists())
                 self.assertFalse((run / "artifact-index.json").exists())
-                self.assertFalse((displaced / "artifact-index.json").exists())
-                self.assertEqual((displaced / "stage-manifest.json").exists(), recovery)
+                self.assertEqual(
+                    (displaced / "artifact-index.json").read_text(),
+                    plan.artifact_index_text,
+                )
+                self.assertEqual(
+                    (displaced / "stage-manifest.json").read_text(),
+                    plan.stage_manifest_text,
+                )
 
     @requires_secure_nofollow_writes
     def test_changed_first_output_during_second_write_blocks_success(self):
-        for recovery in (False, True):
-            with self.subTest(recovery=recovery), tempfile.TemporaryDirectory() as temp:
+        for recovery, mutation in (
+            (False, "change"),
+            (True, "change"),
+            (False, "remove"),
+            (True, "remove"),
+        ):
+            with (
+                self.subTest(recovery=recovery, mutation=mutation),
+                tempfile.TemporaryDirectory() as temp,
+            ):
                 root = Path(temp)
                 pack, run = _saved_run(root)
                 loader, summary, card, index = _saved_output_refs(pack)
@@ -252,10 +271,15 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                     if recovery:
                         first.write_text(plan.stage_manifest_text)
 
-                    def tamper_first(path, text, label, *, first=first, **kwargs):
+                    def tamper_first(
+                        path, text, label, *, first=first, mutation=mutation, **kwargs
+                    ):
                         write_new_text_no_follow(path, text, label, **kwargs)
                         if Path(path).name == "artifact-index.json":
-                            first.write_text("unapproved output bytes")
+                            if mutation == "remove":
+                                first.unlink()
+                            else:
+                                first.write_text("unapproved output bytes")
 
                     publish = (
                         recover_partial_multi_source_run_package
@@ -270,8 +294,183 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                         self.assertRaises(MillefeuilleContractError),
                     ):
                         publish(plan, expected_preview_sha256=plan.preview_sha256)
-                self.assertEqual(first.read_text(), "unapproved output bytes")
-                self.assertFalse((run / "artifact-index.json").exists())
+                if mutation == "remove":
+                    self.assertFalse(first.exists())
+                else:
+                    self.assertEqual(first.read_text(), "unapproved output bytes")
+                self.assertEqual(
+                    (run / "artifact-index.json").read_text(), plan.artifact_index_text
+                )
+
+    def _assert_substituted_entry_preserved(self, *, fifo, input_drift=True):
+        for recovery, failed_name in (
+            (False, "stage-manifest.json"),
+            (False, "artifact-index.json"),
+            (True, "artifact-index.json"),
+        ):
+            with (
+                self.subTest(recovery=recovery, failed_name=failed_name),
+                tempfile.TemporaryDirectory() as temp,
+            ):
+                root = Path(temp)
+                pack, run = _saved_run(root)
+                loader, summary, card, index = _saved_output_refs(pack)
+                from millefeuille.domain.secure_io import write_new_text_no_follow
+
+                with loader, summary, card, index:
+                    plan = plan_multi_source_run_package(
+                        source_pack_root=root / "source-packs",
+                        item_key="ITEM1234",
+                        run_id=run.name,
+                    )
+                    if recovery:
+                        (run / "stage-manifest.json").write_text(
+                            plan.stage_manifest_text
+                        )
+
+                    def substitute_after_write(
+                        path, text, label, *, failed_name=failed_name, run=run, **kwargs
+                    ):
+                        write_new_text_no_follow(path, text, label, **kwargs)
+                        if Path(path).name == failed_name:
+                            # Retain the original inode so substitution cannot reuse it.
+                            path.rename(run / "displaced-output")
+                            if fifo:
+                                os.mkfifo(path)
+                            else:
+                                path.write_text(text)
+                            if input_drift:
+                                (run / "summaries/texts/part.md").write_text(
+                                    "changed input"
+                                )
+
+                    publish = (
+                        recover_partial_multi_source_run_package
+                        if recovery
+                        else publish_multi_source_run_package
+                    )
+
+                    def fifo_deadline(*_):
+                        self.fail(
+                            "publication did not reject the substituted FIFO promptly"
+                        )
+
+                    if fifo:
+                        previous_handler = signal.signal(signal.SIGALRM, fifo_deadline)
+                        signal.setitimer(signal.ITIMER_REAL, 2)
+                    try:
+                        with (
+                            patch(
+                                "millefeuille.domain.multi_source_run_package.write_new_text_no_follow",
+                                side_effect=substitute_after_write,
+                            ),
+                            self.assertRaisesRegex(
+                                MillefeuilleContractError,
+                                "input snapshot changed"
+                                if input_drift
+                                else "not a regular file",
+                            ),
+                        ):
+                            publish(plan, expected_preview_sha256=plan.preview_sha256)
+                    finally:
+                        if fifo:
+                            signal.setitimer(signal.ITIMER_REAL, 0)
+                            signal.signal(signal.SIGALRM, previous_handler)
+                substituted = run / failed_name
+                self.assertNotEqual(
+                    substituted.lstat().st_ino, (run / "displaced-output").stat().st_ino
+                )
+                if fifo:
+                    self.assertTrue(stat.S_ISFIFO(substituted.lstat().st_mode))
+                else:
+                    self.assertEqual(
+                        substituted.read_text(), (run / "displaced-output").read_text()
+                    )
+                if failed_name == "artifact-index.json":
+                    self.assertEqual(
+                        (run / "stage-manifest.json").read_text(),
+                        plan.stage_manifest_text,
+                    )
+                else:
+                    self.assertFalse((run / "artifact-index.json").exists())
+
+    @requires_secure_nofollow_writes
+    def test_input_drift_preserves_substituted_regular_output(self):
+        self._assert_substituted_entry_preserved(fifo=False)
+
+    @requires_secure_nofollow_writes
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "requires POSIX FIFOs")
+    def test_input_drift_preserves_fifo_without_blocking_open(self):
+        self._assert_substituted_entry_preserved(fifo=True)
+
+    @requires_secure_nofollow_writes
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "requires POSIX FIFOs")
+    def test_output_verification_preserves_fifo_without_blocking_open(self):
+        self._assert_substituted_entry_preserved(fifo=True, input_drift=False)
+
+    @requires_secure_nofollow_writes
+    def test_write_failure_preserves_created_output_for_operator_resolution(self):
+        for recovery, failed_name in (
+            (False, "stage-manifest.json"),
+            (False, "artifact-index.json"),
+            (True, "artifact-index.json"),
+        ):
+            with (
+                self.subTest(recovery=recovery, failed_name=failed_name),
+                tempfile.TemporaryDirectory() as temp,
+            ):
+                root = Path(temp)
+                pack, run = _saved_run(root)
+                loader, summary, card, index = _saved_output_refs(pack)
+                original_fsync = os.fsync
+                with loader, summary, card, index:
+                    plan = plan_multi_source_run_package(
+                        source_pack_root=root / "source-packs",
+                        item_key="ITEM1234",
+                        run_id=run.name,
+                    )
+                    if recovery:
+                        (run / "stage-manifest.json").write_text(
+                            plan.stage_manifest_text
+                        )
+
+                    def fail_output_fsync(
+                        fd,
+                        *,
+                        run=run,
+                        failed_name=failed_name,
+                        original_fsync=original_fsync,
+                    ):
+                        target = run / failed_name
+                        opened = os.fstat(fd)
+                        if target.exists() and opened.st_ino == target.stat().st_ino:
+                            raise OSError("synthetic output fsync failure")
+                        return original_fsync(fd)
+
+                    publish = (
+                        recover_partial_multi_source_run_package
+                        if recovery
+                        else publish_multi_source_run_package
+                    )
+                    with (
+                        patch("os.fsync", side_effect=fail_output_fsync),
+                        self.assertRaisesRegex(
+                            MillefeuilleContractError, "synthetic output fsync failure"
+                        ),
+                    ):
+                        publish(plan, expected_preview_sha256=plan.preview_sha256)
+                    expected = (
+                        plan.stage_manifest_text
+                        if failed_name == "stage-manifest.json"
+                        else plan.artifact_index_text
+                    )
+                    self.assertEqual((run / failed_name).read_text(), expected)
+                    # The retained entry is not a successful publication and
+                    # cannot be silently replaced by another ordinary attempt.
+                    with self.assertRaisesRegex(
+                        MillefeuilleContractError, "target already exists"
+                    ):
+                        publish(plan, expected_preview_sha256=plan.preview_sha256)
 
     @requires_secure_nofollow_writes
     def test_plan_is_read_only_and_publication_is_exact_and_append_only(self):
@@ -350,7 +549,7 @@ class MultiSourceRunPackageTests(unittest.TestCase):
             self.assertFalse((run / "stage-manifest.json").exists())
 
     @requires_secure_nofollow_writes
-    def test_ocr_or_mixed_route_is_not_labeled_native(self):
+    def test_upstream_builder_rejects_ocr_or_mixed_evidence(self):
         for selected_route in ("ocr", "merged-dual"):
             with (
                 self.subTest(selected_route=selected_route),
@@ -372,6 +571,58 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                         run_id=run.name,
                     )
                 self.assertFalse((run / "stage-manifest.json").exists())
+
+    @requires_secure_nofollow_writes
+    def test_planner_rejects_non_native_upstream_before_generating_stage_metadata(self):
+        for selected_route, structure_route in (
+            ("ocr", "ocr"),
+            ("merged-dual", "merged-dual"),
+            ("native", "ocr"),
+            ("ocr", "native"),
+        ):
+            with (
+                self.subTest(
+                    selected_route=selected_route, structure_route=structure_route
+                ),
+                tempfile.TemporaryDirectory() as temp,
+            ):
+                root = Path(temp)
+                pack, run = _saved_run(root)
+                # Validate the complete fixture with the real builder first. That
+                # builder currently only supports native; inject a future non-native
+                # result at its boundary to exercise the planner's own guard.
+                verified_upstream = build_multi_source_summary_package(
+                    route_evidence_path=pack / "selected/route.json",
+                    structure_evidence_path=pack / "structure/structure.json",
+                    output_dir=run,
+                    validation_only=True,
+                )
+                loader, summary, card, index = _saved_output_refs(pack)
+                with (
+                    loader,
+                    summary,
+                    card,
+                    index,
+                    patch(
+                        "millefeuille.domain.multi_source_run_package.build_multi_source_summary_package",
+                        return_value={
+                            **verified_upstream,
+                            "selected_route": selected_route,
+                            "structure_route": structure_route,
+                        },
+                    ),
+                    self.assertRaisesRegex(
+                        MillefeuilleContractError,
+                        "run package requires verified native-only extraction",
+                    ),
+                ):
+                    plan_multi_source_run_package(
+                        source_pack_root=root / "source-packs",
+                        item_key="ITEM1234",
+                        run_id=run.name,
+                    )
+                self.assertFalse((run / "stage-manifest.json").exists())
+                self.assertFalse((run / "artifact-index.json").exists())
 
     @requires_secure_nofollow_writes
     def test_relative_root_cannot_retarget_publication_after_chdir(self):
@@ -444,7 +695,7 @@ class MultiSourceRunPackageTests(unittest.TestCase):
             )
 
     @requires_secure_nofollow_writes
-    def test_input_change_during_write_rolls_back_new_file(self):
+    def test_input_change_during_write_preserves_new_file(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             pack, run = _saved_run(root)
@@ -476,7 +727,9 @@ class MultiSourceRunPackageTests(unittest.TestCase):
                     publish_multi_source_run_package(
                         plan, expected_preview_sha256=plan.preview_sha256
                     )
-            self.assertFalse((run / "stage-manifest.json").exists())
+            self.assertEqual(
+                (run / "stage-manifest.json").read_text(), plan.stage_manifest_text
+            )
             self.assertFalse((run / "artifact-index.json").exists())
 
     @requires_secure_nofollow_writes
