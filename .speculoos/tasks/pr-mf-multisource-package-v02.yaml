@@ -1,0 +1,42 @@
+id: pr-mf-multisource-package-v02
+title: Plan a verified multi-source run package from saved outputs
+status: in-progress
+branch: feat/pr-mf-multisource-package-v02-compliant-20260930
+base_branch: dev
+post_merge_expected:
+  pull_request: 172
+  base_branch: dev
+  head_branch: feat/pr-mf-multisource-package-v02-compliant-20260930
+  head_sha: merge-plan-exact-head
+  merge_actor: user_api
+  delete_branch_after_merge: true
+write_paths:
+  - .speculoos/tasks/pr-mf-multisource-package-v02.yaml
+  - millefeuille/domain/multi_source_summary.py
+  - millefeuille/domain/multi_source_run_package.py
+  - millefeuille/domain/secure_io.py
+  - tests/test_millefeuille_multi_source_run_package.py
+  - specs/millefeuille-pipeline/multi-source-materialization.md
+  - specs/millefeuille-pipeline/multi-source-run-package.md
+github:
+  issue: null
+  pull_request: null
+  url: null
+  head_sha: null
+scope:
+  - Verify every v0.2 source PDF, page attribution, summary, card and native index before planning a flat run package
+  - Preview exactly stage-manifest.json and artifact-index.json with stable byte hashes and zero provider calls
+  - Require an exact preview hash and unchanged inputs for append-only publication
+acceptance:
+  - Synthetic PDF mutation, unsafe run identity and overwrite cases fail closed
+  - Failed publication and recovery preserve created or substituted outputs without automatic deletion or a blocking FIFO read
+  - The planner independently rejects non-native upstream results before proposing native-only stage metadata
+  - The saved two-PDF CollaGAN run plans without permanent writes and resolves as a complete package in memory
+  - Focused tests, Ruff, metadata and private-data checks pass
+publication_boundary:
+  statement: Repository code, synthetic tests and docs only. The live private run-package write requires a separate exact-output approval. This PR makes no GPT, OCR, Zotero, OpenKB, source-pack, index or release write.
+documentation_impact:
+  status: none
+  rationale: The pipeline specification documents preservation of outputs after a failed write and the native-only provenance boundary. No README or docs/ user-facing surface changes.
+publish_authority: Existing user approval covers isolated GCP implementation and feature-to-dev repository publication.
+private_data_scan: Required; test fixtures are synthetic.

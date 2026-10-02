@@ -501,9 +501,7 @@ def _open_windows_locked_regular_file_fd(
     if handle == invalid_handle_value:
         error = ctypes.get_last_error()
         detail = ctypes.FormatError(error).strip()
-        raise MillefeuilleContractError(
-            f"could not open {label} {path}: {detail}"
-        )
+        raise MillefeuilleContractError(f"could not open {label} {path}: {detail}")
 
     crt_flags = os.O_RDONLY
     if hasattr(os, "O_BINARY"):
@@ -1228,12 +1226,16 @@ def write_new_text_no_follow(
     label: str,
     *,
     forbidden_ancestor_markers: frozenset[str] = frozenset(),
+    expected_parent_identity: tuple[int, int] | None = None,
+    preserve_created_on_failure: bool = False,
 ) -> None:
     """Create one new UTF-8 file through pinned no-follow descriptors.
 
     Existing outputs are never replaced. Missing parent directories are made
     descriptor-relatively, and the parent plus final name are rebound after the
     write so a concurrent rename or symlink substitution fails closed.
+    Callers requiring operator resolution can preserve created entries on
+    failure instead of attempting name-based cleanup.
     """
 
     if not _supports_no_follow():
@@ -1250,6 +1252,18 @@ def write_new_text_no_follow(
         forbidden_ancestor_markers=forbidden_ancestor_markers,
     )
     parent_identity = os.fstat(parent_fd)
+    if (
+        expected_parent_identity is not None
+        and (
+            parent_identity.st_dev,
+            parent_identity.st_ino,
+        )
+        != expected_parent_identity
+    ):
+        os.close(parent_fd)
+        raise MillefeuilleContractError(
+            f"{label} parent directory changed after approval: {target.parent}"
+        )
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
     if hasattr(os, "O_CLOEXEC"):
         flags |= os.O_CLOEXEC
@@ -1327,7 +1341,11 @@ def write_new_text_no_follow(
             os.close(rebound_parent_fd)
         os.fsync(parent_fd)
     except Exception as exc:
-        if fd is not None and opened_identity is not None:
+        if (
+            not preserve_created_on_failure
+            and fd is not None
+            and opened_identity is not None
+        ):
             try:
                 named_stat = os.stat(
                     target.name,
