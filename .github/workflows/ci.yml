@@ -99,8 +99,14 @@ jobs:
         python-version: ["3.13"]
     env:
       EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-      NATIVE_ROOT: ${{ runner.temp }}/millefeuille-native-head-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
+      - name: Bind native scratch root
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $native = Join-Path $env:RUNNER_TEMP "millefeuille-native-head-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          "NATIVE_ROOT=$native" | Out-File -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Check out exact pull request head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
