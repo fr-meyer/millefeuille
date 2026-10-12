@@ -23,8 +23,8 @@ write_paths:
   - tests/test_millefeuille_retrieval_batch.py
 github:
   issue: null
-  pull_request: null
-  url: null
+  pull_request: 175
+  url: https://github.com/fr-meyer/millefeuille/pull/175
   head_sha: null
 scope:
   - Bind exactly the validated original-run layout including run_id summaries
@@ -46,3 +46,10 @@ documentation_impact:
   rationale: The native transaction specification documents implementation semantics; no user-facing README or docs surface changes are required.
 publish_authority: Isolated GCP source implementation is explicitly authorized; repository publication and private effects require separate approval.
 private_data_scan: Required; fixtures and failure mutations are synthetic.
+post_merge_expected:
+  pull_request: 175
+  base_branch: dev
+  head_branch: fix/pr-mf-native-metadata-transactions-20261012
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
