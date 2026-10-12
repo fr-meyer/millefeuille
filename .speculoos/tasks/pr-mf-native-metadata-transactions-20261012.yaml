@@ -1,0 +1,36 @@
+id: pr-mf-native-metadata-transactions-20261012
+title: Protect native metadata and acceptance persistence
+status: in-progress
+branch: fix/pr-mf-native-metadata-transactions-20261012
+base_branch: dev
+write_paths:
+  - .speculoos/tasks/pr-mf-native-metadata-transactions-20261012.yaml
+  - millefeuille/domain/metadata_transaction.py
+  - millefeuille/domain/stage_runtime.py
+  - millefeuille/domain/artifacts.py
+  - millefeuille/domain/acceptance.py
+  - tests/test_millefeuille_metadata_transaction.py
+  - specs/millefeuille-pipeline/native-metadata-transactions.md
+  - millefeuille/domain/artifact_writer.py
+  - millefeuille/domain/status_observability.py
+github:
+  issue: null
+  pull_request: null
+  url: null
+  head_sha: null
+scope:
+  - Bind exactly the validated original-run layout including run_id summaries
+  - Replace unsafe native pathname writes with descriptor-anchored transactions
+  - Commit each run metadata pair and acceptance reports under one native reader barrier
+  - Preserve exact backups and require recovery after ownership drift or rollback failure
+acceptance:
+  - Original native symlink and partial-acceptance regressions fail without errors
+  - Repaired synthetic transactions, affected native callers, Ruff, format, metadata and diff checks pass
+  - No raw multi-file atomicity or unconditional rollback claim
+publication_boundary:
+  statement: Source code, synthetic fixtures and task/spec metadata only. No private source-pack, provider, broker, credential, GCP management, index, model or release effects. Live journals, replacements, reports and recovery require separate exact authorization.
+documentation_impact:
+  status: updated
+  rationale: Describe native commit, reader visibility, rollback and recovery semantics.
+publish_authority: Isolated GCP source implementation is explicitly authorized; repository publication and private effects require separate approval.
+private_data_scan: Required; fixtures and failure mutations are synthetic.

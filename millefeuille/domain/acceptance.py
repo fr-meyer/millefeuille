@@ -25,6 +25,7 @@ from millefeuille.domain.index_fixtures import (
     INDEX_STATUS_REF,
     load_retrieval_index_status,
 )
+from millefeuille.domain.metadata_transaction import capture_run_inputs
 from millefeuille.domain.millefeuille import (
     AcceptanceBatchRunRecord,
     AcceptanceBatchSummaryRecord,
@@ -120,6 +121,15 @@ class AcceptanceBatchWriteResult:
         }
 
 
+def _acceptance_input_guard(resolved, handoff_path=None, duplicate_scan_path=None):
+    extra = [
+        Path(path) for path in (handoff_path, duplicate_scan_path) if path is not None
+    ]
+    return capture_run_inputs(
+        resolved.source_pack_root, resolved.source_pack_dir, resolved.run_dir, extra
+    )
+
+
 def write_acceptance_summary(
     *,
     source_pack_root: str | Path,
@@ -139,12 +149,15 @@ def write_acceptance_summary(
         artifact_root=artifact_root,
         stage_manifest=stage_manifest,
     )
+    input_guard = _acceptance_input_guard(resolved, handoff_path, duplicate_scan_path)
     summary = _build_acceptance_summary(
         resolved=resolved,
         handoff_path=handoff_path,
         duplicate_scan_path=duplicate_scan_path,
     )
-    return _persist_acceptance_summary(resolved=resolved, summary=summary)
+    return _persist_acceptance_summary(
+        resolved=resolved, summary=summary, input_guard=input_guard
+    )
 
 
 def write_acceptance_batch_summary(
@@ -162,7 +175,7 @@ def write_acceptance_batch_summary(
     """
 
     batch_id, run_locators = _load_acceptance_batch_manifest(batch_manifest_path)
-    prepared: list[tuple[ResolvedRunArtifacts, AcceptanceSummaryRecord]] = []
+    prepared = []
     for locator in run_locators:
         resolved = resolve_run_artifacts(
             source_pack_root=source_pack_root,
@@ -170,15 +183,18 @@ def write_acceptance_batch_summary(
             paper_id=locator.get("paper_id"),
             item_key=locator.get("item_key"),
         )
+        input_guard = _acceptance_input_guard(
+            resolved, handoff_path, duplicate_scan_path
+        )
         summary = _build_acceptance_summary(
             resolved=resolved,
             handoff_path=handoff_path,
             duplicate_scan_path=duplicate_scan_path,
         )
-        prepared.append((resolved, summary))
+        prepared.append((resolved, summary, input_guard))
 
     prepared.sort(key=lambda item: (item[0].paper_id, item[0].run_id))
-    identities = [(resolved.paper_id, resolved.run_id) for resolved, _ in prepared]
+    identities = [(resolved.paper_id, resolved.run_id) for resolved, _, _ in prepared]
     if len(identities) != len(set(identities)):
         raise MillefeuilleContractError(
             "acceptance batch runs must have unique paper_id/run_id pairs"
@@ -186,8 +202,10 @@ def write_acceptance_batch_summary(
 
     root = Path(source_pack_root)
     run_records: list[AcceptanceBatchRunRecord] = []
-    for resolved, summary in prepared:
-        result = _persist_acceptance_summary(resolved=resolved, summary=summary)
+    for resolved, summary, input_guard in prepared:
+        result = _persist_acceptance_summary(
+            resolved=resolved, summary=summary, input_guard=input_guard
+        )
         run_records.append(
             AcceptanceBatchRunRecord(
                 paper_id=resolved.paper_id,
@@ -236,11 +254,10 @@ def _persist_acceptance_summary(
     *,
     resolved: ResolvedRunArtifacts,
     summary: AcceptanceSummaryRecord,
+    input_guard=None,
 ) -> AcceptanceWriteResult:
     summary_path = resolved.run_dir / ACCEPTANCE_SUMMARY_REF
     markdown_path = resolved.run_dir / ACCEPTANCE_SUMMARY_MARKDOWN_REF
-    write_json_object(summary_path, summary.to_dict())
-    write_text(markdown_path, _render_acceptance_markdown(summary))
 
     summary_ref = relative_ref(summary_path, resolved.run_dir)
     markdown_ref = relative_ref(markdown_path, resolved.run_dir)
@@ -283,6 +300,14 @@ def _persist_acceptance_summary(
         resolved,
         stage_manifest=stage_manifest,
         artifact_index=artifact_index,
+        extra_outputs={
+            str(ACCEPTANCE_SUMMARY_REF): json.dumps(
+                summary.to_dict(), indent=2, sort_keys=True
+            )
+            + "\n",
+            str(ACCEPTANCE_SUMMARY_MARKDOWN_REF): _render_acceptance_markdown(summary),
+        },
+        verify_inputs=input_guard,
     )
     return AcceptanceWriteResult(
         paper_id=resolved.paper_id,
