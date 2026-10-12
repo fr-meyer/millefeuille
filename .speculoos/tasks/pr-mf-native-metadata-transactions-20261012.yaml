@@ -4,15 +4,23 @@ status: in-progress
 branch: fix/pr-mf-native-metadata-transactions-20261012
 base_branch: dev
 write_paths:
+  - .github/scripts/native_windows/adapter.py
+  - .github/scripts/native_windows/controller.py
+  - .github/scripts/native_windows/manifest.json
+  - .github/scripts/native_windows/native_controls.py
+  - .github/scripts/native_windows/worker.py
+  - .github/workflows/ci.yml
   - .speculoos/tasks/pr-mf-native-metadata-transactions-20261012.yaml
+  - millefeuille/domain/acceptance.py
+  - millefeuille/domain/artifact_writer.py
+  - millefeuille/domain/artifacts.py
+  - millefeuille/domain/classification.py
   - millefeuille/domain/metadata_transaction.py
   - millefeuille/domain/stage_runtime.py
-  - millefeuille/domain/artifacts.py
-  - millefeuille/domain/acceptance.py
-  - tests/test_millefeuille_metadata_transaction.py
-  - specs/millefeuille-pipeline/native-metadata-transactions.md
-  - millefeuille/domain/artifact_writer.py
   - millefeuille/domain/status_observability.py
+  - specs/millefeuille-pipeline/native-metadata-transactions.md
+  - tests/test_millefeuille_metadata_transaction.py
+  - tests/test_millefeuille_retrieval_batch.py
 github:
   issue: null
   pull_request: null
@@ -23,10 +31,14 @@ scope:
   - Replace unsafe native pathname writes with descriptor-anchored transactions
   - Commit each run metadata pair and acceptance reports under one native reader barrier
   - Preserve exact backups and require recovery after ownership drift or rollback failure
+  - Preserve materialized classification bindings for byte-identical repeat runs
+  - Run three prototype native Windows controls and current-head tests in bounded GitHub Actions
 acceptance:
   - Original native symlink and partial-acceptance regressions fail without errors
   - Repaired synthetic transactions, affected native callers, Ruff, format, metadata and diff checks pass
   - No raw multi-file atomicity or unconditional rollback claim
+  - Existing six merge-result CI jobs and the additive exact-head Windows job all pass before readiness
+  - Three native controls have positive capability baselines and zero skips, errors or failures
 publication_boundary:
   statement: Source code, synthetic fixtures and task/spec metadata only. No private source-pack, provider, broker, credential, GCP management, index, model or release effects. Live journals, replacements, reports and recovery require separate exact authorization.
 documentation_impact:

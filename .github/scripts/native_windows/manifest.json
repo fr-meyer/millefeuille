@@ -1,0 +1,42 @@
+{
+  "actual_candidate_modules": true,
+  "schema": "millefeuille.native-windows-public-source-manifest/v1",
+  "scope": "Three prototype native controls only; current head role hashes bound. Normal exact-head full tests remain required and separate.",
+  "sources": [
+    {
+      "bytes": 97480,
+      "module": "millefeuille.domain.millefeuille",
+      "path": "millefeuille/domain/millefeuille.py",
+      "sha256": "06c8b8f990c5a39e28eef73a8f972a4f4dbda10d8fc6858603062fd730df474c"
+    },
+    {
+      "bytes": 49272,
+      "module": "millefeuille.domain.secure_io",
+      "path": "millefeuille/domain/secure_io.py",
+      "sha256": "1fdc419aa564cb0ad2cb2be94ff39b856c94486feeb648d48ace0a49bcb72615"
+    },
+    {
+      "bytes": 28196,
+      "module": "millefeuille.domain.metadata_transaction",
+      "path": "millefeuille/domain/metadata_transaction.py",
+      "sha256": "b83abe465f21de3cb6837e18bec0f50713a395677432cf84d19693677b814632"
+    },
+    {
+      "bytes": 29766,
+      "module": "collagan_windows_adapter",
+      "path": ".github/scripts/native_windows/adapter.py",
+      "sha256": "05228085cab406b145bc5aaf6efc083d4f472a42c5e057ac881aff6784a5bd8e"
+    },
+    {
+      "bytes": 38069,
+      "module": "collagan_windows_tests",
+      "path": ".github/scripts/native_windows/native_controls.py",
+      "sha256": "3f942247642dc80ce549951d7b1253258c7370de2c390be20e9d804d84dc35f3"
+    }
+  ],
+  "worker": {
+    "bytes": 3567,
+    "path": ".github/scripts/native_windows/worker.py",
+    "sha256": "7dc920694eaabf057c271c22eb4ddd6c64d0faac3523c452064a53f9c27027eb"
+  }
+}

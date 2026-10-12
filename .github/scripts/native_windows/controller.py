@@ -1,0 +1,517 @@
+"""UNQUALIFIED offline Windows launcher proposal; no authorized executor exists.
+
+Create a suspended child, assign/query a bounded JobObject, then resume. This
+controller must itself receive native resource/failure qualification before a
+production or application compatibility claim. It never installs or uploads.
+"""
+
+import argparse
+import ctypes
+from ctypes import wintypes as w
+import hashlib
+import json
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+
+MEMORY = 536870912
+RESERVE = 33554432
+SCRATCH_CEILING = 268435456
+LOG_LIMIT = 131072
+FLAGS = 0x8 | 0x10 | 0x100 | 0x200 | 0x400 | 0x2000
+
+
+class BasicLimit(ctypes.Structure):
+    _fields_ = [
+        ("process_time", ctypes.c_int64),
+        ("job_time", ctypes.c_int64),
+        ("flags", w.DWORD),
+        ("minimum_ws", ctypes.c_size_t),
+        ("maximum_ws", ctypes.c_size_t),
+        ("active_limit", w.DWORD),
+        ("affinity", ctypes.c_size_t),
+        ("priority", w.DWORD),
+        ("scheduling", w.DWORD),
+    ]
+
+
+class IoCounters(ctypes.Structure):
+    _fields_ = [
+        (name, ctypes.c_uint64)
+        for name in ("read_ops", "write_ops", "other_ops", "read", "write", "other")
+    ]
+
+
+class ExtendedLimit(ctypes.Structure):
+    _fields_ = [
+        ("basic", BasicLimit),
+        ("io", IoCounters),
+        ("process_memory", ctypes.c_size_t),
+        ("job_memory", ctypes.c_size_t),
+        ("peak_process", ctypes.c_size_t),
+        ("peak_job", ctypes.c_size_t),
+    ]
+
+
+class CpuRate(ctypes.Structure):
+    _fields_ = [("flags", w.DWORD), ("rate", w.DWORD)]
+
+
+class Accounting(ctypes.Structure):
+    _fields_ = [
+        (name, ctypes.c_int64)
+        for name in ("total_user", "total_kernel", "period_user", "period_kernel")
+    ] + [
+        (name, w.DWORD)
+        for name in ("page_faults", "total_processes", "active", "terminated")
+    ]
+
+
+class Startup(ctypes.Structure):
+    _fields_ = [
+        ("cb", w.DWORD),
+        ("reserved", w.LPWSTR),
+        ("desktop", w.LPWSTR),
+        ("title", w.LPWSTR),
+    ] + [
+        (name, w.DWORD)
+        for name in ("x", "y", "width", "height", "chars_x", "chars_y", "fill", "flags")
+    ]
+    _fields_ += [
+        ("show", w.WORD),
+        ("reserved_size", w.WORD),
+        ("reserved_bytes", ctypes.c_void_p),
+        ("stdin", w.HANDLE),
+        ("stdout", w.HANDLE),
+        ("stderr", w.HANDLE),
+    ]
+
+
+class ProcessInfo(ctypes.Structure):
+    _fields_ = [
+        ("process", w.HANDLE),
+        ("thread", w.HANDLE),
+        ("pid", w.DWORD),
+        ("tid", w.DWORD),
+    ]
+
+
+class MemoryStatus(ctypes.Structure):
+    _fields_ = [("length", w.DWORD), ("load", w.DWORD)] + [
+        (name, ctypes.c_uint64)
+        for name in (
+            "total_phys",
+            "available_phys",
+            "total_page",
+            "available_page",
+            "total_virtual",
+            "available_virtual",
+            "available_extended",
+        )
+    ]
+
+
+def digest(path):
+    value = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1048576), b""):
+            value.update(chunk)
+    return value.hexdigest()
+
+
+def require_plain(path, directory=False):
+    assert path.is_absolute() and not str(path).startswith("\\\\")
+    assert ".." not in path.parts
+    for parent in reversed((path.parent, *path.parent.parents)):
+        info = parent.lstat()
+        assert stat.S_ISDIR(info.st_mode)
+        assert not info.st_file_attributes & 0x400, "reparse ancestor"
+    info = path.lstat()
+    assert not info.st_file_attributes & 0x400, "reparse input"
+    assert stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
+    return [info.st_dev, info.st_ino, info.st_size]
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--source-root", required=True)
+    p.add_argument("--scratch-parent", required=True)
+    p.add_argument("--manifest", required=True)
+    p.add_argument("--manifest-sha256", required=True)
+    p.add_argument("--python", required=True)
+    p.add_argument("--python-sha256", required=True)
+    p.add_argument("--route-id", required=True)
+    p.add_argument("--owner-clearance-id", required=True)
+    p.add_argument("--carried-scratch-bytes", type=int, required=True)
+    args = p.parse_args()
+    started = time.monotonic()
+    report = {
+        "schema": "millefeuille.native-windows-controller-proposal/v1",
+        "status": "stopped-preserve-and-reconcile",
+        "native_qualification": False,
+        "production_dispatch": False,
+        "application_candidate_qualified": False,
+        "route_id_operator_provided": args.route_id,
+        "owner_clearance_id_operator_provided": args.owner_clearance_id,
+        "external_permission_verified_by_this_code": False,
+        "private_provider_broker_model_operations": 0,
+        "owned_operations_in_flight": 0,
+        "failures": [],
+    }
+    job = scratch = None
+    process = ProcessInfo()
+    kernel = None
+    assigned = resumed = False
+    exit_code = None
+    phase = "route-and-platform-admission"
+    try:
+        assert os.name == "nt" and sys.platform == "win32"
+        assert sys.maxsize > 2**32 and ctypes.sizeof(ExtendedLimit) == 144
+        assert args.route_id.strip() and args.owner_clearance_id.strip()
+        assert args.carried_scratch_bytes >= 204000000
+        assert args.carried_scratch_bytes + RESERVE <= SCRATCH_CEILING
+        source = Path(args.source_root)
+        parent = Path(args.scratch_parent)
+        manifest_path = Path(args.manifest)
+        python = Path(args.python)
+        require_plain(source, True)
+        require_plain(parent, True)
+        require_plain(manifest_path)
+        require_plain(python)
+        assert manifest_path.stat().st_size <= 131072
+        assert digest(manifest_path) == args.manifest_sha256
+        assert digest(python) == args.python_sha256
+        manifest = json.loads(manifest_path.read_text())
+        assert (
+            manifest["schema"]
+            == "millefeuille.native-windows-public-source-manifest/v1"
+        )
+        expected_sources = {}
+        for record in manifest["sources"] + [manifest["worker"]]:
+            relative = Path(record["path"])
+            assert not relative.is_absolute() and ".." not in relative.parts
+            path = source / relative
+            require_plain(path)
+            assert path.stat().st_size == record["bytes"] <= 1048576
+            assert digest(path) == record["sha256"]
+            expected_sources[str(path)] = record["sha256"]
+        assert sum(record["bytes"] for record in manifest["sources"]) <= 1048576
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+
+        def bind(name, restype, types):
+            value = getattr(kernel, name)
+            value.restype, value.argtypes = restype, types
+            return value
+
+        handle, void, uint = w.HANDLE, ctypes.c_void_p, w.DWORD
+        bind("CreateJobObjectW", handle, [void, w.LPCWSTR])
+        bind("SetInformationJobObject", w.BOOL, [handle, ctypes.c_int, void, uint])
+        bind(
+            "QueryInformationJobObject",
+            w.BOOL,
+            [handle, ctypes.c_int, void, uint, ctypes.POINTER(uint)],
+        )
+        bind("AssignProcessToJobObject", w.BOOL, [handle, handle])
+        bind("IsProcessInJob", w.BOOL, [handle, handle, ctypes.POINTER(w.BOOL)])
+        bind("GetCurrentProcess", handle, [])
+        bind(
+            "GetProcessAffinityMask",
+            w.BOOL,
+            [handle, ctypes.POINTER(ctypes.c_size_t), ctypes.POINTER(ctypes.c_size_t)],
+        )
+        bind("GetActiveProcessorCount", uint, [w.WORD])
+        bind(
+            "CreateProcessW",
+            w.BOOL,
+            [
+                w.LPCWSTR,
+                w.LPWSTR,
+                void,
+                void,
+                w.BOOL,
+                uint,
+                void,
+                w.LPCWSTR,
+                ctypes.POINTER(Startup),
+                ctypes.POINTER(ProcessInfo),
+            ],
+        )
+        bind("ResumeThread", uint, [handle])
+        bind("WaitForSingleObject", uint, [handle, uint])
+        bind("GetExitCodeProcess", w.BOOL, [handle, ctypes.POINTER(uint)])
+        bind("TerminateJobObject", w.BOOL, [handle, uint])
+        bind("TerminateProcess", w.BOOL, [handle, uint])
+        bind("CloseHandle", w.BOOL, [handle])
+        bind("GlobalMemoryStatusEx", w.BOOL, [ctypes.POINTER(MemoryStatus)])
+        bind(
+            "GetVolumeInformationW",
+            w.BOOL,
+            [
+                w.LPCWSTR,
+                w.LPWSTR,
+                uint,
+                ctypes.POINTER(uint),
+                ctypes.POINTER(uint),
+                ctypes.POINTER(uint),
+                w.LPWSTR,
+                uint,
+            ],
+        )
+
+        def checked(value):
+            if not value:
+                raise ctypes.WinError(ctypes.get_last_error())
+            return value
+
+        def query(info_class, structure):
+            value = structure()
+            checked(
+                kernel.QueryInformationJobObject(
+                    job, info_class, ctypes.byref(value), ctypes.sizeof(value), None
+                )
+            )
+            return value
+
+        memory = MemoryStatus()
+        memory.length = ctypes.sizeof(memory)
+        checked(kernel.GlobalMemoryStatusEx(ctypes.byref(memory)))
+        assert memory.available_phys >= 1073741824
+        import shutil
+
+        free = shutil.disk_usage(parent).free
+        assert free >= 67108864
+        fs = ctypes.create_unicode_buffer(32)
+        checked(
+            kernel.GetVolumeInformationW(
+                parent.anchor, None, 0, None, None, None, fs, len(fs)
+            )
+        )
+        assert fs.value.upper() == "NTFS"
+        process_mask, system_mask = ctypes.c_size_t(), ctypes.c_size_t()
+        checked(
+            kernel.GetProcessAffinityMask(
+                kernel.GetCurrentProcess(),
+                ctypes.byref(process_mask),
+                ctypes.byref(system_mask),
+            )
+        )
+        assert process_mask.value and system_mask.value
+        affinity = process_mask.value & -process_mask.value
+        processors = kernel.GetActiveProcessorCount(0xFFFF)
+        assert 1 <= processors <= 10000
+        report["admission"] = {
+            "available_phys_bytes": memory.available_phys,
+            "scratch_volume": fs.value,
+            "disk_free_bytes": free,
+            "active_processors": processors,
+            "one_logical_cpu_affinity": affinity,
+            "carried_scratch_bytes": args.carried_scratch_bytes,
+            "new_scratch_reservation_bytes": RESERVE,
+            "Windows_swap0_qualified": False,
+        }
+        job = checked(kernel.CreateJobObjectW(None, None))
+        limit = ExtendedLimit()
+        limit.basic.flags, limit.basic.active_limit = FLAGS, 1
+        limit.basic.affinity = affinity
+        limit.process_memory = limit.job_memory = MEMORY
+        checked(
+            kernel.SetInformationJobObject(
+                job, 9, ctypes.byref(limit), ctypes.sizeof(limit)
+            )
+        )
+        cpu = CpuRate(5, 10000 // processors)
+        checked(
+            kernel.SetInformationJobObject(
+                job, 15, ctypes.byref(cpu), ctypes.sizeof(cpu)
+            )
+        )
+        observed, observed_cpu = query(9, ExtendedLimit), query(15, CpuRate)
+        assert observed.basic.flags & FLAGS == FLAGS
+        assert not observed.basic.flags & (0x800 | 0x1000)
+        assert observed.basic.affinity == affinity and observed.basic.active_limit == 1
+        assert observed.process_memory == observed.job_memory == MEMORY
+        assert observed_cpu.flags == 5 and observed_cpu.rate == cpu.rate
+        report["job_limits_readback"] = {
+            "flags": observed.basic.flags,
+            "memory_commit_bytes": observed.job_memory,
+            "active_process_limit": 1,
+            "affinity": affinity,
+            "cpu_rate": cpu.rate,
+            "launcher_included_in_child_job_memory_limit": False,
+        }
+        scratch = Path(tempfile.mkdtemp(prefix="mf-native-win3-", dir=parent))
+        require_plain(scratch, True)
+        report["evidence_root"] = str(scratch)
+        command = subprocess.list2cmdline(
+            [
+                str(python),
+                "-I",
+                "-B",
+                str(source / manifest["worker"]["path"]),
+                str(source),
+                str(scratch),
+                str(manifest_path),
+                args.manifest_sha256,
+            ]
+        )
+        environment = {
+            "SystemRoot": os.environ["SYSTEMROOT"],
+            "WINDIR": os.environ["SYSTEMROOT"],
+            "TEMP": str(scratch),
+            "TMP": str(scratch),
+            "PATH": str(python.parent) + ";" + os.environ["SYSTEMROOT"] + "\\System32",
+        }
+        env = ctypes.create_unicode_buffer(
+            "\0".join(key + "=" + value for key, value in sorted(environment.items()))
+            + "\0\0"
+        )
+        startup = Startup()
+        startup.cb = ctypes.sizeof(startup)
+        phase = "suspended-create-and-verified-job-assignment"
+        checked(
+            kernel.CreateProcessW(
+                str(python),
+                ctypes.create_unicode_buffer(command),
+                None,
+                None,
+                False,
+                0x4 | 0x400 | 0x08000000,
+                ctypes.cast(env, void),
+                str(scratch),
+                ctypes.byref(startup),
+                ctypes.byref(process),
+            )
+        )
+        report["owned_operations_in_flight"] = 1
+        checked(kernel.AssignProcessToJobObject(job, process.process))
+        assigned = True
+        belongs = w.BOOL()
+        checked(kernel.IsProcessInJob(process.process, job, ctypes.byref(belongs)))
+        assert belongs.value and query(1, Accounting).active == 1
+        child_mask, child_system = ctypes.c_size_t(), ctypes.c_size_t()
+        checked(
+            kernel.GetProcessAffinityMask(
+                process.process, ctypes.byref(child_mask), ctypes.byref(child_system)
+            )
+        )
+        assert child_mask.value == affinity
+        assert time.monotonic() - started < 285, "setup exceeded worker window"
+        assert kernel.ResumeThread(process.thread) == 1
+        resumed = True
+        phase = "native-three-controls"
+        while kernel.WaitForSingleObject(process.process, 100) == 0x102:
+            assert time.monotonic() - started < 290, "native worker deadline"
+            size = sum(
+                path.lstat().st_size
+                for path in scratch.rglob("*")
+                if path.is_file() and not path.is_symlink()
+            )
+            assert size <= RESERVE, "scratch reservation exceeded"
+            for name in ("stdout.log", "stderr.log", "worker-result.json"):
+                path = scratch / name
+                assert not path.exists() or path.stat().st_size <= LOG_LIMIT
+        code = uint()
+        checked(kernel.GetExitCodeProcess(process.process, ctypes.byref(code)))
+        exit_code = code.value
+        report["worker_exit"] = exit_code
+        result_path = scratch / "worker-result.json"
+        assert result_path.stat().st_size <= LOG_LIMIT
+        result = json.loads(result_path.read_text())
+        report["worker_result"] = result
+        assert result["platform"] == "win32" and result["tests_run"] == 3
+        assert result["failures"] == result["errors"] == result["skips"] == 0
+        assert exit_code == 0
+        assert {
+            path: digest(Path(path)) for path in expected_sources
+        } == expected_sources
+        report["source_inputs_unchanged"] = True
+        report["native_qualification"] = "three prototype controls only"
+        report["status"] = "native-three-controls-pass-production-unqualified"
+    except Exception as error:
+        report["failures"].append(
+            {"phase": phase, "type": type(error).__name__, "reason": str(error)[:600]}
+        )
+    finally:
+        if kernel is not None and process.process:
+            try:
+                if kernel.WaitForSingleObject(process.process, 0) == 0x102:
+                    if assigned:
+                        if not kernel.TerminateJobObject(job, 73):
+                            raise ctypes.WinError(ctypes.get_last_error())
+                    elif not kernel.TerminateProcess(process.process, 73):
+                        raise ctypes.WinError(ctypes.get_last_error())
+                    assert kernel.WaitForSingleObject(process.process, 10000) == 0
+                code = w.DWORD()
+                assert kernel.GetExitCodeProcess(process.process, ctypes.byref(code))
+                assert code.value != 259
+                report["owned_operations_in_flight"] = 0
+                report["terminal_worker_exit"] = code.value
+                if job:
+                    final_limit = query(9, ExtendedLimit)
+                    report["worker_peak_committed_memory_bytes"] = final_limit.peak_job
+                    active = query(1, Accounting).active
+                    report["worker_job_active_processes"] = active
+                    if active:
+                        report["owned_operations_in_flight"] = active
+                        raise RuntimeError("owned job still reports active processes")
+            except Exception as error:
+                report["failures"].append(
+                    {"phase": "termination/readback", "reason": str(error)[:600]}
+                )
+        if kernel is not None:
+            for handle in (process.thread, process.process, job):
+                if handle:
+                    kernel.CloseHandle(handle)
+        if scratch is not None:
+            report["logs"] = []
+            for name in ("stdout.log", "stderr.log", "worker-result.json"):
+                path = scratch / name
+                if path.exists():
+                    report["logs"].append(
+                        {
+                            "path": str(path),
+                            "bytes": path.stat().st_size,
+                            "sha256": digest(path),
+                        }
+                    )
+                    if path.stat().st_size > LOG_LIMIT:
+                        report["failures"].append(
+                            {
+                                "phase": "final-resource-accounting",
+                                "reason": name + " exceeded final log limit",
+                            }
+                        )
+            used = sum(
+                path.lstat().st_size
+                for path in scratch.rglob("*")
+                if path.is_file() and not path.is_symlink()
+            )
+            report["retained_scratch_bytes"] = used
+            report["cumulative_scratch_upper_bytes"] = args.carried_scratch_bytes + used
+            report["scratch_reservation_met"] = used <= RESERVE
+            if used > RESERVE or args.carried_scratch_bytes + used > SCRATCH_CEILING:
+                report["failures"].append(
+                    {
+                        "phase": "final-resource-accounting",
+                        "reason": "final scratch limit exceeded",
+                    }
+                )
+        if report["failures"]:
+            report["status"] = "stopped-preserve-and-reconcile"
+            report["native_qualification"] = False
+        report["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        report["child_resumed"] = resumed
+        report["terminal"] = report["owned_operations_in_flight"] == 0
+        report["resource_controller_native_qualification_pending"] = True
+        encoded = json.dumps(report, sort_keys=True)
+        assert len(encoded.encode()) <= LOG_LIMIT
+        print(encoded)
+    return 0 if not report["failures"] and report["native_qualification"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
