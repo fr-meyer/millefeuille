@@ -42,7 +42,7 @@ acceptance:
 publication_boundary:
   statement: Source code, synthetic fixtures and task/spec metadata only. No private source-pack, provider, broker, credential, GCP management, index, model or release effects. Live journals, replacements, reports and recovery require separate exact authorization.
 documentation_impact:
-  status: updated
-  rationale: Describe native commit, reader visibility, rollback and recovery semantics.
+  status: none
+  rationale: The native transaction specification documents implementation semantics; no user-facing README or docs surface changes are required.
 publish_authority: Isolated GCP source implementation is explicitly authorized; repository publication and private effects require separate approval.
 private_data_scan: Required; fixtures and failure mutations are synthetic.
