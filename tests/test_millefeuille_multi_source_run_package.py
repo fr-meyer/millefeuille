@@ -182,6 +182,117 @@ class MultiSourceRunPackageTests(unittest.TestCase):
         original_text.write_bytes(original_text.read_bytes() + b"changed")
         self.assertNotEqual(before, _inventory_inputs(fixture.root, pack, fixture.run))
 
+    def _real_published_link_inventory_fixture(self):
+        from tests.test_millefeuille_published_summary_run_link import (
+            TestPublishedSummaryRunLink,
+        )
+
+        fixture = TestPublishedSummaryRunLink(
+            "test_view_keeps_original_generation_and_uses_verified_original_files"
+        )
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        fixture._publish_fixture_link()
+        (fixture.run / "index").mkdir()
+        return fixture
+
+    @requires_secure_nofollow_writes
+    def test_real_published_link_inventory_binds_both_input_snapshots(self):
+        import hashlib
+
+        from millefeuille.domain.multi_source_run_package import _inventory_inputs
+
+        fixture = self._real_published_link_inventory_fixture()
+        pack = fixture.root / "zotero" / fixture.plan.paper_id
+        inventory = {
+            ref: (size, digest)
+            for ref, size, digest in _inventory_inputs(fixture.root, pack, fixture.run)
+        }
+        origin_run = fixture.origin.parent.parent
+        for filename in ("selected.md", "structure.json"):
+            snapshot = origin_run / "structure" / "inputs" / filename
+            data = snapshot.read_bytes()
+            ref = snapshot.relative_to(fixture.root).as_posix()
+            with self.subTest(snapshot=filename):
+                self.assertIn(ref, inventory)
+                self.assertEqual(
+                    inventory[ref], (len(data), hashlib.sha256(data).hexdigest())
+                )
+
+    @requires_secure_nofollow_writes
+    def test_real_snapshot_drift_after_first_write_preserves_created_output(self):
+        import hashlib
+
+        import millefeuille.domain.multi_source_run_package as package
+        from millefeuille.domain.secure_io import write_new_text_no_follow
+
+        for filename in ("selected.md", "structure.json"):
+            with self.subTest(snapshot=filename):
+                fixture = self._real_published_link_inventory_fixture()
+                pack = fixture.root / "zotero" / fixture.plan.paper_id
+                manifest = json.loads((pack / "manifest.json").read_bytes())
+                run_stat = fixture.run.stat()
+                plan = package.MultiSourceRunPackagePlan(
+                    source_pack_root=fixture.root,
+                    item_key=manifest["identity"]["zotero_item_key"],
+                    run_id=fixture.run.name,
+                    run_dir=fixture.run,
+                    run_dir_identity=(run_stat.st_dev, run_stat.st_ino),
+                    stage_manifest_text='{"fixture": "approved stage"}\n',
+                    artifact_index_text='{"fixture": "approved index"}\n',
+                    verified_inputs=package._inventory_inputs(
+                        fixture.root, pack, fixture.run
+                    ),
+                    preview_sha256="",
+                )
+                plan = replace(
+                    plan,
+                    preview_sha256=hashlib.sha256(
+                        package._json_text(plan.preview()).encode("utf-8")
+                    ).hexdigest(),
+                )
+                snapshot = (
+                    fixture.origin.parent.parent / "structure" / "inputs" / filename
+                )
+                original = snapshot.read_bytes()
+                written = []
+
+                def mutate_snapshot(
+                    path,
+                    text,
+                    label,
+                    *,
+                    written=written,
+                    snapshot=snapshot,
+                    original=original,
+                    **kwargs,
+                ):
+                    write_new_text_no_follow(path, text, label, **kwargs)
+                    written.append(path.name)
+                    if path.name == "stage-manifest.json":
+                        snapshot.write_bytes(original + b"changed")
+
+                # The published-link fixture is single-source. Isolate the
+                # publication boundary from the multi-source fresh planner;
+                # retain the real inventory, link checks, lock and writer.
+                with (
+                    patch.object(package, "_approved_fresh_plan", return_value=plan),
+                    patch.object(package, "write_new_text_no_follow", mutate_snapshot),
+                    self.assertRaisesRegex(
+                        MillefeuilleContractError, "input snapshot changed"
+                    ),
+                ):
+                    publish_multi_source_run_package(
+                        plan, expected_preview_sha256=plan.preview_sha256
+                    )
+                self.assertEqual(written, ["stage-manifest.json"])
+                self.assertEqual(
+                    (fixture.run / "stage-manifest.json").read_bytes(),
+                    plan.stage_manifest_text.encode("utf-8"),
+                )
+                self.assertFalse((fixture.run / "artifact-index.json").exists())
+                self.assertEqual(snapshot.read_bytes(), original + b"changed")
+
     @requires_secure_nofollow_writes
     def test_destination_replacement_during_final_check_preserves_pinned_outputs(self):
         for recovery in (False, True):

@@ -1,0 +1,28 @@
+id: pr-mf-origin-run-inventory-20261012
+title: Bind original summary-run input snapshots during package publication
+status: in-progress
+branch: fix/pr-mf-origin-run-inventory-20261012
+base_branch: dev
+delivery:
+  mode: inherit_branch_policy
+  continue_after_review: true
+write_paths:
+  - .speculoos/tasks/pr-mf-origin-run-inventory-20261012.yaml
+  - millefeuille/domain/multi_source_run_package.py
+  - tests/test_millefeuille_multi_source_run_package.py
+  - specs/millefeuille-pipeline/multi-source-run-package.md
+scope:
+  - Inventory the complete linked original generation without changing link or reference validation
+  - Bind selected-text and structure snapshots to planning and post-write drift checks
+  - Preserve created outputs when either snapshot changes after the first metadata write
+acceptance:
+  - Both existing published-link snapshot refs bind exact byte sizes and hashes
+  - The old source fails both new regressions across four snapshot subcases
+  - The repaired source passes both regressions and all focused tests without skips
+  - Formatting, full Ruff, metadata, attribution and private-data scans pass
+publication_boundary:
+  statement: Repository code, synthetic tests, pipeline specification and task metadata only. No Zotero, OCR, OpenKB, credential change, live provider execution, original private snapshot rewrite, private package or acceptance publication, distribution build or release. October12 continuation authorizes ordinary confirmed repository fixes; private writes retain their exact-output approval gates.
+documentation_impact:
+  status: none
+  rationale: The pipeline specification now names the complete original run and its input snapshots. No README, docs/ user-facing surface or CLI changes.
+private_data_scan: Required; all new fixture data is synthetic.

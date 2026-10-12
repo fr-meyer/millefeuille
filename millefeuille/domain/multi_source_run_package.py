@@ -138,7 +138,10 @@ def _published_summary_inventory_paths(
     expected_refs = {"route_evidence_ref", "structure_evidence_ref", "preparation_ref"}
     if set(evidence) != expected_refs:
         raise MillefeuilleContractError("run-package summary evidence refs drift")
-    return (origin,), tuple(root / _safe_ref(evidence[key]) for key in sorted(evidence))
+    # Bind the generation's input snapshots as well as its summary artifacts.
+    return (origin.parent,), tuple(
+        root / _safe_ref(evidence[key]) for key in sorted(evidence)
+    )
 
 
 def _inventory_inputs(
