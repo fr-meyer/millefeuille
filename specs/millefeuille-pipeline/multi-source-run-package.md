@@ -9,8 +9,8 @@ with byte counts, SHA-256 hashes and a combined preview fingerprint. The
 preview also records the size and SHA-256 of every regular file in the source
 pack and the saved run's summaries, cards and index trees. Symlinks and
 unexpected file types fail closed. Published-summary links also bind the
-original generation's complete summaries tree and the exact route, structure
-and preparation evidence refs. All these inputs share the same file, node,
+original generation's complete run tree, including selected-text and structure
+input snapshots, and the exact route, structure and preparation evidence refs. All these inputs share the same file, node,
 depth and byte limits; repeated file refs are inventoried once. These input
 hashes bind the approved preview to the saved evidence, not just to the two
 proposed output files. The source
