@@ -21,8 +21,20 @@ acceptance:
   - The repaired source passes both regressions and all focused tests without skips
   - Formatting, full Ruff, metadata, attribution and private-data scans pass
 publication_boundary:
-  statement: Repository code, synthetic tests, pipeline specification and task metadata only. No Zotero, OCR, OpenKB, credential change, live provider execution, original private snapshot rewrite, private package or acceptance publication, distribution build or release. October12 continuation authorizes ordinary confirmed repository fixes; private writes retain their exact-output approval gates.
+  statement: Repository code, synthetic tests, pipeline specification and task metadata only. No Zotero, OCR, OpenKB, credential change, live pipeline provider execution, original private snapshot rewrite, private package or acceptance publication, distribution build or release. October12 continuation authorizes ordinary confirmed repository fixes; private writes retain their exact-output approval gates.
 documentation_impact:
   status: none
   rationale: The pipeline specification now names the complete original run and its input snapshots. No README, docs/ user-facing surface or CLI changes.
 private_data_scan: Required; all new fixture data is synthetic.
+github:
+  issue: null
+  pull_request: 174
+  url: https://github.com/fr-meyer/millefeuille/pull/174
+  head_sha: null
+post_merge_expected:
+  pull_request: 174
+  base_branch: dev
+  head_branch: fix/pr-mf-origin-run-inventory-20261012
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
