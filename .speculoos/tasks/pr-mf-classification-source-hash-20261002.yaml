@@ -1,0 +1,28 @@
+id: pr-mf-classification-source-hash-20261002
+title: Accept multi-source identities in classification output schema
+status: in-progress
+branch: fix/pr-mf-classification-source-hash-20261002
+base_branch: dev
+delivery:
+  mode: inherit_branch_policy
+  continue_after_review: true
+write_paths:
+  - .speculoos/tasks/pr-mf-classification-source-hash-20261002.yaml
+  - specs/millefeuille-pipeline/classification-model-output.schema.json
+  - specs/millefeuille-pipeline/classification-model-boundary.md
+  - tests/test_millefeuille_classification_model_schema.py
+scope:
+  - Match the classification output source identity contract to v0.1 single-PDF and v0.2 multi-PDF manifests
+  - Preserve exact identity binding and ordinary taxonomy lock hashes
+  - Reject malformed source identities including trailing line breaks
+acceptance:
+  - A complete synthetic two-PDF manifest identity validates unchanged in classification output
+  - Single-source output remains valid and malformed hashes fail closed
+  - Focused schema, classification planner and source-hash compatibility tests pass
+  - Ruff, metadata, attribution and changed-file private-data checks pass
+publication_boundary:
+  statement: Schema, synthetic tests, specification and task metadata only. October12 continuation approval covers isolated GCP validation and feature-to-dev publication/hosted review. No private artifact publication, live classification, provider call, Zotero, OCR, OpenKB, credential change, build, main merge, release or Gateway mutation. Bind actual PR and closeout metadata before final-head review.
+documentation_impact:
+  status: none
+  rationale: No README or docs/ Speculoos or CLI surface changes. The classification pipeline specification now states the accepted source identity formats; runtime request binding, classification execution and publication authority remain unchanged.
+private_data_scan: Required; all new test identities, attachment metadata and output evidence are synthetic.

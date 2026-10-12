@@ -28,8 +28,12 @@ symlinks or permit a reference outside the corpus.
 The prompt includes the entire locked registry, all selected text and page
 locators. Hash-bound metadata excludes private prompt content.
 
-The transient output uses classification-model-output.schema.json. Runtime
-checks additionally bind exact paper/run/source/taxonomy identities, active
+The transient output uses classification-model-output.schema.json. Its
+`source_hash` accepts `sha256:` for a
+single PDF and `sha256-aggregate:` for a v0.2 multi-PDF manifest, each followed
+by exactly 64 lowercase hexadecimal characters without line breaks.
+`taxonomy_lock_identity` remains an ordinary `sha256:` content identity.
+Runtime checks additionally bind exact paper/run/source/taxonomy identities, active
 level-2 membership, a distinct active alternative when provided, valid page
 locators, nonempty claims and rationale, and explicit review reasons for low
 confidence or a taxonomy gap. Validation also rechecks the input binding and
