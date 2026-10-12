@@ -3,6 +3,18 @@ title: Accept multi-source identities in classification output schema
 status: in-progress
 branch: fix/pr-mf-classification-source-hash-20261002
 base_branch: dev
+github:
+  issue: null
+  pull_request: 173
+  url: https://github.com/fr-meyer/millefeuille/pull/173
+  head_sha: null
+post_merge_expected:
+  pull_request: 173
+  base_branch: dev
+  head_branch: fix/pr-mf-classification-source-hash-20261002
+  head_sha: merge-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true
 delivery:
   mode: inherit_branch_policy
   continue_after_review: true
@@ -21,7 +33,7 @@ acceptance:
   - Focused schema, classification planner and source-hash compatibility tests pass
   - Ruff, metadata, attribution and changed-file private-data checks pass
 publication_boundary:
-  statement: Schema, synthetic tests, specification and task metadata only. October12 continuation approval covers isolated GCP validation and feature-to-dev publication/hosted review. No private artifact publication, live classification, provider call, Zotero, OCR, OpenKB, credential change, build, main merge, release or Gateway mutation. Bind actual PR and closeout metadata before final-head review.
+  statement: Schema, synthetic tests, specification and task metadata only. October12 continuation approval covers isolated GCP validation and feature-to-dev publication/hosted review. No private artifact publication, live classification, live pipeline provider call, Zotero, OCR, OpenKB, credential change, build, main merge, release or Gateway mutation. Bind actual PR and closeout metadata before final-head review.
 documentation_impact:
   status: none
   rationale: No README or docs/ Speculoos or CLI surface changes. The classification pipeline specification now states the accepted source identity formats; runtime request binding, classification execution and publication authority remain unchanged.
