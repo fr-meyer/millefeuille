@@ -1,5 +1,52 @@
 # Isolated staged Windows replacement preparation
 
+## Job admission operand diagnostics after run 38394894696
+
+The once-retrieved exact-head `4567268` evidence records a `Refusal` at
+`bounded-job-admission`: complete child membership/accounting/PID binding
+mismatch. Parent PID 1280 was assigned and read back while suspended with
+active/assigned 1, PID list [1280], 512 MiB and one logical CPU before its single
+resume. The worker did not retain any of its comparison operands. Terminal
+cleanup was complete. Historical total processes 2 does not identify its PID,
+a currently active second process, or which comparison failed.
+
+This offline change preserves every original admission predicate and every
+resource, inheritance and production gate. It reports expected and observed
+membership, active accounting, PID-list assigned count, complete bounded PID
+list, Python PID and Win32 PID, with explicit comparison results and unavailable
+fields. Accounting immediately before the PID-list read and a second accounting
+snapshot are retained. A later good snapshot cannot excuse an initial refusal.
+A missing second read, changing active accounting, or inconsistent Python/Win32
+PID refuses before dispatch. Changes to historical totals alone do not refuse.
+No settling wait, admission retry, process-limit increase or Job handle inheritance
+is introduced. The worker still queries its default associated job with a NULL
+handle; the parent still queries its explicit owned Job handle.
+
+All composite operands appear in one compact numeric-only stderr line capped at
+1,792 ASCII bytes, before traceback output. It fits the existing 2,048-byte text
+capture. The full separate error receipt retains supplementary resource/query
+metadata. Invalid non-numeric fields become unavailable, never raw strings.
+Successful admission also emits a numeric line. Reporting failures retain the
+readback in the owned error receipt where possible. CRLF is normalized before
+text sanitization. Controller markers record creation, assignment validation,
+resume begin/return, previous suspend count and primary signaling. Creation and
+handle PID values are retained, and a second resume attempt cannot issue another
+ResumeThread call.
+
+These are diagnostics and stricter identity/snapshot consistency checks. They do
+not establish an OS root-cause repair. Default-job selection in a nested hierarchy,
+interpreter handoff and a snapshot race remain hypotheses until actual values are
+available. The source's after-case worker/parent PID binding remains mandatory.
+No individual native outcomes are inferred from the missing case receipt.
+
+Run `python -I -B test_job_admission.py` for the targeted pure-memory regressions.
+They exercise each operand, combined failures, historical counters, bracketed
+snapshot changes, API failures, PID differences, incomplete bounded PID queries,
+maximum output, malformed values and exactly-once resume. They execute no Windows
+API, external process or network call. This continuation performs no push, workflow,
+download, private read or remote call. Another actual run requires a separate
+reviewed exact-head proposal and approval.
+
 ## Worker startup evidence repair after run 38386606540
 
 At exact head `f5ba780d6018633b0c442d87bb519e8d4932fedf`, the actual CI

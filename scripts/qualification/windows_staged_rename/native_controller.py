@@ -26,7 +26,12 @@ from diagnostic_core import (
     validate_manifest,
 )
 from staged_replacement import Refusal
-from worker_diagnostics import BoundedStreams, safe_text
+from worker_diagnostics import (
+    AdmissionRefusal,
+    BoundedStreams,
+    admission_record,
+    safe_text,
+)
 
 U32 = ctypes.c_uint32
 I32 = ctypes.c_int32
@@ -130,37 +135,59 @@ class StartupEx(ctypes.Structure):
     _fields_ = [("startup", Startup), ("attributes", VOID)]
 
 
-def validate_limits(limits):
+def validate_limits(limits, *, origin="controller-explicit", context=None):
     if (
         limits.get("memory") != MEMORY
         or limits.get("process_memory") != MEMORY
         or limits.get("active_limit") != 1
     ):
-        raise Refusal("512MiB/one-process limit readback mismatch")
+        raise AdmissionRefusal(
+            "512MiB/one-process limit readback mismatch",
+            limits,
+            origin=origin,
+            context=context,
+        )
     affinity = limits.get("affinity", 0)
     if (
         not affinity
         or affinity & (affinity - 1)
         or limits.get("child_affinity") != affinity
     ):
-        raise Refusal("one-logical-CPU affinity readback mismatch")
+        raise AdmissionRefusal(
+            "one-logical-CPU affinity readback mismatch",
+            limits,
+            origin=origin,
+            context=context,
+        )
     if limits.get("flags", 0) & FLAGS != FLAGS or limits.get("flags", 0) & (
         0x800 | 0x1000
     ):
-        raise Refusal("JobObject flags/breakaway readback mismatch")
+        raise AdmissionRefusal(
+            "JobObject flags/breakaway readback mismatch",
+            limits,
+            origin=origin,
+            context=context,
+        )
     if (
         limits.get("cpu_flags") != 5
         or not 1 <= limits.get("cpu_rate", 0) <= 10000
         or limits.get("cpu_rate") != limits.get("expected_cpu_rate")
     ):
-        raise Refusal("CPU hard-cap readback mismatch")
+        raise AdmissionRefusal(
+            "CPU hard-cap readback mismatch", limits, origin=origin, context=context
+        )
     if (
         not limits.get("membership")
         or limits.get("active") != 1
         or limits.get("assigned") != 1
         or limits.get("pids") != [limits.get("pid")]
     ):
-        raise Refusal("complete child membership/accounting/PID binding mismatch")
+        raise AdmissionRefusal(
+            "complete child membership/accounting/PID binding mismatch",
+            limits,
+            origin=origin,
+            context=context,
+        )
 
 
 def execute_controller(backend):
@@ -181,13 +208,20 @@ def execute_controller(backend):
         "worker_logical_cpus": 1,
     }
     try:
+        result["startup_timing_ns"] = {}
         backend.create_job()
+        result["startup_timing_ns"]["job_created"] = time.monotonic_ns()
         backend.create_suspended()
+        result["startup_timing_ns"]["child_created_suspended"] = time.monotonic_ns()
         result["owned_operations_in_flight"] = 1
         limits = backend.assign_and_readback()
         validate_limits(limits)
         result["limits_readback"] = limits
+        result["startup_timing_ns"]["assignment_and_limits_validated"] = (
+            time.monotonic_ns()
+        )
         backend.resume()
+        result["startup_timing_ns"]["resume_returned"] = time.monotonic_ns()
         pump = getattr(backend, "drain_worker_output", None)
         while not backend.wait_primary(100):
             if pump is not None:
@@ -196,6 +230,7 @@ def execute_controller(backend):
                 raise Refusal("worker deadline reached; no rerun")
             if backend.owned_bytes() > ARTIFACT_CAP:
                 raise Refusal("owned scratch byte cap exceeded")
+        result["startup_timing_ns"]["primary_signaled"] = time.monotonic_ns()
         if pump is not None:
             pump()
         worker = backend.worker_result()
@@ -234,6 +269,8 @@ def execute_controller(backend):
         result["worker_qualified"] = True
     except BaseException as error:  # noqa: BLE001 - All failures preserve owned process custody.
         result["error"] = {"type": type(error).__name__, "message": safe_text(error)}
+        if isinstance(error, AdmissionRefusal):
+            result["job_admission"] = error.numeric
     finally:
         remaining = max(
             0, min(CLEANUP_SECONDS, CONTROLLER_SECONDS - (backend.clock() - started))
@@ -418,16 +455,22 @@ class NativeJobBackend:
 
     def query(self, kind, structure):
         value = structure()
-        self.checked(
-            self.kernel.QueryInformationJobObject(
-                self.job, kind, ctypes.byref(value), ctypes.sizeof(value), None
-            )
+        self.last_query = {"kind": kind, "bytes": ctypes.sizeof(value), "ok": None}
+        result = self.kernel.QueryInformationJobObject(
+            self.job, kind, ctypes.byref(value), ctypes.sizeof(value), None
         )
+        self.last_query.update(
+            ok=bool(result), error=0 if result else ctypes.get_last_error()
+        )
+        self.checked(result)
         return value
 
     def pids(self):
         capacity = 1
+        self.pid_query_attempts = 0
+        self.last_pid_query = {}
         for _attempt in range(3):
+            self.pid_query_attempts += 1
             data = ctypes.create_string_buffer(
                 8 + capacity * ctypes.sizeof(ctypes.c_size_t)
             )
@@ -440,6 +483,20 @@ class NativeJobBackend:
                 U32.from_buffer(data, 0).value,
                 U32.from_buffer(data, 4).value,
             )
+            self.last_query = {
+                "kind": 3,
+                "bytes": len(data),
+                "ok": bool(value),
+                "error": error,
+            }
+            self.last_pid_query = {
+                "capacity": capacity,
+                "return_length": used.value,
+                "assigned": assigned,
+                "returned": count,
+                "ok": int(bool(value)),
+                "error": error,
+            }
             if assigned > 32 or count > assigned:
                 raise Refusal("unbounded or inconsistent owned-job PID query")
             if value and count == assigned and count <= capacity:
@@ -457,6 +514,11 @@ class NativeJobBackend:
 
     def sample(self):
         value = self.query(1, Accounting)
+        self.last_accounting = {
+            "active": value.active,
+            "total_processes": value.total_processes,
+            "terminated": value.terminated,
+        }
         assigned, ids = self.pids()
         result = {
             "active": value.active,
@@ -470,7 +532,8 @@ class NativeJobBackend:
 
     def create_job(self):
         if (
-            ctypes.sizeof(ExtendedLimit) != 144
+            ctypes.sizeof(Accounting) != 48
+            or ctypes.sizeof(ExtendedLimit) != 144
             or ctypes.sizeof(Startup) != 104
             or ctypes.sizeof(StartupEx) != 112
             or ctypes.sizeof(SecurityAttributes) != 24
@@ -578,10 +641,13 @@ class NativeJobBackend:
         if not closed or self.attribute_delete_uncertain:
             raise Refusal("startup parent-handle/attribute release uncertain")
         self.checked(value)
-        if (
-            self.process.pid == 0
-            or self.kernel.GetProcessId(self.process.process) != self.process.pid
-        ):
+        self.launch_record["created_primary_pid"] = self.process.pid
+        if self.process.pid == 0:
+            raise Refusal("owned created PID/handle readback mismatch")
+        observed_pid = self.kernel.GetProcessId(self.process.process)
+        self.launch_record["created_primary_handle_pid"] = observed_pid
+        self.launch_record["created_primary_tid"] = self.process.tid
+        if observed_pid != self.process.pid:
             raise Refusal("owned created PID/handle readback mismatch")
 
     def prepare_stdio(self, startup):
@@ -751,7 +817,15 @@ class NativeJobBackend:
         }
 
     def resume(self):
-        if self.kernel.ResumeThread(self.process.thread) != 1:
+        attempts = self.launch_record.get("resume_attempts", 0) + 1
+        self.launch_record["resume_attempts"] = min(attempts, 2)
+        if attempts != 1:
+            raise Refusal("owned suspended child resume already attempted; no retry")
+        self.launch_record["resume_call_begin_ns"] = time.monotonic_ns()
+        previous = self.kernel.ResumeThread(self.process.thread)
+        self.launch_record["resume_call_return_ns"] = time.monotonic_ns()
+        self.launch_record["resume_previous_suspend_count"] = previous
+        if previous != 1:
             raise Refusal("owned suspended child did not resume exactly once")
 
     def wait_primary(self, milliseconds):
@@ -864,53 +938,145 @@ class NativeJobBackend:
 
 
 def require_worker_job():
-    """Refuse raw worker invocations outside a matching bounded one-process job."""
+    """Read-only diagnostics never waive the original bounded one-process check."""
     if os.name != "nt" or sys.platform != "win32" or sys.maxsize <= 2**32:
         raise Refusal("bounded worker requires native Windows AMD64")
+    started = time.monotonic_ns()
+    limits = {"pid": os.getpid()}
+    context = {}
     backend = NativeJobBackend.__new__(NativeJobBackend)
-    backend.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    backend.job, backend.samples = None, []
-    for name, restype, args in (
-        ("GetCurrentProcess", HANDLE, []),
-        ("IsProcessInJob", I32, [HANDLE, HANDLE, VOID]),
-        ("QueryInformationJobObject", I32, [HANDLE, U32, VOID, U32, VOID]),
-        ("GetProcessAffinityMask", I32, [HANDLE, VOID, VOID]),
-        ("GetActiveProcessorCount", U32, [ctypes.c_uint16]),
-    ):
-        function = getattr(backend.kernel, name)
-        function.restype, function.argtypes = restype, args
-    member = I32()
-    backend.checked(
-        backend.kernel.IsProcessInJob(
-            backend.kernel.GetCurrentProcess(), None, ctypes.byref(member)
+    try:
+        backend.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        backend.job, backend.samples = None, []
+        for name, restype, args in (
+            ("GetCurrentProcess", HANDLE, []),
+            ("GetCurrentProcessId", U32, []),
+            ("IsProcessInJob", I32, [HANDLE, HANDLE, VOID]),
+            ("QueryInformationJobObject", I32, [HANDLE, U32, VOID, U32, VOID]),
+            ("GetProcessAffinityMask", I32, [HANDLE, VOID, VOID]),
+            ("GetActiveProcessorCount", U32, [ctypes.c_uint16]),
+        ):
+            function = getattr(backend.kernel, name)
+            function.restype, function.argtypes = restype, args
+        context["win32_pid"] = backend.kernel.GetCurrentProcessId()
+        member = I32()
+        backend.checked(
+            backend.kernel.IsProcessInJob(
+                backend.kernel.GetCurrentProcess(), None, ctypes.byref(member)
+            )
         )
-    )
-    limit, cpu = backend.query(9, ExtendedLimit), backend.query(15, CpuRate)
-    mask, system = ctypes.c_size_t(), ctypes.c_size_t()
-    backend.checked(
-        backend.kernel.GetProcessAffinityMask(
-            backend.kernel.GetCurrentProcess(), ctypes.byref(mask), ctypes.byref(system)
+        context["membership_raw"] = member.value
+        limits["membership"] = bool(member.value)
+        limit, cpu = backend.query(9, ExtendedLimit), backend.query(15, CpuRate)
+        mask, system = ctypes.c_size_t(), ctypes.c_size_t()
+        backend.checked(
+            backend.kernel.GetProcessAffinityMask(
+                backend.kernel.GetCurrentProcess(),
+                ctypes.byref(mask),
+                ctypes.byref(system),
+            )
         )
+        processors = backend.kernel.GetActiveProcessorCount(0xFFFF)
+        if not 1 <= processors <= 10000:
+            raise Refusal("worker active CPU count outside cap domain")
+        limits.update(
+            {
+                "memory": limit.job_memory,
+                "process_memory": limit.process_memory,
+                "active_limit": limit.basic.active_limit,
+                "flags": limit.basic.flags,
+                "affinity": limit.basic.affinity,
+                "child_affinity": mask.value,
+                "cpu_flags": cpu.flags,
+                "cpu_rate": cpu.rate,
+                "expected_cpu_rate": 10000 // processors,
+            }
+        )
+        limits.update(backend.sample())
+        problem = None
+        try:
+            validate_limits(limits, origin="worker-default-null", context=context)
+        except AdmissionRefusal as error:
+            problem = error
+        if problem is None and context["win32_pid"] != limits["pid"]:
+            problem = AdmissionRefusal(
+                "Python/Win32 worker PID mismatch; no dispatch",
+                limits,
+                origin="worker-default-null",
+                context=context,
+            )
+        # Accounting and PID-list reads are separate snapshots. A second bounded
+        # accounting read exposes change; it never replaces or excuses the first.
+        try:
+            after = backend.query(1, Accounting)
+            context.update(
+                after_active=after.active,
+                after_total=after.total_processes,
+                after_terminated=after.terminated,
+            )
+            if problem is None and after.active != limits["active"]:
+                problem = AdmissionRefusal(
+                    "active accounting changed across PID-list snapshot; no dispatch",
+                    limits,
+                    origin="worker-default-null",
+                    context=context,
+                )
+        except OSError as error:
+            context["query_error_code"] = getattr(error, "winerror", None)
+            if problem is None:
+                problem = (
+                    error  # An unavailable diagnostic read cannot advance dispatch.
+                )
+        if problem is not None:
+            raise problem
+    except Exception as error:  # noqa: BLE001 - Preserve complete/partial numeric readbacks on API or guard failure.
+        if "active" not in limits:
+            limits.update(getattr(backend, "last_accounting", {}))
+        query, pid_query = (
+            getattr(backend, "last_query", {}),
+            getattr(backend, "last_pid_query", {}),
+        )
+        ended = time.monotonic_ns()
+        context.update(
+            started_ns=started,
+            ended_ns=ended,
+            window_ns=ended - started,
+            last_query_kind=query.get("kind"),
+            last_query_bytes=query.get("bytes"),
+            query_error_code=context.get(
+                "query_error_code", getattr(error, "winerror", None)
+            ),
+            pid_query_capacity=pid_query.get("capacity"),
+            pid_query_return_length=pid_query.get("return_length"),
+            pid_query_attempts=getattr(backend, "pid_query_attempts", None),
+            pid_query_assigned=pid_query.get("assigned"),
+            pid_query_returned=pid_query.get("returned"),
+            pid_query_ok=pid_query.get("ok"),
+        )
+        if isinstance(error, AdmissionRefusal):
+            error.numeric = admission_record(
+                limits, origin="worker-default-null", context=context
+            )
+            raise
+        raise AdmissionRefusal(
+            safe_text(error), limits, origin="worker-default-null", context=context
+        ) from error
+    query, pid_query = backend.last_query, backend.last_pid_query
+    ended = time.monotonic_ns()
+    context.update(
+        started_ns=started,
+        ended_ns=ended,
+        window_ns=ended - started,
+        last_query_kind=query.get("kind"),
+        last_query_bytes=query.get("bytes"),
+        pid_query_capacity=pid_query.get("capacity"),
+        pid_query_return_length=pid_query.get("return_length"),
+        pid_query_attempts=backend.pid_query_attempts,
+        pid_query_assigned=pid_query.get("assigned"),
+        pid_query_returned=pid_query.get("returned"),
+        pid_query_ok=pid_query.get("ok"),
     )
-    processors = backend.kernel.GetActiveProcessorCount(0xFFFF)
-    if not 1 <= processors <= 10000:
-        raise Refusal("worker active CPU count outside cap domain")
-    validate_limits(
-        {
-            "memory": limit.job_memory,
-            "process_memory": limit.process_memory,
-            "active_limit": limit.basic.active_limit,
-            "flags": limit.basic.flags,
-            "affinity": limit.basic.affinity,
-            "child_affinity": mask.value,
-            "cpu_flags": cpu.flags,
-            "cpu_rate": cpu.rate,
-            "expected_cpu_rate": 10000 // processors,
-            "membership": bool(member.value),
-            "pid": os.getpid(),
-            **backend.sample(),
-        }
-    )
+    return admission_record(limits, origin="worker-default-null", context=context)
 
 
 def collect_owned(root):

@@ -16,7 +16,7 @@ from build_manifest import plain_path, read_plain
 from diagnostic_core import FILE_CAP, record_bytes, run_ten_cases, validate_manifest
 from references.probe_contract import pack_rename
 from staged_replacement import Refusal
-from worker_diagnostics import emit_error, exception_record
+from worker_diagnostics import emit_admission, emit_error, exception_record
 
 U32 = ctypes.c_uint32
 I32 = ctypes.c_int32
@@ -597,7 +597,10 @@ def main(entry):
     from native_controller import require_worker_job
 
     entry["phase"] = "bounded-job-admission"
-    require_worker_job()
+    admission = require_worker_job()
+    entry["job_admission"] = admission
+    entry["phase"] = "job-admission-diagnostic-report"
+    emit_admission(admission, sys.__stderr__)
     entry["phase"] = "stdout-log-open"
     sys.stdout = (args.synthetic_root / "stdout.log").open("x", encoding="utf-8")
     entry["phase"] = "stderr-log-open"
@@ -666,6 +669,8 @@ def guarded_main():
             if name in entry
         )
         record = exception_record(error, entry["phase"], substitutions)
+        if "job_admission" in entry:
+            record["job_admission"] = entry["job_admission"]
         try:  # noqa: SIM105 - Keep reporting stages explicit beside unconditional exit custody.
             # Original inherited stderr stays available after stderr.log redirection.
             emit_error(error, entry["phase"], sys.__stderr__, substitutions)

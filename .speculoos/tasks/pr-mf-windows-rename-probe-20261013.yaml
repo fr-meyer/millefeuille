@@ -35,6 +35,7 @@ write_paths:
   - scripts/qualification/windows_staged_rename/test_sdk_bootstrap.py
   - scripts/qualification/windows_staged_rename/worker_diagnostics.py
   - scripts/qualification/windows_staged_rename/test_worker_startup.py
+  - scripts/qualification/windows_staged_rename/test_job_admission.py
 scope:
   - Execute exactly eight file/directory API-layout baselines and two matching no-clobber collision controls in fresh owned synthetic fixtures
   - Capture actual granted access, SDK layout, API and IOSB statuses, identities, exact bytes and terminal owned-process accounting
@@ -53,6 +54,8 @@ documentation_impact:
   rationale: The developer-only diagnostic README states its native qualification gaps. README.md and all user-facing application behavior remain unchanged.
 private_data_scan: Required; all included fixtures, handle tokens and diagnostic outputs are synthetic only.
 notes:
+  - Head 456726834d40183682e4956b070decbfffef1a6f and run38394894696 are terminal and preserved. The recorded worker failure is bounded-job-admission membership/accounting/PID mismatch, with its operands missing. Its single push/run/download allowance is consumed.
+  - This change is offline bounded numeric diagnostics and stricter identity/snapshot consistency only. It preserves original admission predicates and caps, and does not claim a root-cause repair or authorize another run.
   - SDK follow-up head f5ba780d6018633b0c442d87bb519e8d4932fedf and run38386606540 are terminal; actual shell fixtures and compilation passed, but the worker exited1 with no worker result or stderr evidence. Its single-push/run/download allowance is consumed.
   - This next change is offline worker-entry evidence repair only; any further exact-head fast-forward and single automatic run need separate approval and fresh policy/resource guards. No PR, metadata follow-up or private-data action is included.
   - Failed head fa6b6f7ba27fb6a4e64f4d56469e0cb0529363b6 and run38378966024 are preserved; that single-use allowance was consumed. The separately approved SDK follow-up f5ba780 is also terminal and preserved.
