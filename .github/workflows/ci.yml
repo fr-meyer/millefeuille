@@ -18,6 +18,7 @@ jobs:
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -86,3 +87,131 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: semantic-release version
+
+  native-windows-head:
+    name: Native Windows exact head / Python 3.13
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      max-parallel: 1
+      matrix:
+        python-version: ["3.13"]
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Bind native scratch root
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $native = Join-Path $env:RUNNER_TEMP "millefeuille-native-head-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          "NATIVE_ROOT=$native" | Out-File -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check out exact pull request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify checked out head
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $actual = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $env:EXPECTED_HEAD -notmatch '^[0-9a-f]{40}$' -or $actual -ne $env:EXPECTED_HEAD) {
+            throw 'Exact-head checkout verification failed'
+          }
+          Write-Output "Verified exact head: $actual"
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install package and test tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --editable ".[test]"
+
+      - name: Lint exact head
+        run: python -m ruff check .
+
+      - name: Qualify three native Windows prototype controls
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Get-TreeBytes([string] $path) {
+            if (-not (Test-Path -LiteralPath $path)) { return [long]0 }
+            $sum = (Get-ChildItem -LiteralPath $path -File -Recurse -Force -ErrorAction Stop | Measure-Object Length -Sum).Sum
+            return [long]$sum
+          }
+          $checkout = Get-TreeBytes $env:GITHUB_WORKSPACE
+          $staging = Get-TreeBytes $env:RUNNER_TEMP
+          $carried = [long]216000000 + $checkout + $staging
+          New-Item -ItemType Directory -Path $env:NATIVE_ROOT -ErrorAction Stop | Out-Null
+          $admission = @{
+            expected_head = $env:EXPECTED_HEAD
+            retained_prior_source_bytes = 216000000
+            checkout_bytes = $checkout
+            runner_temp_before_native_bytes = $staging
+            carried_bytes = $carried
+            native_reservation_bytes = 33554432
+            shared_ceiling_bytes = 268435456
+            normal_ci_provisioning_in_child_job_cap = $false
+            windows_swap0_qualified = $false
+          }
+          $admission | ConvertTo-Json | Set-Content (Join-Path $env:NATIVE_ROOT 'ci-admission.json') -Encoding utf8NoBOM
+          if ($carried + 33554432 -gt 268435456) { throw 'Measured checkout/staging plus retained carry exceeds native scratch budget' }
+          $python = (Get-Command python -ErrorAction Stop).Source
+          $pythonSha = (Get-FileHash -LiteralPath $python -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest = Join-Path $env:GITHUB_WORKSPACE '.github/scripts/native_windows/manifest.json'
+          $manifestSha = (Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
+          $controller = Join-Path $env:GITHUB_WORKSPACE '.github/scripts/native_windows/controller.py'
+          $receipt = Join-Path $env:NATIVE_ROOT 'controller-result.json'
+          & $python -I -B $controller --source-root $env:GITHUB_WORKSPACE --scratch-parent $env:NATIVE_ROOT --manifest $manifest --manifest-sha256 $manifestSha --python $python --python-sha256 $pythonSha --route-id "github-actions:${env:GITHUB_RUN_ID}:${env:GITHUB_RUN_ATTEMPT}" --owner-clearance-id "approved-PR-workflow:$env:EXPECTED_HEAD" --carried-scratch-bytes $carried | Out-File -LiteralPath $receipt -Encoding utf8NoBOM
+          $code = $LASTEXITCODE
+          if ((Get-Item -LiteralPath $receipt).Length -gt 131072) { throw 'Native controller receipt exceeds bound' }
+          $result = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
+          if ($code -ne 0 -or $result.owned_operations_in_flight -ne 0 -or $result.worker_job_active_processes -ne 0 -or $result.worker_result.tests_run -ne 3 -or $result.worker_result.failures -ne 0 -or $result.worker_result.errors -ne 0 -or $result.worker_result.skips -ne 0) {
+            throw 'Native qualification failed; preserve evidence and stop'
+          }
+
+      - name: Run actual head unit tests
+        run: python -m unittest discover -v
+
+      - name: Retain bounded native receipts and synthetic failure evidence
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path -LiteralPath $env:NATIVE_ROOT)) {
+            Write-Output 'Native worker never started; earlier CI failure remains blocking'
+            exit 0
+          }
+          $nativeBytes = [long](Get-ChildItem -LiteralPath $env:NATIVE_ROOT -File -Recurse -Force | Measure-Object Length -Sum).Sum
+          Get-ChildItem -LiteralPath $env:NATIVE_ROOT -File -Recurse -Force |
+            Where-Object { $_.Name -in @('stdout.log', 'stderr.log', 'worker-result.json', 'controller-result.json', 'ci-admission.json') } |
+            ForEach-Object {
+              if ($_.Length -gt 131072) { throw 'Native retained log exceeds bound' }
+              Write-Output "$($_.Name) bytes=$($_.Length) sha256=$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)"
+            }
+          $archive = "$env:NATIVE_ROOT.zip"
+          if ($nativeBytes * 2 + 65536 -gt 33554432) { throw 'Native archive reservation would exceed bound' }
+          Compress-Archive -Path (Join-Path $env:NATIVE_ROOT '*') -DestinationPath $archive -CompressionLevel Optimal -ErrorAction Stop
+          $archiveBytes = (Get-Item -LiteralPath $archive).Length
+          $checkout = [long](Get-ChildItem -LiteralPath $env:GITHUB_WORKSPACE -File -Recurse -Force | Measure-Object Length -Sum).Sum
+          $staging = [long](Get-ChildItem -LiteralPath $env:RUNNER_TEMP -File -Recurse -Force | Measure-Object Length -Sum).Sum
+          Write-Output "Final checkout=$checkout runner-temp=$staging native=$nativeBytes archive=$archiveBytes"
+          if ($nativeBytes + $archiveBytes -gt 33554432 -or 216000000 + $checkout + $staging -gt 268435456) {
+            throw 'Final retained evidence exceeds native/shared scratch scope'
+          }
+
+      - name: Upload bounded native qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: native-windows-head-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.NATIVE_ROOT }}.zip
+          if-no-files-found: error
+          retention-days: 7

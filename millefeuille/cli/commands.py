@@ -24,6 +24,7 @@ from millefeuille.domain.extraction_fixtures import (
     write_ocr_extractions_from_evidence,
 )
 from millefeuille.domain.index_fixtures import write_indexes_from_evidence
+from millefeuille.domain.metadata_transaction import require_metadata_write_support
 from millefeuille.domain.models import OpenKBHandoffRow, TagAddingResult
 from millefeuille.domain.route_fixtures import write_route_selections_from_evidence
 from millefeuille.domain.source_packs import write_source_packs_from_handoff_evidence
@@ -90,6 +91,9 @@ def dry_run_command(
     Returns:
         Exit code: 0 for success
     """
+    if cfg.export.artifacts.enabled:
+        require_metadata_write_support()
+
     logger.info("Dry-run mode enabled - previewing items without processing")
     items, discovery_stats = zotero_client.get_items_by_selection(
         cfg.tagging.selection, cfg.tagging.include_abstract

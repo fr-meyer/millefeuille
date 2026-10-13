@@ -22,6 +22,7 @@ from millefeuille.domain.stage_runtime import (
     load_jsonl_records,
     load_stage_manifest,
 )
+from tests.platform_capabilities import requires_posix_batch_publication
 from tests.test_millefeuille_stage_cli import (
     PAPER_ID,
     RUN_ID,
@@ -158,6 +159,7 @@ def _action_args(source_pack_root: Path, action_path: Path) -> list[str]:
     ]
 
 
+@requires_posix_batch_publication
 class TestMillefeuilleClassificationActions(unittest.TestCase):
     def test_review_no_change_is_idempotent_and_updates_current_refs(self):
         with tempfile.TemporaryDirectory() as tempdir:

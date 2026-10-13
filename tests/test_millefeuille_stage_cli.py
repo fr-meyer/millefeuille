@@ -38,6 +38,8 @@ from millefeuille.domain.stage_runtime import load_stage_manifest, resolve_run_a
 from millefeuille.domain.structure_fixtures import write_structures_from_evidence
 from millefeuille.domain.summary_fixtures import write_summaries_from_evidence
 from millefeuille.domain.writeback import WRITEBACK_PLAN_REF
+from tests.metadata_fixtures import write_fixture_metadata
+from tests.platform_capabilities import requires_posix_batch_publication
 from tests.test_millefeuille_source_pack_writer import (
     _evidence,
     _make_handoff_row,
@@ -133,7 +135,7 @@ def _prepare_fixture_run(tempdir: str) -> tuple[Path, Path]:
         run_id=RUN_ID,
     )
 
-    write_dry_run_artifacts(
+    write_fixture_metadata(
         items=[_make_item()],
         handoff_rows=[_make_handoff_row()],
         config=ArtifactExportConfig(
@@ -159,7 +161,7 @@ def _prepare_source_pack_run(tempdir: str) -> tuple[Path, Path]:
         source_pack_root=source_pack_root,
         created_at="2026-07-14T01:00:00+00:00",
     )
-    write_dry_run_artifacts(
+    write_fixture_metadata(
         items=[_make_item()],
         handoff_rows=[_make_handoff_row()],
         config=ArtifactExportConfig(
@@ -315,6 +317,7 @@ def _write_classification_evidence_json(tempdir: str) -> Path:
 
 
 class TestMillefeuilleStageCli(unittest.TestCase):
+    @requires_posix_batch_publication
     def test_acceptance_command_writes_summary_and_updates_status(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -354,6 +357,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
             artifact_index = load_artifact_index(run_dir / "artifact-index.json")
             self.assertIn("acceptance_summary", artifact_index.artifacts)
 
+    @requires_posix_batch_publication
     def test_acceptance_and_index_resume_reject_each_noncanonical_index_ref(self):
         for field_name in (
             "selected_fulltext_ref",
@@ -435,6 +439,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
                         handoff_enabled=True,
                     )
 
+    @requires_posix_batch_publication
     def test_classify_and_writeback_commands_materialize_preview_artifacts(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -499,6 +504,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
                 "previewed",
             )
 
+    @requires_posix_batch_publication
     def test_run_retrieve_and_models_commands_cover_full_preview_chain(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -676,6 +682,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
             ["off", "on", "auto"],
         )
 
+    @requires_posix_batch_publication
     def test_run_executes_full_fixture_pipeline_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_source_pack_run(tempdir)
@@ -726,6 +733,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
             )
             self.assertEqual(_snapshot_files(source_pack_root), first_snapshot)
 
+    @requires_posix_batch_publication
     def test_run_resume_revalidates_outputs_without_stage_evidence(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, _run_dir = _prepare_source_pack_run(tempdir)
@@ -799,6 +807,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
             self.assertIn("canonical pipeline order", stderr.getvalue())
             self.assertFalse(acceptance_path.exists())
 
+    @requires_posix_batch_publication
     def test_classification_failure_does_not_leave_partial_preview(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
