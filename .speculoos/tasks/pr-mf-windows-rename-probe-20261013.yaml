@@ -31,12 +31,15 @@ write_paths:
   - scripts/qualification/windows_staged_rename/test_diagnostic_executor.py
   - scripts/qualification/windows_staged_rename/test_isolated_entrypoints.py
   - scripts/qualification/windows_staged_rename/test_staged_replacement.py
+  - scripts/qualification/windows_staged_rename/sdk_bootstrap.py
+  - scripts/qualification/windows_staged_rename/test_sdk_bootstrap.py
 scope:
   - Execute exactly eight file/directory API-layout baselines and two matching no-clobber collision controls in fresh owned synthetic fixtures
   - Capture actual granted access, SDK layout, API and IOSB statuses, identities, exact bytes and terminal owned-process accounting
   - Keep the staged replacement prototype and every production Windows write gate unqualified and disabled
   - Publish only one isolated diagnostic branch through the existing broker after exact scoped approval, with no PR or metadata follow-up
 acceptance:
+  - Actual CI pwsh must round-trip the bounded launcher fixtures before SDK compilation; raw CMD command-line and Python argv are retained in its logs
   - Complete frozen source receives independent offline review and synthetic guard, controller, packing and fault tests
   - One exact-branch push selects one automatic workflow with one Windows Python 3.13 job capped at fifteen minutes
   - Controller and native execution have separate bounded custody, including pending or late-error uncertainty
@@ -48,6 +51,7 @@ documentation_impact:
   rationale: The developer-only diagnostic README states its native qualification gaps. README.md and all user-facing application behavior remain unchanged.
 private_data_scan: Required; all included fixtures, handle tokens and diagnostic outputs are synthetic only.
 notes:
+  - Failed head fa6b6f7ba27fb6a4e64f4d56469e0cb0529363b6 and run38378966024 are preserved; that single-use allowance is consumed and this bootstrap-only follow-up requires separate exact-head approval before another push or run
   - This branch-only diagnostic has no pull request and cannot acquire or waive PR176 formal Mergeguez review.
   - PR175 and PR176, the six baseline merge-result CI contexts and all private ledgers are preserved.
   - Full native transaction durability, restart recovery, application integration and activation are outside this diagnostic.

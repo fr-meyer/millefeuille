@@ -55,13 +55,15 @@ jobs:
           if (!(Test-Path -LiteralPath $vcvars)) { throw 'Installed x64 SDK environment unavailable' }
           $c = Join-Path $source 'references\sdk_rename_reference.c'
           $dll = Join-Path $build 'mf_sdk_rename.dll'
-          $obj = Join-Path $build 'mf_sdk_rename.obj'
-          $command = '"' + $vcvars + '" >nul && cl.exe /nologo /W4 /WX /LD /MT "' + $c + '" /Fo"' + $obj + '" /link /OUT:"' + $dll + '"'
-          Push-Location $build
-          try {
-            & $env:ComSpec /d /s /c ('"' + $command + '"')
-            if ($LASTEXITCODE -ne 0) { throw 'SDK reference compilation failed' }
-          } finally { Pop-Location }
+          Write-Host ('MF_PWSH_LAUNCH_MODE=' + $PSVersionTable.PSVersion.ToString() + ';' + $PSNativeCommandArgumentPassing)
+          $fixture = Join-Path $build 'launch fixture spaces & (group) !'
+          python -I -B (Join-Path $source 'test_sdk_bootstrap.py') --prepare-windows-shell-fixture --fixture-root $fixture --source-root $source
+          if ($LASTEXITCODE -ne 0) { throw 'Launcher fixture preparation failed' }
+          $fixtureEntry = Join-Path $fixture 'test_sdk_bootstrap.py'
+          python -I -B $fixtureEntry --windows-shell-fixture --fixture-root $fixture --source-root $source --space-value 'argument with spaces & (group) !' --tail-value 'C:\fixture with spaces\' --quote-value 'quoted "value"'
+          if ($LASTEXITCODE -ne 0) { throw 'Actual pwsh/CMD/Python launcher regression failed' }
+          python -I -B (Join-Path $source 'sdk_bootstrap.py') --vcvars $vcvars --source $c --build $build
+          if ($LASTEXITCODE -ne 0) { throw 'SDK reference compilation failed' }
           if (!(Test-Path -LiteralPath $dll)) { throw 'Compiled SDK DLL missing' }
           $buildBytes = (Get-ChildItem -LiteralPath $build -File -Recurse | Measure-Object -Property Length -Sum).Sum
           if ($buildBytes -gt 33554432) { throw 'SDK build scratch cap exceeded' }

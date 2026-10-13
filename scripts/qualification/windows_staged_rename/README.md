@@ -1,5 +1,40 @@
 # Isolated staged Windows replacement preparation
 
+## SDK launcher repair after run 38378966024
+
+The failed head `fa6b6f7ba27fb6a4e64f4d56469e0cb0529363b6` checked out correctly
+and set up Python 3.13.15, but the SDK bootstrap stopped with
+`'""C:\Program' is not recognized`. It did not execute the ten native cases.
+The emitted PowerShell script and decoded failed-run log are retained outside
+this source patch; the full native command line was not captured in that run.
+
+`sdk_bootstrap.py` passes one raw command-line string and an explicit executable
+to `CreateProcessW` through Python's `subprocess`, with `shell=False`. CMD `/S`
+removes one deliberate outer quote pair. `CALL` returns from the SDK environment
+batch in that same CMD process, and `/V:OFF` disables delayed bang expansion.
+Local paths with percent expansion, carets, quotes or control characters refuse.
+PowerShell no longer serializes a quoted CMD payload. It passes ordinary Python
+arguments. The unchanged controller continues using `list2cmdline` for its Python
+worker, whose CRT argument parser has different rules from CMD.
+
+Run the portable launcher contract tests with `python -I -B test_sdk_bootstrap.py`.
+These tests check construction, refusal and dispatch parameters; mocks do not
+establish Windows parsing, SDK compilation or native success. The actual CI
+`pwsh` step also runs owned fixtures before compilation: a script path containing
+spaces, batch environment propagation, CMD-to-Python argument capture, and Python
+child CRT forwarding. Spaces, ampersands, parentheses, bangs, trailing backslashes
+and a quoted logical argument are checked. The fixtures compile nothing and
+dispatch no native rename controls. A failing batch must preserve its exit code
+and prevent the chained child from starting. They add at most 64 KiB inside the existing
+32-MiB post-build SDK scratch bound and the existing three-minute build step.
+Neither the actual CI-shell fixtures nor the SDK can run on this Mac.
+
+The failed run's one-push/one-run permission is consumed. Publishing this exact
+follow-up and running it requires separate approval. Native diagnostic sources,
+case selection, limits, artifact cap and all production write gates stay unchanged.
+
+## Original diagnostic preparation
+
 This unpublished prototype supplies a staged transaction protocol, a deterministic
 object/namespace adapter, fault tests, concrete native request preparation, and
 an executable diagnostic worker/controller for a future owned Windows runner.
