@@ -1,0 +1,108 @@
+name: Windows rename diagnostic
+
+on:
+  push:
+    branches:
+      - test/pr-mf-windows-rename-probe-20261013
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-rename-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native-rename-probe:
+    if: github.event.deleted == false && github.run_attempt == '1'
+    name: Windows rename diagnostic / Python 3.13
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      PROBE_SOURCE: scripts/qualification/windows_staged_rename
+      PROBE_ZIP_READY: 'false'
+    steps:
+      - name: Check out the event head
+        timeout-minutes: 2
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        timeout-minutes: 2
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+
+      - name: Compile the retained reference with the installed SDK
+        timeout-minutes: 3
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $head = (git rev-parse HEAD).Trim()
+          if ($head -ne $env:GITHUB_SHA) { throw 'Event/head mismatch' }
+          $source = Join-Path $env:GITHUB_WORKSPACE $env:PROBE_SOURCE
+          $build = Join-Path $env:RUNNER_TEMP ('mf-rename-sdk-' + $env:GITHUB_RUN_ID + '-' + $env:GITHUB_RUN_ATTEMPT)
+          if (Test-Path -LiteralPath $build) { throw 'SDK build destination collision' }
+          New-Item -ItemType Directory -Path $build | Out-Null
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (!(Test-Path -LiteralPath $vswhere)) { throw 'Installed vswhere unavailable' }
+          $vs = (& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)
+          if ($LASTEXITCODE -ne 0 -or !$vs) { throw 'Installed C++ SDK unavailable' }
+          $vcvars = Join-Path $vs.Trim() 'VC\Auxiliary\Build\vcvars64.bat'
+          if (!(Test-Path -LiteralPath $vcvars)) { throw 'Installed x64 SDK environment unavailable' }
+          $c = Join-Path $source 'references\sdk_rename_reference.c'
+          $dll = Join-Path $build 'mf_sdk_rename.dll'
+          $obj = Join-Path $build 'mf_sdk_rename.obj'
+          $command = '"' + $vcvars + '" >nul && cl.exe /nologo /W4 /WX /LD /MT "' + $c + '" /Fo"' + $obj + '" /link /OUT:"' + $dll + '"'
+          Push-Location $build
+          try {
+            & $env:ComSpec /d /s /c ('"' + $command + '"')
+            if ($LASTEXITCODE -ne 0) { throw 'SDK reference compilation failed' }
+          } finally { Pop-Location }
+          if (!(Test-Path -LiteralPath $dll)) { throw 'Compiled SDK DLL missing' }
+          $buildBytes = (Get-ChildItem -LiteralPath $build -File -Recurse | Measure-Object -Property Length -Sum).Sum
+          if ($buildBytes -gt 33554432) { throw 'SDK build scratch cap exceeded' }
+          "PROBE_DLL=$dll" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $zip = Join-Path $env:RUNNER_TEMP ('mf-rename-evidence-' + $env:GITHUB_RUN_ID + '-' + $env:GITHUB_RUN_ATTEMPT + '.zip')
+          if (Test-Path -LiteralPath $zip) { throw 'Evidence destination collision' }
+          "PROBE_ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Run the bounded ten-case diagnostic
+        timeout-minutes: 6
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = Join-Path $env:GITHUB_WORKSPACE $env:PROBE_SOURCE
+          $manifest = Join-Path $env:RUNNER_TEMP ('mf-rename-manifest-' + $env:GITHUB_RUN_ID + '-' + $env:GITHUB_RUN_ATTEMPT + '.json')
+          if (Test-Path -LiteralPath $manifest) { throw 'Manifest destination collision' }
+          python -I -B (Join-Path $source 'build_manifest.py') --source-root $source --expected-head $env:GITHUB_SHA --sdk-dll $env:PROBE_DLL --output $manifest
+          if ($LASTEXITCODE -ne 0) { throw 'Source/SDK manifest preparation failed' }
+          $manifestHash = (Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
+          $route = 'github-actions:' + $env:GITHUB_RUN_ID + ':' + $env:GITHUB_RUN_ATTEMPT
+          # This labels approval custody. Human approval must precede the sole push.
+          $clearance = 'approved-publication:' + $env:GITHUB_SHA
+          try {
+            python -I -B (Join-Path $source 'native_controller.py') --source-root $source --scratch-parent $env:RUNNER_TEMP --sdk-dll $env:PROBE_DLL --source-manifest $manifest --source-manifest-sha256 $manifestHash --expected-head $env:GITHUB_SHA --route-id $route --owner-clearance-id $clearance --artifact $env:PROBE_ZIP
+            $exit = $LASTEXITCODE
+          } finally {
+            if (Test-Path -LiteralPath $env:PROBE_ZIP) {
+              if ((Get-Item -LiteralPath $env:PROBE_ZIP).Length -gt 1048576) { throw 'Evidence ZIP exceeds 1 MiB cap' }
+              'PROBE_ZIP_READY=true' | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            }
+          }
+          if ($exit -ne 0) { throw 'Diagnostic failed; retained evidence requires terminal inspection' }
+
+      - name: Retain the single synthetic evidence ZIP
+        if: always() && env.PROBE_ZIP_READY == 'true'
+        timeout-minutes: 2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-rename-diagnostic-${{ github.sha }}
+          path: ${{ env.PROBE_ZIP }}
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: false
