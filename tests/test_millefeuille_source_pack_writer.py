@@ -61,6 +61,7 @@ from millefeuille.domain.summary_fixtures import (
     load_hierarchical_summary,
     write_summaries_from_evidence,
 )
+from tests.platform_capabilities import requires_posix_batch_publication
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_BYTES = b"fixture recovered paper bytes for source-pack intake\n"
@@ -810,6 +811,7 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
             self.assertEqual(evidence.recovered_pdf_path, source_path)
             self.assertEqual(evidence.expected_sha256, FIXTURE_SHA256)
 
+    @requires_posix_batch_publication
     def test_source_pack_artifact_root_consumes_intake_manifest_hash(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_path = _write_recovered_pdf(tempdir)
@@ -907,6 +909,7 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
                     created_at="2026-07-13T12:00:00+00:00",
                 )
 
+    @requires_posix_batch_publication
     def test_handoff_intake_writes_idempotent_multi_pdf_same_item_pack(self):
         with tempfile.TemporaryDirectory() as tempdir:
             bytes_one = b"main paper bytes\n"

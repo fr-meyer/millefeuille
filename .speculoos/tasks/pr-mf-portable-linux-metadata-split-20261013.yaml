@@ -1,0 +1,67 @@
+id: pr-mf-portable-linux-metadata-split-20261013
+title: Deliver portable reads and POSIX metadata transactions with Windows writes disabled
+status: in-progress
+branch: fix/pr-mf-portable-linux-metadata-split-20261013
+base_branch: dev
+write_paths:
+  - .gitattributes
+  - .github/workflows/ci.yml
+  - .speculoos/tasks/pr-mf-portable-linux-metadata-split-20261013.yaml
+  - README.md
+  - millefeuille/cli/commands.py
+  - millefeuille/domain/acceptance.py
+  - millefeuille/domain/artifact_writer.py
+  - millefeuille/domain/artifacts.py
+  - millefeuille/domain/classification.py
+  - millefeuille/domain/metadata_transaction.py
+  - millefeuille/domain/offline_stages.py
+  - millefeuille/domain/stage_runtime.py
+  - millefeuille/domain/status_observability.py
+  - specs/millefeuille-pipeline/native-metadata-transactions.md
+  - tests/fixtures/millefeuille_portable_metadata/complete-preview.json
+  - tests/metadata_fixtures.py
+  - tests/test_millefeuille_acceptance_batch.py
+  - tests/test_millefeuille_artifact_commands.py
+  - tests/test_millefeuille_artifact_overrides.py
+  - tests/test_millefeuille_artifact_writer.py
+  - tests/test_millefeuille_classification_actions.py
+  - tests/test_millefeuille_classification_batch.py
+  - tests/test_millefeuille_classification_model.py
+  - tests/test_millefeuille_metadata_portability.py
+  - tests/test_millefeuille_metadata_transaction.py
+  - tests/test_millefeuille_retrieval_batch.py
+  - tests/test_millefeuille_retrieve.py
+  - tests/test_millefeuille_source_pack_writer.py
+  - tests/test_millefeuille_stage_cli.py
+  - tests/test_millefeuille_status_observability.py
+github:
+  issue: null
+  pull_request: null
+  url: null
+  head_sha: null
+scope:
+  - Preserve the reviewed portable/Linux application repair bytes
+  - Retain the production POSIX metadata writer admission gate and Windows no-effect refusal
+  - Preserve bounded portable reads and capability-independent synthetic read fixtures
+  - Keep the native Windows in-place prototype and its failed qualification separate in draft PR175
+acceptance:
+  - The six existing merge-result matrix jobs and every applicable live required check must pass
+  - Linux supported writes and Windows unsupported-write no-effect contracts must pass
+  - No Windows write compatibility or hostile same-owner namespace-exclusion claim
+  - No skip, rename, success reclassification or waiver of a globally required native qualification context
+  - Current PR175 acceptance and all five failed/consumed attempt receipts remain unchanged
+  - Fresh classic branch-protection and exact-head review requirements must be verified before readiness
+publication_boundary:
+  statement: Source-only unpublished preparation. No publication, CI, security policy, private reads/acceptance, provider/model/reviewer, GCP, production, release or merge action is authorized by this preparation.
+documentation_impact:
+  status: updated
+  rationale: README capability table and transaction specification explicitly report Windows writes unsupported and distinguish the separate unqualified prototype.
+publish_authority: User approved this source-only safe split; publication and any new CI require a separate execution approval and applicable policy gates.
+private_data_scan: Required; retained fixtures are synthetic.
+post_merge_expected:
+  pull_request: split-plan-actual-pr
+  base_branch: dev
+  head_branch: fix/pr-mf-portable-linux-metadata-split-20261013
+  head_sha: split-plan-exact-head
+  merge_actor: mergeguez_dev_merge
+  delete_branch_after_merge: true

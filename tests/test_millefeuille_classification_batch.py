@@ -19,6 +19,7 @@ from millefeuille.domain.classification import (
 )
 from millefeuille.domain.index_fixtures import INDEX_STATUS_REF
 from millefeuille.domain.summary_fixtures import SUMMARY_ARTIFACT_REF
+from tests.platform_capabilities import requires_posix_batch_publication
 from tests.test_millefeuille_stage_cli import (
     PAPER_ID,
     RUN_ID,
@@ -147,6 +148,7 @@ def _snapshot_classification_outputs(source_pack_root: Path) -> dict[str, bytes]
     }
 
 
+@requires_posix_batch_publication
 class TestMillefeuilleClassificationBatch(unittest.TestCase):
     def test_batch_classification_routes_sorted_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tempdir:
