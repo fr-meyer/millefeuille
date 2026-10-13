@@ -18,6 +18,7 @@ from pathlib import Path
 import stat
 import sys
 
+from millefeuille.domain import secure_io
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.secure_io import (
     _open_directory_path_no_follow,
@@ -35,6 +36,13 @@ from millefeuille.domain.secure_io import (
 PENDING = ".millefeuille-metadata-pending"
 HISTORY = ".millefeuille-metadata-history"
 _MAX_FILE_BYTES = 16 * 1024 * 1024
+_HAS_METADATA_DIR_FD = (
+    all(
+        function in os.supports_dir_fd
+        for function in (os.open, os.mkdir, os.stat, os.unlink)
+    )
+    and os.stat in os.supports_follow_symlinks
+)
 
 
 def _identity(value: os.stat_result) -> tuple[int, int]:
@@ -86,16 +94,23 @@ def _state(parent_fd: int, name: str) -> dict | None:
 
 def capture_metadata_binding(path: str | Path) -> dict | None:
     target = Path(path)
-    if os.name != "posix":
+    if os.name != "posix" or not secure_io._supports_no_follow():
+        if ".." in target.parts:
+            raise MillefeuilleContractError("metadata path contains parent traversal")
+        for parent in target.parents:
+            _require_portable_directory(parent, target=target, label="metadata")
         try:
-            before = _portable_lstat_regular_file(target, label="metadata")
-        except MillefeuilleContractError:
-            if not target.exists() and not target.is_symlink():
-                return None
-            raise
+            target.lstat()
+        except FileNotFoundError:
+            return None
+        before = _portable_lstat_regular_file(target, label="metadata")
+        if before.st_nlink != 1:
+            raise MillefeuilleContractError("metadata is not a single-link file")
         data = read_bytes_no_follow(target, "metadata", max_bytes=_MAX_FILE_BYTES)
         after = _portable_lstat_regular_file(target, label="metadata")
-        if _stat_stability_snapshot(before) != _stat_stability_snapshot(after):
+        if _identity(before) != _identity(after) or _stat_stability_snapshot(
+            before
+        ) != _stat_stability_snapshot(after):
             raise MillefeuilleContractError("portable metadata changed")
         return {
             "inode": list(_identity(after)),
@@ -120,10 +135,19 @@ def _pending(directory_fd: int) -> None:
 @contextmanager
 def metadata_read_guard(directory: str | Path) -> Iterator[tuple[int, int]]:
     path = Path(directory)
-    if os.name != "posix":
+    if os.name != "posix" or not secure_io._supports_no_follow():
+        if ".." in path.parts:
+            raise MillefeuilleContractError("metadata path contains parent traversal")
+        ancestors = []
         for parent in (path, *path.parents):
             _require_portable_directory(parent, target=path, label="metadata")
-        identity = _identity(path.lstat())
+            identity = _identity(parent.lstat())
+            if not identity[1]:
+                raise MillefeuilleContractError(
+                    "portable metadata identity unavailable"
+                )
+            ancestors.append((parent, identity))
+        identity = ancestors[0][1]
 
         def portable_pending() -> None:
             try:
@@ -139,6 +163,10 @@ def metadata_read_guard(directory: str | Path) -> Iterator[tuple[int, int]]:
         portable_pending()
         if _identity(path.lstat()) != identity:
             raise MillefeuilleContractError("portable metadata directory changed")
+        for parent, before_identity in ancestors:
+            _require_portable_directory(parent, target=path, label="metadata")
+            if _identity(parent.lstat()) != before_identity:
+                raise MillefeuilleContractError("portable metadata ancestor changed")
         return
     try:
         import fcntl
@@ -258,6 +286,34 @@ def _output_parent(root_fd: int, relative: Path) -> int:
         raise
 
 
+def require_metadata_write_support() -> None:
+    """Reject an unqualified native writer before creating directories or outputs."""
+    if os.name != "posix":
+        raise MillefeuilleContractError(
+            "metadata writes require POSIX transaction support"
+        )
+    try:
+        import fcntl  # noqa: F401
+    except (ImportError, OSError) as error:
+        raise MillefeuilleContractError(
+            "metadata writes require POSIX transaction support"
+        ) from error
+    if (
+        not secure_io._supports_no_follow()
+        or not _HAS_METADATA_DIR_FD
+        or not hasattr(os, "fchmod")
+        or not hasattr(os, "fsync")
+    ):
+        raise MillefeuilleContractError(
+            "metadata writes require descriptor-relative no-follow support"
+        )
+    symbol = "renameatx_np" if sys.platform == "darwin" else "renameat2"
+    try:
+        getattr(ctypes.CDLL(None, use_errno=True), symbol)
+    except (AttributeError, OSError) as error:
+        raise MillefeuilleContractError("atomic metadata rename unavailable") from error
+
+
 def write_metadata_transaction(
     directory: str | Path,
     outputs: dict[str, str],
@@ -273,12 +329,8 @@ def write_metadata_transaction(
     rolls back only exact owned entries. Failed rollback leaves readers blocked.
     All journals remain available for separately authorized recovery.
     """
-    try:
-        import fcntl
-    except ImportError as error:
-        raise MillefeuilleContractError(
-            "metadata writes require POSIX transaction support"
-        ) from error
+    require_metadata_write_support()
+    import fcntl
 
     if not outputs or len(outputs) > 16:
         raise MillefeuilleContractError("metadata output set is invalid")

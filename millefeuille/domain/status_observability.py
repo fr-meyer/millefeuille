@@ -14,6 +14,7 @@ import re
 import stat
 from typing import Any
 
+from millefeuille.domain import secure_io
 from millefeuille.domain.artifacts import (
     WRITEBACK_INCOMPLETE_STATUSES,
     ArtifactIndex,
@@ -228,7 +229,7 @@ def load_status_observation(path: str | Path) -> dict[str, Any]:
     target = _validated_operator_path(path, label="status observation")
     directory_snapshot = (
         _portable_directory_snapshot(target.parent, label="status observation parent")
-        if not hasattr(os, "O_NOFOLLOW")
+        if not secure_io._supports_no_follow()
         else None
     )
     payload = _load_strict_json_bytes(
@@ -309,7 +310,7 @@ def _build_canonical_status(
         source_pack_root,
         label="source-pack root",
     )
-    if not hasattr(os, "O_NOFOLLOW"):
+    if not secure_io._supports_no_follow():
         return _build_portable_canonical_status(
             root=root,
             paper_id=paper_id,
@@ -466,7 +467,7 @@ def _build_progressive_index_status(
     run_dir = target.parent
     with metadata_read_guard(run_dir):
         stage_path = run_dir / "stage-manifest.json"
-        if hasattr(os, "O_NOFOLLOW"):
+        if secure_io._supports_no_follow():
             with RootArtifactReader(run_dir) as reader:
                 index_payload = _load_reader_json(reader, target, "artifact index")
                 stage_payload = _probe_reader_json(reader, stage_path, "stage manifest")

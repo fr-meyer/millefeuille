@@ -32,6 +32,7 @@ from millefeuille.domain.index_fixtures import (
     INDEX_STATUS_REF,
 )
 from millefeuille.domain.metadata_transaction import (
+    require_metadata_write_support,
     write_metadata_text,
     write_metadata_transaction,
 )
@@ -142,6 +143,9 @@ def write_dry_run_artifacts(
             run_id=run_id,
         )
         planned_runs.append((item, paper_id, item_rows, run_context))
+
+    if planned_runs:
+        require_metadata_write_support()
 
     results: list[ArtifactWriteResult] = []
     for item, paper_id, item_rows, run_context in planned_runs:

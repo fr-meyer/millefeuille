@@ -16,10 +16,10 @@
       "sha256": "1fdc419aa564cb0ad2cb2be94ff39b856c94486feeb648d48ace0a49bcb72615"
     },
     {
-      "bytes": 28196,
+      "bytes": 30449,
       "module": "millefeuille.domain.metadata_transaction",
       "path": "millefeuille/domain/metadata_transaction.py",
-      "sha256": "b83abe465f21de3cb6837e18bec0f50713a395677432cf84d19693677b814632"
+      "sha256": "ecc7241f677a5ad4ddbe8175729f1cefc6ffb2abdb92222dd3eefd2b93e14176"
     },
     {
       "bytes": 29766,

@@ -25,3 +25,15 @@ Private execution must separately authorize every exact journal, staged, backup,
 commit and recovery effect, as well as replacement/report outputs and read caps.
 Earlier source approval or a package-only receipt does not cover these effects.
 Unsupported descriptor-relative atomic rename/write platforms fail closed.
+
+Portable metadata readers use the existing bounded, non-link regular-file reader
+when no-follow descriptors are unavailable. They check pending barriers before
+and after loading, bind directory and ancestor identities, and reject changed
+file identities, bytes, hardlinks, and unsafe paths. This fallback does not
+provide the native shared-lock guarantee. Unqualified native writes still fail
+closed, with export and offline-stage capability admission before effects.
+
+Portable read-only tests construct completed synthetic DTO fixtures independently
+of application metadata writers. Native write success tests retain capability
+gates, with explicit unsupported-platform no-effect tests. Native Windows source
+pins require exact LF checkout bytes; the controller does not normalize mismatches.

@@ -13,7 +13,6 @@ import unittest
 
 from millefeuille.cli.stages import run_stage_cli
 from millefeuille.domain.acceptance import ACCEPTANCE_SUMMARY_REF
-from millefeuille.domain.artifact_writer import write_dry_run_artifacts
 from millefeuille.domain.classification import (
     CLASSIFICATION_PLAN_REF,
     WRITEBACK_PREVIEW_REF,
@@ -28,6 +27,8 @@ from millefeuille.domain.stage_runtime import (
 )
 from millefeuille.domain.summary_fixtures import SUMMARY_ARTIFACT_REF
 from millefeuille.domain.writeback import WRITEBACK_PLAN_REF
+from tests.metadata_fixtures import write_fixture_metadata
+from tests.platform_capabilities import requires_posix_batch_publication
 from tests.test_millefeuille_source_pack_writer import (
     _make_handoff_row,
     _make_item,
@@ -45,7 +46,7 @@ from tests.test_millefeuille_stage_cli import (
 def _prepare_external_run(tempdir: str) -> tuple[Path, Path, Path]:
     source_pack_root, canonical_run_dir = _prepare_source_pack_run(tempdir)
     artifact_root = Path(tempdir) / "artifacts"
-    write_dry_run_artifacts(
+    write_fixture_metadata(
         items=[_make_item()],
         handoff_rows=[_make_handoff_row()],
         config=ArtifactExportConfig(
@@ -73,6 +74,7 @@ def _run_locator_args(source_pack_root: Path, artifact_root: Path) -> list[str]:
 
 
 class TestMillefeuilleArtifactOverrides(unittest.TestCase):
+    @requires_posix_batch_publication
     def test_external_root_and_custom_manifest_route_run_scoped_writes(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, artifact_root, canonical_run_dir = (

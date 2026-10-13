@@ -169,7 +169,7 @@ jobs:
           $manifestSha = (Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
           $controller = Join-Path $env:GITHUB_WORKSPACE '.github/scripts/native_windows/controller.py'
           $receipt = Join-Path $env:NATIVE_ROOT 'controller-result.json'
-          & $python -I -B $controller --source-root $env:GITHUB_WORKSPACE --scratch-parent $env:NATIVE_ROOT --manifest $manifest --manifest-sha256 $manifestSha --python $python --python-sha256 $pythonSha --route-id "github-actions:$env:GITHUB_RUN_ID:$env:GITHUB_RUN_ATTEMPT" --owner-clearance-id "approved-PR-workflow:$env:EXPECTED_HEAD" --carried-scratch-bytes $carried | Out-File -LiteralPath $receipt -Encoding utf8NoBOM
+          & $python -I -B $controller --source-root $env:GITHUB_WORKSPACE --scratch-parent $env:NATIVE_ROOT --manifest $manifest --manifest-sha256 $manifestSha --python $python --python-sha256 $pythonSha --route-id "github-actions:${env:GITHUB_RUN_ID}:${env:GITHUB_RUN_ATTEMPT}" --owner-clearance-id "approved-PR-workflow:$env:EXPECTED_HEAD" --carried-scratch-bytes $carried | Out-File -LiteralPath $receipt -Encoding utf8NoBOM
           $code = $LASTEXITCODE
           if ((Get-Item -LiteralPath $receipt).Length -gt 131072) { throw 'Native controller receipt exceeds bound' }
           $result = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json

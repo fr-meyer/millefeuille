@@ -4,6 +4,7 @@ status: in-progress
 branch: fix/pr-mf-native-metadata-transactions-20261012
 base_branch: dev
 write_paths:
+  - .gitattributes
   - .github/scripts/native_windows/adapter.py
   - .github/scripts/native_windows/controller.py
   - .github/scripts/native_windows/manifest.json
@@ -11,16 +12,33 @@ write_paths:
   - .github/scripts/native_windows/worker.py
   - .github/workflows/ci.yml
   - .speculoos/tasks/pr-mf-native-metadata-transactions-20261012.yaml
+  - millefeuille/cli/commands.py
   - millefeuille/domain/acceptance.py
   - millefeuille/domain/artifact_writer.py
   - millefeuille/domain/artifacts.py
   - millefeuille/domain/classification.py
   - millefeuille/domain/metadata_transaction.py
+  - millefeuille/domain/offline_stages.py
   - millefeuille/domain/stage_runtime.py
   - millefeuille/domain/status_observability.py
   - specs/millefeuille-pipeline/native-metadata-transactions.md
+  - tests/fixtures/millefeuille_portable_metadata/complete-preview.json
+  - tests/metadata_fixtures.py
+  - tests/test_millefeuille_acceptance_batch.py
+  - tests/test_millefeuille_artifact_commands.py
+  - tests/test_millefeuille_artifact_overrides.py
+  - tests/test_millefeuille_artifact_writer.py
+  - tests/test_millefeuille_classification_actions.py
+  - tests/test_millefeuille_classification_batch.py
+  - tests/test_millefeuille_classification_model.py
+  - tests/test_millefeuille_metadata_portability.py
   - tests/test_millefeuille_metadata_transaction.py
+  - tests/test_millefeuille_native_admission.py
   - tests/test_millefeuille_retrieval_batch.py
+  - tests/test_millefeuille_retrieve.py
+  - tests/test_millefeuille_source_pack_writer.py
+  - tests/test_millefeuille_stage_cli.py
+  - tests/test_millefeuille_status_observability.py
 github:
   issue: null
   pull_request: 175
@@ -33,6 +51,8 @@ scope:
   - Preserve exact backups and require recovery after ownership drift or rollback failure
   - Preserve materialized classification bindings for byte-identical repeat runs
   - Run three prototype native Windows controls and current-head tests in bounded GitHub Actions
+  - Preserve portable metadata reads and read-only DTO fixtures on unsupported native-write platforms
+  - Preflight unqualified metadata writers before export and offline-stage effects
 acceptance:
   - Original native symlink and partial-acceptance regressions fail without errors
   - Repaired synthetic transactions, affected native callers, Ruff, format, metadata and diff checks pass
@@ -44,7 +64,7 @@ publication_boundary:
 documentation_impact:
   status: none
   rationale: The native transaction specification documents implementation semantics; no user-facing README or docs surface changes are required.
-publish_authority: Isolated GCP source implementation is explicitly authorized; repository publication and private effects require separate approval.
+publish_authority: The isolated unpublished Mac repair and offline checks are authorized; another repository push and one additional automatic CI run require separate approval. Prior source and publication receipts are preserved. Private effects require separate exact approval.
 private_data_scan: Required; fixtures and failure mutations are synthetic.
 post_merge_expected:
   pull_request: 175

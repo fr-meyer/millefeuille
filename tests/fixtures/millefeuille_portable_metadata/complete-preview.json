@@ -1,0 +1,686 @@
+{
+  "artifact-index.json": {
+    "artifact_root": "${RUN_DIR}",
+    "artifacts": {
+      "acceptance_summary": {
+        "format": "json",
+        "kind": "acceptance-summary",
+        "private_content": false,
+        "ref": "reports/acceptance-summary.json",
+        "stage": "acceptance"
+      },
+      "acceptance_summary_markdown": {
+        "format": "markdown",
+        "kind": "acceptance-summary-markdown",
+        "private_content": false,
+        "ref": "reports/acceptance-summary.md",
+        "stage": "acceptance"
+      },
+      "classification_decision": {
+        "format": "json",
+        "kind": "classification-decision",
+        "private_content": false,
+        "ref": "classification/decision-records/zotero-ITEM1.json",
+        "stage": "classify"
+      },
+      "classification_decision_markdown": {
+        "format": "markdown",
+        "kind": "classification-decision-markdown",
+        "private_content": false,
+        "ref": "classification/decision-records/zotero-ITEM1.md",
+        "stage": "classify"
+      },
+      "classification_plan": {
+        "format": "json",
+        "kind": "classification-plan",
+        "private_content": false,
+        "ref": "classification/classification-plan.json",
+        "stage": "classify"
+      },
+      "hierarchical_summary": {
+        "format": "json",
+        "kind": "hierarchical-summary",
+        "private_content": false,
+        "ref": "summaries/hierarchical-summary.json",
+        "stage": "summarize"
+      },
+      "native_extraction_evidence": {
+        "format": "json",
+        "kind": "native-extraction-evidence",
+        "private_content": false,
+        "ref": "../../../extractions/native/evidence.json",
+        "stage": "extract-native"
+      },
+      "native_extraction_markdown": {
+        "format": "markdown",
+        "kind": "native-extraction-markdown",
+        "private_content": true,
+        "ref": "../../../extractions/native/fulltext.md",
+        "stage": "extract-native"
+      },
+      "ocr_extraction_evidence": {
+        "format": "json",
+        "kind": "ocr-extraction-evidence",
+        "private_content": false,
+        "ref": "../../../extractions/mistral-ocr/evidence.json",
+        "stage": "extract-ocr"
+      },
+      "ocr_extraction_markdown": {
+        "format": "markdown",
+        "kind": "ocr-extraction-markdown",
+        "private_content": true,
+        "ref": "../../../extractions/mistral-ocr/fulltext.md",
+        "stage": "extract-ocr"
+      },
+      "paper_card_json": {
+        "format": "json",
+        "kind": "paper-card",
+        "private_content": false,
+        "ref": "cards/paper-card.json",
+        "stage": "card"
+      },
+      "paper_card_markdown": {
+        "format": "markdown",
+        "kind": "paper-card-markdown",
+        "private_content": true,
+        "ref": "cards/paper-card.md",
+        "stage": "card"
+      },
+      "retrieval_index_status": {
+        "format": "json",
+        "kind": "retrieval-index-status",
+        "private_content": false,
+        "ref": "index/index-status.json",
+        "stage": "index"
+      },
+      "route_evidence": {
+        "format": "json",
+        "kind": "route-selection-evidence",
+        "private_content": false,
+        "ref": "../../../selected/route.json",
+        "stage": "route"
+      },
+      "selected_fulltext": {
+        "format": "markdown",
+        "kind": "selected-fulltext",
+        "private_content": true,
+        "ref": "../../../selected/fulltext.md",
+        "stage": "route"
+      },
+      "stage_manifest": {
+        "format": "json",
+        "kind": "stage-manifest",
+        "private_content": false,
+        "ref": "stage-manifest.json",
+        "stage": "discover"
+      },
+      "structure_evidence": {
+        "format": "json",
+        "kind": "structure-evidence",
+        "private_content": false,
+        "ref": "../../../structure/structure.json",
+        "stage": "structure"
+      },
+      "structure_outline": {
+        "format": "markdown",
+        "kind": "structure-outline",
+        "private_content": true,
+        "ref": "../../../structure/outline.md",
+        "stage": "structure"
+      },
+      "summary_texts": {
+        "format": "directory",
+        "kind": "summary-texts",
+        "private_content": true,
+        "ref": "summaries/texts",
+        "stage": "summarize"
+      },
+      "zotero_writeback_note": {
+        "format": "markdown",
+        "kind": "zotero-writeback-note",
+        "private_content": false,
+        "ref": "reports/zotero-writeback-note.md",
+        "stage": "writeback"
+      },
+      "zotero_writeback_plan": {
+        "format": "json",
+        "kind": "zotero-writeback-plan",
+        "private_content": false,
+        "ref": "zotero-writeback-plan.json",
+        "stage": "writeback"
+      },
+      "zotero_writeback_preview": {
+        "format": "json",
+        "kind": "zotero-writeback-preview",
+        "private_content": false,
+        "ref": "classification/zotero-writeback-preview.json",
+        "stage": "classify"
+      }
+    },
+    "indexes": [
+      {
+        "lane": "openkb",
+        "skip_reason": "fixture-only run",
+        "status": "skipped"
+      },
+      {
+        "lane": "pageindex",
+        "status": "previewed"
+      }
+    ],
+    "paper_id": "zotero-ITEM1",
+    "run_id": "run-fixture",
+    "schema_version": "millefeuille-artifact-index/v0.1",
+    "source_identity": {
+      "canonical_filename": "Example Author - 2026 - Intake Fixture.pdf",
+      "citation_key": "fixture2026intake",
+      "doi": "10.0000/intake-fixture",
+      "pdf_count": 1,
+      "title": "Intake Fixture Paper",
+      "year": 2026,
+      "zotero_attachment_key": "ATT1",
+      "zotero_item_key": "ITEM1"
+    },
+    "source_pack": {
+      "manifest_ref": "../../../manifest.json",
+      "ref": "${SOURCE_PACK_ROOT}/zotero/zotero-ITEM1",
+      "source_hash": "sha256:d2cdefee2d0dd786c00f3beca5122e81791b2220622924b6a8ca92f4d0e5bf0c",
+      "source_type": "zotero"
+    },
+    "stages": {
+      "acceptance": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "card": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "classify": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "discover": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "extract-native": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "extract-ocr": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "handoff": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "index": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "openkb-add": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "skipped"
+      },
+      "recover": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "skipped"
+      },
+      "route": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "source-pack": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "structure": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "summarize": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      },
+      "writeback": {
+        "manifest_ref": "stage-manifest.json",
+        "status": "passed"
+      }
+    },
+    "zotero_writeback": {
+      "mode": "preview",
+      "plan_ref": "zotero-writeback-plan.json",
+      "status": "previewed"
+    }
+  },
+  "classification/adjudication-queue.jsonl": "",
+  "classification/batch-classification-report.md": "# Batch Classification Report\n\n- Run: `run-fixture`\n- Mode: `single`\n- Taxonomy version: `taxonomy-v1`\n- Papers: `1`\n- Decision status: `classified`\n- Primary path: `Methods > Normalization & training dynamics`\n",
+  "classification/classification-plan.json": {
+    "default_profile": "research-default",
+    "mode": "single",
+    "papers": [
+      {
+        "decision_markdown_ref": "classification/decision-records/zotero-ITEM1.md",
+        "decision_ref": "classification/decision-records/zotero-ITEM1.json",
+        "paper_id": "zotero-ITEM1",
+        "status": "classified",
+        "writeback_preview_ref": "classification/zotero-writeback-preview.json"
+      }
+    ],
+    "run_id": "run-fixture",
+    "schema_version": "millefeuille-classification-plan/v0.1",
+    "taxonomy_version": "taxonomy-v1"
+  },
+  "classification/decision-records/zotero-ITEM1.json": {
+    "confidence": "high",
+    "evidence_refs": [
+      "summaries/hierarchical-summary.json",
+      "cards/paper-card.json"
+    ],
+    "mode": "single",
+    "paper_id": "zotero-ITEM1",
+    "primary_path": "Methods > Normalization & training dynamics",
+    "rejected_alternatives": [
+      {
+        "path": "Applications > Vision",
+        "reason": "the primary contribution is methodological"
+      }
+    ],
+    "run_id": "run-fixture",
+    "schema_version": "millefeuille-classification-decision/v0.1",
+    "source_hash": "sha256:d2cdefee2d0dd786c00f3beca5122e81791b2220622924b6a8ca92f4d0e5bf0c",
+    "status": "classified",
+    "taxonomy_version": "taxonomy-v1",
+    "writeback_preview_ref": "classification/zotero-writeback-preview.json"
+  },
+  "classification/decision-records/zotero-ITEM1.md": "# Classification Decision: zotero-ITEM1\n\n- Run: `run-fixture`\n- Taxonomy version: `taxonomy-v1`\n- Mode: `single`\n- Status: `classified`\n- Primary path: `Methods > Normalization & training dynamics`\n- Confidence: `high`\n\n## Evidence Refs\n- `summaries/hierarchical-summary.json`\n- `cards/paper-card.json`\n\n## Rejected Alternatives\n- `Applications > Vision`: the primary contribution is methodological\n",
+  "classification/rejected-alternatives.jsonl": "{\"path\": \"Applications > Vision\", \"reason\": \"the primary contribution is methodological\"}\n",
+  "classification/taxonomy-change-requests.jsonl": "",
+  "classification/zotero-writeback-preview.json": {
+    "add_tags": [
+      "millefeuille-classified"
+    ],
+    "classification_path": "Methods > Normalization & training dynamics",
+    "destination_collection": "Methods \u00b7 Normalization & training dynamics",
+    "mode": "preview",
+    "note_markdown": "Classification preview note.",
+    "paper_id": "zotero-ITEM1",
+    "remove_tags": [
+      "millefeuille"
+    ],
+    "run_id": "run-fixture",
+    "schema_version": "millefeuille-zotero-writeback-preview/v0.1",
+    "source_hash": "sha256:d2cdefee2d0dd786c00f3beca5122e81791b2220622924b6a8ca92f4d0e5bf0c",
+    "status": "previewed"
+  },
+  "reports/acceptance-summary.json": {
+    "checks": [
+      {
+        "name": "source-pack",
+        "notes": [
+          "verified source-pack manifest loaded"
+        ],
+        "refs": [
+          "../../../manifest.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "name": "handoff",
+        "notes": [
+          "matched handoff evidence"
+        ],
+        "refs": [
+          "../../../../../../handoff.jsonl"
+        ],
+        "status": "passed"
+      },
+      {
+        "name": "extract-native",
+        "notes": [
+          "artifact verified"
+        ],
+        "refs": [
+          "../../../extractions/native/evidence.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "name": "extract-ocr",
+        "notes": [
+          "artifact verified"
+        ],
+        "refs": [
+          "../../../extractions/mistral-ocr/evidence.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "name": "route",
+        "notes": [
+          "artifact verified"
+        ],
+        "refs": [
+          "../../../selected/route.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "name": "structure",
+        "notes": [
+          "artifact verified"
+        ],
+        "refs": [
+          "../../../structure/structure.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "details": {
+          "summary_count": 2
+        },
+        "name": "summarize",
+        "notes": [
+          "hierarchical summary verified"
+        ],
+        "refs": [
+          "summaries/hierarchical-summary.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "name": "card",
+        "notes": [
+          "paper card verified"
+        ],
+        "refs": [
+          "cards/paper-card.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "details": {
+          "lanes": [
+            "openkb",
+            "pageindex"
+          ]
+        },
+        "name": "index",
+        "notes": [
+          "retrieval index and paper card state verified"
+        ],
+        "refs": [
+          "index/index-status.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "name": "duplicate-scan",
+        "notes": [
+          "duplicate scan indicates no blocking duplicate"
+        ],
+        "refs": [],
+        "status": "passed"
+      }
+    ],
+    "counts": {
+      "card": 1,
+      "duplicate_scan": 1,
+      "handoff_rows": 1,
+      "index": 1,
+      "native_extraction": 1,
+      "ocr_extraction": 1,
+      "passed_stages_before_acceptance": 10,
+      "route": 1,
+      "source_pack": 1,
+      "structure": 1,
+      "summary": 1
+    },
+    "duplicate_scan": {
+      "reason": "fixture-only run",
+      "status": "not-run"
+    },
+    "handoff": {
+      "canonical_filename": "Example Author - 2026 - Intake Fixture.pdf",
+      "match_count": 1,
+      "matched": true,
+      "sha256_present": true,
+      "verification_strength": "full"
+    },
+    "paper_id": "zotero-ITEM1",
+    "run_id": "run-fixture",
+    "schema_version": "openkb-millefeuille-acceptance-summary/v0.1",
+    "source_hash": "sha256:d2cdefee2d0dd786c00f3beca5122e81791b2220622924b6a8ca92f4d0e5bf0c",
+    "source_pack_ref": "../../..",
+    "status": "pass"
+  },
+  "reports/acceptance-summary.md": "# Acceptance Summary\n\n- Paper: `zotero-ITEM1`\n- Run: `run-fixture`\n- Status: `pass`\n- Source hash: `sha256:d2cdefee2d0dd786c00f3beca5122e81791b2220622924b6a8ca92f4d0e5bf0c`\n\n## Checks\n- `source-pack`: `passed` (`../../../manifest.json`)\n  note: verified source-pack manifest loaded\n- `handoff`: `passed` (`../../../../../../handoff.jsonl`)\n  note: matched handoff evidence\n- `extract-native`: `passed` (`../../../extractions/native/evidence.json`)\n  note: artifact verified\n- `extract-ocr`: `passed` (`../../../extractions/mistral-ocr/evidence.json`)\n  note: artifact verified\n- `route`: `passed` (`../../../selected/route.json`)\n  note: artifact verified\n- `structure`: `passed` (`../../../structure/structure.json`)\n  note: artifact verified\n- `summarize`: `passed` (`summaries/hierarchical-summary.json`)\n  note: hierarchical summary verified\n- `card`: `passed` (`cards/paper-card.json`)\n  note: paper card verified\n- `index`: `passed` (`index/index-status.json`)\n  note: retrieval index and paper card state verified\n- `duplicate-scan`: `passed` ([none])\n  note: duplicate scan indicates no blocking duplicate\n",
+  "reports/zotero-writeback-note.md": "Classification preview note.\n",
+  "stage-manifest.json": {
+    "manual_gates": [],
+    "mode": "preview",
+    "run_id": "run-fixture",
+    "schema_version": "millefeuille-stage-manifest/v0.1",
+    "source_type": "zotero",
+    "stages": [
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "discover",
+        "notes": [
+          "dry-run discovered Zotero item ITEM1"
+        ],
+        "outputs": [
+          "artifact-index.json",
+          "stage-manifest.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [
+          "zotero:item:ITEM1"
+        ],
+        "manual_gate_required": false,
+        "name": "handoff",
+        "notes": [
+          "1 PDF handoff row(s) available for preview"
+        ],
+        "outputs": [
+          "openkb-millefeuille-handoff-preview"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [
+          "openkb-millefeuille-handoff-preview"
+        ],
+        "manual_gate_required": false,
+        "name": "recover",
+        "notes": [
+          "source-pack manifest already exists; PDF recovery not performed"
+        ],
+        "outputs": [],
+        "status": "skipped"
+      },
+      {
+        "inputs": [
+          "source-pack manifest"
+        ],
+        "manual_gate_required": false,
+        "name": "source-pack",
+        "notes": [
+          "existing source-pack manifest verified for artifact-root lane"
+        ],
+        "outputs": [
+          "source-pack manifest"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "extract-native",
+        "notes": [
+          "fixture native extraction evidence available"
+        ],
+        "outputs": [
+          "native extraction evidence",
+          "native markdown"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "extract-ocr",
+        "notes": [
+          "fixture OCR extraction evidence available"
+        ],
+        "outputs": [
+          "OCR extraction evidence",
+          "OCR markdown"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "route",
+        "notes": [
+          "fixture route selection evidence available"
+        ],
+        "outputs": [
+          "route selection evidence",
+          "selected fulltext",
+          "../../../selected/fulltext.md"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "structure",
+        "notes": [
+          "fixture structure evidence available"
+        ],
+        "outputs": [
+          "structure evidence",
+          "structure outline"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "summarize",
+        "notes": [
+          "fixture hierarchical summary available"
+        ],
+        "outputs": [
+          "hierarchical summary",
+          "summary texts",
+          "summaries/hierarchical-summary.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "card",
+        "notes": [
+          "fixture paper card available"
+        ],
+        "outputs": [
+          "paper card json",
+          "paper card markdown",
+          "cards/paper-card.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "openkb-add",
+        "notes": [
+          "source-pack evidence available; stage not run in dry-run writer"
+        ],
+        "outputs": [],
+        "status": "skipped"
+      },
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "index",
+        "notes": [
+          "fixture retrieval/index status available"
+        ],
+        "outputs": [
+          "retrieval index status",
+          "index/index-status.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "acceptance",
+        "notes": [
+          "acceptance summary written for zotero-ITEM1"
+        ],
+        "outputs": [
+          "reports/acceptance-summary.json",
+          "reports/acceptance-summary.md"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "classify",
+        "notes": [
+          "classification preview written for zotero-ITEM1"
+        ],
+        "outputs": [
+          "classification/classification-plan.json",
+          "classification/decision-records/zotero-ITEM1.json",
+          "classification/zotero-writeback-preview.json"
+        ],
+        "status": "passed"
+      },
+      {
+        "inputs": [],
+        "manual_gate_required": false,
+        "name": "writeback",
+        "notes": [
+          "preview-only Zotero writeback plan materialized"
+        ],
+        "outputs": [
+          "zotero-writeback-plan.json",
+          "reports/zotero-writeback-note.md"
+        ],
+        "status": "passed"
+      }
+    ]
+  },
+  "zotero-writeback-plan.json": {
+    "add_tags": [
+      "millefeuille-classified"
+    ],
+    "destination_collection": "Methods \u00b7 Normalization & training dynamics",
+    "execution_notes": [
+      "preview-only plan; no live Zotero mutation"
+    ],
+    "mode": "preview",
+    "note_markdown_ref": "reports/zotero-writeback-note.md",
+    "paper_id": "zotero-ITEM1",
+    "remove_tags": [
+      "millefeuille"
+    ],
+    "run_id": "run-fixture",
+    "schema_version": "millefeuille-zotero-writeback-plan/v0.1",
+    "source_hash": "sha256:d2cdefee2d0dd786c00f3beca5122e81791b2220622924b6a8ca92f4d0e5bf0c",
+    "status": "previewed"
+  }
+}

@@ -124,15 +124,21 @@ def digest(path):
 
 
 def require_plain(path, directory=False):
-    assert path.is_absolute() and not str(path).startswith("\\\\")
-    assert ".." not in path.parts
+    assert path.is_absolute() and not str(path).startswith("\\\\"), (
+        "input path must be absolute and local"
+    )
+    assert ".." not in path.parts, "input path contains traversal"
     for parent in reversed((path.parent, *path.parent.parents)):
         info = parent.lstat()
-        assert stat.S_ISDIR(info.st_mode)
+        assert stat.S_ISDIR(info.st_mode), (
+            f"input ancestor is not a directory: {parent}"
+        )
         assert not info.st_file_attributes & 0x400, "reparse ancestor"
     info = path.lstat()
     assert not info.st_file_attributes & 0x400, "reparse input"
-    assert stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
+    assert stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode), (
+        f"input kind mismatch: {path}"
+    )
     return [info.st_dev, info.st_ino, info.st_size]
 
 
@@ -169,11 +175,20 @@ def main():
     exit_code = None
     phase = "route-and-platform-admission"
     try:
-        assert os.name == "nt" and sys.platform == "win32"
-        assert sys.maxsize > 2**32 and ctypes.sizeof(ExtendedLimit) == 144
-        assert args.route_id.strip() and args.owner_clearance_id.strip()
-        assert args.carried_scratch_bytes >= 204000000
-        assert args.carried_scratch_bytes + RESERVE <= SCRATCH_CEILING
+        assert os.name == "nt" and sys.platform == "win32", "requires native Windows"
+        assert sys.maxsize > 2**32 and ctypes.sizeof(ExtendedLimit) == 144, (
+            f"Windows ABI mismatch: maxsize={sys.maxsize}, "
+            f"ExtendedLimit={ctypes.sizeof(ExtendedLimit)}"
+        )
+        assert args.route_id.strip() and args.owner_clearance_id.strip(), (
+            "route or clearance binding is empty"
+        )
+        assert args.carried_scratch_bytes >= 204000000, (
+            "carried scratch below retained floor"
+        )
+        assert args.carried_scratch_bytes + RESERVE <= SCRATCH_CEILING, (
+            "carried scratch plus reserve exceeds ceiling"
+        )
         source = Path(args.source_root)
         parent = Path(args.scratch_parent)
         manifest_path = Path(args.manifest)
@@ -182,24 +197,35 @@ def main():
         require_plain(parent, True)
         require_plain(manifest_path)
         require_plain(python)
-        assert manifest_path.stat().st_size <= 131072
-        assert digest(manifest_path) == args.manifest_sha256
-        assert digest(python) == args.python_sha256
+        assert manifest_path.stat().st_size <= 131072, (
+            "source manifest exceeds size bound"
+        )
+        assert digest(manifest_path) == args.manifest_sha256, (
+            "source manifest hash mismatch"
+        )
+        assert digest(python) == args.python_sha256, "Python executable hash mismatch"
         manifest = json.loads(manifest_path.read_text())
         assert (
             manifest["schema"]
             == "millefeuille.native-windows-public-source-manifest/v1"
-        )
+        ), "source manifest schema mismatch"
         expected_sources = {}
         for record in manifest["sources"] + [manifest["worker"]]:
             relative = Path(record["path"])
-            assert not relative.is_absolute() and ".." not in relative.parts
+            assert not relative.is_absolute() and ".." not in relative.parts, (
+                "source record path is absolute or contains traversal"
+            )
             path = source / relative
             require_plain(path)
-            assert path.stat().st_size == record["bytes"] <= 1048576
-            assert digest(path) == record["sha256"]
+            assert path.stat().st_size == record["bytes"] <= 1048576, (
+                f"source size mismatch: {relative}; actual={path.stat().st_size}, "
+                f"expected={record['bytes']}"
+            )
+            assert digest(path) == record["sha256"], f"source hash mismatch: {relative}"
             expected_sources[str(path)] = record["sha256"]
-        assert sum(record["bytes"] for record in manifest["sources"]) <= 1048576
+        assert sum(record["bytes"] for record in manifest["sources"]) <= 1048576, (
+            "aggregate source exceeds size bound"
+        )
         kernel = ctypes.WinDLL("kernel32", use_last_error=True)
 
         def bind(name, restype, types):
