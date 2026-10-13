@@ -143,6 +143,7 @@ not expose through Python's POSIX descriptor APIs:
 | Legacy single-run retrieval | Supported | Supported |
 | Atomic retrieval-batch publication | Supported and fully tested | Fails closed before publication |
 | Exclusive no-follow model-provenance output | Supported and fully tested | Fails closed before output creation |
+| Metadata/acceptance transactions and artifact/offline-stage persistence | Supported where required POSIX primitives are available | Unsupported; refuses before effects |
 
 Capability-marked tests for POSIX locks, descriptor-relative mutation checks,
 and atomic no-replace publication still run in every Ubuntu matrix job. Windows

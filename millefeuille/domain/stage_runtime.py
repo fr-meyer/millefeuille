@@ -13,7 +13,13 @@ from typing import Any
 from millefeuille.domain.artifacts import (
     ArtifactIndex,
     load_artifact_index,
-    write_artifact_index,
+)
+from millefeuille.domain.metadata_transaction import (
+    capture_metadata_binding,
+    metadata_path_read_guard,
+    metadata_read_guard,
+    write_metadata_text,
+    write_metadata_transaction,
 )
 from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
@@ -50,6 +56,8 @@ class ResolvedRunArtifacts:
     artifact_index_path: Path
     stage_manifest: StageManifest
     artifact_index: ArtifactIndex
+    metadata_snapshot: dict[str, dict | None] | None = None
+    run_dir_identity: tuple[int, int] | None = None
 
 
 def resolve_run_artifacts(
@@ -68,9 +76,7 @@ def resolve_run_artifacts(
         if not requested_item_key:
             raise MillefeuilleContractError("item_key must not be empty")
     resolved_paper_id = paper_id or (
-        paper_id_for_zotero_item_key(requested_item_key)
-        if requested_item_key
-        else None
+        paper_id_for_zotero_item_key(requested_item_key) if requested_item_key else None
     )
     if not isinstance(resolved_paper_id, str) or not resolved_paper_id.strip():
         raise MillefeuilleContractError("paper_id or item_key is required")
@@ -86,12 +92,7 @@ def resolve_run_artifacts(
     ensure_no_follow_directory(root, "source-pack root")
     source_pack_dir = root / "zotero" / resolved_paper_id
     manifest_path = source_pack_dir / "manifest.json"
-    canonical_run_dir = (
-        source_pack_dir
-        / "analyses"
-        / "millefeuille"
-        / resolved_run_id
-    )
+    canonical_run_dir = source_pack_dir / "analyses" / "millefeuille" / resolved_run_id
     run_dir, stage_manifest_path = _resolve_run_package_paths(
         canonical_run_dir=canonical_run_dir,
         artifact_root=artifact_root,
@@ -100,74 +101,92 @@ def resolve_run_artifacts(
         run_id=resolved_run_id,
     )
     artifact_index_path = run_dir / "artifact-index.json"
-
-    if artifact_reader is None:
+    try:
+        run_dir.lstat()
+    except FileNotFoundError:
+        # Preserve normal missing-package diagnostics. Existing runs still enter
+        # the shared lock and pending barrier before any pair member is loaded.
+        ensure_no_follow_regular_file(manifest_path, "source-pack manifest", root=root)
         ensure_no_follow_regular_file(
-            manifest_path,
-            "source-pack manifest",
-            root=root,
+            stage_manifest_path, "stage manifest", root=run_dir
         )
-        ensure_no_follow_regular_file(
-            stage_manifest_path,
-            "stage manifest",
-            root=run_dir,
-        )
-        ensure_no_follow_regular_file(
-            artifact_index_path,
-            "artifact index",
-            root=run_dir,
-        )
-        source_pack_manifest = load_source_pack_manifest(manifest_path)
-        stage_manifest = load_stage_manifest(stage_manifest_path)
-        artifact_index = load_artifact_index(artifact_index_path)
-    else:
-        source_pack_manifest = parse_source_pack_manifest(
-            artifact_reader.load_json_object(
+    with metadata_read_guard(run_dir) as run_identity:
+        if artifact_reader is None:
+            ensure_no_follow_regular_file(
                 manifest_path,
                 "source-pack manifest",
+                root=root,
             )
-        )
-        stage_manifest = StageManifest.from_dict(
-            artifact_reader.load_json_object(stage_manifest_path, "stage manifest")
-        )
-        artifact_index = ArtifactIndex.from_dict(
-            artifact_reader.load_json_object(artifact_index_path, "artifact index")
-        )
-    if requested_item_key is not None:
-        manifest_identity = source_pack_manifest.get("identity")
-        actual_item_key = (
-            manifest_identity.get("zotero_item_key")
-            if isinstance(manifest_identity, dict)
-            else None
-        )
-        if actual_item_key != requested_item_key:
-            raise MillefeuilleContractError(
-                "source-pack item_key drift: "
-                f"expected {requested_item_key!r}, got {actual_item_key!r}"
+            ensure_no_follow_regular_file(
+                stage_manifest_path,
+                "stage manifest",
+                root=run_dir,
             )
-    _validate_run_identity(
-        paper_id=resolved_paper_id,
-        run_id=resolved_run_id,
-        run_dir=run_dir,
-        source_pack_manifest=source_pack_manifest,
-        stage_manifest=stage_manifest,
-        stage_manifest_path=stage_manifest_path,
-        artifact_index=artifact_index,
-        source_pack_dir=source_pack_dir,
-    )
-    return ResolvedRunArtifacts(
-        paper_id=resolved_paper_id,
-        run_id=resolved_run_id,
-        source_pack_root=root,
-        source_pack_dir=source_pack_dir,
-        run_dir=run_dir,
-        source_hash=str(source_pack_manifest["source_hash"]),
-        source_pack_manifest=source_pack_manifest,
-        stage_manifest_path=stage_manifest_path,
-        artifact_index_path=artifact_index_path,
-        stage_manifest=stage_manifest,
-        artifact_index=artifact_index,
-    )
+            ensure_no_follow_regular_file(
+                artifact_index_path,
+                "artifact index",
+                root=run_dir,
+            )
+            source_pack_manifest = load_source_pack_manifest(manifest_path)
+            stage_manifest = load_stage_manifest(stage_manifest_path)
+            artifact_index = load_artifact_index(artifact_index_path)
+        else:
+            source_pack_manifest = parse_source_pack_manifest(
+                artifact_reader.load_json_object(
+                    manifest_path,
+                    "source-pack manifest",
+                )
+            )
+            stage_manifest = StageManifest.from_dict(
+                artifact_reader.load_json_object(stage_manifest_path, "stage manifest")
+            )
+            artifact_index = ArtifactIndex.from_dict(
+                artifact_reader.load_json_object(artifact_index_path, "artifact index")
+            )
+        if requested_item_key is not None:
+            manifest_identity = source_pack_manifest.get("identity")
+            actual_item_key = (
+                manifest_identity.get("zotero_item_key")
+                if isinstance(manifest_identity, dict)
+                else None
+            )
+            if actual_item_key != requested_item_key:
+                raise MillefeuilleContractError(
+                    "source-pack item_key drift: "
+                    f"expected {requested_item_key!r}, got {actual_item_key!r}"
+                )
+        _validate_run_identity(
+            paper_id=resolved_paper_id,
+            run_id=resolved_run_id,
+            run_dir=run_dir,
+            source_pack_manifest=source_pack_manifest,
+            stage_manifest=stage_manifest,
+            stage_manifest_path=stage_manifest_path,
+            artifact_index=artifact_index,
+            source_pack_dir=source_pack_dir,
+        )
+        return ResolvedRunArtifacts(
+            paper_id=resolved_paper_id,
+            run_id=resolved_run_id,
+            source_pack_root=root,
+            source_pack_dir=source_pack_dir,
+            run_dir=run_dir,
+            source_hash=str(source_pack_manifest["source_hash"]),
+            source_pack_manifest=source_pack_manifest,
+            stage_manifest_path=stage_manifest_path,
+            artifact_index_path=artifact_index_path,
+            stage_manifest=stage_manifest,
+            artifact_index=artifact_index,
+            metadata_snapshot={
+                relative_ref(stage_manifest_path, run_dir): capture_metadata_binding(
+                    stage_manifest_path
+                ),
+                relative_ref(artifact_index_path, run_dir): capture_metadata_binding(
+                    artifact_index_path
+                ),
+            },
+            run_dir_identity=run_identity,
+        )
 
 
 def _resolve_run_package_paths(
@@ -577,26 +596,26 @@ def _validate_run_identity(
 
 def load_stage_manifest(path: str | Path) -> StageManifest:
     manifest_path = Path(path)
-    payload = load_json_object(manifest_path, "stage manifest")
-    return StageManifest.from_dict(payload)
+    with metadata_path_read_guard(manifest_path):
+        payload = load_json_object_no_follow(manifest_path, "stage manifest")
+        return StageManifest.from_dict(payload)
 
 
 def write_stage_manifest(manifest: StageManifest, path: str | Path) -> None:
-    output_path = Path(path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(manifest.to_dict(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    write_metadata_text(
+        path, json.dumps(manifest.to_dict(), indent=2, sort_keys=True) + "\n"
     )
 
 
 def load_json_object(path: str | Path, label: str) -> dict[str, Any]:
-    return load_json_object_no_follow(path, label)
+    with metadata_path_read_guard(path):
+        return load_json_object_no_follow(path, label)
 
 
 def load_jsonl_records(path: str | Path, label: str) -> list[dict[str, Any]]:
     target = Path(path)
-    text = read_text_no_follow(target, label)
+    with metadata_path_read_guard(target):
+        text = read_text_no_follow(target, label)
 
     records: list[dict[str, Any]] = []
     for line_number, line in enumerate(text.splitlines(), start=1):
@@ -617,28 +636,16 @@ def load_jsonl_records(path: str | Path, label: str) -> list[dict[str, Any]]:
 
 
 def write_json_object(path: str | Path, payload: dict[str, Any]) -> None:
-    output_path = Path(path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    write_metadata_text(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def write_jsonl_records(path: str | Path, records: list[dict[str, Any]]) -> None:
-    output_path = Path(path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     lines = [json.dumps(record, ensure_ascii=False) for record in records]
-    output_path.write_text(
-        ("\n".join(lines) + "\n") if lines else "",
-        encoding="utf-8",
-    )
+    write_metadata_text(path, ("\n".join(lines) + "\n") if lines else "")
 
 
 def write_text(path: str | Path, text: str) -> None:
-    output_path = Path(path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(text, encoding="utf-8")
+    write_metadata_text(path, text)
 
 
 def relative_ref(path: str | Path, start: str | Path) -> str:
@@ -742,6 +749,37 @@ def persist_run_artifacts(
     *,
     stage_manifest: StageManifest,
     artifact_index: ArtifactIndex,
+    extra_outputs: dict[str, str] | None = None,
+    verify_inputs=None,
 ) -> None:
-    write_stage_manifest(stage_manifest, resolved.stage_manifest_path)
-    write_artifact_index(artifact_index, resolved.artifact_index_path)
+    outputs = {
+        relative_ref(resolved.stage_manifest_path, resolved.run_dir): json.dumps(
+            stage_manifest.to_dict(), indent=2, sort_keys=True
+        )
+        + "\n",
+        relative_ref(resolved.artifact_index_path, resolved.run_dir): json.dumps(
+            artifact_index.to_dict(), indent=2, sort_keys=True
+        )
+        + "\n",
+    }
+    if extra_outputs:
+        if set(outputs).intersection(extra_outputs):
+            raise MillefeuilleContractError("metadata extra-output collision")
+        outputs.update(extra_outputs)
+    expected = getattr(resolved, "metadata_snapshot", None)
+    if expected is None:
+        expected = {
+            relative_ref(
+                resolved.stage_manifest_path, resolved.run_dir
+            ): capture_metadata_binding(resolved.stage_manifest_path),
+            relative_ref(
+                resolved.artifact_index_path, resolved.run_dir
+            ): capture_metadata_binding(resolved.artifact_index_path),
+        }
+    write_metadata_transaction(
+        resolved.run_dir,
+        outputs,
+        expected_before=expected,
+        expected_directory_identity=getattr(resolved, "run_dir_identity", None),
+        check_inputs=verify_inputs,
+    )

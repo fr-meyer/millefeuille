@@ -19,6 +19,7 @@ from millefeuille.domain.acceptance import (
 from millefeuille.domain.card_index_contract import canonical_json_bytes
 from millefeuille.domain.index_fixtures import INDEX_STATUS_REF
 from millefeuille.domain.summary_fixtures import SUMMARY_ARTIFACT_REF
+from tests.platform_capabilities import requires_posix_batch_publication
 from tests.test_millefeuille_stage_cli import (
     PAPER_ID,
     RUN_ID,
@@ -100,6 +101,7 @@ def _snapshot_acceptance_outputs(source_pack_root: Path) -> dict[str, bytes]:
 
 
 class TestMillefeuilleAcceptanceBatch(unittest.TestCase):
+    @requires_posix_batch_publication
     def test_batch_acceptance_writes_sorted_idempotent_aggregate(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -157,6 +159,7 @@ class TestMillefeuilleAcceptanceBatch(unittest.TestCase):
                 first_snapshot,
             )
 
+    @requires_posix_batch_publication
     def test_batch_acceptance_aggregates_needs_review_without_skipping_runs(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -201,6 +204,7 @@ class TestMillefeuilleAcceptanceBatch(unittest.TestCase):
             )
             self.assertEqual(review_summary["status"], "needs-review")
 
+    @requires_posix_batch_publication
     def test_duplicate_batch_run_fails_before_acceptance_writes(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -228,6 +232,7 @@ class TestMillefeuilleAcceptanceBatch(unittest.TestCase):
             self.assertFalse((run_dir / ACCEPTANCE_SUMMARY_REF).exists())
             self.assertFalse((source_pack_root / ACCEPTANCE_BATCH_ROOT_REF).exists())
 
+    @requires_posix_batch_publication
     def test_missing_later_run_fails_before_first_run_is_written(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
