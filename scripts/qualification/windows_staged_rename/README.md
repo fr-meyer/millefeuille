@@ -1,5 +1,45 @@
 # Isolated staged Windows replacement preparation
 
+## Worker startup evidence repair after run 38386606540
+
+At exact head `f5ba780d6018633b0c442d87bb519e8d4932fedf`, the actual CI
+PowerShell/CMD/Python argv fixtures and installed SDK compilation passed. The
+worker then exited 1 without `worker-result.json`, `stdout.log` or `stderr.log`.
+The once-retrieved ZIP contains only the owner marker and controller receipt;
+process cleanup was terminal. No individual native case outcomes were retained.
+The historical process total of two does not identify the cause. Existing logs
+cannot recover the missing interpreter, import, argv or admission error.
+
+This offline repair captures stdout/stderr before creating the suspended worker.
+`STARTUPINFOEX` whitelists only three inherited handles: NUL stdin and the two
+pipe writers. Parent readers are non-inheritable. Assignment, complete membership
+and limit readback precede the single resume; no breakaway or extra process is
+permitted. Each stream retains at most 32 KiB in memory, with one overflow byte
+probe. Overflow stops reads and fails qualification through the existing cleanup
+path. Retained text is ASCII-sanitized, token-redacted and capped at 2,048 bytes
+per stream. The fixed public launcher argv, interpreter identity, cwd and five
+allowlisted environment fields are recorded; the full host environment is never
+recorded.
+
+Worker entry errors report a phase, exception type, bounded sanitized message and
+six bounded traceback metadata frames through original inherited stderr. A separate
+`worker-entry-error.json` is written only after owner binding and a fresh root/
+marker identity check. It contains no case rows or qualification claim. Import or
+interpreter failures before the guard rely on parent pipe capture. Abrupt OS exit
+or a process that emits no text can still leave the precise cause unknown. Existing
+pending-buffer forced-exit custody remains unconditional, including reporting
+failures. The controller always records its own observation and confirmed cleanup
+where possible, without substituting that observation for a worker result. Unknown
+process or handle custody blocks terminal collection.
+
+The source manifest now includes the diagnostic helper. The SDK launcher, real
+shell fixtures, workflow, native request implementation and ten-case assessment
+are unchanged. Run the new portable faults with `python -I -B test_worker_startup.py`.
+These simulations and affected controller regressions establish source behavior;
+Windows handle inheritance and native rename qualification still require a
+separately approved actual run. No publication, additional artifact download or
+workflow execution is authorized or performed by this offline preparation.
+
 ## SDK launcher repair after run 38378966024
 
 The failed head `fa6b6f7ba27fb6a4e64f4d56469e0cb0529363b6` checked out correctly
@@ -29,9 +69,10 @@ and prevent the chained child from starting. They add at most 64 KiB inside the 
 32-MiB post-build SDK scratch bound and the existing three-minute build step.
 Neither the actual CI-shell fixtures nor the SDK can run on this Mac.
 
-The failed run's one-push/one-run permission is consumed. Publishing this exact
-follow-up and running it requires separate approval. Native diagnostic sources,
-case selection, limits, artifact cap and all production write gates stay unchanged.
+The failed run's one-push/one-run permission was consumed. The SDK follow-up was
+separately approved and completed at `f5ba780`; its permission is now consumed too.
+The worker evidence repair above is a separately proposed next step. Case selection,
+limits, artifact cap and all production write gates remain unchanged.
 
 ## Original diagnostic preparation
 
@@ -196,7 +237,7 @@ python -I -B native_controller.py --source-root ABS_SOURCE --scratch-parent ABS_
 
 Entry points explicitly add only their script root for isolated-mode sibling
 imports. A nonempty, pinned references/__init__.py prevents an ambient regular
-package from taking over the retained reference module. The manifest binds nine
+package from taking over the retained reference module. The manifest binds ten
 runtime sources and the prebuilt SDK DLL; the Git head is supplied by the
 workflow rather than embedded in source. An `approved-publication:<head>` label
 is custody metadata, not proof of human approval. The future publisher must
@@ -221,7 +262,8 @@ approval is performed here.
 
 No publication, CI, installation, model/broker, GCP, Windows desktop, private-data
 or production operation is performed by this preparation. Production adapter
-dispatch remains disabled. Native execution, SDK compilation, directory flush/
-durability/crash guarantees, restart recovery, hostile alias exclusion and
+dispatch remains disabled. The retained `f5ba780` run establishes its shell
+fixtures and SDK compilation. Native controls, directory flush/durability/crash
+guarantees, restart recovery, hostile alias exclusion and
 application integration remain unqualified. Ten successful native rows would
 qualify only the observed primitive baselines, not production writes.

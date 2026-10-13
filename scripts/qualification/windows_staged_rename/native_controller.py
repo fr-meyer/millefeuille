@@ -5,12 +5,12 @@ import ctypes
 import hashlib
 import json
 import os
+from pathlib import Path
 import secrets
 import subprocess
 import sys
 import tempfile
 import time
-from pathlib import Path
 
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).absolute().parent))
@@ -26,6 +26,7 @@ from diagnostic_core import (
     validate_manifest,
 )
 from staged_replacement import Refusal
+from worker_diagnostics import BoundedStreams, safe_text
 
 U32 = ctypes.c_uint32
 I32 = ctypes.c_int32
@@ -121,6 +122,14 @@ class ProcessInfo(ctypes.Structure):
     _fields_ = [("process", HANDLE), ("thread", HANDLE), ("pid", U32), ("tid", U32)]
 
 
+class SecurityAttributes(ctypes.Structure):
+    _fields_ = [("size", U32), ("descriptor", VOID), ("inherit", I32)]
+
+
+class StartupEx(ctypes.Structure):
+    _fields_ = [("startup", Startup), ("attributes", VOID)]
+
+
 def validate_limits(limits):
     if (
         limits.get("memory") != MEMORY
@@ -179,11 +188,16 @@ def execute_controller(backend):
         validate_limits(limits)
         result["limits_readback"] = limits
         backend.resume()
+        pump = getattr(backend, "drain_worker_output", None)
         while not backend.wait_primary(100):
+            if pump is not None:
+                pump()
             if backend.clock() - started >= WORKER_SECONDS:
                 raise Refusal("worker deadline reached; no rerun")
             if backend.owned_bytes() > ARTIFACT_CAP:
                 raise Refusal("owned scratch byte cap exceeded")
+        if pump is not None:
+            pump()
         worker = backend.worker_result()
         result["worker_result"] = worker
         if (
@@ -218,8 +232,8 @@ def execute_controller(backend):
                 "exact ten-case native worker result/exit/identity requirement failed"
             )
         result["worker_qualified"] = True
-    except Exception as error:  # noqa: BLE001 - All failures preserve owned process custody.
-        result["error"] = {"type": type(error).__name__, "message": str(error)}
+    except BaseException as error:  # noqa: BLE001 - All failures preserve owned process custody.
+        result["error"] = {"type": type(error).__name__, "message": safe_text(error)}
     finally:
         remaining = max(
             0, min(CLEANUP_SECONDS, CONTROLLER_SECONDS - (backend.clock() - started))
@@ -234,7 +248,7 @@ def execute_controller(backend):
                 and cleanup.get("closes")
                 == {"process": True, "thread": True, "job": True}
             )
-            # Pre-child admission failures have no owned process; still require owned job close.
+            # Pre-child admission still requires the owned job to close.
             if not backend.pid:
                 terminal = (
                     cleanup.get("no_owned_process") is True
@@ -242,24 +256,53 @@ def execute_controller(backend):
                     and cleanup.get("pids") == []
                     and cleanup.get("job_closed") is True
                 )
+            terminal = terminal and cleanup.get("stdio_closed", True) is True
             result["terminal"] = terminal
             result["owned_operations_in_flight"] = (
                 0
                 if terminal
                 else 1
-                if backend.pid or backend.has_job or backend.has_process_handles
+                if backend.pid
+                or backend.has_job
+                or backend.has_process_handles
+                or getattr(backend, "has_stdio_handles", False)
+                or getattr(backend, "attribute_delete_uncertain", False)
                 else 0
             )
-        except Exception as error:  # noqa: BLE001 - Unknown cleanup is never reported terminal.
+        except BaseException as error:  # noqa: BLE001 - Unknown cleanup is never reported terminal.
             result["cleanup_error"] = {
                 "type": type(error).__name__,
-                "message": str(error),
+                "message": safe_text(error),
             }
             result["owned_operations_in_flight"] = (
                 1
-                if backend.pid or backend.has_job or backend.has_process_handles
+                if backend.pid
+                or backend.has_job
+                or backend.has_process_handles
+                or getattr(backend, "has_stdio_handles", False)
+                or getattr(backend, "attribute_delete_uncertain", False)
                 else 0
             )
+        diagnostics = getattr(backend, "diagnostic_record", None)
+        if diagnostics is not None:
+            try:
+                captured = diagnostics()
+                result["worker_startup_diagnostics"] = captured
+                if captured.get("overflow") or captured.get("capture_error"):
+                    result["worker_qualified"] = False
+            except BaseException as error:  # noqa: BLE001 - Reporting cannot skip cleanup.
+                result["diagnostic_capture_error"] = {"type": type(error).__name__}
+                result["worker_qualified"] = False
+        if "worker_result" not in result:
+            result["controller_observed_worker_failure"] = {
+                "schema": "millefeuille.controller-observed-worker-failure/v1",
+                "receipt_origin": "controller-observation-not-worker-receipt",
+                "worker_result_present": False,
+                "individual_case_outcomes": "not-established",
+                "exit_code": result.get("cleanup", {}).get("exit_code"),
+                "process_cleanup_terminal": result["terminal"],
+                "native_qualified": False,
+            }
     result["elapsed_seconds"] = backend.clock() - started
     if result["elapsed_seconds"] > CONTROLLER_SECONDS:
         result["deadline_exceeded"] = True
@@ -282,6 +325,13 @@ class NativeJobBackend:
         self.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
         self.job, self.process, self.assigned = None, ProcessInfo(), False
         self.samples = []
+        self.stdio = {}
+        self.failed_stdio_closes = set()
+        self.attribute_pointer = None
+        self.attribute_delete_uncertain = False
+        self.capture_error = None
+        self.capture = BoundedStreams()
+        self.launch_record = {}
         definitions = (
             ("GetCurrentProcess", HANDLE, []),
             ("GetProcessId", U32, [HANDLE]),
@@ -314,6 +364,22 @@ class NativeJobBackend:
             ("TerminateJobObject", I32, [HANDLE, U32]),
             ("TerminateProcess", I32, [HANDLE, U32]),
             ("CloseHandle", I32, [HANDLE]),
+            ("CreatePipe", I32, [VOID, VOID, VOID, U32]),
+            ("SetHandleInformation", I32, [HANDLE, U32, U32]),
+            ("PeekNamedPipe", I32, [HANDLE, VOID, U32, VOID, VOID, VOID]),
+            ("ReadFile", I32, [HANDLE, VOID, U32, VOID, VOID]),
+            (
+                "CreateFileW",
+                HANDLE,
+                [ctypes.c_wchar_p, U32, U32, VOID, U32, U32, HANDLE],
+            ),
+            ("InitializeProcThreadAttributeList", I32, [VOID, U32, U32, VOID]),
+            (
+                "UpdateProcThreadAttribute",
+                I32,
+                [VOID, U32, ctypes.c_size_t, VOID, ctypes.c_size_t, VOID, VOID],
+            ),
+            ("DeleteProcThreadAttributeList", None, [VOID]),
             (
                 "GetVolumeInformationW",
                 I32,
@@ -335,6 +401,10 @@ class NativeJobBackend:
     @property
     def has_process_handles(self):
         return bool(self.process.process or self.process.thread)
+
+    @property
+    def has_stdio_handles(self):
+        return bool(self.stdio or self.attribute_pointer)
 
     @staticmethod
     def clock():
@@ -399,7 +469,12 @@ class NativeJobBackend:
         return result
 
     def create_job(self):
-        if ctypes.sizeof(ExtendedLimit) != 144 or ctypes.sizeof(Startup) != 104:
+        if (
+            ctypes.sizeof(ExtendedLimit) != 144
+            or ctypes.sizeof(Startup) != 104
+            or ctypes.sizeof(StartupEx) != 112
+            or ctypes.sizeof(SecurityAttributes) != 24
+        ):
             raise Refusal("native JobObject/process ABI mismatch")
         volume = ctypes.create_unicode_buffer(32)
         self.checked(
@@ -445,8 +520,9 @@ class NativeJobBackend:
         )
 
     def create_suspended(self):
-        startup = Startup()
-        startup.cb = ctypes.sizeof(startup)
+        startup = StartupEx()
+        startup.startup.cb = ctypes.sizeof(startup)
+        self.prepare_stdio(startup)
         environment = {
             "SystemRoot": os.environ["SYSTEMROOT"],
             "WINDIR": os.environ["SYSTEMROOT"],
@@ -462,30 +538,183 @@ class NativeJobBackend:
             + "\0\0"
         )
         command = ctypes.create_unicode_buffer(subprocess.list2cmdline(self.argv))
+        self.launch_record = {
+            "executable": sys.executable,
+            "base_executable": getattr(sys, "_base_executable", None),
+            "prefix": sys.prefix,
+            "base_prefix": sys.base_prefix,
+            "argv": self.argv,
+            "raw_command_line": command.value,
+            "environment": environment,
+            "cwd": str(self.root),
+            "inheritance": "explicit-stdin-stdout-stderr-handle-list-only",
+            "startup_size": ctypes.sizeof(startup),
+        }
         # ProcessInfo is retained even if a late call error reports failure.
-        value = self.kernel.CreateProcessW(
-            sys.executable,
-            command,
-            None,
-            None,
-            False,
-            0x4 | 0x400 | 0x08000000,
-            ctypes.cast(block, VOID),
-            str(self.root),
-            ctypes.byref(startup),
-            ctypes.byref(self.process),
-        )
-        # Reconcile any returned handle before trusting the BOOL; no retry.
-        if self.process.process:
-            recovered_pid = self.kernel.GetProcessId(self.process.process)
-            if not self.process.pid and recovered_pid:
-                self.process.pid = recovered_pid
+        try:
+            value = self.kernel.CreateProcessW(
+                sys.executable,
+                command,
+                None,
+                None,
+                True,
+                0x4 | 0x400 | 0x08000000 | 0x80000,
+                ctypes.cast(block, VOID),
+                str(self.root),
+                ctypes.byref(startup),
+                ctypes.byref(self.process),
+            )
+        finally:
+            # Recover custody even if CreateProcessW itself reports a late error.
+            try:
+                if self.process.process and not self.process.pid:
+                    self.process.pid = self.kernel.GetProcessId(self.process.process)
+            finally:
+                self.delete_startup_attributes()
+                # Child writers alone permit EOF after an early interpreter exit.
+                closed = self.close_stdio_names(
+                    ("stdin", "stdout_write", "stderr_write")
+                )
+        if not closed or self.attribute_delete_uncertain:
+            raise Refusal("startup parent-handle/attribute release uncertain")
         self.checked(value)
         if (
             self.process.pid == 0
             or self.kernel.GetProcessId(self.process.process) != self.process.pid
         ):
             raise Refusal("owned created PID/handle readback mismatch")
+
+    def prepare_stdio(self, startup):
+        security = SecurityAttributes(ctypes.sizeof(SecurityAttributes), None, 1)
+        for name in ("stdout", "stderr"):
+            read, write = HANDLE(), HANDLE()
+            value = self.kernel.CreatePipe(
+                ctypes.byref(read), ctypes.byref(write), ctypes.byref(security), 4096
+            )
+            if read.value:
+                self.stdio[name + "_read"] = read.value
+            if write.value:
+                self.stdio[name + "_write"] = write.value
+            self.checked(value)
+            self.checked(self.kernel.SetHandleInformation(read.value, 1, 0))
+        null = self.kernel.CreateFileW(
+            "NUL", 0x80000000, 3, ctypes.byref(security), 3, 0, None
+        )
+        if not null or null == ctypes.c_void_p(-1).value:
+            raise ctypes.WinError(ctypes.get_last_error())
+        self.stdio["stdin"] = null
+        size = ctypes.c_size_t()
+        self.kernel.InitializeProcThreadAttributeList(None, 1, 0, ctypes.byref(size))
+        if not 0 < size.value <= 65536:
+            raise Refusal("bounded startup attribute-list size required")
+        self.attribute_storage = ctypes.create_string_buffer(size.value)
+        self.checked(
+            self.kernel.InitializeProcThreadAttributeList(
+                self.attribute_storage, 1, 0, ctypes.byref(size)
+            )
+        )
+        startup.attributes = ctypes.cast(self.attribute_storage, VOID)
+        self.attribute_pointer = startup.attributes
+        self.inherited_stdio = (HANDLE * 3)(
+            null, self.stdio["stdout_write"], self.stdio["stderr_write"]
+        )
+        self.checked(
+            self.kernel.UpdateProcThreadAttribute(
+                startup.attributes,
+                0,
+                0x20002,
+                self.inherited_stdio,
+                ctypes.sizeof(self.inherited_stdio),
+                None,
+                None,
+            )
+        )
+        startup.startup.flags = 0x100
+        startup.startup.stdin = null
+        startup.startup.stdout = self.stdio["stdout_write"]
+        startup.startup.stderr = self.stdio["stderr_write"]
+
+    def close_stdio_names(self, names):
+        # Attempt every known handle once; uncertain closes are never retried.
+        for name in names:
+            handle = self.stdio.get(name)
+            if handle is None or name in self.failed_stdio_closes:
+                continue
+            try:
+                self.checked(self.kernel.CloseHandle(handle))
+            except BaseException:  # noqa: BLE001 - Preserve uncertainty while releasing other handles.
+                self.failed_stdio_closes.add(name)
+            else:
+                del self.stdio[name]
+        return not any(name in self.stdio for name in names)
+
+    def delete_startup_attributes(self):
+        pointer, self.attribute_pointer = self.attribute_pointer, None
+        if pointer:
+            try:
+                self.kernel.DeleteProcThreadAttributeList(pointer)
+            except BaseException:  # noqa: BLE001 - No retry after uncertain attribute release.
+                self.attribute_delete_uncertain = True
+
+    def finish_stdio(self):
+        try:
+            if not self.capture.overflow:
+                self.drain_worker_output()
+        except BaseException as error:  # noqa: BLE001 - Capture failure cannot strand known handles.
+            self.capture_error = {
+                "type": type(error).__name__,
+                "message": safe_text(error),
+            }
+        self.delete_startup_attributes()
+        return (
+            self.close_stdio_names(tuple(self.stdio))
+            and not self.attribute_delete_uncertain
+        )
+
+    def drain_worker_output(self):
+        if self.capture.overflow:
+            raise Refusal("capture overflow; no further pipe reads")
+        for name in ("stdout", "stderr"):
+            handle = self.stdio.get(name + "_read")
+            if handle is None or self.capture.eof[name]:
+                continue
+            while True:
+                available = U32()
+                value = self.kernel.PeekNamedPipe(
+                    handle, None, 0, None, ctypes.byref(available), None
+                )
+                if not value:
+                    if ctypes.get_last_error() == 109:
+                        self.capture.eof[name] = True
+                        break
+                    self.checked(value)
+                if not available.value:
+                    break
+                count = min(4096, available.value, self.capture.allowance(name) + 1)
+                block, used = ctypes.create_string_buffer(count), U32()
+                self.checked(
+                    self.kernel.ReadFile(handle, block, count, ctypes.byref(used), None)
+                )
+                if used.value > count:
+                    raise Refusal("pipe read exceeded reserved diagnostic bytes")
+                if not used.value:
+                    break
+                self.capture.accept(name, bytes(block.raw[: used.value]))
+
+    def diagnostic_record(self):
+        substitutions = (
+            (self.root, "[owned-root]"),
+            (self.source_root, "[source-root]"),
+        )
+        result = self.capture.record(substitutions)
+        # These are only the fixed public interpreter/source/owned-root fields,
+        # never the complete inherited host environment or private credentials.
+        result["launch"] = self.launch_record
+        result["capture_error"] = self.capture_error
+        receipt = self.root / "worker-entry-error.json"
+        if receipt.exists():
+            result["worker_entry_error"] = json.loads(read_plain(receipt, FILE_CAP))
+        return result
 
     def assign_and_readback(self):
         self.checked(
@@ -565,8 +794,10 @@ class NativeJobBackend:
         if not self.pid:
             if self.has_process_handles:
                 raise Refusal(
-                    "returned process/thread handles lack a reconciled PID; retain custody"
+                    "returned process/thread handles lack a reconciled PID; "
+                    "retain custody"
                 )
+            stdio_closed = self.finish_stdio()
             sample = (
                 self.sample() if self.job else {"active": 0, "assigned": 0, "pids": []}
             )
@@ -576,6 +807,7 @@ class NativeJobBackend:
             return {
                 "no_owned_process": True,
                 "job_closed": closed,
+                "stdio_closed": stdio_closed,
                 **sample,
                 "samples": list(self.samples),
             }
@@ -604,10 +836,19 @@ class NativeJobBackend:
             and sample["pids"] == []
         )
         exit_code = self.exit_code() if signaled else None
+        stdio_closed = self.finish_stdio() if terminal else False
         if terminal:
-            closes["thread"] = bool(self.kernel.CloseHandle(self.process.thread))
-            closes["process"] = bool(self.kernel.CloseHandle(self.process.process))
-            closes["job"] = not self.job or bool(self.kernel.CloseHandle(self.job))
+            for name, handle in (
+                ("thread", self.process.thread),
+                ("process", self.process.process),
+                ("job", self.job),
+            ):
+                try:
+                    closes[name] = (name == "job" and not handle) or bool(
+                        self.kernel.CloseHandle(handle)
+                    )
+                except BaseException:  # noqa: BLE001 - Still attempt the other known terminal handles once.
+                    closes[name] = False
             if closes["job"]:
                 self.job = None
         return {
@@ -616,6 +857,7 @@ class NativeJobBackend:
             "exit_code": exit_code,
             "termination_requested": terminated_job,
             "closes": closes,
+            "stdio_closed": stdio_closed,
             **sample,
             "samples": list(self.samples),
         }

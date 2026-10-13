@@ -16,6 +16,7 @@ SOURCE_FILES = (
     "diagnostic_core.py",
     "native_worker.py",
     "native_controller.py",
+    "worker_diagnostics.py",
     "build_manifest.py",
     "staged_replacement.py",
     "native_contract.py",
@@ -37,7 +38,7 @@ def validate_manifest(manifest, *, expected_head, source_reader, sdk_reader):
     if len(records) != len(SOURCE_FILES) or {r.get("path") for r in records} != set(
         SOURCE_FILES
     ):
-        raise Refusal("manifest requires exactly nine diagnostic source files")
+        raise Refusal("manifest requires the exact diagnostic source files")
     for record in records:
         data = source_reader(record["path"])
         if (

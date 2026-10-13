@@ -5,9 +5,9 @@ import ctypes
 import hashlib
 import json
 import os
+from pathlib import Path
 import sys
 import time
-from pathlib import Path
 
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).absolute().parent))
@@ -16,6 +16,7 @@ from build_manifest import plain_path, read_plain
 from diagnostic_core import FILE_CAP, record_bytes, run_ten_cases, validate_manifest
 from references.probe_contract import pack_rename
 from staged_replacement import Refusal
+from worker_diagnostics import emit_error, exception_record
 
 U32 = ctypes.c_uint32
 I32 = ctypes.c_int32
@@ -464,7 +465,8 @@ class NativeBackend:
     def close_fixture(self, fixture):
         # Also reconciles handles opened before prepare failed to return.
         if LIVE_PENDING_REQUESTS:
-            return  # Kernel may still use retained IOSB/buffer; process termination owns settlement.
+            # Kernel may still use the IOSB/buffer; termination owns settlement.
+            return
         errors = []
         for handle in list(reversed(self.owned_handles)):
             if handle in self.failed_handles:
@@ -515,7 +517,7 @@ def execute_worker(backend, evidence_root, *, started, receipt_bindings):
             # destroy buffers still referenced by a pending kernel request.
             try:
                 for stream in (sys.stdout, sys.stderr):
-                    try:
+                    try:  # noqa: SIM105 - Preserve the explicit unconditional exit path.
                         stream.flush()
                     except BaseException:  # noqa: BLE001, S110 - Logging can fail too; exit custody is unconditional.
                         pass
@@ -523,7 +525,8 @@ def execute_worker(backend, evidence_root, *, started, receipt_bindings):
                 os._exit(1)
 
 
-def main():
+def main(entry):
+    entry["phase"] = "argument-parser"
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--authorize-owned-synthetic-native-diagnostics", action="store_true"
@@ -536,6 +539,7 @@ def main():
     parser.add_argument("--expected-head", required=True)
     parser.add_argument("--nonce", required=True)
     args = parser.parse_args()
+    entry["phase"] = "platform-and-authorization"
     if (
         not args.authorize_owned_synthetic_native_diagnostics
         or os.name != "nt"
@@ -544,14 +548,17 @@ def main():
         or sys.maxsize <= 2**32
     ):
         raise Refusal(
-            "explicit authorized owned-synthetic-root Windows AMD64/Python3.13 invocation required"
+            "explicit authorized owned-synthetic-root "
+            "Windows AMD64/Python3.13 invocation required"
         )
+    entry["phase"] = "source-root"
     if (
         str(args.source_root).casefold()
         != str(Path(__file__).absolute().parent).casefold()
     ):
         raise Refusal("executed worker root must match pinned source root")
     started = time.monotonic()
+    entry["phase"] = "owned-root-binding"
     plain_path(args.synthetic_root, directory=True)
     marker = json.loads(read_plain(args.synthetic_root / "owner-marker.json", FILE_CAP))
     if (
@@ -563,6 +570,16 @@ def main():
     root_info = args.synthetic_root.lstat()
     if marker.get("root_identity") != [root_info.st_dev, root_info.st_ino]:
         raise Refusal("synthetic root identity changed")
+    entry.update(
+        {
+            "root": args.synthetic_root,
+            "root_identity": marker["root_identity"],
+            "nonce": args.nonce,
+            "expected_head": args.expected_head,
+            "source_root": args.source_root,
+            "phase": "source-manifest",
+        }
+    )
     raw = read_plain(args.source_manifest, FILE_CAP)
     if hashlib.sha256(raw).hexdigest() != args.source_manifest_sha256:
         raise Refusal("manifest digest mismatch")
@@ -579,8 +596,11 @@ def main():
     )
     from native_controller import require_worker_job
 
+    entry["phase"] = "bounded-job-admission"
     require_worker_job()
+    entry["phase"] = "stdout-log-open"
     sys.stdout = (args.synthetic_root / "stdout.log").open("x", encoding="utf-8")
+    entry["phase"] = "stderr-log-open"
     sys.stderr = (args.synthetic_root / "stderr.log").open("x", encoding="utf-8")
 
     def audit(event, _arguments):
@@ -592,8 +612,11 @@ def main():
         }:
             raise Refusal("worker forbids network and additional processes")
 
+    entry["phase"] = "worker-audit-hook"
     sys.addaudithook(audit)
+    entry["phase"] = "native-backend-startup"
     backend = NativeBackend(args.synthetic_root, args.sdk_dll, deadline=started + 290)
+    entry["phase"] = "native-cases-and-receipt"
     return execute_worker(
         backend,
         args.synthetic_root,
@@ -606,5 +629,62 @@ def main():
     )
 
 
+def write_entry_error(entry, record):
+    # Only a fully admitted, still-bound root can receive this separate error.
+    # The marker is a custody label; it is not human publication authorization.
+    root = entry.get("root")
+    if root is None:
+        return
+    info = plain_path(root, directory=True)
+    marker = json.loads(read_plain(root / "owner-marker.json", FILE_CAP))
+    if (
+        [info.st_dev, info.st_ino] != entry["root_identity"]
+        or marker.get("root_identity") != entry["root_identity"]
+        or marker.get("nonce") != entry["nonce"]
+        or marker.get("expected_head") != entry["expected_head"]
+        or marker.get("schema") != "millefeuille.owned-native-diagnostic-root/v1"
+    ):
+        raise Refusal("error receipt owned-root binding changed")
+    with (root / "worker-entry-error.json").open("xb") as output:
+        output.write(record_bytes(record))
+        output.flush()
+
+
+def guarded_main():
+    entry = {"phase": "worker-entry"}
+    try:
+        return main(entry)
+    except BaseException as error:  # noqa: BLE001 - Early failures get a separate bounded diagnostic.
+        if isinstance(error, SystemExit) and error.code in (None, 0):
+            return 0
+        substitutions = tuple(
+            (entry[name], label)
+            for name, label in (
+                ("root", "[owned-root]"),
+                ("source_root", "[source-root]"),
+            )
+            if name in entry
+        )
+        record = exception_record(error, entry["phase"], substitutions)
+        try:  # noqa: SIM105 - Keep reporting stages explicit beside unconditional exit custody.
+            # Original inherited stderr stays available after stderr.log redirection.
+            emit_error(error, entry["phase"], sys.__stderr__, substitutions)
+        except BaseException:  # noqa: BLE001, S110 - A broken diagnostic pipe cannot defeat cleanup.
+            pass
+        try:  # noqa: SIM105 - Keep reporting stages explicit beside unconditional exit custody.
+            write_entry_error(entry, record)
+        except BaseException:  # noqa: BLE001, S110 - Reporting failure must not fabricate a worker result.
+            pass
+        return (
+            error.code
+            if isinstance(error, SystemExit) and isinstance(error.code, int)
+            else 1
+        )
+    finally:
+        if LIVE_PENDING_REQUESTS:
+            # Includes entry/reporting failures outside execute_worker's own finally.
+            os._exit(1)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(guarded_main())

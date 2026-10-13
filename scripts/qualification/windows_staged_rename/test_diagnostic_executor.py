@@ -4,11 +4,11 @@ import copy
 import ctypes
 import hashlib
 import io
-import unittest
-import zipfile
 from pathlib import Path
 from types import SimpleNamespace
+import unittest
 from unittest.mock import patch
+import zipfile
 
 import build_manifest as bm
 import diagnostic_core as dc
@@ -552,7 +552,8 @@ class DiagnosticTests(unittest.TestCase):
                     exit_call.assert_called_once_with(1)
                     self.assertEqual(len(nw.LIVE_PENDING_REQUESTS), 1)
                 finally:
-                    nw.LIVE_PENDING_REQUESTS.clear()  # Python fakes, no native kernel request.
+                    # Python fakes; no native kernel request.
+                    nw.LIVE_PENDING_REQUESTS.clear()
 
     def test_controller_happy_path_is_simulated_only(self):
         backend = MemoryController()
@@ -643,6 +644,7 @@ class DiagnosticTests(unittest.TestCase):
             [],
         )
         calls = []
+        backend.finish_stdio = lambda: True
         backend.kernel = SimpleNamespace(
             TerminateJobObject=lambda handle, _code: (
                 calls.append(("terminate-job", handle)) or 1
@@ -703,6 +705,10 @@ class DiagnosticTests(unittest.TestCase):
             Path("/owned"),
         )
         creates = []
+        backend.prepare_stdio = lambda _startup: None
+        backend.delete_startup_attributes = lambda: None
+        backend.close_stdio_names = lambda _names: True
+        backend.attribute_delete_uncertain = False
 
         def created(*arguments):
             creates.append(True)
@@ -775,9 +781,9 @@ class DiagnosticTests(unittest.TestCase):
                         self.assertEqual(backend.pids(), (assigned, expected))
                         self.assertEqual(len(calls), 2)
 
-    def test_manifest_exact_nine_byte_pins_head_and_sdk(self):
+    def test_manifest_exact_runtime_byte_pins_head_and_sdk(self):
         sources = {name: name.encode() for name in dc.SOURCE_FILES}
-        self.assertEqual(len(sources), 9)
+        self.assertEqual(len(sources), 10)
         self.assertIn("references/__init__.py", sources)
         sdk = b"compiled-sdk-synthetic"
         manifest = {
