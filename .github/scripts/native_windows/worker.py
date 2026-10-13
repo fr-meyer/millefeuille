@@ -68,6 +68,7 @@ def main():
         "python": sys.version,
         "loaded": loaded,
         "tests_run": result.testsRun,
+        "native_observations": tests.NATIVE_OBSERVATIONS,
         "failures": len(result.failures),
         "errors": len(result.errors),
         "skips": len(result.skipped),

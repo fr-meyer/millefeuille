@@ -29,13 +29,13 @@ class BasicLimit(ctypes.Structure):
     _fields_ = [
         ("process_time", ctypes.c_int64),
         ("job_time", ctypes.c_int64),
-        ("flags", w.DWORD),
+        ("flags", ctypes.c_uint32),
         ("minimum_ws", ctypes.c_size_t),
         ("maximum_ws", ctypes.c_size_t),
-        ("active_limit", w.DWORD),
+        ("active_limit", ctypes.c_uint32),
         ("affinity", ctypes.c_size_t),
-        ("priority", w.DWORD),
-        ("scheduling", w.DWORD),
+        ("priority", ctypes.c_uint32),
+        ("scheduling", ctypes.c_uint32),
     ]
 
 
@@ -58,7 +58,7 @@ class ExtendedLimit(ctypes.Structure):
 
 
 class CpuRate(ctypes.Structure):
-    _fields_ = [("flags", w.DWORD), ("rate", w.DWORD)]
+    _fields_ = [("flags", ctypes.c_uint32), ("rate", ctypes.c_uint32)]
 
 
 class Accounting(ctypes.Structure):
@@ -66,19 +66,19 @@ class Accounting(ctypes.Structure):
         (name, ctypes.c_int64)
         for name in ("total_user", "total_kernel", "period_user", "period_kernel")
     ] + [
-        (name, w.DWORD)
+        (name, ctypes.c_uint32)
         for name in ("page_faults", "total_processes", "active", "terminated")
     ]
 
 
 class Startup(ctypes.Structure):
     _fields_ = [
-        ("cb", w.DWORD),
+        ("cb", ctypes.c_uint32),
         ("reserved", w.LPWSTR),
         ("desktop", w.LPWSTR),
         ("title", w.LPWSTR),
     ] + [
-        (name, w.DWORD)
+        (name, ctypes.c_uint32)
         for name in ("x", "y", "width", "height", "chars_x", "chars_y", "fill", "flags")
     ]
     _fields_ += [
@@ -95,13 +95,13 @@ class ProcessInfo(ctypes.Structure):
     _fields_ = [
         ("process", w.HANDLE),
         ("thread", w.HANDLE),
-        ("pid", w.DWORD),
-        ("tid", w.DWORD),
+        ("pid", ctypes.c_uint32),
+        ("tid", ctypes.c_uint32),
     ]
 
 
 class MemoryStatus(ctypes.Structure):
-    _fields_ = [("length", w.DWORD), ("load", w.DWORD)] + [
+    _fields_ = [("length", ctypes.c_uint32), ("load", ctypes.c_uint32)] + [
         (name, ctypes.c_uint64)
         for name in (
             "total_phys",
@@ -113,6 +113,119 @@ class MemoryStatus(ctypes.Structure):
             "available_extended",
         )
     ]
+
+
+class ProcessIds(ctypes.Structure):
+    # Active-process admission is one; leave bounded room for inconsistent readback.
+    _fields_ = [
+        ("assigned", ctypes.c_uint32),
+        ("count", ctypes.c_uint32),
+        ("ids", ctypes.c_size_t * 16),
+    ]
+
+
+def _api_error(reason):
+    return OSError(getattr(ctypes, "get_last_error", lambda: 0)(), reason)
+
+
+def _job_query(kernel, job, kind, structure):
+    value = structure()
+    if not kernel.QueryInformationJobObject(
+        job, kind, ctypes.byref(value), ctypes.sizeof(value), None
+    ):
+        raise _api_error("job information query failed; class=" + str(kind))
+    return value
+
+
+def _job_membership(kernel, job):
+    accounting = _job_query(kernel, job, 1, Accounting)
+    ids = _job_query(kernel, job, 3, ProcessIds)
+    if ids.count > 16 or ids.count != ids.assigned:
+        raise RuntimeError("job PID list incomplete or exceeds bounded capacity")
+    return {
+        "active": accounting.active,
+        "assigned": ids.assigned,
+        "pids": list(ids.ids[: ids.count]),
+    }
+
+
+def finalize_owned_worker(
+    kernel,
+    job,
+    process,
+    assigned,
+    report,
+    deadline,
+    *,
+    clock=time.monotonic,
+    pause=time.sleep,
+):
+    """Release exited-worker references before bounded accounting/PID drain.
+
+    A signaled primary alone is insufficient. Unknown membership, failed close,
+    or a nonzero final sample remains unresolved; never erase an old receipt.
+    """
+    receipt = report["cleanup_readback"] = {
+        "worker_pid": process.pid,
+        "handles_released": {},
+        "samples": [],
+        "membership_qualified": False,
+    }
+    report["owned_operations_in_flight"] = 1
+    state = kernel.WaitForSingleObject(process.process, 0)
+    if state == 0x102:
+        terminated = (
+            kernel.TerminateJobObject(job, 73)
+            if assigned
+            else kernel.TerminateProcess(process.process, 73)
+        )
+        if not terminated:
+            raise _api_error("owned worker termination failed")
+        remaining = max(0, min(10000, int((deadline - clock()) * 1000)))
+        state = kernel.WaitForSingleObject(process.process, remaining)
+    if state != 0:
+        raise RuntimeError(f"owned worker not signaled; wait=0x{state:08x}")
+    code = ctypes.c_uint32()
+    if not kernel.GetExitCodeProcess(process.process, ctypes.byref(code)):
+        raise _api_error("owned worker exit readback failed")
+    if code.value == 259:
+        raise RuntimeError("owned worker still reports STILL_ACTIVE")
+    receipt["worker_signaled"] = True
+    report["terminal_worker_exit"] = code.value
+    if assigned:
+        limits = _job_query(kernel, job, 9, ExtendedLimit)
+        report["worker_peak_committed_memory_bytes"] = limits.peak_job
+        receipt["before_release"] = _job_membership(kernel, job)
+    for name in ("thread", "process"):
+        handle = getattr(process, name)
+        if handle:
+            if not kernel.CloseHandle(handle):
+                raise _api_error("owned worker handle close failed: " + name)
+            setattr(process, name, None)
+            receipt["handles_released"][name] = True
+    if not assigned:
+        # No job assignment occurred; this sole owned process is signaled and closed.
+        report["owned_operations_in_flight"] = 0
+        receipt["unassigned_worker_terminal"] = True
+        return
+    terminated_residue = False
+    while True:
+        sample = _job_membership(kernel, job)
+        receipt["samples"].append(sample)
+        report["worker_job_active_processes"] = sample["active"]
+        report["worker_job_process_ids"] = sample["pids"]
+        report["owned_operations_in_flight"] = max(sample["active"], sample["assigned"])
+        if not sample["active"] and not sample["assigned"] and not sample["pids"]:
+            receipt["membership_qualified"] = True
+            return
+        if not terminated_residue:
+            if not kernel.TerminateJobObject(job, 73):
+                raise _api_error("owned job residue termination failed")
+            terminated_residue = True
+            receipt["residue_termination_requested"] = True
+        if clock() >= deadline or len(receipt["samples"]) >= 101:
+            raise RuntimeError("owned job membership did not drain before deadline")
+        pause(min(0.1, max(0, deadline - clock())))
 
 
 def digest(path):
@@ -233,7 +346,7 @@ def main():
             value.restype, value.argtypes = restype, types
             return value
 
-        handle, void, uint = w.HANDLE, ctypes.c_void_p, w.DWORD
+        handle, void, uint = w.HANDLE, ctypes.c_void_p, ctypes.c_uint32
         bind("CreateJobObjectW", handle, [void, w.LPCWSTR])
         bind("SetInformationJobObject", w.BOOL, [handle, ctypes.c_int, void, uint])
         bind(
@@ -429,7 +542,11 @@ def main():
         assert kernel.ResumeThread(process.thread) == 1
         resumed = True
         phase = "native-three-controls"
-        while kernel.WaitForSingleObject(process.process, 100) == 0x102:
+        while True:
+            wait = kernel.WaitForSingleObject(process.process, 100)
+            if wait == 0:
+                break
+            assert wait == 0x102, f"native worker wait failed: 0x{wait:08x}"
             assert time.monotonic() - started < 290, "native worker deadline"
             size = sum(
                 path.lstat().st_size
@@ -449,7 +566,11 @@ def main():
         result = json.loads(result_path.read_text())
         report["worker_result"] = result
         assert result["platform"] == "win32" and result["tests_run"] == 3
-        assert result["failures"] == result["errors"] == result["skips"] == 0
+        assert result["failures"] == result["errors"] == result["skips"] == 0, (
+            f"native controls: tests={result['tests_run']} "
+            f"failures={result['failures']} "
+            f"errors={result['errors']} skips={result['skips']}"
+        )
         assert exit_code == 0
         assert {
             path: digest(Path(path)) for path in expected_sources
@@ -464,34 +585,27 @@ def main():
     finally:
         if kernel is not None and process.process:
             try:
-                if kernel.WaitForSingleObject(process.process, 0) == 0x102:
-                    if assigned:
-                        if not kernel.TerminateJobObject(job, 73):
-                            raise ctypes.WinError(ctypes.get_last_error())
-                    elif not kernel.TerminateProcess(process.process, 73):
-                        raise ctypes.WinError(ctypes.get_last_error())
-                    assert kernel.WaitForSingleObject(process.process, 10000) == 0
-                code = w.DWORD()
-                assert kernel.GetExitCodeProcess(process.process, ctypes.byref(code))
-                assert code.value != 259
-                report["owned_operations_in_flight"] = 0
-                report["terminal_worker_exit"] = code.value
-                if job:
-                    final_limit = query(9, ExtendedLimit)
-                    report["worker_peak_committed_memory_bytes"] = final_limit.peak_job
-                    active = query(1, Accounting).active
-                    report["worker_job_active_processes"] = active
-                    if active:
-                        report["owned_operations_in_flight"] = active
-                        raise RuntimeError("owned job still reports active processes")
+                finalize_owned_worker(
+                    kernel,
+                    job,
+                    process,
+                    assigned,
+                    report,
+                    min(started + 300, time.monotonic() + 10),
+                )
             except Exception as error:
                 report["failures"].append(
                     {"phase": "termination/readback", "reason": str(error)[:600]}
                 )
         if kernel is not None:
             for handle in (process.thread, process.process, job):
-                if handle:
-                    kernel.CloseHandle(handle)
+                if handle and not kernel.CloseHandle(handle):
+                    report["failures"].append(
+                        {"phase": "handle-close", "reason": "owned handle close failed"}
+                    )
+                    report["owned_operations_in_flight"] = max(
+                        1, report["owned_operations_in_flight"]
+                    )
         if scratch is not None:
             report["logs"] = []
             for name in ("stdout.log", "stderr.log", "worker-result.json"):

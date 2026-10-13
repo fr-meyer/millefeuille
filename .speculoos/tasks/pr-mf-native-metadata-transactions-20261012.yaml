@@ -24,6 +24,7 @@ write_paths:
   - specs/millefeuille-pipeline/native-metadata-transactions.md
   - tests/fixtures/millefeuille_portable_metadata/complete-preview.json
   - tests/metadata_fixtures.py
+  - tests/test_native_windows_harness.py
   - tests/test_millefeuille_acceptance_batch.py
   - tests/test_millefeuille_artifact_commands.py
   - tests/test_millefeuille_artifact_overrides.py
@@ -53,12 +54,16 @@ scope:
   - Run three prototype native Windows controls and current-head tests in bounded GitHub Actions
   - Preserve portable metadata reads and read-only DTO fixtures on unsupported native-write platforms
   - Preflight unqualified metadata writers before export and offline-stage effects
+  - Keep Windows backup and plan files in a fixed history journal and move only an empty barrier
+  - Release owned worker references before bounded native JobObject accounting and PID-list drain
 acceptance:
   - Original native symlink and partial-acceptance regressions fail without errors
   - Repaired synthetic transactions, affected native callers, Ruff, format, metadata and diff checks pass
   - No raw multi-file atomicity or unconditional rollback claim
   - Existing six merge-result CI jobs and the additive exact-head Windows job all pass before readiness
   - Three native controls have positive capability baselines and zero skips, errors or failures
+  - Native cleanup requires released worker handles plus zero job accounting and PID membership
+  - Offline shims do not qualify Windows APIs or revise historical failed receipts
 publication_boundary:
   statement: Source code, synthetic fixtures and task/spec metadata only. No private source-pack, provider, broker, credential, GCP management, index, model or release effects. Live journals, replacements, reports and recovery require separate exact authorization.
 documentation_impact:

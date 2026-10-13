@@ -27,6 +27,7 @@ MAX_BYTES = 16 * 1024 * 1024
 MAX_GROUP_BYTES = 64 * 1024 * 1024
 READ_WRITE_DELETE = 0x0013019F
 DIRECTORY_READ = 0x001200A0
+DIRECTORY_SHARE = 3  # READ | WRITE; still withhold DELETE for pinned directories.
 FILE_OPEN = 1
 FILE_CREATE = 2
 FILE_OPEN_REPARSE_POINT = 0x00200000
@@ -104,6 +105,22 @@ def _leaf(name):
     return name
 
 
+def _relative_name_information(parent, name):
+    """Zero flags, byte-counted UTF-16 and full native structure allocation."""
+    encoded = _leaf(name).encode("utf-16-le")
+    if len(encoded) > 65532:
+        raise MillefeuilleContractError("Windows metadata name exceeds bound")
+    # Includes trailing structure padding, the variable name and a spare NUL.
+    size = ctypes.sizeof(_RenameInformation) + len(encoded) + 2
+    buffer = ctypes.create_string_buffer(size)
+    value = _RenameInformation.from_buffer(buffer)
+    value.flags, value.root, value.length = 0, parent, len(encoded)
+    ctypes.memmove(
+        ctypes.addressof(buffer) + _RenameInformation.name.offset, encoded, len(encoded)
+    )
+    return buffer
+
+
 def _binding(snapshot):
     if snapshot is None:
         return None
@@ -128,6 +145,7 @@ class NativeWindowsIO:
         self.files = {}
         self.directories = {}
         self.mutex_handle = None
+        self.rename_observations = []
         self.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
         self.nt = ctypes.WinDLL("ntdll", use_last_error=True)
         prototypes = {
@@ -190,7 +208,7 @@ class NativeWindowsIO:
             anchor = self.kernel.CreateFileW(
                 str(self.path.anchor),
                 DIRECTORY_READ,
-                1,
+                DIRECTORY_SHARE,
                 None,
                 3,
                 0x02000000 | FILE_OPEN_REPARSE_POINT,
@@ -293,7 +311,7 @@ class NativeWindowsIO:
                 parent,
                 name,
                 access=access,
-                share=1,
+                share=DIRECTORY_SHARE,
                 disposition=FILE_CREATE,
                 options=FILE_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
             )
@@ -305,7 +323,7 @@ class NativeWindowsIO:
                     parent,
                     name,
                     access=access,
-                    share=1,
+                    share=DIRECTORY_SHARE,
                     disposition=FILE_OPEN,
                     options=FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
                 )
@@ -325,6 +343,7 @@ class NativeWindowsIO:
         if parts in self.directories:
             if exclusive:
                 raise MillefeuilleContractError("Windows metadata directory collision")
+            self._directory_info(self.directories[parts])
             return self.directories[parts]
         parent = self.directory(parts[:-1], create=create)
         handle = self._open_directory(
@@ -433,22 +452,34 @@ class NativeWindowsIO:
     def _rename_handle(self, handle, destination):
         destination = tuple(destination)
         parent = self.directory(destination[:-1], create=True)
-        encoded = _leaf(destination[-1]).encode("utf-16-le")
-        size = max(
-            ctypes.sizeof(_RenameInformation),
-            _RenameInformation.name.offset + len(encoded) + 2,
-        )
-        buffer = ctypes.create_string_buffer(size)
-        value = _RenameInformation.from_buffer(buffer)
-        value.flags, value.root, value.length = 0, parent, len(encoded)
-        ctypes.memmove(
-            ctypes.addressof(buffer) + _RenameInformation.name.offset,
-            encoded,
-            len(encoded),
-        )
-        if not self.kernel.SetFileInformationByHandle(handle, 3, buffer, size):
+        buffer = _relative_name_information(parent, destination[-1])
+        size = ctypes.sizeof(buffer)
+        success = self.kernel.SetFileInformationByHandle(handle, 3, buffer, size)
+        error = ctypes.get_last_error() if not success else 0
+        if not hasattr(self, "rename_observations"):
+            self.rename_observations = []
+        if len(self.rename_observations) < 16:
+            self.rename_observations.append(
+                {
+                    "api": "SetFileInformationByHandle",
+                    "class": 3,
+                    "flags": 0,
+                    "size": size,
+                    "name_bytes": _RenameInformation.from_buffer(buffer).length,
+                    "name_offset": _RenameInformation.name.offset,
+                    "structure_bytes": ctypes.sizeof(_RenameInformation),
+                    "directory_share": DIRECTORY_SHARE,
+                    "success": bool(success),
+                    "GetLastError": error,
+                }
+            )
+        if not success:
             raise OSError(
-                ctypes.get_last_error(), "Windows metadata no-replace handle rename"
+                error,
+                "Windows metadata no-replace handle rename; "
+                f"class=3 flags=0 size={size} "
+                f"name_bytes={_RenameInformation.from_buffer(buffer).length} "
+                f"name_offset={_RenameInformation.name.offset}",
             )
 
     def move_file(self, fd, destination):
@@ -466,6 +497,10 @@ class NativeWindowsIO:
         return destination
 
     def root_identity(self):
+        # READ|WRITE sharing permits target opens. Recheck every held ancestor
+        # for an in-place reparse change; DELETE remains denied.
+        for handle in self.handles:
+            self._directory_info(handle)
         if self._directory_info(self.root) != self.native_root_identity:
             raise MillefeuilleContractError("Windows metadata pinned run drift")
         info = self.path.lstat()
@@ -560,6 +595,7 @@ def _write_inplace_group_open(
             "Windows metadata case-insensitive output collision"
         )
     journal = None
+    barrier = None
     io._committed = False
     initial = io.root_identity()
     if (
@@ -623,8 +659,12 @@ def _write_inplace_group_open(
         io.directory((HISTORY,), create=True)
         if io.exists((HISTORY, archive)):
             raise MillefeuilleContractError("Windows metadata journal collision")
+        # Never rename a directory containing held backup/plan files on Windows.
+        # Allocate the immutable journal first; only its empty barrier moves.
+        io.directory((HISTORY, archive), exclusive=True)
         io.directory((PENDING,), exclusive=True, delete=True)
-        journal = (PENDING,)
+        journal = (HISTORY, archive)
+        barrier = (PENDING,)
         for number, entry in enumerate(entries):
             if entry["before"] is not None:
                 backup = io.open_file(journal + (f"before-{number}.txt",), create=True)
@@ -657,7 +697,7 @@ def _write_inplace_group_open(
             ):
                 raise MillefeuilleContractError("Windows metadata exact backup drift")
         check()
-        journal = io.move_directory(journal, (HISTORY, archive))
+        barrier = io.move_directory(barrier, journal + ("committed-barrier",))
         io._committed = True
     except Exception as cause:
         if journal is None:
@@ -668,10 +708,9 @@ def _write_inplace_group_open(
                 actual = (
                     io.journal_location()
                     if hasattr(io, "journal_location")
-                    else (HISTORY, archive)
+                    else journal + ("committed-barrier",)
                 )
-                journal = actual
-                journal = io.move_directory(actual, (PENDING,))
+                barrier = io.move_directory(actual, (PENDING,))
             except Exception:
                 errors.append("pending-barrier-uncertain")
         try:
@@ -710,9 +749,7 @@ def _write_inplace_group_open(
             errors.append("run-drift-no-automatic-rollback")
         if not errors:
             try:
-                journal = io.move_directory(
-                    journal, (HISTORY, archive + "-rolled-back")
-                )
+                barrier = io.move_directory(barrier, journal + ("rolled-back-barrier",))
             except Exception:
                 errors.append("rollback-journal-archive-failed")
         if errors:

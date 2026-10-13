@@ -15,6 +15,14 @@ import collagan_windows_adapter as adapter
 from millefeuille.domain.metadata_transaction import _rename_entry
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 
+NATIVE_OBSERVATIONS = []
+
+
+def native_observation(control, stage, **details):
+    if len(NATIVE_OBSERVATIONS) >= 16:
+        raise MillefeuilleContractError("native diagnostic record bound exceeded")
+    NATIVE_OBSERVATIONS.append({"control": control, "stage": stage, **details})
+
 
 class SyntheticIO:
     """Real synthetic POSIX FDs; Windows sharing is NOT emulated/proven.
@@ -262,7 +270,13 @@ class GroupProtocolTests(unittest.TestCase):
                         if (
                             not io.faulted
                             and not rollback
-                            and parts == selected
+                            and (
+                                parts == selected
+                                or (
+                                    len(parts) == 3
+                                    and (parts[0], parts[-1]) == selected
+                                )
+                            )
                             and event == phase
                         ):
                             io.faulted = True
@@ -280,9 +294,9 @@ class GroupProtocolTests(unittest.TestCase):
 
     def test_each_backup_plan_or_new_output_creation_failure_has_no_acceptance(self):
         for selected in (
-            (adapter.PENDING, "before-0.txt"),
-            (adapter.PENDING, "before-1.txt"),
-            (adapter.PENDING, "plan.json"),
+            (adapter.HISTORY, "before-0.txt"),
+            (adapter.HISTORY, "before-1.txt"),
+            (adapter.HISTORY, "plan.json"),
             ("reports", "acceptance-summary.json"),
             ("reports", "acceptance-summary.md"),
         ):
@@ -292,7 +306,10 @@ class GroupProtocolTests(unittest.TestCase):
                 def fault(io, event, parts, rollback, *, selected=selected):
                     if (
                         event == "before-create"
-                        and parts == selected
+                        and (
+                            parts == selected
+                            or (len(parts) == 3 and (parts[0], parts[-1]) == selected)
+                        )
                         and not io.faulted
                     ):
                         io.faulted = True
@@ -421,7 +438,7 @@ class GroupProtocolTests(unittest.TestCase):
         with self.assertRaisesRegex(MillefeuilleContractError, "recovery required"):
             adapter.write_inplace_group(io, outputs)
         self.assertEqual(
-            (run / adapter.PENDING / "before-0.txt").read_bytes(),
+            (next((run / adapter.HISTORY).iterdir()) / "before-0.txt").read_bytes(),
             before["stage-manifest.json"],
         )
         reader = SyntheticIO(run)
@@ -442,7 +459,7 @@ class GroupProtocolTests(unittest.TestCase):
         def fault(io, event, parts, rollback):
             if (
                 event == "before-archive"
-                and not parts[-1].endswith("-rolled-back")
+                and parts[-1] == "committed-barrier"
                 and not io.faulted
             ):
                 io.faulted = True
@@ -460,7 +477,7 @@ class GroupProtocolTests(unittest.TestCase):
         def fault(io, event, parts, rollback):
             if (
                 event == "archive"
-                and not parts[-1].endswith("-rolled-back")
+                and parts[-1] == "committed-barrier"
                 and not io.faulted
             ):
                 io.faulted = True
@@ -501,13 +518,18 @@ class GroupProtocolTests(unittest.TestCase):
                 and not io.faulted
             ):
                 io.faulted = True
-                (run / adapter.PENDING / "failed-3.txt").write_bytes(foreign)
+                (next((run / adapter.HISTORY).iterdir()) / "failed-3.txt").write_bytes(
+                    foreign
+                )
                 raise OSError("synthetic last-output fault")
 
         io = SyntheticIO(run, fault=fault)
         with self.assertRaisesRegex(MillefeuilleContractError, "recovery required"):
             adapter.write_inplace_group(io, outputs)
-        self.assertEqual((run / adapter.PENDING / "failed-3.txt").read_bytes(), foreign)
+        self.assertEqual(
+            (next((run / adapter.HISTORY).iterdir()) / "failed-3.txt").read_bytes(),
+            foreign,
+        )
         self.assertTrue((run / adapter.PENDING).exists())
 
     def test_case_collision_and_unsafe_paths_are_refused_without_effects(self):
@@ -593,7 +615,8 @@ class GroupProtocolTests(unittest.TestCase):
                             backup = next(
                                 fd
                                 for fd, name in io.files.items()
-                                if name == (adapter.PENDING, "before-0.txt")
+                                if name[0] == adapter.HISTORY
+                                and name[-1] == "before-0.txt"
                             )
                             os.lseek(backup, 0, os.SEEK_SET)
                             os.ftruncate(backup, 0)
@@ -610,7 +633,8 @@ class GroupProtocolTests(unittest.TestCase):
                     if (
                         selected == "read-failure"
                         and io.faulted
-                        and io.files[fd] == (adapter.PENDING, "before-0.txt")
+                        and io.files[fd][0] == adapter.HISTORY
+                        and io.files[fd][-1] == "before-0.txt"
                     ):
                         raise OSError("synthetic retained backup read failure")
                     return snapshot(fd)
@@ -631,12 +655,16 @@ class GroupProtocolTests(unittest.TestCase):
                 self.assertFalse((run / "reports/acceptance-summary.md").exists())
                 if selected == "drift":
                     self.assertEqual(
-                        (run / adapter.PENDING / "before-0.txt").read_bytes(),
+                        (
+                            next((run / adapter.HISTORY).iterdir()) / "before-0.txt"
+                        ).read_bytes(),
                         b"synthetic corrupted backup",
                     )
                 else:
                     self.assertEqual(
-                        (run / adapter.PENDING / "before-0.txt").read_bytes(),
+                        (
+                            next((run / adapter.HISTORY).iterdir()) / "before-0.txt"
+                        ).read_bytes(),
                         before["stage-manifest.json"],
                     )
 
@@ -735,7 +763,7 @@ class NativeRequestTests(unittest.TestCase):
         self.assertEqual(recorded[0][:5], (123, 3, 0, 456, "failed-2.txt"))
         self.assertGreaterEqual(
             recorded[0][5],
-            adapter._RenameInformation.name.offset
+            ctypes.sizeof(adapter._RenameInformation)
             + len("failed-2.txt".encode("utf-16-le")),
         )
 
@@ -777,7 +805,12 @@ class NativeWindowsQualification(unittest.TestCase):
             run, before, outputs = self.fixture(temporary)
             identities = {name: (run / name).stat().st_ino for name in before}
             io = adapter.NativeWindowsIO(run)
-            adapter.write_inplace_group(io, outputs)
+            try:
+                adapter.write_inplace_group(io, outputs)
+            finally:
+                native_observation(
+                    "group", "rename-requests", requests=io.rename_observations
+                )
             for name, text in outputs.items():
                 self.assertEqual((run / name).read_bytes(), text.encode())
                 if name in identities:
@@ -789,6 +822,16 @@ class NativeWindowsQualification(unittest.TestCase):
                     (history[0] / f"before-{number}.txt").read_bytes(), data
                 )
             self.assertFalse((run / adapter.PENDING).exists())
+            self.assertTrue((history[0] / "committed-barrier").is_dir())
+            self.assertEqual(list((history[0] / "committed-barrier").iterdir()), [])
+            native_observation(
+                "group",
+                "verified",
+                original_inodes_preserved=True,
+                exact_backups_verified=True,
+                pending_absent=True,
+                empty_committed_barrier=True,
+            )
 
     def test_win32_hardlink_creation_cannot_escape_held_single_link_file(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -799,11 +842,21 @@ class NativeWindowsQualification(unittest.TestCase):
                 create.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_void_p]
                 create.restype = ctypes.c_int32
                 alias = Path(temporary) / "outside-approved-run-alias.json"
+                baseline = create(str(alias), str(run / "stage-manifest.json"), None)
+                baseline_error = ctypes.get_last_error() if not baseline else 0
+                native_observation(
+                    "Win32-alias",
+                    "positive-baseline",
+                    success=bool(baseline),
+                    GetLastError=baseline_error,
+                    directory_share=adapter.DIRECTORY_SHARE,
+                )
                 self.assertTrue(
-                    create(str(alias), str(run / "stage-manifest.json"), None),
+                    baseline,
                     (
                         "positive Win32 hardlink capability control failed; "
-                        "confinement is unqualified"
+                        f"confinement is unqualified; GetLastError={baseline_error}; "
+                        f"directory_share={adapter.DIRECTORY_SHARE}"
                     ),
                 )
                 self.assertEqual(
@@ -814,12 +867,23 @@ class NativeWindowsQualification(unittest.TestCase):
                 success = bool(
                     create(str(alias), str(run / "stage-manifest.json"), None)
                 )
+                held_error = ctypes.get_last_error() if not success else 0
+                native_observation(
+                    "Win32-alias",
+                    "exclusive-file-held",
+                    success=success,
+                    GetLastError=held_error,
+                    data_share=0,
+                )
                 self.assertFalse(
                     success,
                     (
                         "Win32 alias escaped exclusive data hold; "
                         "refuse production dispatch"
                     ),
+                )
+                self.assertIn(
+                    held_error, (5, 32), "held alias refused for unqualified reason"
                 )
                 self.assertFalse(alias.exists())
             finally:
@@ -849,20 +913,10 @@ class NativeWindowsQualification(unittest.TestCase):
                 def native_link(handle):
                     # Adversarial native capability test.
                     # This ABI is not a production dependency.
-                    name = "alias.json".encode("utf-16-le")
-                    size = max(
-                        ctypes.sizeof(adapter._RenameInformation),
-                        adapter._RenameInformation.name.offset + len(name) + 2,
+                    buffer = adapter._relative_name_information(
+                        destination.root, "alias.json"
                     )
-                    buffer = ctypes.create_string_buffer(size)
-                    link = adapter._RenameInformation.from_buffer(buffer)
-                    link.flags, link.root, link.length = 0, destination.root, len(name)
-                    ctypes.memmove(
-                        ctypes.addressof(buffer)
-                        + adapter._RenameInformation.name.offset,
-                        name,
-                        len(name),
-                    )
+                    size = ctypes.sizeof(buffer)
                     native_set = io.nt.NtSetInformationFile
                     native_set.argtypes = [
                         ctypes.c_void_p,
@@ -873,20 +927,42 @@ class NativeWindowsQualification(unittest.TestCase):
                     ]
                     native_set.restype = ctypes.c_int32
                     status_block = adapter._IoStatusBlock()
-                    return native_set(
+                    status = native_set(
                         handle, ctypes.byref(status_block), buffer, size, 11
                     )
+                    native_observation(
+                        "NT-attribute-alias",
+                        "set-link",
+                        NTSTATUS=status & 0xFFFFFFFF,
+                        IOSB=status_block.status.Status & 0xFFFFFFFF,
+                        information_class=11,
+                        flags=0,
+                        size=size,
+                        name_bytes=20,
+                        source_access=0x00100080,
+                        directory_share=adapter.DIRECTORY_SHARE,
+                    )
+                    self.link_diagnostic = (
+                        f"NTSTATUS=0x{status & 0xFFFFFFFF:08x}; "
+                        f"IOSB=0x{status_block.status.Status & 0xFFFFFFFF:08x}; "
+                        f"class=11 flags=0 size={size} "
+                        f"name_bytes=20 directory_share={adapter.DIRECTORY_SHARE}"
+                    )
+                    return status
 
                 # Prove this exact ABI/rights/filesystem path works before relying
                 # on its later refusal as an exclusive-hold confinement signal.
                 attribute_handle = open_attributes()
                 baseline = native_link(attribute_handle)
+                native_observation(
+                    "NT-attribute-alias", "positive-baseline", success=baseline >= 0
+                )
                 self.assertGreaterEqual(
                     baseline,
                     0,
                     (
                         "positive native attribute-handle alias control failed; "
-                        "confinement remains unqualified"
+                        "confinement remains unqualified; " + self.link_diagnostic
                     ),
                 )
                 alias = outside / "alias.json"
@@ -900,6 +976,12 @@ class NativeWindowsQualification(unittest.TestCase):
                 try:
                     attribute_handle = open_attributes()
                 except OSError as error:
+                    native_observation(
+                        "NT-attribute-alias",
+                        "exclusive-file-held-open",
+                        NTSTATUS=error.errno,
+                        data_share=0,
+                    )
                     self.assertEqual(
                         error.errno,
                         0xC0000043,
@@ -907,6 +989,12 @@ class NativeWindowsQualification(unittest.TestCase):
                     )
                     return
                 status = native_link(attribute_handle)
+                native_observation(
+                    "NT-attribute-alias",
+                    "exclusive-file-held-link",
+                    NTSTATUS=status & 0xFFFFFFFF,
+                    data_share=0,
+                )
                 self.assertLess(
                     status,
                     0,
@@ -918,7 +1006,8 @@ class NativeWindowsQualification(unittest.TestCase):
                 self.assertIn(
                     status & 0xFFFFFFFF,
                     (0xC0000043, 0xC0000022),
-                    "native alias failed for an unqualified reason",
+                    "native alias failed for an unqualified reason; "
+                    + self.link_diagnostic,
                 )
                 self.assertFalse(alias.exists())
             finally:

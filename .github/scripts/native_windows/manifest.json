@@ -22,21 +22,21 @@
       "sha256": "ecc7241f677a5ad4ddbe8175729f1cefc6ffb2abdb92222dd3eefd2b93e14176"
     },
     {
-      "bytes": 29766,
+      "bytes": 31773,
       "module": "collagan_windows_adapter",
       "path": ".github/scripts/native_windows/adapter.py",
-      "sha256": "05228085cab406b145bc5aaf6efc083d4f472a42c5e057ac881aff6784a5bd8e"
+      "sha256": "f554b3bc4df74c33bd7d8b2797c40b10b6f665e104d3a4c7e9f64956f81975b5"
     },
     {
-      "bytes": 38069,
+      "bytes": 41756,
       "module": "collagan_windows_tests",
       "path": ".github/scripts/native_windows/native_controls.py",
-      "sha256": "3f942247642dc80ce549951d7b1253258c7370de2c390be20e9d804d84dc35f3"
+      "sha256": "f474bb245f0de702e6d343b02ef72eff534da4b8fb481fd5a00604ddd57d9914"
     }
   ],
   "worker": {
-    "bytes": 3567,
+    "bytes": 3625,
     "path": ".github/scripts/native_windows/worker.py",
-    "sha256": "7dc920694eaabf057c271c22eb4ddd6c64d0faac3523c452064a53f9c27027eb"
+    "sha256": "5cfc7bbc83dd202841024caf4d385a3eb9ce2a8d0c316a23a6e36cea96758058"
   }
 }

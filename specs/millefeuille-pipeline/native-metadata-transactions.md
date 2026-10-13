@@ -37,3 +37,19 @@ Portable read-only tests construct completed synthetic DTO fixtures independentl
 of application metadata writers. Native write success tests retain capability
 gates, with explicit unsupported-platform no-effect tests. Native Windows source
 pins require exact LF checkout bytes; the controller does not normalize mismatches.
+
+The CI-only Windows prototype keeps backup and plan handles exclusive in a
+fixed history directory. An empty pending directory moves into that journal as
+`committed-barrier` or `rolled-back-barrier`; populated journals never move.
+Pinned directories share read and write access for native link/rename target
+opens, with delete sharing withheld and held ancestors rechecked for reparses.
+Data, backup and plan files retain zero sharing. This remains a prototype: three
+real native controls, positive alias baselines, exact-head tests and terminal
+resource evidence are required before making any Windows compatibility claim.
+
+The native launcher closes its exited worker's thread and process handles before
+polling both JobObject accounting and the bounded job PID list. A signaled primary
+worker or an empty PID list alone does not clear ownership. Failed readback, failed
+handle release or membership that does not drain within the existing ten-second
+cleanup window remains unresolved. Offline API shims do not qualify this kernel
+behavior, and corrected accounting does not revise historical failed receipts.
