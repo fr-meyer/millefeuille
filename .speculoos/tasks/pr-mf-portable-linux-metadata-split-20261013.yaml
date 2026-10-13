@@ -36,9 +36,9 @@ write_paths:
   - tests/test_millefeuille_status_observability.py
 github:
   issue: null
-  pull_request: null
-  url: null
-  head_sha: null
+  pull_request: 176
+  url: https://github.com/fr-meyer/millefeuille/pull/176
+  head_sha: dd6f0124a6f05e1a8e5319834375dba0785a074b
 scope:
   - Preserve the reviewed portable/Linux application repair bytes
   - Retain the production POSIX metadata writer admission gate and Windows no-effect refusal
@@ -52,16 +52,16 @@ acceptance:
   - Current PR175 acceptance and all five failed/consumed attempt receipts remain unchanged
   - Fresh classic branch-protection and exact-head review requirements must be verified before readiness
 publication_boundary:
-  statement: Source-only unpublished preparation. No publication, CI, security policy, private reads/acceptance, provider/model/reviewer, GCP, production, release or merge action is authorized by this preparation.
+  statement: Approved separate draft publication and at most two automatic six-platform CI runs capped at 15 minutes per job. Keep Windows writes disabled and merging held until protections are verified. No private reads/acceptance, security policy, provider/model/reviewer, production or release action is authorized.
 documentation_impact:
   status: updated
   rationale: README capability table and transaction specification explicitly report Windows writes unsupported and distinguish the separate unqualified prototype.
-publish_authority: User approved this source-only safe split; publication and any new CI require a separate execution approval and applicable policy gates.
+publish_authority: User approved one separate draft PR to dev and one metadata-only PR binding with at most two automatic six-platform CI runs. The PR remains draft and merge is held until repository protections and applicable required checks/review are verified and satisfied.
 private_data_scan: Required; retained fixtures are synthetic.
 post_merge_expected:
-  pull_request: split-plan-actual-pr
+  pull_request: 176
   base_branch: dev
   head_branch: fix/pr-mf-portable-linux-metadata-split-20261013
-  head_sha: split-plan-exact-head
+  head_sha: merge-plan-exact-head
   merge_actor: mergeguez_dev_merge
   delete_branch_after_merge: true
