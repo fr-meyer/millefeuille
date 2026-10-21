@@ -29,8 +29,7 @@ def supports_secure_nofollow_writes() -> bool:
     return (
         hasattr(os, "O_NOFOLLOW")
         and all(
-            function in os.supports_dir_fd
-            for function in required_dir_fd_functions
+            function in os.supports_dir_fd for function in required_dir_fd_functions
         )
         and os.stat in os.supports_follow_symlinks
         and hasattr(os, "fchmod")

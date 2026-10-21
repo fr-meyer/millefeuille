@@ -98,9 +98,7 @@ def serve_one_reservation(*, timeout_seconds: int = 120) -> None:
                         )
                     packet = OperatorPreflightPacket.from_dict(payload["packet"])
                     receipt = ApprovedLiveReceipt.from_dict(payload["receipt"])
-                    _require_canary_scope(
-                        packet, receipt, Path(packet.artifact_root)
-                    )
+                    _require_canary_scope(packet, receipt, Path(packet.artifact_root))
                     _verify_trusted_approval(packet, receipt)
                     _reserve_root_approval(packet, receipt)
                     response = {
@@ -217,9 +215,7 @@ def _parse_canonical_audit(value: str) -> dict[str, Any]:
     except (TypeError, ValueError) as exc:
         raise MillefeuilleContractError("GPT canary replay ledger is invalid") from exc
     if not isinstance(payload, dict) or _canonical_json(payload) != value:
-        raise MillefeuilleContractError(
-            "GPT canary replay ledger is not canonical"
-        )
+        raise MillefeuilleContractError("GPT canary replay ledger is not canonical")
     return payload
 
 

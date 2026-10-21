@@ -63,9 +63,7 @@ FORBIDDEN_PUBLIC_MARKERS = (
     ),
     (
         "private-unix-root",
-        re.compile(
-            r"(?<![\w.])/(?:home|Users|private|root)/[^\s`\"')\]]+"
-        ),
+        re.compile(r"(?<![\w.])/(?:home|Users|private|root)/[^\s`\"')\]]+"),
     ),
     (
         "private-windows-root",
@@ -77,17 +75,11 @@ FORBIDDEN_PUBLIC_MARKERS = (
 
 PUBLIC_ARTIFACT_PATHS = (
     REPO_ROOT / ".speculoos" / "README.md",
-    REPO_ROOT
-    / ".speculoos"
-    / "tasks"
-    / "pr-096-delivery-evidence-templates.yaml",
+    REPO_ROOT / ".speculoos" / "tasks" / "pr-096-delivery-evidence-templates.yaml",
     TEMPLATE_ROOT / "README.md",
     CATALOG_PATH,
     REPO_ROOT / "specs" / "millefeuille-pipeline" / "README.md",
-    REPO_ROOT
-    / "specs"
-    / "pr-096-delivery-evidence-templates"
-    / "commit-message.txt",
+    REPO_ROOT / "specs" / "pr-096-delivery-evidence-templates" / "commit-message.txt",
     REPO_ROOT / "specs" / "pr-096-delivery-evidence-templates" / "pr-body.md",
 ) + tuple(sorted((TEMPLATE_ROOT / "templates").glob("*.md")))
 

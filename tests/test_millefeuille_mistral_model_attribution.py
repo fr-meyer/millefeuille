@@ -26,15 +26,11 @@ class TestMistralOCRModelAttribution(unittest.TestCase):
                     include_image_base64=False,
                 )
             )
-        client._uploaded_files["document-1"] = (
-            "https://example.invalid/document.pdf"
-        )
+        client._uploaded_files["document-1"] = "https://example.invalid/document.pdf"
         return client, sdk
 
     def test_records_exact_requested_and_returned_model_ids(self):
-        client, sdk = self._client(
-            SimpleNamespace(model="mistral-ocr-4-1", pages=[])
-        )
+        client, sdk = self._client(SimpleNamespace(model="mistral-ocr-4-1", pages=[]))
 
         execution = client.process_pdf_with_attribution("document-1")
 

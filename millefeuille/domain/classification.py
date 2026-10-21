@@ -53,12 +53,8 @@ CLASSIFICATION_BATCH_ROOT_REF = Path("batches/millefeuille")
 CLASSIFICATION_BATCH_SUMMARY_REF = Path(
     "classification/batch-classification-summary.json"
 )
-CLASSIFICATION_BATCH_REPORT_REF = Path(
-    "classification/batch-classification-report.md"
-)
-CLASSIFICATION_BATCH_MANIFEST_SCHEMA = (
-    "millefeuille-classification-batch-manifest/v0.1"
-)
+CLASSIFICATION_BATCH_REPORT_REF = Path("classification/batch-classification-report.md")
+CLASSIFICATION_BATCH_MANIFEST_SCHEMA = "millefeuille-classification-batch-manifest/v0.1"
 CLASSIFICATION_ACTION_EVIDENCE_SCHEMA_VERSION = (
     "millefeuille-classification-action-evidence/v0.1"
 )
@@ -69,9 +65,7 @@ CLASSIFICATION_ACTION_FINAL_DECISION_REF = Path("final-decision.json")
 CLASSIFICATION_ACTION_FINAL_MARKDOWN_REF = Path("final-decision.md")
 CLASSIFICATION_ACTION_PREVIEW_REF = Path("zotero-writeback-preview.json")
 CLASSIFICATION_ACTION_ADJUDICATION_QUEUE_REF = Path("adjudication-queue.jsonl")
-CLASSIFICATION_ACTION_TAXONOMY_REQUESTS_REF = Path(
-    "taxonomy-change-requests.jsonl"
-)
+CLASSIFICATION_ACTION_TAXONOMY_REQUESTS_REF = Path("taxonomy-change-requests.jsonl")
 _SAFE_BATCH_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _SAFE_BATCH_LOCATOR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,255}\Z")
 _SAFE_EVIDENCE_REF_PART = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,255}\Z")
@@ -244,8 +238,8 @@ def write_classification_batch_summary(
     """Classify a preflighted set of accepted offline runs deterministically."""
 
     manifest_path = Path(batch_manifest_path)
-    batch_id, taxonomy_version, run_locators = (
-        _load_classification_batch_manifest(manifest_path)
+    batch_id, taxonomy_version, run_locators = _load_classification_batch_manifest(
+        manifest_path
     )
     prepared: list[_PreparedClassification] = []
     for locator in run_locators:
@@ -270,12 +264,8 @@ def write_classification_batch_summary(
             )
         prepared.append(item)
 
-    prepared.sort(
-        key=lambda item: (item.resolved.paper_id, item.resolved.run_id)
-    )
-    identities = [
-        (item.resolved.paper_id, item.resolved.run_id) for item in prepared
-    ]
+    prepared.sort(key=lambda item: (item.resolved.paper_id, item.resolved.run_id))
+    identities = [(item.resolved.paper_id, item.resolved.run_id) for item in prepared]
     if len(identities) != len(set(identities)):
         raise MillefeuilleContractError(
             "classification batch runs must have unique paper_id/run_id pairs"
@@ -413,10 +403,14 @@ def _prepare_classification_action_from_evidence(
         )
 
     primary_path = str(evidence["primary_path"])
-    if outcome in {
-        ClassificationActionOutcome.NO_CHANGE,
-        ClassificationActionOutcome.CONFIRMED,
-    } and primary_path != prior.primary_path:
+    if (
+        outcome
+        in {
+            ClassificationActionOutcome.NO_CHANGE,
+            ClassificationActionOutcome.CONFIRMED,
+        }
+        and primary_path != prior.primary_path
+    ):
         raise MillefeuilleContractError(
             f"{outcome.value} action must retain prior primary_path "
             f"{prior.primary_path!r}"
@@ -455,12 +449,8 @@ def _prepare_classification_action_from_evidence(
     final_markdown_path = action_dir / CLASSIFICATION_ACTION_FINAL_MARKDOWN_REF
     action_preview_path = action_dir / CLASSIFICATION_ACTION_PREVIEW_REF
     canonical_preview_path = resolved.run_dir / WRITEBACK_PREVIEW_REF
-    taxonomy_requests_path = (
-        action_dir / CLASSIFICATION_ACTION_TAXONOMY_REQUESTS_REF
-    )
-    adjudication_queue_path = (
-        action_dir / CLASSIFICATION_ACTION_ADJUDICATION_QUEUE_REF
-    )
+    taxonomy_requests_path = action_dir / CLASSIFICATION_ACTION_TAXONOMY_REQUESTS_REF
+    adjudication_queue_path = action_dir / CLASSIFICATION_ACTION_ADJUDICATION_QUEUE_REF
     status = (
         ClassificationStatus.ADJUDICATION_REQUIRED
         if unresolved
@@ -503,9 +493,7 @@ def _prepare_classification_action_from_evidence(
         ),
     )
     preview_config = evidence.get("writeback_preview") or {}
-    if unresolved and "millefeuille-classified" in preview_config.get(
-        "add_tags", []
-    ):
+    if unresolved and "millefeuille-classified" in preview_config.get("add_tags", []):
         raise MillefeuilleContractError(
             "unresolved classification action must not preview the "
             "millefeuille-classified tag"
@@ -521,10 +509,14 @@ def _prepare_classification_action_from_evidence(
     taxonomy_request_ref: str | None = None
     if requires_taxonomy_request:
         assert isinstance(taxonomy_request, dict)
-        request_evidence_refs = _normalize_action_evidence_refs(
-            evidence_refs=list(taxonomy_request.get("evidence_refs", [])),
-            run_dir=resolved.run_dir,
-        ) if taxonomy_request.get("evidence_refs") else []
+        request_evidence_refs = (
+            _normalize_action_evidence_refs(
+                evidence_refs=list(taxonomy_request.get("evidence_refs", [])),
+                run_dir=resolved.run_dir,
+            )
+            if taxonomy_request.get("evidence_refs")
+            else []
+        )
         taxonomy_records.append(
             {
                 "action_id": action_id,
@@ -780,8 +772,7 @@ def _persist_classification(
                 "run_id": resolved.run_id,
                 "taxonomy_version": decision.taxonomy_version,
                 "primary_path": decision.primary_path,
-                "review_reasons": decision.review_reasons
-                or ["adjudication requested"],
+                "review_reasons": decision.review_reasons or ["adjudication requested"],
             }
         )
     write_jsonl_records(prepared.adjudication_queue_path, adjudication_records)
@@ -921,10 +912,13 @@ def _preflight_existing_action(prepared: _PreparedClassificationAction) -> None:
         prepared.adjudication_queue_path: prepared.adjudication_records,
     }
     for path, expected in expected_jsonl.items():
-        if load_jsonl_records(
-            path,
-            "existing classification action JSONL",
-        ) != expected:
+        if (
+            load_jsonl_records(
+                path,
+                "existing classification action JSONL",
+            )
+            != expected
+        ):
             raise MillefeuilleContractError(
                 f"classification action {prepared.action.action_id!r} already "
                 f"exists with drift at {path.name}"
@@ -1111,8 +1105,7 @@ def _load_classification_batch_manifest(
         ]
         if required:
             raise MillefeuilleContractError(
-                f"classification batch run {index} requires "
-                + ", ".join(required)
+                f"classification batch run {index} requires " + ", ".join(required)
             )
         has_paper_id = "paper_id" in entry
         has_item_key = "item_key" in entry
@@ -1239,9 +1232,7 @@ def _load_classification_evidence(path: str | Path) -> dict[str, Any]:
         )
     mode = payload.get("mode", ClassificationMode.SINGLE.value)
     if not isinstance(mode, str):
-        raise MillefeuilleContractError(
-            "classification evidence mode must be a string"
-        )
+        raise MillefeuilleContractError("classification evidence mode must be a string")
     try:
         ClassificationMode(mode)
     except ValueError as exc:
@@ -1392,8 +1383,7 @@ def _load_classification_action_evidence(path: str | Path) -> dict[str, Any]:
     for index, record in enumerate(rejected):
         if not isinstance(record, dict):
             raise MillefeuilleContractError(
-                f"classification action rejected alternative {index} must be "
-                "an object"
+                f"classification action rejected alternative {index} must be an object"
             )
         extra = sorted(set(record) - {"path", "reason", "evidence_refs"})
         if extra:
@@ -1480,9 +1470,7 @@ def _load_classification_action_evidence(path: str | Path) -> dict[str, Any]:
                 )
         for field_name in ("destination_collection", "note_markdown"):
             value = preview.get(field_name)
-            if value is not None and (
-                not isinstance(value, str) or not value.strip()
-            ):
+            if value is not None and (not isinstance(value, str) or not value.strip()):
                 raise MillefeuilleContractError(
                     "classification action writeback_preview "
                     f"{field_name} must be a non-empty string when provided"
@@ -1499,8 +1487,7 @@ def _resolve_safe_run_file_ref(*, ref: str, run_dir: Path, label: str) -> Path:
         or not relative.parts
         or any(part in {"", ".", ".."} for part in relative.parts)
         or any(
-            _SAFE_EVIDENCE_REF_PART.fullmatch(part) is None
-            for part in relative.parts
+            _SAFE_EVIDENCE_REF_PART.fullmatch(part) is None for part in relative.parts
         )
     ):
         raise MillefeuilleContractError(
@@ -1694,25 +1681,19 @@ def _render_classification_batch_markdown(
         "## Routes",
     ]
     for route in summary.routes:
-        lines.append(
-            f"- `{route['primary_path']}`: `{route['count']}` run(s)"
-        )
+        lines.append(f"- `{route['primary_path']}`: `{route['count']}` run(s)")
         for run in route["runs"]:
             lines.append(
                 f"  - `{run['paper_id']}` / `{run['run_id']}`: "
                 f"`{run['status']}` (`{run['decision_ref']}`)"
             )
     review_runs = [
-        run
-        for run in summary.runs
-        if run.status != ClassificationStatus.CLASSIFIED
+        run for run in summary.runs if run.status != ClassificationStatus.CLASSIFIED
     ]
     if review_runs:
         lines.extend(["", "## Review And Adjudication Queue"])
         for run in review_runs:
-            lines.append(
-                f"- `{run.paper_id}` / `{run.run_id}`: `{run.status.value}`"
-            )
+            lines.append(f"- `{run.paper_id}` / `{run.run_id}`: `{run.status.value}`")
             for reason in run.review_reasons:
                 lines.append(f"  review: {reason}")
     return "\n".join(lines) + "\n"

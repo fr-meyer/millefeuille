@@ -68,9 +68,9 @@ def _validate_schema(
     if "properties" in schema:
         source_hash_schema = schema["properties"]["source_hash"]
     else:
-        source_hash_schema = schema["$defs"]["multi_source_manifest"][
-            "properties"
-        ]["source_hash"]
+        source_hash_schema = schema["$defs"]["multi_source_manifest"]["properties"][
+            "source_hash"
+        ]
     pattern = source_hash_schema["pattern"]
     testcase.assertIsNotNone(re.fullmatch(pattern, payload["source_hash"]))
     if "not" in source_hash_schema:
@@ -88,9 +88,7 @@ class TestSourceHashCompatibility(unittest.TestCase):
             )
         )
         cls.source_pack_schema = json.loads(
-            (SPEC_DIR / "source-pack-manifest.schema.json").read_text(
-                encoding="utf-8"
-            )
+            (SPEC_DIR / "source-pack-manifest.schema.json").read_text(encoding="utf-8")
         )
 
     def test_index_schema_runtime_and_fixture_loader_accept_both_hash_forms(self):
@@ -136,12 +134,15 @@ class TestSourceHashCompatibility(unittest.TestCase):
                     "source_hash must use",
                 ):
                     RetrievalIndexRecord.from_dict(payload)
-                with mock.patch(
-                    "millefeuille.domain.index_fixtures._load_json_object",
-                    return_value=payload,
-                ), self.assertRaisesRegex(
-                    MillefeuilleContractError,
-                    "source_hash must use",
+                with (
+                    mock.patch(
+                        "millefeuille.domain.index_fixtures._load_json_object",
+                        return_value=payload,
+                    ),
+                    self.assertRaisesRegex(
+                        MillefeuilleContractError,
+                        "source_hash must use",
+                    ),
                 ):
                     load_retrieval_index_status("fixture-index.json")
                 if validator is not None:

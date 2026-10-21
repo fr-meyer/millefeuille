@@ -75,8 +75,8 @@ def _run_locator_args(source_pack_root: Path, artifact_root: Path) -> list[str]:
 class TestMillefeuilleArtifactOverrides(unittest.TestCase):
     def test_external_root_and_custom_manifest_route_run_scoped_writes(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            source_pack_root, artifact_root, canonical_run_dir = (
-                _prepare_external_run(tempdir)
+            source_pack_root, artifact_root, canonical_run_dir = _prepare_external_run(
+                tempdir
             )
             evidence = _write_offline_stage_evidence(tempdir)
             setup_exit = run_stage_cli(
@@ -106,9 +106,7 @@ class TestMillefeuilleArtifactOverrides(unittest.TestCase):
             index_payload = json.loads(index_path.read_text(encoding="utf-8"))
             for stage_record in index_payload["stages"].values():
                 stage_record["manifest_ref"] = custom_manifest.name
-            index_payload["artifacts"]["stage_manifest"]["ref"] = (
-                custom_manifest.name
-            )
+            index_payload["artifacts"]["stage_manifest"]["ref"] = custom_manifest.name
             index_path.write_text(
                 json.dumps(index_payload, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
@@ -233,8 +231,8 @@ class TestMillefeuilleArtifactOverrides(unittest.TestCase):
 
     def test_root_layout_resolution_is_exact_and_unambiguous(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            source_pack_root, artifact_root, canonical_run_dir = (
-                _prepare_external_run(tempdir)
+            source_pack_root, artifact_root, canonical_run_dir = _prepare_external_run(
+                tempdir
             )
             run_dir = artifact_root / PAPER_ID / RUN_ID
 
@@ -284,8 +282,8 @@ class TestMillefeuilleArtifactOverrides(unittest.TestCase):
 
     def test_traversal_cross_wiring_and_identity_drift_fail_closed(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            source_pack_root, artifact_root, _canonical_run_dir = (
-                _prepare_external_run(tempdir)
+            source_pack_root, artifact_root, _canonical_run_dir = _prepare_external_run(
+                tempdir
             )
             run_dir = artifact_root / PAPER_ID / RUN_ID
 
@@ -378,9 +376,7 @@ class TestMillefeuilleArtifactOverrides(unittest.TestCase):
                 )
 
             first_stage["manifest_ref"] = "stage-manifest.json"
-            index_payload["artifacts"]["stage_manifest"]["ref"] = (
-                "other-manifest.json"
-            )
+            index_payload["artifacts"]["stage_manifest"]["ref"] = "other-manifest.json"
             index_path.write_text(
                 json.dumps(index_payload, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
@@ -396,9 +392,7 @@ class TestMillefeuilleArtifactOverrides(unittest.TestCase):
                     run_id=RUN_ID,
                 )
 
-            index_payload["artifacts"]["stage_manifest"]["ref"] = (
-                "stage-manifest.json"
-            )
+            index_payload["artifacts"]["stage_manifest"]["ref"] = "stage-manifest.json"
             index_payload["source_pack"]["ref"] = str(Path(tempdir) / "wrong-pack")
             index_path.write_text(
                 json.dumps(index_payload, indent=2, sort_keys=True) + "\n",
@@ -452,8 +446,8 @@ class TestMillefeuilleArtifactOverrides(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as tempdir:
-            source_pack_root, artifact_root, _canonical_run_dir = (
-                _prepare_external_run(tempdir)
+            source_pack_root, artifact_root, _canonical_run_dir = _prepare_external_run(
+                tempdir
             )
             linked_root = Path(tempdir) / "linked-artifacts"
             try:

@@ -253,13 +253,16 @@ class TestStatusCanonicalJoin(unittest.TestCase):
                     _write_json(_target, payload)
                     return report
 
-                with patch.object(
-                    status_observability,
-                    "_join_status",
-                    side_effect=mutate_after_join,
-                ), self.assertRaisesRegex(
-                    MillefeuilleContractError,
-                    r"changed (?:after batch preflight|during observation)",
+                with (
+                    patch.object(
+                        status_observability,
+                        "_join_status",
+                        side_effect=mutate_after_join,
+                    ),
+                    self.assertRaisesRegex(
+                        MillefeuilleContractError,
+                        r"changed (?:after batch preflight|during observation)",
+                    ),
                 ):
                     build_status_report(
                         index_path=index_path,

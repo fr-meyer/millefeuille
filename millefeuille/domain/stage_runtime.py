@@ -68,9 +68,7 @@ def resolve_run_artifacts(
         if not requested_item_key:
             raise MillefeuilleContractError("item_key must not be empty")
     resolved_paper_id = paper_id or (
-        paper_id_for_zotero_item_key(requested_item_key)
-        if requested_item_key
-        else None
+        paper_id_for_zotero_item_key(requested_item_key) if requested_item_key else None
     )
     if not isinstance(resolved_paper_id, str) or not resolved_paper_id.strip():
         raise MillefeuilleContractError("paper_id or item_key is required")
@@ -86,12 +84,7 @@ def resolve_run_artifacts(
     ensure_no_follow_directory(root, "source-pack root")
     source_pack_dir = root / "zotero" / resolved_paper_id
     manifest_path = source_pack_dir / "manifest.json"
-    canonical_run_dir = (
-        source_pack_dir
-        / "analyses"
-        / "millefeuille"
-        / resolved_run_id
-    )
+    canonical_run_dir = source_pack_dir / "analyses" / "millefeuille" / resolved_run_id
     run_dir, stage_manifest_path = _resolve_run_package_paths(
         canonical_run_dir=canonical_run_dir,
         artifact_root=artifact_root,

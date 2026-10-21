@@ -105,9 +105,7 @@ def _clone_fixture_package(source_pack_root: Path, paper_id: str) -> Path:
         payload = json.loads(index_path.read_text(encoding="utf-8"))
         payload["artifact_root"] = str(index_path.parent)
         payload["source_pack"]["ref"] = str(destination)
-        payload["source_pack"]["manifest_ref"] = str(
-            destination / "manifest.json"
-        )
+        payload["source_pack"]["manifest_ref"] = str(destination / "manifest.json")
         _write_json(index_path, payload)
     return destination
 

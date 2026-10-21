@@ -513,15 +513,11 @@ class TestOCREvidenceContract(unittest.TestCase):
             outcome=ClassificationActionOutcome.NO_CHANGE,
             status=ClassificationStatus.CLASSIFIED,
             summary="The reviewed evidence supports the prior decision.",
-            prior_decision_ref=(
-                "classification/decision-records/zotero-ITEM1.json"
-            ),
+            prior_decision_ref=("classification/decision-records/zotero-ITEM1.json"),
             final_decision_ref=(
                 "classification/actions/review-001/final-decision.json"
             ),
-            writeback_preview_ref=(
-                "classification/zotero-writeback-preview.json"
-            ),
+            writeback_preview_ref=("classification/zotero-writeback-preview.json"),
             evidence_refs=["summaries/hierarchical-summary.json"],
         )
 
