@@ -45,6 +45,7 @@ from millefeuille.domain.source_packs import (
     write_source_pack_from_recovered_pdf,
 )
 from millefeuille.domain.summary_fixtures import load_hierarchical_summary
+from tests.platform_capabilities import requires_posix_batch_publication
 
 FIXTURE_PDF_BYTES = b"artifact writer source-pack fixture pdf bytes\n"
 FIXTURE_PDF_SHA256 = hashlib.sha256(FIXTURE_PDF_BYTES).hexdigest()
@@ -519,6 +520,7 @@ def _make_multi_pdf_item(
 
 
 class TestDryRunArtifactWriter(unittest.TestCase):
+    @requires_posix_batch_publication
     def test_dry_run_writes_artifact_index_and_stage_manifest(self):
         with tempfile.TemporaryDirectory() as tempdir:
             cfg = _make_app_config(
@@ -581,6 +583,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             self.assertIn("pdf_recovery", stage_manifest["manual_gates"])
             self.assertIn("source_pack_write", stage_manifest["manual_gates"])
 
+    @requires_posix_batch_publication
     def test_source_pack_artifact_root_preflights_before_writing(self):
         with tempfile.TemporaryDirectory() as tempdir:
             existing_source_pack_dir = Path(tempdir) / "zotero" / "zotero-ITEM1"
@@ -628,6 +631,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    @requires_posix_batch_publication
     def test_source_pack_artifact_root_writes_under_existing_source_pack(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_dir = Path(tempdir) / "zotero" / "zotero-ITEM1"
@@ -697,6 +701,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             )
             self.assertEqual(source_pack_stage["status"], "passed")
 
+    @requires_posix_batch_publication
     def test_source_pack_intake_fixture_path_feeds_artifact_writer(self):
         with tempfile.TemporaryDirectory() as tempdir:
             fixture_bytes = b"x" * 12345
@@ -776,6 +781,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
                 "passed",
             )
 
+    @requires_posix_batch_publication
     def test_extraction_fixture_paths_feed_source_pack_artifact_writer(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root = _write_source_pack(tempdir)
@@ -870,6 +876,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    @requires_posix_batch_publication
     def test_route_selection_fixture_path_feeds_source_pack_artifact_writer(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root = _write_source_pack(tempdir)
@@ -957,6 +964,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    @requires_posix_batch_publication
     def test_structure_fixture_path_feeds_source_pack_artifact_writer(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root = _write_source_pack(tempdir)
@@ -1060,6 +1068,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    @requires_posix_batch_publication
     def test_summary_fixture_path_feeds_source_pack_artifact_writer(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root = _write_source_pack(tempdir)
@@ -1165,6 +1174,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    @requires_posix_batch_publication
     def test_card_fixture_path_feeds_source_pack_artifact_writer(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root = _write_source_pack(tempdir)
@@ -1281,6 +1291,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    @requires_posix_batch_publication
     def test_index_fixture_path_feeds_source_pack_artifact_writer(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root = _write_source_pack(tempdir)
@@ -1401,6 +1412,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    @requires_posix_batch_publication
     def test_source_pack_intake_fixture_path_writes_multi_pdf_item(self):
         with tempfile.TemporaryDirectory() as tempdir:
             recovered_main = Path(tempdir) / "main.pdf"
@@ -1509,6 +1521,7 @@ class TestDryRunArtifactWriter(unittest.TestCase):
             mock_zotero.add_tag.assert_not_called()
             mock_zotero.remove_tag.assert_not_called()
 
+    @requires_posix_batch_publication
     def test_source_pack_artifact_root_requires_existing_manifest(self):
         with tempfile.TemporaryDirectory() as tempdir:
             cfg = _make_app_config(

@@ -1,0 +1,7 @@
+# Exact-byte source pins used by the native Windows admission controller.
+/millefeuille/domain/millefeuille.py text eol=lf
+/millefeuille/domain/secure_io.py text eol=lf
+/millefeuille/domain/metadata_transaction.py text eol=lf
+/.github/scripts/native_windows/adapter.py text eol=lf
+/.github/scripts/native_windows/native_controls.py text eol=lf
+/.github/scripts/native_windows/worker.py text eol=lf
