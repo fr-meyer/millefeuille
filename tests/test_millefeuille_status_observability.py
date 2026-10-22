@@ -14,7 +14,6 @@ from unittest.mock import patch
 from jsonschema import Draft202012Validator
 
 from millefeuille.cli.artifacts import run_artifact_cli
-from millefeuille.cli.stages import run_stage_cli
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 import millefeuille.domain.status_observability as status_observability
 from millefeuille.domain.status_observability import (
@@ -26,12 +25,11 @@ from millefeuille.domain.status_observability import (
     compute_status_observation_digest,
     load_status_observation,
 )
+from tests.metadata_fixtures import apply_complete_preview_fixture
 from tests.test_millefeuille_stage_cli import (
     PAPER_ID,
     RUN_ID,
     _prepare_fixture_run,
-    _write_classification_evidence_json,
-    _write_handoff_jsonl,
 )
 
 _SPEC_DIR = Path(__file__).resolve().parents[1] / "specs/millefeuille-pipeline"
@@ -79,72 +77,7 @@ def _canonical_digest(payload: object) -> str:
 
 def _prepare_complete_preview(tempdir: str) -> tuple[Path, Path]:
     source_pack_root, run_dir = _prepare_fixture_run(tempdir)
-    handoff = _write_handoff_jsonl(tempdir)
-    classification = _write_classification_evidence_json(tempdir)
-    commands = (
-        [
-            "acceptance",
-            "--source-pack-root",
-            str(source_pack_root),
-            "--paper-id",
-            PAPER_ID,
-            "--run-id",
-            RUN_ID,
-            "--handoff",
-            str(handoff),
-        ],
-        [
-            "classify",
-            "--source-pack-root",
-            str(source_pack_root),
-            "--paper-id",
-            PAPER_ID,
-            "--run-id",
-            RUN_ID,
-            "--evidence",
-            str(classification),
-        ],
-        [
-            "writeback",
-            "--source-pack-root",
-            str(source_pack_root),
-            "--paper-id",
-            PAPER_ID,
-            "--run-id",
-            RUN_ID,
-        ],
-    )
-    for command in commands:
-        if run_stage_cli(command, stdout=StringIO(), stderr=StringIO()) != 0:
-            raise AssertionError("fixture stage command failed")
-
-    stage_path = run_dir / "stage-manifest.json"
-    index_path = run_dir / "artifact-index.json"
-    retrieval_path = run_dir / "index/index-status.json"
-    stage_manifest = _read_json(stage_path)
-    artifact_index = _read_json(index_path)
-    retrieval = _read_json(retrieval_path)
-    stages = {record["name"]: record for record in stage_manifest["stages"]}
-
-    stages["openkb-add"]["status"] = "skipped"
-    artifact_index["stages"]["openkb-add"]["status"] = "skipped"
-    artifact_index["indexes"] = [
-        {
-            "lane": lane["lane"],
-            "status": lane["status"],
-            **({"skip_reason": lane["skip_reason"]} if "skip_reason" in lane else {}),
-        }
-        for lane in retrieval["lanes"]
-    ]
-    for name, record in artifact_index["artifacts"].items():
-        if name not in _STATUS_ARTIFACTS:
-            continue
-        outputs = stages[record["stage"]]["outputs"]
-        if record["ref"] not in outputs:
-            outputs.append(record["ref"])
-
-    _write_json(stage_path, stage_manifest)
-    _write_json(index_path, artifact_index)
+    apply_complete_preview_fixture(source_pack_root, run_dir)
     return source_pack_root, run_dir
 
 

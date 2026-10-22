@@ -14,10 +14,12 @@ import re
 import stat
 from typing import Any
 
+from millefeuille.domain import secure_io
 from millefeuille.domain.artifacts import (
     WRITEBACK_INCOMPLETE_STATUSES,
     ArtifactIndex,
 )
+from millefeuille.domain.metadata_transaction import metadata_read_guard
 from millefeuille.domain.millefeuille import (
     AcceptanceSummaryRecord,
     ClassificationDecisionRecord,
@@ -227,7 +229,7 @@ def load_status_observation(path: str | Path) -> dict[str, Any]:
     target = _validated_operator_path(path, label="status observation")
     directory_snapshot = (
         _portable_directory_snapshot(target.parent, label="status observation parent")
-        if not hasattr(os, "O_NOFOLLOW")
+        if not secure_io._supports_no_follow()
         else None
     )
     payload = _load_strict_json_bytes(
@@ -308,7 +310,7 @@ def _build_canonical_status(
         source_pack_root,
         label="source-pack root",
     )
-    if not hasattr(os, "O_NOFOLLOW"):
+    if not secure_io._supports_no_follow():
         return _build_portable_canonical_status(
             root=root,
             paper_id=paper_id,
@@ -324,21 +326,77 @@ def _build_canonical_status(
             item_key=item_key,
             artifact_reader=reader,
         )
-        source_payload = _load_reader_json(
-            reader,
-            resolved.source_pack_dir / "manifest.json",
-            "source-pack manifest",
-        )
-        stage_payload = _load_reader_json(
-            reader,
-            resolved.stage_manifest_path,
-            "stage manifest",
-        )
-        index_payload = _load_reader_json(
-            reader,
-            resolved.artifact_index_path,
-            "artifact index",
-        )
+        with metadata_read_guard(resolved.run_dir):
+            source_payload = _load_reader_json(
+                reader,
+                resolved.source_pack_dir / "manifest.json",
+                "source-pack manifest",
+            )
+            stage_payload = _load_reader_json(
+                reader,
+                resolved.stage_manifest_path,
+                "stage manifest",
+            )
+            index_payload = _load_reader_json(
+                reader,
+                resolved.artifact_index_path,
+                "artifact index",
+            )
+            _validate_stage_manifest_payload(stage_payload)
+            _validate_artifact_index_payload(index_payload)
+            parsed_source = parse_source_pack_manifest(source_payload)
+            parsed_stage = StageManifest.from_dict(stage_payload)
+            parsed_index = ArtifactIndex.from_dict(index_payload)
+            _require_identity(
+                parsed_index,
+                paper_id=resolved.paper_id,
+                run_id=resolved.run_id,
+                source_hash=str(parsed_source.get("source_hash", "")),
+            )
+            _require_stage_index_match(parsed_stage, parsed_index)
+            _require_canonical_refs(
+                parsed_index,
+                stage_manifest=parsed_stage,
+                run_dir=resolved.run_dir,
+                source_pack_dir=resolved.source_pack_dir,
+            )
+            context = _StatusContext(
+                artifact_index=parsed_index,
+                artifact_index_payload=index_payload,
+                run_dir=resolved.run_dir,
+                boundary=resolved.source_pack_dir,
+                stage_manifest=parsed_stage,
+                stage_manifest_payload=stage_payload,
+                source_pack_payload=parsed_source,
+                source_pack_dir=resolved.source_pack_dir,
+                scope="canonical-source-pack",
+                reader=reader,
+            )
+            report = _join_status(context, evidence_paths=evidence_paths)
+            reader.revalidate_snapshot()
+            return report
+
+
+def _build_portable_canonical_status(
+    *,
+    root: Path,
+    paper_id: str | None,
+    item_key: str | None,
+    run_id: str,
+    evidence_paths: Sequence[str | Path],
+) -> dict[str, Any]:
+    root_snapshot = _portable_directory_snapshot(root, label="source-pack root")
+    resolved = resolve_run_artifacts(
+        source_pack_root=root,
+        run_id=run_id,
+        paper_id=paper_id,
+        item_key=item_key,
+    )
+    with metadata_read_guard(resolved.run_dir):
+        source_path = resolved.source_pack_dir / "manifest.json"
+        source_payload = _load_path_json(source_path, "source-pack manifest")
+        stage_payload = _load_path_json(resolved.stage_manifest_path, "stage manifest")
+        index_payload = _load_path_json(resolved.artifact_index_path, "artifact index")
         _validate_stage_manifest_payload(stage_payload)
         _validate_artifact_index_payload(index_payload)
         parsed_source = parse_source_pack_manifest(source_payload)
@@ -367,89 +425,35 @@ def _build_canonical_status(
             source_pack_payload=parsed_source,
             source_pack_dir=resolved.source_pack_dir,
             scope="canonical-source-pack",
-            reader=reader,
+            portable_snapshots={},
         )
         report = _join_status(context, evidence_paths=evidence_paths)
-        reader.revalidate_snapshot()
+        # Portable platforms cannot pin a multi-file root, so bind the returned
+        # snapshot to a second complete set of stable per-file reads.
+        if (
+            _digest_object(_load_path_json(source_path, "source-pack manifest"))
+            != _digest_object(source_payload)
+            or _digest_object(
+                _load_path_json(resolved.stage_manifest_path, "stage manifest")
+            )
+            != _digest_object(stage_payload)
+            or _digest_object(
+                _load_path_json(resolved.artifact_index_path, "artifact index")
+            )
+            != _digest_object(index_payload)
+        ):
+            raise MillefeuilleContractError(
+                "canonical status inputs changed during observation"
+            )
+        _revalidate_portable_artifacts(context)
+        if root_snapshot != _portable_directory_snapshot(
+            root,
+            label="source-pack root",
+        ):
+            raise MillefeuilleContractError(
+                "source-pack root changed during canonical observation"
+            )
         return report
-
-
-def _build_portable_canonical_status(
-    *,
-    root: Path,
-    paper_id: str | None,
-    item_key: str | None,
-    run_id: str,
-    evidence_paths: Sequence[str | Path],
-) -> dict[str, Any]:
-    root_snapshot = _portable_directory_snapshot(root, label="source-pack root")
-    resolved = resolve_run_artifacts(
-        source_pack_root=root,
-        run_id=run_id,
-        paper_id=paper_id,
-        item_key=item_key,
-    )
-    source_path = resolved.source_pack_dir / "manifest.json"
-    source_payload = _load_path_json(source_path, "source-pack manifest")
-    stage_payload = _load_path_json(resolved.stage_manifest_path, "stage manifest")
-    index_payload = _load_path_json(resolved.artifact_index_path, "artifact index")
-    _validate_stage_manifest_payload(stage_payload)
-    _validate_artifact_index_payload(index_payload)
-    parsed_source = parse_source_pack_manifest(source_payload)
-    parsed_stage = StageManifest.from_dict(stage_payload)
-    parsed_index = ArtifactIndex.from_dict(index_payload)
-    _require_identity(
-        parsed_index,
-        paper_id=resolved.paper_id,
-        run_id=resolved.run_id,
-        source_hash=str(parsed_source.get("source_hash", "")),
-    )
-    _require_stage_index_match(parsed_stage, parsed_index)
-    _require_canonical_refs(
-        parsed_index,
-        stage_manifest=parsed_stage,
-        run_dir=resolved.run_dir,
-        source_pack_dir=resolved.source_pack_dir,
-    )
-    context = _StatusContext(
-        artifact_index=parsed_index,
-        artifact_index_payload=index_payload,
-        run_dir=resolved.run_dir,
-        boundary=resolved.source_pack_dir,
-        stage_manifest=parsed_stage,
-        stage_manifest_payload=stage_payload,
-        source_pack_payload=parsed_source,
-        source_pack_dir=resolved.source_pack_dir,
-        scope="canonical-source-pack",
-        portable_snapshots={},
-    )
-    report = _join_status(context, evidence_paths=evidence_paths)
-    # Portable platforms cannot pin a multi-file root, so bind the returned
-    # snapshot to a second complete set of stable per-file reads.
-    if (
-        _digest_object(_load_path_json(source_path, "source-pack manifest"))
-        != _digest_object(source_payload)
-        or _digest_object(
-            _load_path_json(resolved.stage_manifest_path, "stage manifest")
-        )
-        != _digest_object(stage_payload)
-        or _digest_object(
-            _load_path_json(resolved.artifact_index_path, "artifact index")
-        )
-        != _digest_object(index_payload)
-    ):
-        raise MillefeuilleContractError(
-            "canonical status inputs changed during observation"
-        )
-    _revalidate_portable_artifacts(context)
-    if root_snapshot != _portable_directory_snapshot(
-        root,
-        label="source-pack root",
-    ):
-        raise MillefeuilleContractError(
-            "source-pack root changed during canonical observation"
-        )
-    return report
 
 
 def _build_progressive_index_status(
@@ -461,61 +465,62 @@ def _build_progressive_index_status(
 ) -> dict[str, Any]:
     target = _validated_operator_path(index_path, label="artifact index")
     run_dir = target.parent
-    stage_path = run_dir / "stage-manifest.json"
-    if hasattr(os, "O_NOFOLLOW"):
-        with RootArtifactReader(run_dir) as reader:
-            index_payload = _load_reader_json(reader, target, "artifact index")
-            stage_payload = _probe_reader_json(reader, stage_path, "stage manifest")
-            context = _progressive_status_context(
-                index_payload=index_payload,
-                stage_payload=stage_payload,
-                run_dir=run_dir,
-                paper_id=paper_id,
-                run_id=run_id,
-                reader=reader,
-            )
-            report = _join_status(context, evidence_paths=evidence_paths)
-            reader.revalidate_snapshot()
-            return report
+    with metadata_read_guard(run_dir):
+        stage_path = run_dir / "stage-manifest.json"
+        if secure_io._supports_no_follow():
+            with RootArtifactReader(run_dir) as reader:
+                index_payload = _load_reader_json(reader, target, "artifact index")
+                stage_payload = _probe_reader_json(reader, stage_path, "stage manifest")
+                context = _progressive_status_context(
+                    index_payload=index_payload,
+                    stage_payload=stage_payload,
+                    run_dir=run_dir,
+                    paper_id=paper_id,
+                    run_id=run_id,
+                    reader=reader,
+                )
+                report = _join_status(context, evidence_paths=evidence_paths)
+                reader.revalidate_snapshot()
+                return report
 
-    run_snapshot = _portable_directory_snapshot(
-        run_dir,
-        label="artifact index run directory",
-    )
-    index_payload = _load_path_json(target, "artifact index")
-    stage_payload = _probe_path_json(stage_path, "stage manifest")
-    context = _progressive_status_context(
-        index_payload=index_payload,
-        stage_payload=stage_payload,
-        run_dir=run_dir,
-        paper_id=paper_id,
-        run_id=run_id,
-        portable_snapshots={},
-    )
-    report = _join_status(context, evidence_paths=evidence_paths)
-    refreshed_stage = _probe_path_json(stage_path, "stage manifest")
-    if (
-        _digest_object(_load_path_json(target, "artifact index"))
-        != _digest_object(index_payload)
-        or (refreshed_stage is None) != (stage_payload is None)
-        or (
-            refreshed_stage is not None
-            and stage_payload is not None
-            and _digest_object(refreshed_stage) != _digest_object(stage_payload)
+        run_snapshot = _portable_directory_snapshot(
+            run_dir,
+            label="artifact index run directory",
         )
-    ):
-        raise MillefeuilleContractError(
-            "progressive status inputs changed during observation"
+        index_payload = _load_path_json(target, "artifact index")
+        stage_payload = _probe_path_json(stage_path, "stage manifest")
+        context = _progressive_status_context(
+            index_payload=index_payload,
+            stage_payload=stage_payload,
+            run_dir=run_dir,
+            paper_id=paper_id,
+            run_id=run_id,
+            portable_snapshots={},
         )
-    _revalidate_portable_artifacts(context)
-    if run_snapshot != _portable_directory_snapshot(
-        run_dir,
-        label="artifact index run directory",
-    ):
-        raise MillefeuilleContractError(
-            "artifact index run directory changed during observation"
-        )
-    return report
+        report = _join_status(context, evidence_paths=evidence_paths)
+        refreshed_stage = _probe_path_json(stage_path, "stage manifest")
+        if (
+            _digest_object(_load_path_json(target, "artifact index"))
+            != _digest_object(index_payload)
+            or (refreshed_stage is None) != (stage_payload is None)
+            or (
+                refreshed_stage is not None
+                and stage_payload is not None
+                and _digest_object(refreshed_stage) != _digest_object(stage_payload)
+            )
+        ):
+            raise MillefeuilleContractError(
+                "progressive status inputs changed during observation"
+            )
+        _revalidate_portable_artifacts(context)
+        if run_snapshot != _portable_directory_snapshot(
+            run_dir,
+            label="artifact index run directory",
+        ):
+            raise MillefeuilleContractError(
+                "artifact index run directory changed during observation"
+            )
+        return report
 
 
 def _progressive_status_context(

@@ -97,11 +97,20 @@ def _clone_fixture_package(source_pack_root: Path, paper_id: str) -> Path:
     destination = source_pack_root / "zotero" / paper_id
     shutil.copytree(source, destination)
     for path in destination.rglob("*.json"):
+        # Recovery evidence is copied byte-for-byte, never relabelled.
+        if ".millefeuille-metadata-history" in path.relative_to(destination).parts:
+            continue
         payload = json.loads(path.read_text(encoding="utf-8"))
         if payload.get("paper_id") == PAPER_ID:
             payload["paper_id"] = paper_id
             _write_json(path, payload)
     for index_path in destination.rglob("artifact-index.json"):
+        # Recovery evidence is copied byte-for-byte, never relabelled.
+        if (
+            ".millefeuille-metadata-history"
+            in index_path.relative_to(destination).parts
+        ):
+            continue
         payload = json.loads(index_path.read_text(encoding="utf-8"))
         payload["artifact_root"] = str(index_path.parent)
         payload["source_pack"]["ref"] = str(destination)

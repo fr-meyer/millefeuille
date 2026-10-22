@@ -1,0 +1,4 @@
+# Canonical LF bytes for metadata transaction sources across supported CI hosts.
+/millefeuille/domain/millefeuille.py text eol=lf
+/millefeuille/domain/secure_io.py text eol=lf
+/millefeuille/domain/metadata_transaction.py text eol=lf
