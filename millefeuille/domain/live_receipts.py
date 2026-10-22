@@ -400,12 +400,9 @@ class ApprovedLiveScope:
 
     def _validate_staging_cleanup_scope(self) -> None:
         uses_operation = STAGING_CLEANUP_MAINTENANCE_OPERATION in self.operations
-        uses_selector = (
-            self.selector.kind == STAGING_CLEANUP_MAINTENANCE_SELECTOR
-        )
+        uses_selector = self.selector.kind == STAGING_CLEANUP_MAINTENANCE_SELECTOR
         uses_disposal = (
-            self.disposal_policy.temporary_files
-            == STAGING_CLEANUP_MAINTENANCE_DISPOSAL
+            self.disposal_policy.temporary_files == STAGING_CLEANUP_MAINTENANCE_DISPOSAL
         )
         if not (uses_operation or uses_selector or uses_disposal):
             return

@@ -24,9 +24,7 @@ from millefeuille.domain.secure_io import load_json_object_no_follow
 SOURCE_PACK_ARTIFACT_ROOT = "source-pack"
 DEFAULT_SOURCE_PACK_ROOT = "/srv/openkb/source-packs"
 SOURCE_PACK_MANIFEST_SCHEMA_VERSION = "millefeuille-source-pack-manifest/v0.1"
-SOURCE_PACK_MULTI_MANIFEST_SCHEMA_VERSION = (
-    "millefeuille-source-pack-manifest/v0.2"
-)
+SOURCE_PACK_MULTI_MANIFEST_SCHEMA_VERSION = "millefeuille-source-pack-manifest/v0.2"
 RECOVERED_PDF_EVIDENCE_SCHEMA_VERSION = "millefeuille-recovered-pdf-evidence/v0.1"
 SOURCE_PACK_SOURCE_REF = "source.pdf"
 
@@ -805,7 +803,7 @@ def source_ref_for_attachment_key(attachment_key: str) -> str:
     """Return a deterministic, traversal-safe source ref for one attachment."""
     normalized_key = _required_string(attachment_key, "attachment_key")
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", normalized_key).strip("-._")
-    slug = (slug[:80].rstrip("-._") or "attachment")
+    slug = slug[:80].rstrip("-._") or "attachment"
     digest = hashlib.sha256(normalized_key.encode("utf-8")).hexdigest()[:12]
     return f"sources/{slug}-{digest}.pdf"
 

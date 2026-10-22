@@ -717,9 +717,7 @@ def _clone_package(root: Path, source_paper_id: str, target_paper_id: str) -> No
     index_payload = _read_json(index_path)
     index_payload["artifact_root"] = str(run_dir)
     index_payload["source_pack"]["ref"] = str(target_dir)
-    index_payload["source_pack"]["manifest_ref"] = str(
-        target_dir / "manifest.json"
-    )
+    index_payload["source_pack"]["manifest_ref"] = str(target_dir / "manifest.json")
     _write_json(index_path, index_payload)
 
 

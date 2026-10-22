@@ -162,7 +162,9 @@ class TestComponentModelBoundaries(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, "-c", script],
             cwd=Path(__file__).resolve().parents[1],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("component boundaries passed", result.stdout)

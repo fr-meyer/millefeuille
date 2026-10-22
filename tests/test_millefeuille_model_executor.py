@@ -37,9 +37,7 @@ class TestModelExecutorContract(unittest.TestCase):
             )
         )
         cls.result_schema = json.loads(
-            (SPEC_DIR / "model-executor-result.schema.json").read_text(
-                encoding="utf-8"
-            )
+            (SPEC_DIR / "model-executor-result.schema.json").read_text(encoding="utf-8")
         )
         Draft202012Validator.check_schema(cls.request_schema)
         Draft202012Validator.check_schema(cls.result_schema)
@@ -145,9 +143,7 @@ class TestModelExecutorContract(unittest.TestCase):
 
         over_limit = deepcopy(at_limit)
         over_limit["completed_at"] = "2026-08-27T12:03:00.000001Z"
-        over_limit["attempts"][0]["completed_at"] = (
-            "2026-08-27T12:03:00.000001Z"
-        )
+        over_limit["attempts"][0]["completed_at"] = "2026-08-27T12:03:00.000001Z"
         with self.assertRaisesRegex(
             MillefeuilleContractError, "exceeded timeout_seconds"
         ):
@@ -162,7 +158,7 @@ class TestModelExecutorContract(unittest.TestCase):
         self.assertEqual(request, validate_model_executor_request(request))
         self.request_validator.validate(request)
         serialized = json.dumps(request, sort_keys=True)
-        self.assertNotIn("locator\":\"p.1", serialized)
+        self.assertNotIn('locator":"p.1', serialized)
         self.assertNotIn("provider_payload", serialized)
         self.assertNotIn("credentials", serialized)
         self.assertTrue(str(request["input"]["sha256"]).startswith("sha256:"))
@@ -179,12 +175,8 @@ class TestModelExecutorContract(unittest.TestCase):
             model_executor_request_sha256(first),
             model_executor_request_sha256(replay),
         )
-        self.assertNotEqual(
-            first["idempotency_key"], changed_input["idempotency_key"]
-        )
-        self.assertNotEqual(
-            first["idempotency_key"], changed_model["idempotency_key"]
-        )
+        self.assertNotEqual(first["idempotency_key"], changed_input["idempotency_key"])
+        self.assertNotEqual(first["idempotency_key"], changed_model["idempotency_key"])
         stale_identity = deepcopy(first)
         stale_identity["requested_model"] = "xai/grok-4.6"
         with self.assertRaisesRegex(MillefeuilleContractError, "idempotency key drift"):

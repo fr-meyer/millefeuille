@@ -328,8 +328,11 @@ class MultiSourceMaterializationTests(unittest.TestCase):
                     bad_route = copy.deepcopy(route)
                     bad_structure = copy.deepcopy(structure)
                     if target == "route" and field in (
-                        "attachment_key", "source_ref", "attachment_locator",
-                        "text_sha256", "character_count",
+                        "attachment_key",
+                        "source_ref",
+                        "attachment_locator",
+                        "text_sha256",
+                        "character_count",
                     ):
                         bad_route["page_map"][1][field] = value
                     elif target == "route" and field == "swap_sources":

@@ -42,9 +42,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
             "rk_" + "live_" + "abcdefghijklmnopqrstuvwxyz",
             "hf" + "_" + "abcdefghijklmnopqrstuvwxyz123456",
             "xox" + "b-" + "abcdefghijklmnopqrstuvwxyz123456",
-            "eyJabcdefghijklmno"
-            + ".eyJpqrstuvwxyzAB"
-            + ".cdefghijklmnop",
+            "eyJabcdefghijklmno" + ".eyJpqrstuvwxyzAB" + ".cdefghijklmnop",
         )
 
     @classmethod
@@ -156,9 +154,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
 
     def test_plan_fails_closed_for_missing_auth_or_inconsistent_fallback(self):
         missing_auth = deepcopy(DEFAULT_MODEL_PROFILE_BUNDLE)
-        del missing_auth["profiles"]["research-default"]["summarize_page"][
-            "auth_lane"
-        ]
+        del missing_auth["profiles"]["research-default"]["summarize_page"]["auth_lane"]
         with self.assertRaisesRegex(MillefeuilleContractError, "auth_lane"):
             build_summary_execution_plan(
                 profile="research-default",
@@ -178,9 +174,9 @@ class ModelExecutionPlanTests(unittest.TestCase):
             )
 
         mismatched_lane = deepcopy(DEFAULT_MODEL_PROFILE_BUNDLE)
-        mismatched_lane["profiles"]["research-default"]["summarize_page"][
-            "backend"
-        ] = "fixture"
+        mismatched_lane["profiles"]["research-default"]["summarize_page"]["backend"] = (
+            "fixture"
+        )
         with self.assertRaisesRegex(MillefeuilleContractError, "fixture execution"):
             build_summary_execution_plan(
                 profile="research-default",
@@ -554,9 +550,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
 
     def test_model_evidence_and_record_schemas_match_lexical_semantic_contract(self):
         spec_dir = (
-            Path(__file__).resolve().parents[1]
-            / "specs"
-            / "millefeuille-pipeline"
+            Path(__file__).resolve().parents[1] / "specs" / "millefeuille-pipeline"
         )
         plan = build_summary_execution_plan(
             profile="research-default",
@@ -611,9 +605,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
                     "\u3000",
                 ):
                     padded_profile = deepcopy(valid_payload)
-                    padded_profile["profile"] = (
-                        boundary_whitespace + "research-default"
-                    )
+                    padded_profile["profile"] = boundary_whitespace + "research-default"
                     malformed_payloads.append(padded_profile)
                     padded_prompt_version = deepcopy(valid_payload)
                     padded_prompt_version["prompt_version"] = (
@@ -631,17 +623,13 @@ class ModelExecutionPlanTests(unittest.TestCase):
                     bare_namespace_payload["input_refs"][0] = bare_namespace
                     malformed_payloads.append(bare_namespace_payload)
                 for credential_token in self._ref_payload_tokens():
-                    credential_ref = (
-                        f"summaries/texts/{credential_token}.md"
-                    )
+                    credential_ref = f"summaries/texts/{credential_token}.md"
                     for ref_field in ("input_refs", "output_refs"):
                         credential_payload = deepcopy(valid_payload)
                         credential_payload[ref_field] = [credential_ref]
                         malformed_payloads.append(credential_payload)
                     credential_warning = deepcopy(valid_payload)
-                    credential_warning["quality_warnings"][0]["ref"] = (
-                        credential_ref
-                    )
+                    credential_warning["quality_warnings"][0]["ref"] = credential_ref
                     malformed_payloads.append(credential_warning)
                 for payload_marker in self._payload_markers():
                     payload_marker_provider = deepcopy(valid_payload)
@@ -707,9 +695,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
         byte_order_mark_record = deepcopy(record)
         byte_order_mark_record["prompt_version"] = "\ufeffsummary-v1\ufeff"
         self.assertEqual(
-            validate_model_provenance_record(byte_order_mark_record)[
-                "prompt_version"
-            ],
+            validate_model_provenance_record(byte_order_mark_record)["prompt_version"],
             "\ufeffsummary-v1\ufeff",
         )
 
@@ -720,9 +706,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
             "total_tokens": 9007199254740991,
         }
         self.assertEqual(
-            validate_model_provenance_record(maximum_record)["usage"][
-                "total_tokens"
-            ],
+            validate_model_provenance_record(maximum_record)["usage"]["total_tokens"],
             9007199254740991,
         )
 
@@ -817,9 +801,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
         cases.append(("false fixture claim", false_fixture_claim, "execution lane"))
 
         changed_provenance_contract = deepcopy(plan)
-        changed_provenance_contract["provenance_contract"][
-            "required_fields"
-        ].pop()
+        changed_provenance_contract["provenance_contract"]["required_fields"].pop()
         cases.append(
             (
                 "incomplete provenance contract",
@@ -1245,14 +1227,10 @@ class ModelExecutionPlanTests(unittest.TestCase):
     def test_model_provenance_schemas_validate_generated_records(self):
         root = Path(__file__).resolve().parents[1] / "specs" / "millefeuille-pipeline"
         evidence_schema = json.loads(
-            (root / "model-execution-evidence.schema.json").read_text(
-                encoding="utf-8"
-            )
+            (root / "model-execution-evidence.schema.json").read_text(encoding="utf-8")
         )
         record_schema = json.loads(
-            (root / "model-provenance-record.schema.json").read_text(
-                encoding="utf-8"
-            )
+            (root / "model-provenance-record.schema.json").read_text(encoding="utf-8")
         )
         Draft202012Validator.check_schema(evidence_schema)
         Draft202012Validator.check_schema(record_schema)
@@ -1274,5 +1252,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
         malformed["prompt"] = "forbidden"
         with self.assertRaises(ValidationError):
             Draft202012Validator(record_schema).validate(malformed)
+
+
 if __name__ == "__main__":
     unittest.main()

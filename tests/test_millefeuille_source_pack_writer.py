@@ -2382,9 +2382,9 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
 
             self.assertEqual(index_path.read_bytes(), canonical_bytes)
             self.assertEqual(
-                load_paper_card(run_dir / "cards" / "paper-card.json")[
-                    "index_state"
-                ]["phase"],
+                load_paper_card(run_dir / "cards" / "paper-card.json")["index_state"][
+                    "phase"
+                ],
                 "observed",
             )
 
@@ -2421,9 +2421,9 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
             )[0]
             self.assertEqual(result.status, "created")
             self.assertEqual(
-                load_paper_card(run_dir / "cards" / "paper-card.json")[
-                    "index_state"
-                ]["phase"],
+                load_paper_card(run_dir / "cards" / "paper-card.json")["index_state"][
+                    "phase"
+                ],
                 "observed",
             )
 
@@ -2456,9 +2456,9 @@ class TestSourcePackIntakeWriter(unittest.TestCase):
             )[0]
             self.assertEqual(result.status, "created")
             self.assertEqual(
-                load_paper_card(run_dir / "cards" / "paper-card.json")[
-                    "index_state"
-                ]["phase"],
+                load_paper_card(run_dir / "cards" / "paper-card.json")["index_state"][
+                    "phase"
+                ],
                 "observed",
             )
 

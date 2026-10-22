@@ -701,9 +701,7 @@ class TestApprovedLiveReceiptCliGate(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
             disposal_drift = self._live_receipt(root)
-            disposal_drift["scope"]["disposal_policy"]["pdfs"] = (
-                "retain-until-expiry"
-            )
+            disposal_drift["scope"]["disposal_policy"]["pdfs"] = "retain-until-expiry"
             _sign(disposal_drift)
             stop_drift = self._live_receipt(root)
             stop_drift["scope"]["stop_conditions"] = [

@@ -237,8 +237,11 @@ def run_stage_cli(
         elif args.command == "models":
             if args.route:
                 if (
-                    args.plan or args.provenance or args.plan_file
-                    or args.execution_evidence or args.output
+                    args.plan
+                    or args.provenance
+                    or args.plan_file
+                    or args.execution_evidence
+                    or args.output
                 ):
                     raise MillefeuilleContractError(
                         "models --route cannot be combined with other model "
@@ -263,8 +266,13 @@ def run_stage_cli(
                         "materializes local JSON evidence"
                     )
                 if (
-                    args.plan or args.profile or args.stage or args.model
-                    or args.thinking or args.fallback_model or args.retry_on
+                    args.plan
+                    or args.profile
+                    or args.stage
+                    or args.model
+                    or args.thinking
+                    or args.fallback_model
+                    or args.retry_on
                 ):
                     raise MillefeuilleContractError(
                         "models --provenance cannot be combined with plan "
@@ -281,9 +289,7 @@ def run_stage_cli(
                     output_path=args.output,
                 )
             elif args.plan:
-                if (
-                    args.model or args.thinking or args.fallback_model or args.retry_on
-                ):
+                if args.model or args.thinking or args.fallback_model or args.retry_on:
                     raise MillefeuilleContractError(
                         "model route controls require --route"
                     )

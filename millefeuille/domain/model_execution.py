@@ -156,9 +156,7 @@ def build_summary_execution_plan(
             + ", ".join(SUMMARY_MODEL_STAGES)
         )
 
-    selected_bundle = (
-        DEFAULT_MODEL_PROFILE_BUNDLE if bundle is None else bundle
-    )
+    selected_bundle = DEFAULT_MODEL_PROFILE_BUNDLE if bundle is None else bundle
     profiles = selected_bundle.get("profiles")
     if not isinstance(profiles, dict):
         raise MillefeuilleContractError(
@@ -185,9 +183,7 @@ def build_summary_execution_plan(
         "fallback_policy",
     )
     if fallback_policy not in {"none", "explicit"}:
-        raise MillefeuilleContractError(
-            "fallback_policy must be 'none' or 'explicit'"
-        )
+        raise MillefeuilleContractError("fallback_policy must be 'none' or 'explicit'")
     fallback_model = stage_config.get("fallback_model")
     if fallback_policy == "none" and fallback_model is not None:
         raise MillefeuilleContractError(
@@ -203,10 +199,14 @@ def build_summary_execution_plan(
         if name in stage_config
     }
     fixture_only = provider == "none"
-    blockers = [] if fixture_only else [
-        "provider call requires a separately approved live execution path",
-        "approved-live model execution is not implemented by this command",
-    ]
+    blockers = (
+        []
+        if fixture_only
+        else [
+            "provider call requires a separately approved live execution path",
+            "approved-live model execution is not implemented by this command",
+        ]
+    )
 
     return {
         "schema_version": MODEL_EXECUTION_PLAN_SCHEMA_VERSION,
@@ -580,9 +580,7 @@ def _validate_plan_shape(execution_plan: dict[str, Any]) -> None:
     elif fallback_policy == "explicit":
         _required_string(fallback_model, "fallback.model")
     else:
-        raise MillefeuilleContractError(
-            "fallback policy must be 'none' or 'explicit'"
-        )
+        raise MillefeuilleContractError("fallback policy must be 'none' or 'explicit'")
 
     execution = _require_object(execution_plan.get("execution"), "execution")
     _require_exact_fields(execution, _EXECUTION_FIELDS, "execution")
@@ -643,9 +641,7 @@ def _validate_plan_shape(execution_plan: dict[str, Any]) -> None:
         raise MillefeuilleContractError(
             "provenance_contract.schema_version is unsupported"
         )
-    if provenance_contract.get("required_fields") != list(
-        _PROVENANCE_REQUIRED_FIELDS
-    ):
+    if provenance_contract.get("required_fields") != list(_PROVENANCE_REQUIRED_FIELDS):
         raise MillefeuilleContractError(
             "provenance_contract.required_fields does not match the strict contract"
         )

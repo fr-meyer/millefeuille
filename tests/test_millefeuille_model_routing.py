@@ -112,8 +112,9 @@ class TestSummaryModelRouting(unittest.TestCase):
             },
         )
         for options in invalid:
-            with self.subTest(options=options), self.assertRaises(
-                MillefeuilleContractError
+            with (
+                self.subTest(options=options),
+                self.assertRaises(MillefeuilleContractError),
             ):
                 resolve_summary_model_route(**base, **options)
         with self.assertRaisesRegex(MillefeuilleContractError, "fixture-only"):
@@ -124,10 +125,19 @@ class TestSummaryModelRouting(unittest.TestCase):
     def test_cli_route_is_no_call_and_rejects_mixed_actions(self):
         out, err = StringIO(), StringIO()
         args = [
-            "models", "--route", "--profile", "research-default",
-            "--stage", "summarize_page", "--model", "xai/grok-4.6",
-            "--fallback-model", "openai/gpt-5.6-sol",
-            "--retry-on", "timeout", "--json",
+            "models",
+            "--route",
+            "--profile",
+            "research-default",
+            "--stage",
+            "summarize_page",
+            "--model",
+            "xai/grok-4.6",
+            "--fallback-model",
+            "openai/gpt-5.6-sol",
+            "--retry-on",
+            "timeout",
+            "--json",
         ]
         self.assertEqual(run_stage_cli(args, stdout=out, stderr=err), 0)
         payload = json.loads(out.getvalue())
@@ -136,9 +146,7 @@ class TestSummaryModelRouting(unittest.TestCase):
         self.assertFalse(payload["provider_call_performed"])
 
         out, err = StringIO(), StringIO()
-        self.assertEqual(
-            run_stage_cli(args + ["--plan"], stdout=out, stderr=err), 2
-        )
+        self.assertEqual(run_stage_cli(args + ["--plan"], stdout=out, stderr=err), 2)
         self.assertIn("cannot be combined", err.getvalue())
 
 

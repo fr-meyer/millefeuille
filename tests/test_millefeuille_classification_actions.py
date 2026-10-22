@@ -31,9 +31,7 @@ from tests.test_millefeuille_stage_cli import (
     _write_handoff_jsonl,
 )
 
-PRIOR_DECISION_REF = (
-    f"classification/decision-records/{PAPER_ID}.json"
-)
+PRIOR_DECISION_REF = f"classification/decision-records/{PAPER_ID}.json"
 PRIMARY_PATH = "Methods > Normalization & training dynamics"
 CORRECTED_PATH = "Methods > Optimization & training dynamics"
 
@@ -162,9 +160,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
     def test_review_no_change_is_idempotent_and_updates_current_refs(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, run_dir = _prepare_classified_run(tempdir)
-            action_path = _write_action_evidence(
-                Path(tempdir) / "review.json"
-            )
+            action_path = _write_action_evidence(Path(tempdir) / "review.json")
             stdout = StringIO()
 
             first_exit = run_stage_cli(
@@ -230,9 +226,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             action_dir = (
-                run_dir
-                / CLASSIFICATION_ACTION_ROOT_REF
-                / "review-correction-001"
+                run_dir / CLASSIFICATION_ACTION_ROOT_REF / "review-correction-001"
             )
             final_decision = json.loads(
                 (action_dir / CLASSIFICATION_ACTION_FINAL_DECISION_REF).read_text(
@@ -272,9 +266,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
 
             self.assertEqual(exit_code, 2)
             action_dir = (
-                run_dir
-                / CLASSIFICATION_ACTION_ROOT_REF
-                / "review-escalation-001"
+                run_dir / CLASSIFICATION_ACTION_ROOT_REF / "review-escalation-001"
             )
             queue = load_jsonl_records(
                 action_dir / CLASSIFICATION_ACTION_ADJUDICATION_QUEUE_REF,
@@ -283,9 +275,9 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
             self.assertEqual(len(queue), 1)
             self.assertEqual(queue[0]["status"], "adjudication-required")
             preview = json.loads(
-                (
-                    run_dir / "classification/zotero-writeback-preview.json"
-                ).read_text(encoding="utf-8")
+                (run_dir / "classification/zotero-writeback-preview.json").read_text(
+                    encoding="utf-8"
+                )
             )
             self.assertEqual(
                 preview["add_tags"],
@@ -293,8 +285,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
             )
             stage_manifest = load_stage_manifest(run_dir / "stage-manifest.json")
             stage_map = {
-                stage.name.value: stage.status.value
-                for stage in stage_manifest.stages
+                stage.name.value: stage.status.value for stage in stage_manifest.stages
             }
             self.assertEqual(stage_map["classify"], "needs-review")
 
@@ -315,9 +306,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
             )
 
             self.assertEqual(exit_code, 0)
-            action_dir = (
-                run_dir / CLASSIFICATION_ACTION_ROOT_REF / "adjudication-001"
-            )
+            action_dir = run_dir / CLASSIFICATION_ACTION_ROOT_REF / "adjudication-001"
             final_decision = json.loads(
                 (action_dir / CLASSIFICATION_ACTION_FINAL_DECISION_REF).read_text(
                     encoding="utf-8"
@@ -339,9 +328,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
                 _action_args(root, review_path),
                 stdout=StringIO(),
             )
-            review_dir = (
-                run_dir / CLASSIFICATION_ACTION_ROOT_REF / "review-chain"
-            )
+            review_dir = run_dir / CLASSIFICATION_ACTION_ROOT_REF / "review-chain"
             review_snapshot = {
                 path.relative_to(review_dir).as_posix(): path.read_bytes()
                 for path in review_dir.rglob("*")
@@ -358,8 +345,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
                 )
             )
             scoped_preview_ref = (
-                "classification/actions/review-chain/"
-                "zotero-writeback-preview.json"
+                "classification/actions/review-chain/zotero-writeback-preview.json"
             )
 
             adjudication_path = _write_action_evidence(
@@ -426,9 +412,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
 
             self.assertEqual(exit_code, 2)
             action_dir = (
-                run_dir
-                / CLASSIFICATION_ACTION_ROOT_REF
-                / "adjudication-taxonomy-001"
+                run_dir / CLASSIFICATION_ACTION_ROOT_REF / "adjudication-taxonomy-001"
             )
             requests = load_jsonl_records(
                 action_dir / CLASSIFICATION_ACTION_TAXONOMY_REQUESTS_REF,
@@ -460,9 +444,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
             self.assertIn("adjudication requires", stderr.getvalue())
             self.assertFalse(
                 (
-                    run_dir
-                    / CLASSIFICATION_ACTION_ROOT_REF
-                    / "invalid-adjudication"
+                    run_dir / CLASSIFICATION_ACTION_ROOT_REF / "invalid-adjudication"
                 ).exists()
             )
 
@@ -486,9 +468,9 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
             nested_traversal_payload = json.loads(
                 nested_traversal_path.read_text(encoding="utf-8")
             )
-            nested_traversal_payload["rejected_alternatives"][0][
-                "evidence_refs"
-            ] = ["../outside.json"]
+            nested_traversal_payload["rejected_alternatives"][0]["evidence_refs"] = [
+                "../outside.json"
+            ]
             _write_json(nested_traversal_path, nested_traversal_payload)
 
             traversal_exit = run_stage_cli(
@@ -507,9 +489,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
             self.assertEqual(traversal_exit, 2)
             self.assertEqual(drift_exit, 2)
             self.assertEqual(nested_traversal_exit, 2)
-            self.assertFalse(
-                (run_dir / CLASSIFICATION_ACTION_ROOT_REF).exists()
-            )
+            self.assertFalse((run_dir / CLASSIFICATION_ACTION_ROOT_REF).exists())
 
     def test_unknown_fields_and_invalid_types_fail_before_writes(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -518,9 +498,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
                 Path(tempdir) / "unknown-field.json",
                 action_id="unknown-field",
             )
-            unknown_payload = json.loads(
-                unknown_path.read_text(encoding="utf-8")
-            )
+            unknown_payload = json.loads(unknown_path.read_text(encoding="utf-8"))
             unknown_payload["unexpected"] = True
             _write_json(unknown_path, unknown_payload)
             invalid_type_path = _write_action_evidence(
@@ -567,9 +545,7 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
                 "must be a non-empty string",
                 nested_invalid_stderr.getvalue(),
             )
-            self.assertFalse(
-                (run_dir / CLASSIFICATION_ACTION_ROOT_REF).exists()
-            )
+            self.assertFalse((run_dir / CLASSIFICATION_ACTION_ROOT_REF).exists())
 
     def test_existing_action_id_rejects_drift_without_overwrite(self):
         with tempfile.TemporaryDirectory() as tempdir:

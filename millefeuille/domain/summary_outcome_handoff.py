@@ -48,9 +48,7 @@ def encode_gpt_summary_outcome_handoff(outcome: TrustedGptSummaryOutcome) -> byt
         raise MillefeuilleContractError("GPT summary handoff outcome is invalid")
     executions: list[dict[str, Any]] = []
     accepted_units = []
-    for unit, execution in zip(
-        outcome.batch.units, outcome.executions, strict=True
-    ):
+    for unit, execution in zip(outcome.batch.units, outcome.executions, strict=True):
         if (
             not isinstance(execution, OpenClawModelExecution)
             or not isinstance(execution.result, dict)
@@ -211,9 +209,7 @@ def _require_bounded_json_shape(value: Any) -> None:
         if nodes > _MAX_JSON_NODES or depth > _MAX_JSON_DEPTH:
             raise MillefeuilleContractError("GPT summary handoff JSON is too complex")
         if isinstance(item, (dict, list)):
-            if isinstance(item, dict) and any(
-                not isinstance(key, str) for key in item
-            ):
+            if isinstance(item, dict) and any(not isinstance(key, str) for key in item):
                 raise MillefeuilleContractError(
                     "GPT summary handoff JSON key is invalid"
                 )
