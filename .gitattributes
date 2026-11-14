@@ -1,0 +1,15 @@
+# Exact raw-byte source bindings must match frozen Git blobs on every runner.
+# Narrow to the thirteen F05/S04 evidence source paths; do not normalize receipts.
+/millefeuille/domain/card_index_contract.py text eol=lf
+/millefeuille/domain/index_fixtures.py text eol=lf
+/millefeuille/domain/native_decode_boundary.py text eol=lf
+/millefeuille/domain/scientific_fidelity.py text eol=lf
+/scripts/validate_evidence_archive.py text eol=lf
+/tests/fixtures/evidence_transport.py text eol=lf
+/tests/fixtures/f05_receipts.py text eol=lf
+/tests/fixtures/remaining_source_fixture.py text eol=lf
+/tests/test_evidence_transport.py text eol=lf
+/tests/test_f05_receipts.py text eol=lf
+/tests/test_index_refresh_crash_recovery.py text eol=lf
+/tests/test_millefeuille_source_pack_writer.py text eol=lf
+/tests/test_scientific_fidelity.py text eol=lf

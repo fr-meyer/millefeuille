@@ -72,3 +72,60 @@ relative to the supplied fixture root, never an absolute root or file contents.
 No original crash worker/assertion, production rule, count, source/protected
 binding, byte bound or archive acceptance condition is weakened. This change is
 source-only until freshly authorized runtime validation has actually passed.
+
+
+## Checkout bytes and retained validation failure
+
+The thirteen exact F05/S04 source-binding paths now declare text eol=lf in
+.gitattributes, so future checkouts retain the Git-blob bytes even on Windows.
+This is an artifact-side checkout rule, not receipt normalization: raw-byte
+source equality remains mandatory. It cannot retroactively accept a historical
+CRLF receipt, change its frozen manifest or upgrade a refused archive.
+
+Run 43575513843 passed all six CI jobs but the strict archive was refused.
+The index-publication crash boundary legitimately precedes card exchange; the
+original recovery retry later retains the original card inside that same
+transaction. The original test checks all earlier retained entries unchanged,
+while accept() additionally requires identical whole transaction file sets
+after death and retry. These differ: retry adds card-exchange.json on Linux
+and displaced-card.json on Windows. The checkout repair alone did not authorize changing that cross-stage equality
+requirement. The separately approved prospective amendment below changes it;
+no production change, snapshot omission or historical acceptance follows.
+
+## Owner-approved prospective custody amendment, 2026-11-14 18:32 KST
+
+The owner explicitly approved changing cross-stage transaction-set equality,
+not a transparent or nonweakening repair. Local source/static review only is
+authorized. The historical run 43575513843 archive remains REJECTED, including
+its Windows raw CRLF source mismatch (six jobs passed, 7224 tests, 5847 passed,
+1377 skipped, zero failures/errors). No qualification or programme acceptance.
+
+Only externally bound Linux/Windows and the two original method/seam pairs are
+accepted. Before has zero transaction files/directories. Death/retry have exactly
+one transaction directory. Relative to it, index publication death contains only
+index-status.json; retry contains that unchanged entry plus exactly the original
+card as card-exchange.json (Linux) or displaced-card.json (Windows). Card-exchange
+death and retry both contain precisely index-status.json and that OS-specific
+original-card filename. custody.transaction_files remains the exact death set.
+No schema allowance, arbitrary additions, removals, sibling transactions, nested
+files or extra directories are admitted. Complete stage file sets equal initial
+files plus the canonical index, exact run/.card-index.lock and exact stage
+transaction set; directory sets preserve initial directories and add only missing
+canonical-index parent and transaction ancestors. The initial run has neither
+the lock nor canonical index directory. The lock is an existing producer-run
+artifact, not a transaction entry. Its canonical one-NUL byte (AA==), size 1,
+SHA256 and valid identity are captured, with the full death FileImage unchanged
+at retry and identity distinct from canonical card/index and every retained
+transaction image. No other lock path or extra directory is admitted.
+
+Every old FileImage remains unchanged. The retained original equals the before
+canonical card's full bytes_b64/hash/size/device-inode FileImage. At the index
+seam the death canonical card also equals that full original. Every retained
+transaction image is identity-distinct from current canonical card and index at
+its stage, and retained index bytes equal canonical index bytes. All existing
+raw nine-source, runtime, method, worker, exit71/position, protected initial
+inventory, readback, journal, count, net-effect, entry/file/aggregate/receipt/frame
+and archive bounds remain mandatory. Original production/crash semantics and
+assertions are untouched. New synthetic test source is not executed CI evidence.
+No runtime/helper tests, imports, CI, publication, provider/network operation or
+retroactive acceptance is authorized here. R6/S07/scientific/release holds remain.

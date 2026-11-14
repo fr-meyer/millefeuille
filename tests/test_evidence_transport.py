@@ -1,7 +1,7 @@
 """Synthetic stdlib helper tests, not runtime qualification or archive evidence."""
 
 import copy
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -161,6 +161,43 @@ class TestEvidenceTransport(unittest.TestCase):
                     else:
                         with self.assertRaises(ValueError):
                             validate_archive(path, manifest)
+
+    def test_archive_complete_semantic_stage_inventory(self):
+        from tests.fixtures.f05_receipts import METHOD_SEAMS
+        from tests.test_f05_receipts import TestF05Receipts
+
+        # Pure in-memory synthetic builder, explicit fake bindings, not CI proof.
+        builder = TestF05Receipts()
+        manifest = self._manifest()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "logs.zip"
+            with zipfile.ZipFile(path, "w") as archive:
+                for cell in manifest["cells"]:
+                    frames = []
+                    for method in cell["methods"]:
+                        receipt = builder._accepted_receipt(
+                            cell["runtime"]["RUNNER_OS"], METHOD_SEAMS[method]
+                        )
+                        run = PurePosixPath(
+                            receipt["paths"]["card"]
+                        ).parent.parent.as_posix()
+                        self.assertNotIn(
+                            run + "/.card-index.lock", receipt["before"]["files"]
+                        )
+                        self.assertNotIn(
+                            run + "/index", receipt["before"]["directories"]
+                        )
+                        self.assertEqual(len(receipt["after_retry"]["files"]), 36)
+                        self.assertEqual(len(receipt["after_retry"]["directories"]), 19)
+                        receipt["runtime"] = cell["runtime"]
+                        receipt["source_sha256"] = manifest["source_sha256"]
+                        receipt["fault"]["worker_sha256"] = manifest["worker_sha256"]
+                        frames += frame_receipt("F05", receipt)
+                    archive.writestr(
+                        cell["job"] + "/4_Run unit tests.txt", "\n".join(frames)
+                    )
+            result = validate_archive(path, manifest)
+            self.assertEqual(len(result["receipts"]), 12)
 
     def test_captured_merged_progress_between_two_frames(self):
         # Synthetic payload; envelope mirrors run 43564003732 Ubuntu 3.11.

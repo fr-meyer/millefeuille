@@ -304,6 +304,8 @@ def accept(
         or receipt["fault"]["position"] != "original seam returned, then os._exit(71)"
     ):
         raise ValueError("worker context")
+    if runtime["RUNNER_OS"] not in {"Linux", "Windows"}:
+        raise ValueError("unsupported custody OS")
     validate(receipt)
     paths = receipt["paths"]
     before, death, retry = (
@@ -333,14 +335,92 @@ def accept(
     }
     if not protected or receipt["protected_sha256"] != protected:
         raise ValueError("protected inventory coverage")
-    txn = paths["transaction"] + "/"
-    captured = sorted(p for p in death if p.startswith(txn))
-    if not captured or receipt["custody"]["transaction_files"] != captured:
+    # Explicit prospective amendment, not a subset/superset allowance.
+    transaction = paths["transaction"]
+    parent = PurePosixPath(transaction).parent.as_posix()
+    lock = run + "/.card-index.lock"
+    run_parts = PurePosixPath(run).parts
+    if (
+        len(run_parts) != 6
+        or run_parts[:2] != ("source-packs", "zotero")
+        or run_parts[3:] != ("analyses", "millefeuille", "run-fixture")
+        or paths["card"] != run + "/cards/paper-card.json"
+        or paths["index"] != run + "/index/index-status.json"
+        or parent != run + "/recovery/card-index"
+        or run not in receipt["before"]["directories"]
+        or lock in before
+        or run + "/index" in receipt["before"]["directories"]
+    ):
+        raise ValueError("producer run/index/lock context")
+    lock_image = death.get(lock)
+    if (
+        lock_image is None
+        or lock_image["bytes_b64"] != "AA=="
+        or lock_image["size"] != 1
+        or lock_image["sha256"] != hashlib.sha256(b"\0").hexdigest()
+        or retry.get(lock) != lock_image
+    ):
+        raise ValueError("persistent producer lock custody")
+    recovery = transaction + "/index-status.json"
+    original = (
+        transaction
+        + "/"
+        + (
+            "card-exchange.json"
+            if runtime["RUNNER_OS"] == "Linux"
+            else "displaced-card.json"
+        )
+    )
+    if paths["recovery_index"] != recovery:
+        raise ValueError("exact recovery filename")
+    ensure = METHOD_SEAMS[method] == "_ensure_expected_index"
+    expected_death = {recovery} if ensure else {recovery, original}
+    expected_retry = {recovery, original}
+    captured = sorted(expected_death)
+    if receipt["custody"]["transaction_files"] != captured:
         raise ValueError("transaction inventory coverage")
-    if paths["transaction"] not in receipt["after_death"]["directories"]:
-        raise ValueError("transaction directory missing")
-    if sorted(p for p in retry if p.startswith(txn)) != captured:
-        raise ValueError("retry transaction inventory")
+    ancestors = set()
+    for required in (transaction, PurePosixPath(paths["index"]).parent.as_posix()):
+        cursor = PurePosixPath(required)
+        while cursor.as_posix() != ".":
+            ancestors.add(cursor.as_posix())
+            cursor = cursor.parent
+    initial_dirs = set(receipt["before"]["directories"])
+    if any(p == parent or p.startswith(parent + "/") for p in before):
+        raise ValueError("initial transaction files")
+    if any(p.startswith(parent + "/") for p in initial_dirs):
+        raise ValueError("initial transaction directories")
+    for stage, images, expected, count in (
+        ("before", before, set(), 0),
+        ("after_death", death, expected_death, 1),
+        ("after_retry", retry, expected_retry, 1),
+    ):
+        expected_files = set(before) | expected
+        if stage != "before":
+            expected_files.update((paths["index"], lock))
+        if set(images) != expected_files:
+            raise ValueError("exact stage file inventory")
+        expected_dirs = initial_dirs if stage == "before" else initial_dirs | ancestors
+        if set(receipt[stage]["directories"]) != expected_dirs:
+            raise ValueError("exact stage directory inventory")
+        if receipt["custody"]["transaction_counts"][stage] != count:
+            raise ValueError("exact transaction count")
+        if stage == "before":
+            continue
+        for retained in expected | {lock}:
+            for canonical in (paths["card"], paths["index"]):
+                if images[retained]["identity"] == images[canonical]["identity"]:
+                    raise ValueError("retained image aliases canonical")
+        if any(images[lock]["identity"] == images[p]["identity"] for p in expected):
+            raise ValueError("producer lock aliases retained image")
+        if images[recovery]["bytes_b64"] != images[paths["index"]]["bytes_b64"]:
+            raise ValueError("retained index bytes differ")
+    if ensure and death[paths["card"]] != before[paths["card"]]:
+        raise ValueError("original death card FileImage changed")
+    if retry[original] != before[paths["card"]]:
+        raise ValueError("original retry card FileImage changed")
+    if not ensure and death[original] != before[paths["card"]]:
+        raise ValueError("original death retained FileImage changed")
     journal = receipt["custody"]["journal"]
     if journal != {
         "kind": "transaction file inventory, not a write journal",

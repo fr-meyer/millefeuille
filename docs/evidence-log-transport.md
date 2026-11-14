@@ -60,3 +60,20 @@ responsible for all S04 scientific semantics. No S04 production modules imported
 The trust boundary is the externally prepared manifest and authenticated archived
 run association. Self-reported identity alone is never sufficient. Archive output
 status explicitly distinguishes F05 custody acceptance from pending S04 semantics.
+
+
+F05 prospective custody amendment (owner 2026-11-14 18:32 KST): acceptance now
+requires exact complete per-stage OS/seam-bound transaction inventories, not
+whole-set death/retry equality. Only index-publication retry adds the sole
+original card (Linux card-exchange.json, Windows displaced-card.json), fully
+bound to the original FileImage; all old images remain unchanged and retained
+images cannot alias current canonical card/index. See f05-recovery-evidence.md
+for exact sets, counts and anti-alias requirements. No transport/CLI/schema or
+raw source normalization change. Historical 43575513843 remains REJECTED; local
+static source validation grants no runtime, CI, scientific or release acceptance.
+
+Complete F05 stage sets also include the exact persistent run/.card-index.lock
+producer artifact (absent before, one NUL byte after death, full FileImage retained
+at retry, anti-alias checked) and missing canonical index parent ancestors. The
+lock is not a transaction entry. Initial producer directories are retained; no
+arbitrary lock, directory or sibling allowance is introduced.
