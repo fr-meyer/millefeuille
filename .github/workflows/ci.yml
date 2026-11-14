@@ -47,14 +47,25 @@ jobs:
           script = pathlib.Path('tooling/scripts/p09/stage.py').resolve()
           root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'p09-qualified'
           subprocess.run([sys.executable,'-B',str(script),'--source',str(pathlib.Path('product').resolve()),'--root',str(root)], check=True, timeout=960)
-      - name: Retain only sanitized validated evidence
+      - name: Retain only sanitized validated evidence in job log
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: p09-${{ matrix.os }}-${{ matrix.python }}
-          path: |
-            ${{ runner.temp }}/p09-qualified/SUMMARY.json
-            ${{ runner.temp }}/p09-qualified/COMMANDS.json
-            ${{ runner.temp }}/p09-qualified/OUTCOME.json
-          if-no-files-found: error
-          retention-days: 14
+        shell: python
+        run: |
+          import base64, hashlib, json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'p09-qualified'
+          for name in ('SUMMARY.json', 'COMMANDS.json', 'OUTCOME.json'):
+              path = root / name
+              if not path.is_file():
+                  print('P09_EVIDENCE_MISSING', name)
+                  continue
+              with path.open('rb') as stream:
+                  raw = stream.read(1048577)
+              if len(raw) > 1048576:
+                  raise SystemExit('P09 evidence log cap exceeded')
+              json.loads(raw)
+              digest = hashlib.sha256(raw).hexdigest()
+              encoded = base64.b64encode(raw).decode('ascii')
+              print('P09_EVIDENCE_BEGIN', name, len(raw), digest)
+              for start in range(0, len(encoded), 16384):
+                  print('P09_EVIDENCE_CHUNK', name, start // 16384, encoded[start:start + 16384])
+              print('P09_EVIDENCE_END', name, digest)
