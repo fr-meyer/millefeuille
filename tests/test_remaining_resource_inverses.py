@@ -27,7 +27,7 @@ class RemainingResourceInverses(unittest.TestCase):
     def test_sticky_first_large_refusal_blocks_smaller_real_read(self):
         budget = ReadBudget(max_read_bytes=2)
         reader = ScopedReadOnlyReader(
-            root="/synthetic",
+            root=str(Path(tempfile.gettempdir()) / "synthetic"),
             files={"x": {"identity": (0, 0, 0, 0, 0, 1)}},
             ancestors={},
         )
