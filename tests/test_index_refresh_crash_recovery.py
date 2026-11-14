@@ -19,6 +19,8 @@ from millefeuille.domain.index_fixtures import (
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.route_fixtures import ROUTE_MARKDOWN_REF
 from millefeuille.domain.summary_fixtures import SUMMARY_ARTIFACT_REF
+from tests.fixtures.evidence_transport import runtime_identity
+from tests.fixtures.f05_receipts import effects, emit, snapshot, source_binding
 from tests.test_millefeuille_source_pack_writer import _prepare_card_index_fixture
 
 CRASH_WORKER = """
@@ -63,6 +65,7 @@ class TestIndexRefreshCrashRecovery(unittest.TestCase):
                 for path in root.rglob("*")
                 if path.is_file() and not path.is_relative_to(run_dir)
             }
+            before = snapshot(root)
             process = subprocess.run(
                 [sys.executable, "-B", "-c", CRASH_WORKER],
                 input=json.dumps(
@@ -80,6 +83,7 @@ class TestIndexRefreshCrashRecovery(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(process.returncode, 71, process.stderr)
+            after_death = snapshot(root)
             index_path = run_dir / "index/index-status.json"
             index_bytes = index_path.read_bytes()
             index = json.loads(index_bytes)
@@ -108,6 +112,7 @@ class TestIndexRefreshCrashRecovery(unittest.TestCase):
             }
             if observed:
                 load_and_validate_canonical_card_index(**readback)
+                initial_readback = "accepted"
                 displaced_name = (
                     "displaced-card.json" if os.name == "nt" else "card-exchange.json"
                 )
@@ -118,6 +123,7 @@ class TestIndexRefreshCrashRecovery(unittest.TestCase):
                 self.assertEqual(card_path.read_bytes(), original_card)
                 with self.assertRaises(MillefeuilleContractError):
                     load_and_validate_canonical_card_index(**readback)
+                initial_readback = "refused:MillefeuilleContractError"
             # No patched seams or recovery helper in the surviving process.
             results = write_indexes_from_evidence(
                 evidence_path=evidence,
@@ -135,3 +141,74 @@ class TestIndexRefreshCrashRecovery(unittest.TestCase):
                 self.assertEqual(
                     hashlib.sha256(path.read_bytes()).hexdigest(), expected
                 )
+            after_retry = snapshot(root)
+            transaction_ref = transaction.relative_to(root).as_posix()
+            transaction_parent = transaction.parent.relative_to(root).as_posix()
+            emit(
+                {
+                    "schema": "millefeuille-f05-receipt/v1",
+                    "test": self.id(),
+                    "source_sha256": source_binding(
+                        Path(__file__).resolve().parents[1]
+                    ),
+                    "runtime": runtime_identity(),
+                    "fault": {
+                        "seam": seam,
+                        "returncode": process.returncode,
+                        "worker_sha256": hashlib.sha256(
+                            CRASH_WORKER.encode()
+                        ).hexdigest(),
+                        "position": "original seam returned, then os._exit(71)",
+                    },
+                    "before": before,
+                    "after_death": after_death,
+                    "after_retry": after_retry,
+                    "paths": {
+                        "card": card_path.relative_to(root).as_posix(),
+                        "index": index_path.relative_to(root).as_posix(),
+                        "recovery_index": recovery_index.relative_to(root).as_posix(),
+                        "transaction": transaction_ref,
+                    },
+                    "protected_sha256": {
+                        path.relative_to(root).as_posix(): digest
+                        for path, digest in protected.items()
+                    },
+                    "custody": {
+                        "transaction_files": sorted(
+                            path.relative_to(root).as_posix() for path in retained
+                        ),
+                        "journal": {
+                            "kind": "transaction file inventory, not a write journal",
+                            "journal_named_paths": sorted(
+                                p
+                                for p in after_death["files"]
+                                if p.startswith(transaction_ref + "/")
+                                and "journal" in Path(p).name.lower()
+                            ),
+                        },
+                        "transaction_counts": {
+                            stage: sum(
+                                p.startswith(transaction_parent + "/")
+                                and p.count("/") == transaction_ref.count("/")
+                                for p in snap["directories"]
+                            )
+                            for stage, snap in (
+                                ("before", before),
+                                ("after_death", after_death),
+                                ("after_retry", after_retry),
+                            )
+                        },
+                    },
+                    "readback": {
+                        "after_death": initial_readback,
+                        "after_retry": card.payload["index_state"]["phase"],
+                    },
+                    "retry_statuses": [result.status for result in results],
+                    "net_effects": {
+                        "death": effects(before, after_death),
+                        "retry": effects(after_death, after_retry),
+                    },
+                    "limits": "net snapshots, not syscall counts or power-loss "
+                    "durability, arbitrary crash windows or guard qualification",
+                }
+            )

@@ -38,11 +38,19 @@ try:
     resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
     resource.setrlimit(resource.RLIMIT_AS, (268435456, 268435456))
     import PyPDF2
+    from PyPDF2.generic import ContentStream, NumberObject, FloatObject
+    import math
     import zlib
     import encodings.utf_8
     import encodings.utf_16_be
     import encodings.latin_1
     import encodings.charmap
+
+    def _scientific_number(value):
+        number = float(value)
+        if not math.isfinite(number) or abs(number) > 1e12:
+            raise ValueError("scientific-number-out-of-bounds")
+        return number
 
     hashlib.sha256(b"warmup").digest()
     json.dumps({"warmup": True}).encode("utf-8")
@@ -166,7 +174,7 @@ try:
     raw = source[:]
     if hashlib.sha256(raw).hexdigest() != expected:
         raise ValueError("source-hash-drift")
-    if mode != "decode":
+    if mode not in ("decode", "scientific"):
         denied = []
         for nr, args in (
             (0, (0, 0, 0)),
@@ -242,6 +250,50 @@ try:
                     "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
                 }
             )
+        if mode == "scientific":
+            # Authoritative operators, parsed only AFTER the kernel filter.
+            observations = []
+            for number, page in enumerate(reader.pages, 1):
+                operations = []
+                content = page.get_contents()
+                if content is not None:
+                    parsed_content = ContentStream(content, reader)
+                    if len(parsed_content.operations) > 2048:
+                        raise ValueError("scientific-operation-budget-exhausted")
+                    for index, (operands, operator) in enumerate(
+                        parsed_content.operations
+                    ):
+                        values = []
+                        for value in operands:
+                            if isinstance(
+                                value, (int, float, NumberObject, FloatObject)
+                            ):
+                                values.append(_scientific_number(value))
+                            elif isinstance(value, str):
+                                values.append(str(value))
+                            else:
+                                values.append(None)
+                        operations.append({
+                            "index": index,
+                            "operator": operator.decode("ascii"),
+                            "operands": values,
+                        })
+                fonts = {}
+                resources = page["/Resources"]
+                for name, reference in resources.get("/Font", {}).items():
+                    font = reference.get_object()
+                    fonts[str(name)] = {
+                        "base_font": str(font.get("/BaseFont", "")),
+                        "encoding": str(font.get("/Encoding", "")),
+                        "has_to_unicode": "/ToUnicode" in font,
+                    }
+                observations.append({
+                    "page": number,
+                    "rotation": int(page.get("/Rotate", 0)),
+                    "media_box": [float(v) for v in page.mediabox],
+                    "operations": operations,
+                    "fonts": fonts,
+                })
         result = {
             "outcome": "needs-review",
             "pages": pages,
@@ -249,6 +301,17 @@ try:
             "tool": "PyPDF2/" + PyPDF2.__version__,
             "logical_read_bytes": stream.charged,
         }
+        if mode == "scientific":
+            result["scientific"] = {
+                "schema": "millefeuille-pdf-operators/v1",
+                "coordinate_system": "PDF user space, bottom-left; unnormalized",
+                "pages": observations,
+                "limitations": [
+                    "operators are not rendered geometry",
+                    "glyph semantics and mathematical meaning unresolved",
+                    "no acceptance promotion",
+                ],
+            }
 except BaseException as exc:
     safe = {
         "source-hash-drift",
@@ -257,6 +320,8 @@ except BaseException as exc:
         "page-count-out-of-bounds",
         "extracted-text-too-large",
         "logical-read-budget-exhausted",
+        "scientific-operation-budget-exhausted",
+        "scientific-number-out-of-bounds",
     }
     reason = (
         str(exc) if type(exc) is ValueError and str(exc) in safe else "pdf-decode-error"
@@ -276,8 +341,10 @@ os._exit(0)
 """
 
 
-def inspect_bounded_pdf(input_manifest, resource_limits=None):
-    return _inspect_mapped_pdf(input_manifest, resource_limits)
+def inspect_bounded_pdf(input_manifest, resource_limits=None, *, scientific=False):
+    return _inspect_mapped_pdf(
+        input_manifest, resource_limits, _probe="scientific" if scientific else "decode"
+    )
 
 
 def _inspect_mapped_pdf(input_manifest, resource_limits=None, *, _probe="decode"):
@@ -313,7 +380,8 @@ def _inspect_mapped_pdf(input_manifest, resource_limits=None, *, _probe="decode"
         or set(input_manifest) != {"path", "sha256"}
         or not isinstance(input_manifest["sha256"], str)
         or re.fullmatch("[0-9a-f]{64}", input_manifest["sha256"]) is None
-        or _probe not in ("decode", "syscalls", "spin", "memory", "output")
+        or _probe
+        not in ("decode", "scientific", "syscalls", "spin", "memory", "output")
     ):
         result["reason"] = "invalid-input-manifest"
         return result
