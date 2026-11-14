@@ -308,23 +308,50 @@ class SafetyRegressions(BudgetTests):
 
     @requires_ocr_platform
     def test_slow_header_mock_retains_unknown(self):
-        import time
+        clock = [100.0]
+        calls = []
 
         def wire(request):
-            time.sleep(0.03)
+            calls.append(request.method)
+            clock[0] += 0.03
             return httpx.Response(200, content=b"{}")
 
-        with tempfile.TemporaryDirectory() as root:
+        # The shared monotonic clock stays stable through ledger reservation.
+        # Only the synthetic wire advances it, with no wall-clock scheduling race.
+        with (
+            tempfile.TemporaryDirectory() as root,
+            patch("time.monotonic", side_effect=lambda: clock[0]),
+        ):
             graph = replace(self.graph(), wall_seconds=0.02)
             adapter = BoundedMistralAdapter.isolated_mock(
                 graph, Path(root) / "ledger", transport=httpx.MockTransport(wire)
             )
             try:
                 with self.assertRaises(OCRBudgetError):
-                    adapter.execute("upload", self.payload, authorization="synthetic")
+                    adapter.execute("upload", self.payload, authorization="***")
+                self.assertEqual(calls, ["POST"])
                 self.assertEqual(
                     read_ledger(graph, adapter.ledger)["operations"]["upload"],
                     "unknown",
+                )
+            finally:
+                adapter.close()
+
+            # Expiry before execute must not enter the wire or change reserved.
+            calls.clear()
+            adapter = BoundedMistralAdapter.isolated_mock(
+                graph,
+                Path(root) / "presend-ledger",
+                transport=httpx.MockTransport(wire),
+            )
+            try:
+                clock[0] += 0.03
+                with self.assertRaises(OCRBudgetError):
+                    adapter.execute("upload", self.payload, authorization="***")
+                self.assertEqual(calls, [])
+                self.assertEqual(
+                    read_ledger(graph, adapter.ledger)["operations"]["upload"],
+                    "reserved",
                 )
             finally:
                 adapter.close()

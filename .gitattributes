@@ -4,6 +4,7 @@
 /millefeuille/domain/index_fixtures.py text eol=lf
 /millefeuille/domain/native_decode_boundary.py text eol=lf
 /millefeuille/domain/scientific_fidelity.py text eol=lf
+/millefeuille/domain/pdf_semantics.py text eol=lf
 /scripts/validate_evidence_archive.py text eol=lf
 /tests/fixtures/evidence_transport.py text eol=lf
 /tests/fixtures/f05_receipts.py text eol=lf
@@ -13,3 +14,5 @@
 /tests/test_index_refresh_crash_recovery.py text eol=lf
 /tests/test_millefeuille_source_pack_writer.py text eol=lf
 /tests/test_scientific_fidelity.py text eol=lf
+
+/tests/test_s04_repair.py text eol=lf

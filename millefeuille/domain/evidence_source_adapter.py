@@ -197,6 +197,27 @@ def iter_verified_spans(*, corpus, selection, budget, reader) -> Iterator[dict]:
     source_hashes = [a["source_sha256"] for a in corpus["attachments"]]
     if len(set(source_hashes)) != len(source_hashes):
         raise MillefeuilleContractError("duplicate source evidence requires review")
+    # Corpus-wide, like the raw-source alias refusal above: narrowing a question
+    # must not hide an unresolved equivalence group. These are whole extraction
+    # digests, never span/boilerplate matches or proof of scientific dependence.
+    # Refuse before yielding anything, retaining every input identity and locator.
+    extraction_groups = {}
+    for attachment in corpus["attachments"]:
+        extraction_hash = attachment.get("extraction_sha256")
+        if (
+            not isinstance(extraction_hash, str)
+            or len(extraction_hash) != 71
+            or not extraction_hash.startswith("sha256:")
+            or any(c not in "0123456789abcdef" for c in extraction_hash[7:])
+        ):
+            raise MillefeuilleContractError("invalid whole extraction hash")
+        extraction_groups.setdefault(extraction_hash, []).append(attachment["key"])
+    if any(len(keys) > 1 for keys in extraction_groups.values()):
+        # Metadata can only make this gate stricter, not release evidence. Every
+        # released span still verifies its actual full read against this digest.
+        raise MillefeuilleContractError(
+            "same extraction different sources requires review"
+        )
     for span in sorted(
         corpus["spans"], key=lambda s: (s["attachment_key"], s["page"], s["span_id"])
     ):

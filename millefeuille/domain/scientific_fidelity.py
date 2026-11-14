@@ -11,6 +11,7 @@ import re
 from typing import Any
 
 from millefeuille.domain.native_decode_boundary import inspect_bounded_pdf
+from millefeuille.domain.pdf_semantics import observe_page
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,13 @@ class FactExpectation:
 
 def observe_scientific_source(input_manifest, resource_limits=None):
     """Same production boundary, no trusted-fixture decoder fallback."""
-    return inspect_bounded_pdf(input_manifest, resource_limits, scientific=True)
+    receipt = inspect_bounded_pdf(input_manifest, resource_limits, scientific=True)
+    if "scientific" in receipt:
+        receipt["semantics"] = {
+            "schema": "millefeuille-pdf-semantics/v1",
+            "pages": [observe_page(p) for p in receipt["scientific"]["pages"]],
+        }
+    return receipt
 
 
 def compare_scientific_fact(receipt: dict, expected: FactExpectation) -> dict:
@@ -109,6 +116,11 @@ def compare_scientific_fact(receipt: dict, expected: FactExpectation) -> dict:
         "page": expected.page,
         "region": expected.region,
         "coordinate_system": expected.coordinate_system,
+        "semantic_observation": (
+            observe_page(scientific["pages"][expected.page - 1])
+            if available and expected.page <= len(scientific["pages"])
+            else None
+        ),
         "comparisons": comparisons,
         "status": status,
         "disposition": "needs-review",

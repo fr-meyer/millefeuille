@@ -264,7 +264,28 @@ try:
                         parsed_content.operations
                     ):
                         values = []
+                        operand_bytes = []
                         for value in operands:
+                            record = None
+                            if operator == b"Tj" and isinstance(value, (str, bytes)):
+                                try:
+                                    original = value.original_bytes
+                                    source = "unknown"
+                                    if getattr(value, "autodetect_utf16", False):
+                                        source = "utf16-autodetected"
+                                    elif getattr(
+                                    value, "autodetect_pdfdocencoding", False
+                                ):
+                                        source = "pdfdocencoding-autodetected"
+                                    elif isinstance(value, bytes):
+                                        source = "byte-string"
+                                    if type(original) is bytes and len(original) <= 128:
+                                        record = {
+                                        "source": source, "hex": original.hex()
+                                    }
+                                except Exception:
+                                    pass
+                            operand_bytes.append(record)
                             if isinstance(
                                 value, (int, float, NumberObject, FloatObject)
                             ):
@@ -277,12 +298,31 @@ try:
                             "index": index,
                             "operator": operator.decode("ascii"),
                             "operands": values,
+                            "operand_bytes": operand_bytes,
                         })
                 fonts = {}
                 resources = page["/Resources"]
-                for name, reference in resources.get("/Font", {}).items():
+                font_resources = resources.get("/Font", {})
+                if len(font_resources) > 16:
+                    raise ValueError("scientific-font-budget-exhausted")
+                for name, reference in font_resources.items():
                     font = reference.get_object()
+                    if len(str(name)) > 128 or any(
+                        len(str(font.get(k, ""))) > 128
+                        for k in ("/BaseFont", "/Encoding", "/Subtype")
+                    ):
+                        raise ValueError("scientific-font-budget-exhausted")
+                    descriptor = font.get("/FontDescriptor")
+                    descriptor = (
+                        descriptor.get_object() if descriptor is not None else {}
+                    )
                     fonts[str(name)] = {
+                        "subtype": str(font.get("/Subtype", "")),
+                        "has_descriptor": "/FontDescriptor" in font,
+                        "has_font_file": any(
+                            k in descriptor or k in font
+                            for k in ("/FontFile", "/FontFile2", "/FontFile3")
+                        ),
                         "base_font": str(font.get("/BaseFont", "")),
                         "encoding": str(font.get("/Encoding", "")),
                         "has_to_unicode": "/ToUnicode" in font,

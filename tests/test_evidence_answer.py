@@ -270,6 +270,7 @@ def generated_scenarios(tmp):
             g["independent_scientific_absence_reviewed"] = True
         gold.append(g)
     review = {
+        "corpus": corpus,
         "frozen_gold_sha256": digest(canonical(gold)),
         "corpus_sha256": corpus["manifest_sha256"],
         "source_spans": source_spans,

@@ -24,8 +24,10 @@ from tests.platform_capabilities import requires_linux_native_isolation
 S04_SOURCE_PATHS = (
     "millefeuille/domain/native_decode_boundary.py",
     "millefeuille/domain/scientific_fidelity.py",
+    "millefeuille/domain/pdf_semantics.py",
     "tests/fixtures/remaining_source_fixture.py",
     "tests/test_scientific_fidelity.py",
+    "tests/test_s04_repair.py",
     "tests/fixtures/evidence_transport.py",
     "scripts/validate_evidence_archive.py",
 )
@@ -340,3 +342,160 @@ class ScientificFidelityTests(unittest.TestCase):
         self.assertEqual(receipt["outcome"], "refused", receipt)
         self.assertNotIn("scientific", receipt)
         self.assertLessEqual(receipt["charged_read_bytes"], 1048577)
+
+
+class SemanticWitnessTests(unittest.TestCase):
+    observe = ScientificFidelityTests.observe
+
+    @requires_linux_native_isolation
+    def test_generic_semantics_and_adversarial_controls(self):
+        from millefeuille.domain.pdf_semantics import observe_page
+
+        receipts = {case: self.observe(layout_pdf(case)) for case in GOLDENS}
+        for receipt in receipts.values():
+            self.assertEqual(
+                receipt["semantics"]["pages"][0]["status"], "observed-needs-review"
+            )
+
+        def witnesses(case, kind):
+            return [
+                w
+                for w in receipts[case]["semantics"]["pages"][0]["witnesses"]
+                if w["kind"] == kind
+            ]
+
+        self.assertEqual(
+            [w["runs"] for w in witnesses("multi-column", "column")],
+            [["Left 11", "Left 33"], ["Right 22", "Right 44"]],
+        )
+        self.assertEqual(
+            [
+                (w["row"], w["value"], w["unit"])
+                for w in witnesses("table", "table-association")
+            ],
+            [("dry", "17.25", "ms"), ("wet", "42.50", "ms")],
+        )
+        triangle = witnesses("figure", "stroked-path")[-1]
+        self.assertEqual(triangle["vertices"], [[80, 520], [160, 680], [280, 520]])
+        self.assertTrue(triangle["closed"])
+        self.assertFalse(triangle["fill"])
+        self.assertEqual(witnesses("rotation", "glyph-run")[0]["composed_rotation"], 0)
+        desired = [
+            "equal",
+            ["add", ["power", ["symbol", "x"], ["integer", 2]], ["symbol", "α"]],
+            ["integer", 9],
+        ]
+        self.assertEqual(witnesses("equation", "mathematical-ast")[0]["ast"], desired)
+        page = receipts["equation"]["scientific"]["pages"][0]
+        mutations = [
+            (5, 5, 640),
+            (5, 5, 660),
+            (5, 5, 670),
+            (4, 1, 18),
+            (9, 0, "-"),
+            (15, 0, "= 8"),
+            (11, 5, 661),
+            (10, 1, 17),
+            (2, 0, True),
+        ]
+        for operation, operand, value in mutations:
+            changed = copy.deepcopy(page)
+            changed["operations"][operation]["operands"][operand] = value
+            result = observe_page(changed)
+            self.assertNotIn(desired, [w.get("ast") for w in result["witnesses"]])
+        for change in (
+            "font",
+            "encoding",
+            "unicode",
+            "operator",
+            "duplicate",
+            "order",
+            "budget",
+            "nested",
+        ):
+            changed = copy.deepcopy(page)
+            if change == "font":
+                changed["fonts"]["/F2"]["base_font"] = "/Helvetica"
+            elif change == "encoding":
+                changed["fonts"]["/F2"]["encoding"] = "/Unknown"
+            elif change == "unicode":
+                changed["fonts"]["/F2"]["has_to_unicode"] = True
+            elif change == "operator":
+                changed["operations"][0]["operator"] = "cm"
+            elif change == "duplicate":
+                changed["operations"][11]["operands"] = changed["operations"][2][
+                    "operands"
+                ].copy()
+            elif change == "order":
+                changed["operations"][2], changed["operations"][5] = (
+                    changed["operations"][5],
+                    changed["operations"][2],
+                )
+            elif change == "budget":
+                changed["operations"] *= 257
+            else:
+                changed["operations"][1] = {
+                    "index": 1,
+                    "operator": "BT",
+                    "operands": [],
+                }
+            result = observe_page(changed)
+            self.assertNotIn(
+                desired, [w.get("ast") for w in result["witnesses"]], change
+            )
+        # New variable/exponent/value, not a fixture identity lookup.
+        changed = copy.deepcopy(page)
+        for opindex, value in ((3, "y"), (6, "3"), (15, "= 7")):
+            changed["operations"][opindex]["operands"] = [value]
+            changed["operations"][opindex]["operand_bytes"] = [
+                {
+                    "source": "pdfdocencoding-autodetected",
+                    "hex": value.encode("ascii").hex(),
+                }
+            ]
+        asts = [
+            w["ast"]
+            for w in observe_page(changed)["witnesses"]
+            if w["kind"] == "mathematical-ast"
+        ]
+        self.assertEqual(asts[0][2], ["integer", 7])
+        self.assertEqual(asts[0][1][1][1], ["symbol", "y"])
+
+    @requires_linux_native_isolation
+    def test_geometry_and_type_controls(self):
+        from millefeuille.domain.pdf_semantics import observe_page
+
+        for case, operator in (("figure", "f"), ("table", "cm")):
+            page = self.observe(layout_pdf(case))["scientific"]["pages"][0]
+            page["operations"][0]["operator"] = operator
+            self.assertEqual(observe_page(page)["status"], "unknown")
+        page = self.observe(layout_pdf("table"))["scientific"]["pages"][0]
+        page["operations"][23]["operands"] = ["17x25"]
+        self.assertFalse(
+            any(
+                w["kind"] == "table-association"
+                for w in observe_page(page)["witnesses"]
+            )
+        )
+        for value in (True, None, float("nan"), float("inf"), 1000001, [], {}):
+            changed = copy.deepcopy(page)
+            changed["rotation"] = value
+            self.assertEqual(observe_page(changed)["status"], "unknown")
+        page["operations"][0]["index"] = False
+        self.assertEqual(observe_page(page)["status"], "unknown")
+
+    def test_semantic_binding_and_lf_completeness(self):
+        root = Path(__file__).resolve().parents[1]
+        self.assertIn(
+            "millefeuille/domain/pdf_semantics.py", scientific_source_binding()
+        )
+        attrs = (root / ".gitattributes").read_text().splitlines()
+        for name in S04_SOURCE_PATHS:
+            self.assertIn("/" + name + " text eol=lf", attrs)
+        tree = ast.parse(
+            (root / "millefeuille/domain/scientific_fidelity.py").read_text()
+        )
+        imports = [n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
+        for module in imports:
+            if module and module.startswith("millefeuille."):
+                self.assertIn(module.replace(".", "/") + ".py", S04_SOURCE_PATHS)
