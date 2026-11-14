@@ -105,9 +105,10 @@ def snapshot(root: Path) -> dict:
                     path.suffix in ALLOWED_SUFFIXES
                     or (
                         path.name == ".card-index.lock"
-                        and len(PurePosixPath(relative).parts) == 6
-                        and PurePosixPath(relative).parts[0] == "source-packs"
-                        and PurePosixPath(relative).parts[2:5]
+                        and len(PurePosixPath(relative).parts) == 7
+                        and PurePosixPath(relative).parts[:2]
+                        == ("source-packs", "zotero")
+                        and PurePosixPath(relative).parts[3:6]
                         == ("analyses", "millefeuille", "run-fixture")
                     )
                 ):
@@ -117,7 +118,9 @@ def snapshot(root: Path) -> dict:
                     files[relative] = _image(path)
                     total += files[relative]["size"]
                 else:
-                    raise ValueError("unknown fixture data or symlink")
+                    raise ValueError(
+                        f"unknown fixture data or symlink: {relative[:256]!r}"
+                    )
     return {
         "files": dict(sorted(files.items())),
         "directories": sorted(directories),

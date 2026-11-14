@@ -52,8 +52,23 @@ power-loss durability, arbitrary crash-window or R6/shared-guard qualification.
 No runtime evidence is produced by source changes or static checking.
 
 The only additional non-suffix snapshot entry is a regular file at
-source-packs/<single-pack-component>/analyses/millefeuille/run-fixture/.card-index.lock.
+source-packs/zotero/<paper-id>/analyses/millefeuille/run-fixture/.card-index.lock.
 Its actual empty or nonempty bytes and identity are captured under the same
 no-follow, entry, per-file and aggregate bounds. Other .lock files, misplaced
 locks and symlinks remain rejected. The entire transaction subtree is still
 captured and exact inventory, source and protected bindings are unchanged.
+
+
+Producer-path correction: source_packs.write_source_pack_from_recovered_pdf
+sets source_pack_dir = source_pack_root / "zotero" / paper_id. The real fixture
+then appends analyses/millefeuille/run-fixture. The former six-component allowlist
+and its toy unit fixture omitted the zotero namespace and rejected the actual
+seven-component generated lock. The replacement is specific to that producer
+layout, not a general recursive-lock allowance. A new regression test calls the
+same _prepare_card_index_fixture as the original crash tests and snapshots its
+exact returned run directory, rather than guessing a second fixture layout.
+Unknown-data diagnostics now include only a bounded repr of the synthetic path
+relative to the supplied fixture root, never an absolute root or file contents.
+No original crash worker/assertion, production rule, count, source/protected
+binding, byte bound or archive acceptance condition is weakened. This change is
+source-only until freshly authorized runtime validation has actually passed.

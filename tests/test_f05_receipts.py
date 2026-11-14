@@ -1,4 +1,4 @@
-"""Pure receipt tests: no product imports or fault/recovery execution."""
+"""Receipt integrity tests and real fixture inventory, without crash execution."""
 
 import base64
 import copy
@@ -205,7 +205,8 @@ class TestF05Receipts(unittest.TestCase):
 
     def test_exact_synthetic_run_lock_capture_and_guards(self):
         lock_ref = (
-            "source-packs/synthetic/analyses/millefeuille/run-fixture/.card-index.lock"
+            "source-packs/zotero/zotero-ITEM1/analyses/millefeuille/"
+            "run-fixture/.card-index.lock"
         )
         for payload in (b"", b"\0", b"retained-lock-bytes"):
             with (
@@ -231,6 +232,9 @@ class TestF05Receipts(unittest.TestCase):
             ".card-index.lock",
             "run/.card-index.lock",
             lock_ref + ".extra",
+            lock_ref.replace("source-packs/zotero/", "source-packs/"),
+            lock_ref.replace("source-packs/zotero/", "source-packs/other/"),
+            lock_ref.replace("zotero-ITEM1/", "extra/zotero-ITEM1/"),
             lock_ref.replace("run-fixture", "other"),
             lock_ref.replace(".card-index.lock", "other.lock"),
         ):
@@ -253,3 +257,30 @@ class TestF05Receipts(unittest.TestCase):
                 self.skipTest(f"symlink creation unavailable: {exc}")
             with self.assertRaises(ValueError):
                 snapshot(root)
+
+    def test_snapshot_lock_path_from_real_fixture_producer(self):
+        # Only future approved CI runs execute this. The same fixture producer
+        # feeds both original process-death tests; no toy path reimplementation.
+        from tests.test_millefeuille_source_pack_writer import (
+            _prepare_card_index_fixture,
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _, run_dir, _, _ = _prepare_card_index_fixture(temporary)
+            before = snapshot(root)
+            lock = run_dir / ".card-index.lock"
+            lock.write_bytes(b"\0")
+            relative = lock.relative_to(root).as_posix()
+            after = snapshot(root)
+            self.assertNotIn(relative, before["files"])
+            self.assertIn(relative, after["files"])
+            self.assertEqual(after["file_count"], before["file_count"] + 1)
+            image = after["files"][relative]
+            self.assertEqual(base64.b64decode(image["bytes_b64"]), b"\0")
+            self.assertEqual(image["size"], 1)
+            self.assertEqual(
+                image["identity"], [lock.stat().st_dev, lock.stat().st_ino]
+            )
+            for name, original in before["files"].items():
+                self.assertEqual(after["files"][name], original)
