@@ -1,6 +1,6 @@
 # CANDIDATE replacement for existing .github/workflows/ci.yml on a tooling branch ONLY.
 # Broker must verify branch dispatch support; no main/default-branch mutation assumed.
-name: P09 clean dependency provenance proposal v4
+name: P09 clean dependency provenance proposal v5
 on:
   workflow_dispatch:
     inputs:
@@ -49,7 +49,11 @@ jobs:
           script = pathlib.Path('tooling/scripts/p09/stage.py').resolve()
           expected = {'capture.py': 'f81c137da71f690fb6fe0de61a652902ba4de9a5875b198853e7aa79e52c320d', 'stage.py': 'e4f9f6eb3ad0b7f11fb1a36689b7b6d891589d8c3377dde09349c9c4151579d5'}
           for name, digest in expected.items():
-              assert hashlib.sha256((script.parent / name).read_bytes()).hexdigest() == digest
+              raw = (script.parent / name).read_bytes()
+              actual_digest = hashlib.sha256(raw).hexdigest()
+              if actual_digest != digest:
+                  print('P09_SOURCE_BYTE_MISMATCH', name, len(raw), 'expected', digest, 'actual', actual_digest)
+                  raise SystemExit('P09 source byte-integrity check failed')
           root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'p09-qualified'
           subprocess.run([sys.executable,'-B',str(script),'--source',str(pathlib.Path('product').resolve()),'--root',str(root)], check=True, timeout=960)
       - name: Retain only sanitized validated evidence in job log

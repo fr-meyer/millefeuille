@@ -16,3 +16,6 @@
 /tests/test_scientific_fidelity.py text eol=lf
 
 /tests/test_s04_repair.py text eol=lf
+# P09 diagnostic tooling must retain exact reviewed Git blob bytes.
+/scripts/p09/capture.py text eol=lf
+/scripts/p09/stage.py text eol=lf
