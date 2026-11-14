@@ -105,7 +105,10 @@ class NativeSourceCLITests(unittest.TestCase):
         with (
             patch(
                 "millefeuille.cli.native_source.qualify_untrusted_native_source",
-                return_value={"outcome":"refused", "reason":"native-decoder-unavailable"},
+                return_value={
+                    "outcome": "refused",
+                    "reason": "native-decoder-unavailable",
+                },
             ),
             patch("builtins.print") as output,
         ):

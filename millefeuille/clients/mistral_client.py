@@ -685,7 +685,11 @@ class BoundedMistralAdapter:
         from .approved_mistral import ApprovedMistralLifecycle
 
         return ApprovedMistralLifecycle.approved(
-            graph, capability, verifier=verifier, token_resolver=token_resolver, ledger=ledger
+            graph,
+            capability,
+            verifier=verifier,
+            token_resolver=token_resolver,
+            ledger=ledger,
         )
 
     @classmethod
@@ -778,7 +782,8 @@ class BoundedMistralAdapter:
                 ):
                     raise OCRBudgetError("response-budget-exhausted")
             self.response_receipts[operation_id] = {
-                "wire_observed": True, "semantic_status": "not-parsed",
+                "wire_observed": True,
+                "semantic_status": "not-parsed",
                 "raw_bytes": len(result),
                 "raw_sha256": hashlib.sha256(result).hexdigest(),
             }
@@ -801,12 +806,14 @@ class BoundedMistralAdapter:
             if not isinstance(request, dict) or set(request) != {"model", "document"}:
                 raise ValueError
             document = request["document"]
-            if (not isinstance(document, dict)
-                    or set(document) != {"type", "document_url"}
-                    or document["type"] != "document_url"
-                    or not isinstance(document["document_url"], str)
-                    or not document["document_url"].startswith("https://")
-                    or any(ord(c) < 33 for c in document["document_url"])):
+            if (
+                not isinstance(document, dict)
+                or set(document) != {"type", "document_url"}
+                or document["type"] != "document_url"
+                or not isinstance(document["document_url"], str)
+                or not document["document_url"].startswith("https://")
+                or any(ord(c) < 33 for c in document["document_url"])
+            ):
                 raise ValueError
             if request["model"] != "mistral-ocr-latest":
                 raise ValueError
@@ -852,7 +859,15 @@ class BoundedMistralAdapter:
                 )
                 for p in response["pages"]
             ]
-        except (ValueError, KeyError, TypeError, AttributeError, RecursionError, UnicodeError, OCRBudgetError):
+        except (
+            ValueError,
+            KeyError,
+            TypeError,
+            AttributeError,
+            RecursionError,
+            UnicodeError,
+            OCRBudgetError,
+        ):
             self.response_receipts[operation_id]["semantic_status"] = "parse-failed"
             raise OCRBudgetError("invalid-ocr-response") from None
         self.response_receipts[operation_id]["semantic_status"] = "validated"
@@ -897,8 +912,11 @@ def bounded_json(raw):
 
     if not isinstance(raw, bytes):
         raise ValueError("json-bytes-required")
-    result = json.loads(raw.decode("utf-8", "strict"),
-                        parse_constant=reject_constant, object_pairs_hook=unique_object)
+    result = json.loads(
+        raw.decode("utf-8", "strict"),
+        parse_constant=reject_constant,
+        object_pairs_hook=unique_object,
+    )
     remaining = [result]
     nodes = 0
     while remaining:

@@ -6,15 +6,17 @@ import json
 from pathlib import Path
 
 from millefeuille.domain.source_qualification import (
-    qualify_untrusted_native_source,
     NativeSourceObservation,
+    qualify_untrusted_native_source,
 )
 
 
 def run_native_source_cli(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="millefeuille inspect-native",
-        description="Inspect exact hash-bound PDFs through the isolated native boundary.",
+        description=(
+            "Inspect exact hash-bound PDFs through the isolated native boundary."
+        ),
     )
     parser.add_argument("--pdf", required=True, type=Path)
     parser.add_argument("--sha256", required=True)
@@ -33,13 +35,23 @@ def run_native_source_cli(argv: list[str]) -> int:
     # A CLI trust attestation never bypasses process/kernel isolation.
     result = qualify_untrusted_native_source({"path": args.pdf, "sha256": args.sha256})
     if result["outcome"] == "refused":
-        print(json.dumps({"disposition": "refused", "reason": result["reason"],
-                          "boundary": result}))
+        print(
+            json.dumps(
+                {
+                    "disposition": "refused",
+                    "reason": result["reason"],
+                    "boundary": result,
+                }
+            )
+        )
         return 2
     texts = tuple(row["text"] for row in result["pages"])
-    digest = hashlib.sha256(b"".join(len(p.encode()).to_bytes(8,"big") + p.encode()
-                                    for p in texts)).hexdigest()
-    observation = NativeSourceObservation(result["source_sha256"], texts, digest, result["tool"])
+    digest = hashlib.sha256(
+        b"".join(len(p.encode()).to_bytes(8, "big") + p.encode() for p in texts)
+    ).hexdigest()
+    observation = NativeSourceObservation(
+        result["source_sha256"], texts, digest, result["tool"]
+    )
     pages = []
     for number, page in enumerate(observation.pages, 1):
         raw = page.encode("utf-8")
