@@ -6,7 +6,7 @@ defined short frames in tests/fixtures/evidence_transport.py. Each frame starts
 MILLEFEUILLE_EVIDENCE_FRAME_V1: and is <=8192 UTF-8 bytes (excluding log timestamp
 and newline). Canonical JSON is base64-chunked in 5400-byte pieces with zero-based
 index/count, total byte_length, SHA-256 and identical content-addressed id.
-Each canonical receipt is <=3 MiB. Frames must be contiguous and ordered; missing,
+Each canonical receipt is <=3 MiB. Frames must be ordered with bounded interframe log noise (see transport contract); missing,
 reordered, conflicting, oversized, noncanonical or hash-mismatching data fails.
 
 ## Independent acceptance
@@ -50,3 +50,10 @@ The original assertions, Windows displacement handling and real os._exit(71)
 remain unchanged. Net snapshots are not syscall counts, fsync proof, universal
 power-loss durability, arbitrary crash-window or R6/shared-guard qualification.
 No runtime evidence is produced by source changes or static checking.
+
+The only additional non-suffix snapshot entry is a regular file at
+source-packs/<single-pack-component>/analyses/millefeuille/run-fixture/.card-index.lock.
+Its actual empty or nonempty bytes and identity are captured under the same
+no-follow, entry, per-file and aggregate bounds. Other .lock files, misplaced
+locks and symlinks remain rejected. The entire transaction subtree is still
+captured and exact inventory, source and protected bindings are unchanged.

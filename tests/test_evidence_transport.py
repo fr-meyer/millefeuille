@@ -27,7 +27,9 @@ class TestEvidenceTransport(unittest.TestCase):
             result = None
             for line in frames:
                 self.assertLessEqual(len(line.encode()), MAX_LINE_BYTES)
-                result = assembler.feed(b"timestamp " + line.encode() + b"\n")
+                result = assembler.feed(
+                    b"2026-11-14T06:00:00.1234567Z " + line.encode() + b"\n"
+                )
             assembler.finish()
             self.assertEqual(result, (kind, canonical(receipt), receipt))
 
@@ -115,7 +117,7 @@ class TestEvidenceTransport(unittest.TestCase):
         manifest["s04_source_sha256"] = {"synthetic.py": "d" * 64}
         for cell in manifest["cells"][:3]:
             cell["s04_case_ids"] = cases
-        for mode in ("identical", "conflict", "missing", "truncated"):
+        for mode in ("identical", "conflict", "missing", "truncated", "runtime"):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:
                 path = Path(temporary) / "logs.zip"
                 with zipfile.ZipFile(path, "w") as archive:
@@ -125,6 +127,11 @@ class TestEvidenceTransport(unittest.TestCase):
                         frames = []
                         for method in cell["methods"]:
                             receipt = {"runtime": cell["runtime"], "test": method}
+                            if mode == "runtime" and number == 0:
+                                receipt["runtime"] = {
+                                    **cell["runtime"],
+                                    "python": "3.99",
+                                }
                             frames += frame_receipt("F05", receipt)
                             frames += frame_receipt("F05", receipt)
                             if mode == "conflict" and number == 0:
@@ -154,3 +161,70 @@ class TestEvidenceTransport(unittest.TestCase):
                     else:
                         with self.assertRaises(ValueError):
                             validate_archive(path, manifest)
+
+    def test_captured_merged_progress_between_two_frames(self):
+        # Synthetic payload; envelope mirrors run 43564003732 Ubuntu 3.11.
+        receipt = {"value": "x" * 6000}
+        frames = frame_receipt("S04", receipt)
+        self.assertEqual(len(frames), 2)
+        assembler = Reassembler()
+        stamp = b"2026-11-14T06:00:00.1234567Z "
+        self.assertIsNone(assembler.feed(stamp + frames[0].encode()))
+        self.assertIsNone(
+            assembler.feed(
+                stamp
+                + b"test_actual_embedded_numeric_helper "
+                + b"(tests.synthetic.TestFixture) ... ok\n"
+            )
+        )
+        result = assembler.feed(stamp + frames[1].encode())
+        assembler.finish()
+        self.assertEqual(result, ("S04", canonical(receipt), receipt))
+
+    def test_noise_bounds_damaged_prefix_duplicate_order_and_missing(self):
+        frames = frame_receipt("F05", {"value": "x" * 6000})
+        for mode in (
+            "lines",
+            "bytes",
+            "clipped",
+            "malformed",
+            "envelope",
+            "duplicate",
+            "new_receipt",
+            "missing",
+        ):
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                assembler = Reassembler()
+                assembler.feed(frames[0].encode())
+                if mode == "lines":
+                    for _ in range(33):
+                        assembler.feed(b"ok\n")
+                elif mode == "bytes":
+                    assembler.feed(b"x" * (16 * 1024 + 1))
+                elif mode == "clipped":
+                    assembler.feed(frames[1][5:].encode())
+                elif mode == "malformed":
+                    assembler.feed(PREFIX.encode() + b"{")
+                elif mode == "envelope":
+                    assembler.feed(b"untrusted arbitrary prefix " + frames[1].encode())
+                elif mode == "duplicate":
+                    assembler.feed(frames[0].encode())
+                elif mode == "new_receipt":
+                    assembler.feed(frame_receipt("S04", {"other": 1})[0].encode())
+                else:
+                    assembler.feed(b"bounded progress\n")
+                assembler.finish()
+
+    def test_progress_envelope_and_noise_boundary(self):
+        from tests.fixtures.evidence_transport import MAX_NOISE_BYTES, MAX_NOISE_LINES
+
+        frames = frame_receipt("F05", {"value": "x" * 6000})
+        assembler = Reassembler()
+        assembler.feed(
+            b"test_synthetic (tests.synthetic.TestFixture) ... " + frames[0].encode()
+        )
+        for _ in range(MAX_NOISE_LINES - 1):
+            assembler.feed(b"x")
+        assembler.feed(b"x" * (MAX_NOISE_BYTES - MAX_NOISE_LINES + 1))
+        self.assertIsNotNone(assembler.feed(frames[1].encode()))
+        assembler.finish()

@@ -10,6 +10,7 @@ import hashlib
 import os
 from pathlib import Path, PurePosixPath
 import stat
+import sys
 from typing import TypedDict
 
 from tests.fixtures.evidence_transport import frame_receipt, parse
@@ -100,7 +101,16 @@ def snapshot(root: Path) -> dict:
                 if stat.S_ISDIR(mode):
                     directories.append(relative)
                     pending.append(path)
-                elif stat.S_ISREG(mode) and path.suffix in ALLOWED_SUFFIXES:
+                elif stat.S_ISREG(mode) and (
+                    path.suffix in ALLOWED_SUFFIXES
+                    or (
+                        path.name == ".card-index.lock"
+                        and len(PurePosixPath(relative).parts) == 6
+                        and PurePosixPath(relative).parts[0] == "source-packs"
+                        and PurePosixPath(relative).parts[2:5]
+                        == ("analyses", "millefeuille", "run-fixture")
+                    )
+                ):
                     size = child.stat(follow_symlinks=False).st_size
                     if total + size > MAX_TOTAL_BYTES:
                         raise ValueError("fixture aggregate limit")
@@ -346,5 +356,6 @@ def accept(
 
 def emit(receipt: dict) -> None:
     validate(receipt)
-    for line in frame_receipt("F05", receipt):
-        print(line, flush=True)
+    block = "\n".join(frame_receipt("F05", receipt)) + "\n"
+    sys.stdout.write(block)
+    sys.stdout.flush()

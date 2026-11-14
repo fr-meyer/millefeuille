@@ -63,18 +63,18 @@ CHECKS = {
         + op(7, "Tj", ["Right 44"]),
     ),
     "table": (
-        op(17, "Tm", [1, 0, 0, 1, 50, 660])
-        + op(18, "Tj", ["dry"])
-        + op(19, "Tm", [1, 0, 0, 1, 220, 660])
-        + op(20, "Tj", ["17.25"])
-        + op(15, "Tm", [1, 0, 0, 1, 220, 700])
-        + op(16, "Tj", ["latency ms"]),
-        op(21, "Tm", [1, 0, 0, 1, 50, 620])
-        + op(22, "Tj", ["wet"])
-        + op(23, "Tm", [1, 0, 0, 1, 220, 620])
-        + op(24, "Tj", ["42.50"])
-        + op(15, "Tm", [1, 0, 0, 1, 220, 700])
-        + op(16, "Tj", ["latency ms"]),
+        op(20, "Tm", [1, 0, 0, 1, 50, 660])
+        + op(21, "Tj", ["dry"])
+        + op(22, "Tm", [1, 0, 0, 1, 220, 660])
+        + op(23, "Tj", ["17.25"])
+        + op(18, "Tm", [1, 0, 0, 1, 220, 700])
+        + op(19, "Tj", ["latency ms"]),
+        op(24, "Tm", [1, 0, 0, 1, 50, 620])
+        + op(25, "Tj", ["wet"])
+        + op(26, "Tm", [1, 0, 0, 1, 220, 620])
+        + op(27, "Tj", ["42.50"])
+        + op(18, "Tm", [1, 0, 0, 1, 220, 700])
+        + op(19, "Tj", ["latency ms"]),
     ),
     "figure": (
         op(8, "m", [80, 520])
@@ -125,6 +125,7 @@ class ScientificFidelityTests(unittest.TestCase):
                 self.assertTrue(receipt["limits_enforced"])
                 self.assertTrue(receipt["child_reaped"])
                 comparisons = []
+                expectations = []
                 for index, fact in enumerate(golden["facts"]):
                     expected = FactExpectation(
                         f"S04.{case}.{index + 1}",
@@ -138,6 +139,20 @@ class ScientificFidelityTests(unittest.TestCase):
                         requires_semantics=case == "equation",
                     )
                     comparison = compare_scientific_fact(receipt, expected)
+                    comparisons.append(comparison)
+                    expectations.append(expected)
+                payload = scientific_log_receipt(
+                    receipt,
+                    comparisons,
+                    context=runtime_identity(),
+                    case_id=case,
+                    source_sha256=scientific_source_binding(),
+                )
+                for frame in frame_receipt("S04", payload):
+                    print(frame, flush=True)
+
+                # Preserve mismatch diagnostics before any acceptance assertion.
+                for expected, comparison in zip(expectations, comparisons, strict=True):
                     self.assertEqual(
                         comparison["status"],
                         (
@@ -148,20 +163,10 @@ class ScientificFidelityTests(unittest.TestCase):
                         comparison,
                     )
                     self.assertIsNone(comparison["acceptance_decision"])
-                    comparisons.append(comparison)
                     drift = replace(expected, checks=((("rotation",), 777),))
                     self.assertEqual(
                         compare_scientific_fact(receipt, drift)["status"], "mismatch"
                     )
-                payload = scientific_log_receipt(
-                    receipt,
-                    comparisons,
-                    context=runtime_identity(),
-                    case_id=case,
-                    source_sha256=scientific_source_binding(),
-                )
-                for frame in frame_receipt("S04", payload):
-                    print(frame, flush=True)
 
     def test_malformed_and_hash_drift_refuse_without_observations(self):
         for raw, digest in ((b"%PDF-broken", None), (layout_pdf("figure"), "0" * 64)):
@@ -302,7 +307,9 @@ class ScientificFidelityTests(unittest.TestCase):
 
     @requires_linux_native_isolation
     def test_scientific_output_limit_refuses(self):
-        stream = b"1 0 0 1 999999999999.5 999999999999.5 cm " * 2048
+        # Six finite bounded operands per cubic path exceed the fixed JSON output
+        # budget without exceeding 2048 operations or changing the production cap.
+        stream = (b"999999999999.5 " * 6 + b"c ") * 2048
         with patch.dict(STREAMS, {"figure": stream}):
             raw = layout_pdf("figure")
         receipt = self.observe(raw)

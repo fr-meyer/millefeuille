@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 
@@ -13,6 +14,11 @@ MAX_LINE_BYTES = 8192
 CHUNK = 5400
 MAX_FRAMES = 600
 MAX_RECEIPTS = 64
+MAX_NOISE_LINES = 32
+MAX_NOISE_BYTES = 16 * 1024
+FRAME_MARKER = b"MILLEFEUILLE_EVIDENCE"
+TIMESTAMP = re.compile(rb"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z ")
+PROGRESS = re.compile(rb"test_[A-Za-z0-9_]+ \([^\r\n()]{1,512}\) \.{3} ")
 
 
 def canonical(value):
@@ -88,17 +94,36 @@ class Reassembler:
         self.pending = None
         self.parts = []
         self.completed = 0
+        self.noise_lines = self.noise_bytes = 0
         self.started = time.monotonic()
 
     def feed(self, line):
         if time.monotonic() - self.started > 30:
             raise ValueError("transport time bound")
-        at = line.find(PREFIX.encode())
-        if at < 0:
+        # Accept observed timestamp/progress envelopes, not arbitrary prefixes.
+        raw = line.rstrip(b"\r\n")
+        stamp = TIMESTAMP.match(raw)
+        if stamp:
+            raw = raw[stamp.end() :]
+        progress = PROGRESS.match(raw)
+        if progress:
+            raw = raw[progress.end() :]
+        if not raw.startswith(PREFIX.encode()):
+            if (
+                FRAME_MARKER in line
+                or b"EVIDENCE_FRAME" in line
+                or b"FRAME_V1:" in line
+            ):
+                raise ValueError("malformed frame marker/envelope")
             if self.pending is not None:
-                raise ValueError("interrupted frames")
+                self.noise_lines += 1
+                self.noise_bytes += len(line)
+                if (
+                    self.noise_lines > MAX_NOISE_LINES
+                    or self.noise_bytes > MAX_NOISE_BYTES
+                ):
+                    raise ValueError("interframe noise bound")
             return None
-        raw = line[at:].rstrip(b"\r\n")
         if len(raw) > MAX_LINE_BYTES or raw.count(PREFIX.encode()) != 1:
             raise ValueError("frame line bound")
         frame = parse(raw[len(PREFIX) :])
@@ -128,6 +153,7 @@ class Reassembler:
         )
         if self.pending is None:
             self.pending = identity
+            self.noise_lines = self.noise_bytes = 0
         if identity != self.pending or frame["index"] != len(self.parts):
             raise ValueError("reordered/conflicting frames")
         chunk = base64.b64decode(frame["payload"], validate=True)

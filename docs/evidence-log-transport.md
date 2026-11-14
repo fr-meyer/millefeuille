@@ -4,7 +4,24 @@ Public stdlib-only API in tests.fixtures.evidence_transport:
 frame_receipt(kind: str, receipt: dict) -> list[str], kind F05 or S04;
 runtime_identity() -> dict; Reassembler.feed(bytes) -> None or
 (kind, canonical_payload_bytes, receipt_dict); finish() rejects truncation.
-A sequence is not interleavable with another receipt or nonframe log lines.
+A sequence cannot interleave another receipt. Between its frames, at most 32
+nonframe lines and 16384 bytes (cumulative per receipt) are permitted. Generic
+bounded progress noise is allowed because GitHub merges stdout/stderr. A line
+containing MILLEFEUILLE_EVIDENCE, EVIDENCE_FRAME or FRAME_V1: but not a valid
+frame/envelope fails, including clipped/malformed markers. Missing final frames
+still fail at finish; index sequence, identity, canonical bytes, SHA, length,
+frame/count/receipt bounds and deadline remain strict.
+
+Frames may start at byte zero, after a GitHub ISO timestamp followed by a space,
+or after that timestamp and/or a unittest test_name (qualified class) ... prefix.
+Arbitrary pre-frame content is rejected, not searched past. The F05 emitter uses
+one bounded stdout write per receipt (plus flush), reducing but not claiming to
+eliminate OS/merged-stream interruption. frame_receipt's shared API is unchanged.
+
+This replaces the unsupported contiguous-nonframe requirement after archived run
+43564003732 (Ubuntu 3.11) showed frame 0, unittest progress, then frame 1.
+It does not waive any failed check or authorize accepting the failed run.
+Regression fixtures use synthetic payloads, not recovered acceptance evidence.
 
 Manifest JSON object (externally verified, never extracted from log claims):
 

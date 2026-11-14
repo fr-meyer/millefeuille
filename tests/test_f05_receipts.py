@@ -1,5 +1,6 @@
 """Pure receipt tests: no product imports or fault/recovery execution."""
 
+import base64
 import copy
 from pathlib import Path
 import tempfile
@@ -94,8 +95,8 @@ class TestF05Receipts(unittest.TestCase):
             (root / "run/cards/card.json").write_bytes(b"{}")
             (root / "input.pdf").write_bytes(b"fixture")
             before = snapshot(root)
-            (root / "run/txn").mkdir()
-            (root / "run/txn/index.json").write_bytes(b"{}")
+            (root / "run/index-transactions/txn").mkdir(parents=True)
+            (root / "run/index-transactions/txn/index.json").write_bytes(b"{}")
             (root / "run/index.json").write_bytes(b"{}")
             death = snapshot(root)
             # Reuse synthetic shape, then substitute the full captured fixture.
@@ -106,13 +107,15 @@ class TestF05Receipts(unittest.TestCase):
             receipt["paths"] = {
                 "card": "run/cards/card.json",
                 "index": "run/index.json",
-                "transaction": "run/txn",
-                "recovery_index": "run/txn/index.json",
+                "transaction": "run/index-transactions/txn",
+                "recovery_index": "run/index-transactions/txn/index.json",
             }
             receipt["protected_sha256"] = {
                 "input.pdf": before["files"]["input.pdf"]["sha256"]
             }
-            receipt["custody"]["transaction_files"] = ["run/txn/index.json"]
+            receipt["custody"]["transaction_files"] = [
+                "run/index-transactions/txn/index.json"
+            ]
             receipt["custody"]["journal"] = {
                 "kind": "transaction file inventory, not a write journal",
                 "journal_named_paths": [],
@@ -146,7 +149,14 @@ class TestF05Receipts(unittest.TestCase):
                 )
 
             check(receipt)  # synthetic helper coverage only, not CI evidence
-            for field in ("protected", "transaction", "source", "runtime", "journal"):
+            for field in (
+                "protected",
+                "transaction",
+                "source",
+                "runtime",
+                "journal",
+                "transaction_count",
+            ):
                 bad = copy.deepcopy(receipt)
                 if field == "protected":
                     bad["protected_sha256"] = {}
@@ -156,6 +166,8 @@ class TestF05Receipts(unittest.TestCase):
                     bad["source_sha256"] = {}
                 elif field == "runtime":
                     bad["runtime"] = {}
+                elif field == "transaction_count":
+                    bad["custody"]["transaction_counts"]["after_death"] = 2
                 else:
                     bad["custody"]["journal"]["journal_named_paths"] = ["missing"]
                 with self.subTest(field=field), self.assertRaises(ValueError):
@@ -186,6 +198,57 @@ class TestF05Receipts(unittest.TestCase):
             target.write_bytes(b"{}")
             try:
                 (root / "link.json").symlink_to(target)
+            except OSError as exc:
+                self.skipTest(f"symlink creation unavailable: {exc}")
+            with self.assertRaises(ValueError):
+                snapshot(root)
+
+    def test_exact_synthetic_run_lock_capture_and_guards(self):
+        lock_ref = (
+            "source-packs/synthetic/analyses/millefeuille/run-fixture/.card-index.lock"
+        )
+        for payload in (b"", b"\0", b"retained-lock-bytes"):
+            with (
+                self.subTest(payload=payload),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                root = Path(temporary)
+                lock = root / lock_ref
+                lock.parent.mkdir(parents=True)
+                lock.write_bytes(payload)
+                image = snapshot(root)["files"][lock_ref]
+                self.assertEqual(image["size"], len(payload))
+                self.assertEqual(base64.b64decode(image["bytes_b64"]), payload)
+                self.assertEqual(
+                    image["identity"], [lock.stat().st_dev, lock.stat().st_ino]
+                )
+                with (
+                    patch("tests.fixtures.f05_receipts.MAX_TOTAL_BYTES", -1),
+                    self.assertRaises(ValueError),
+                ):
+                    snapshot(root)
+        for ref in (
+            ".card-index.lock",
+            "run/.card-index.lock",
+            lock_ref + ".extra",
+            lock_ref.replace("run-fixture", "other"),
+            lock_ref.replace(".card-index.lock", "other.lock"),
+        ):
+            with self.subTest(ref=ref), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                target = root / ref
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(b"\0")
+                with self.assertRaises(ValueError):
+                    snapshot(root)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / "card.json"
+            target.write_bytes(b"{}")
+            lock = root / lock_ref
+            lock.parent.mkdir(parents=True)
+            try:
+                lock.symlink_to(target)
             except OSError as exc:
                 self.skipTest(f"symlink creation unavailable: {exc}")
             with self.assertRaises(ValueError):
