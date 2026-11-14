@@ -11,7 +11,7 @@ import re
 import time
 from typing import Literal, cast
 
-from mistralai import Mistral, MistralError
+from mistralai import MistralError
 
 from ..domain.config import MistralOCRConfig
 from ..domain.models import PageContent, UploadedDocument
@@ -63,15 +63,8 @@ class MistralClient(OCRClient):
         Raises:
             MistralAPIError: If client initialization fails (e.g., invalid API key).
         """
-        try:
-            self.config = config
-            self.client = Mistral(api_key=config.api_key)
-            self._uploaded_files: dict[str, str] = {}
-            logger.info("MistralClient initialized successfully")
-        except Exception as e:
-            error_msg = f"Failed to initialize Mistral client: {str(e)}"
-            logger.error(error_msg)
-            raise MistralAPIError(error_msg, original_exception=e) from e
+        # Refuse before configuration/credential access or SDK construction.
+        raise MistralAPIError("live-ocr-controller-unavailable-offline-default")
 
     @property
     def provider(self) -> OCRProvider:
@@ -671,3 +664,253 @@ class MistralClient(OCRClient):
         """
         stripped = markdown.strip()
         return len(stripped) < self.EMPTY_PAGE_THRESHOLD
+
+
+class BoundedMistralAdapter:
+    """Explicit wire-only lane. Never constructs or falls back to the legacy SDK.
+
+    Uses httpx HTTPTransport(retries=0), redirects disabled, trust_env=False.
+    Payloads are already serialized and hash-bound by the reviewed request graph.
+    No implicit lifecycle, retry, polling, redirect or cleanup calls are made.
+    """
+
+    def __init__(self, graph, ledger, *, transport=None):
+        from ..domain.ocr_request_budget import OCRBudgetError
+
+        raise OCRBudgetError("live-ocr-controller-unavailable-offline-default")
+
+    @classmethod
+    def approved(cls, graph, capability, *, verifier, token_resolver, ledger):
+        """Explicit concrete lifecycle; no legacy constructor or ambient fallback."""
+        from .approved_mistral import ApprovedMistralLifecycle
+
+        return ApprovedMistralLifecycle.approved(
+            graph, capability, verifier=verifier, token_resolver=token_resolver, ledger=ledger
+        )
+
+    @classmethod
+    def isolated_mock(cls, graph, ledger, *, transport):
+        """Trusted synthetic handler only, never a hard provider-control proof."""
+        import httpx
+
+        from ..domain.ocr_request_budget import OCRBudgetError, initialize_ledger
+
+        if type(transport) is not httpx.MockTransport:
+            raise OCRBudgetError("isolated-mock-transport-required")
+        initialize_ledger(graph, ledger)
+        self = cls.__new__(cls)
+        self.graph, self.ledger = graph, ledger
+        self.response_receipts = {}
+        self._deadline = time.monotonic() + graph.wall_seconds
+        self._client = httpx.Client(
+            transport=transport, follow_redirects=False, trust_env=False
+        )
+        return self
+
+    def close(self):
+        self._client.close()
+
+    def execute(
+        self,
+        operation_id: str,
+        payload: bytes,
+        *,
+        authorization: str,
+        content_type: str = "application/json",
+    ) -> bytes:
+        import hashlib
+        import time
+
+        from ..domain.ocr_request_budget import (
+            OCRBudgetError,
+            reconcile_operation,
+            reserve_operation,
+        )
+
+        op = next((o for o in self.graph.operations if o.id == operation_id), None)
+        if (
+            op is None
+            or not isinstance(payload, bytes)
+            or len(payload) > op.max_request_bytes
+            or hashlib.sha256(payload).hexdigest() != op.input_payload_sha256
+        ):
+            raise OCRBudgetError("request-payload-not-approved")
+        # Reservation failure, including fsync failure, must precede network effects.
+        if time.monotonic() >= self._deadline:
+            raise OCRBudgetError("wall-budget-exhausted")
+        reserve_operation(self.graph, operation_id, self.ledger)
+        started = time.monotonic()
+        try:
+            with self._client.stream(
+                op.method,
+                op.endpoint,
+                content=payload,
+                headers={
+                    "Authorization": authorization,
+                    "Content-Type": content_type,
+                    "Accept-Encoding": "identity",
+                },
+                timeout=op.timeout_seconds,
+            ) as response:
+                if response.status_code < 200 or response.status_code >= 300:
+                    raise OCRBudgetError("wire-outcome-unknown-no-retry")
+                if (
+                    response.headers.get("Content-Encoding", "identity").lower()
+                    != "identity"
+                ):
+                    raise OCRBudgetError("compressed-response-refused")
+                result = bytearray()
+                chunks = (
+                    iter((response.content,))
+                    if response.is_stream_consumed
+                    else response.iter_raw(chunk_size=min(4096, op.max_response_bytes))
+                )
+                for chunk in chunks:
+                    if (
+                        time.monotonic()
+                        >= min(self._deadline, started + op.timeout_seconds)
+                        or len(result) + len(chunk) > op.max_response_bytes
+                    ):
+                        raise OCRBudgetError("response-budget-exhausted")
+                    result.extend(chunk)
+                if time.monotonic() >= min(
+                    self._deadline, started + op.timeout_seconds
+                ):
+                    raise OCRBudgetError("response-budget-exhausted")
+            self.response_receipts[operation_id] = {
+                "wire_observed": True, "semantic_status": "not-parsed",
+                "raw_bytes": len(result),
+                "raw_sha256": hashlib.sha256(result).hexdigest(),
+            }
+            reconcile_operation(self.graph, operation_id, self.ledger, "observed")
+            return bytes(result)
+        except BaseException:
+            # Timeout, cancellation, 429, redirect and malformed response retain
+            # full liability; neither SDK retry nor hidden cleanup is possible.
+            raise OCRBudgetError("wire-outcome-unknown-no-retry") from None
+
+    def process_pdf_with_attribution(self, operation_id, payload, *, authorization):
+        """Parse the actual bounded OCR response, preserving both model identities."""
+        from ..domain.ocr_request_budget import OCRBudgetError
+
+        op = next((o for o in self.graph.operations if o.id == operation_id), None)
+        if op is None or op.kind != "ocr":
+            raise OCRBudgetError("not-an-ocr-operation")
+        try:
+            request = bounded_json(payload)
+            if not isinstance(request, dict) or set(request) != {"model", "document"}:
+                raise ValueError
+            document = request["document"]
+            if (not isinstance(document, dict)
+                    or set(document) != {"type", "document_url"}
+                    or document["type"] != "document_url"
+                    or not isinstance(document["document_url"], str)
+                    or not document["document_url"].startswith("https://")
+                    or any(ord(c) < 33 for c in document["document_url"])):
+                raise ValueError
+            if request["model"] != "mistral-ocr-latest":
+                raise ValueError
+        except (ValueError, TypeError, UnicodeError, RecursionError, OCRBudgetError):
+            raise OCRBudgetError("invalid-ocr-request") from None
+        raw = self.execute(operation_id, payload, authorization=authorization)
+        try:
+            response = bounded_json(raw)
+            if not isinstance(response, dict) or set(response) != {"model", "pages"}:
+                raise ValueError
+            model = response["model"]
+            if (
+                not isinstance(model, str)
+                or re.fullmatch(
+                    r"mistral-ocr-(?!latest$)[A-Za-z0-9][A-Za-z0-9._-]{0,95}", model
+                )
+                is None
+            ):
+                raise ValueError
+            if (
+                not isinstance(response["pages"], list)
+                or not 1 <= len(response["pages"]) <= 32
+                or any(
+                    not isinstance(p, dict)
+                    or set(p) != {"index", "markdown"}
+                    or type(p.get("index")) is not int
+                    or p["index"] != index
+                    or not isinstance(p.get("markdown"), str)
+                    or len(p["markdown"].encode()) > 65536
+                    for index, p in enumerate(response["pages"])
+                )
+            ):
+                raise ValueError
+            if sum(len(p["markdown"].encode()) for p in response["pages"]) > 262144:
+                raise ValueError
+            pages = [
+                PageContent(
+                    page_number=p["index"] + 1,
+                    markdown=p["markdown"],
+                    has_content=bool(p["markdown"].strip()),
+                    images=[],
+                    tables=[],
+                )
+                for p in response["pages"]
+            ]
+        except (ValueError, KeyError, TypeError, AttributeError, RecursionError, UnicodeError, OCRBudgetError):
+            self.response_receipts[operation_id]["semantic_status"] = "parse-failed"
+            raise OCRBudgetError("invalid-ocr-response") from None
+        self.response_receipts[operation_id]["semantic_status"] = "validated"
+        return MistralOCRExecution("mistral-ocr-latest", model, pages)
+
+
+def bounded_json(raw):
+    """Bound nesting before parser recursion; raw bytes are already capped."""
+    import json
+
+    from ..domain.ocr_request_budget import OCRBudgetError
+
+    depth = 0
+    quoted = escaped = False
+    for value in raw:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif value == 92:
+                escaped = True
+            elif value == 34:
+                quoted = False
+        elif value == 34:
+            quoted = True
+        elif value in (91, 123):
+            depth += 1
+            if depth > 16:
+                raise OCRBudgetError("json-depth-exhausted")
+        elif value in (93, 125):
+            depth -= 1
+
+    def reject_constant(value):
+        raise ValueError("nonfinite-json")
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate-json-key")
+            result[key] = value
+        return result
+
+    if not isinstance(raw, bytes):
+        raise ValueError("json-bytes-required")
+    result = json.loads(raw.decode("utf-8", "strict"),
+                        parse_constant=reject_constant, object_pairs_hook=unique_object)
+    remaining = [result]
+    nodes = 0
+    while remaining:
+        value = remaining.pop()
+        nodes += 1
+        if nodes > 4096:
+            raise OCRBudgetError("json-node-budget-exhausted")
+        if isinstance(value, dict):
+            remaining.extend(value.keys())
+            remaining.extend(value.values())
+        elif isinstance(value, list):
+            remaining.extend(value)
+        elif isinstance(value, str) and len(value.encode()) > 65536:
+            raise OCRBudgetError("json-scalar-budget-exhausted")
+    return result

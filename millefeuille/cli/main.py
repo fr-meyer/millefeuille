@@ -804,6 +804,10 @@ overrides; the packaged placeholder defaults are not accepted.
 def entrypoint() -> None:
     """Dispatch read-only subcommands before falling back to Hydra."""
     argv = sys.argv[1:]
+    if argv and argv[0] == "inspect-native":
+        from millefeuille.cli.native_source import run_native_source_cli
+
+        sys.exit(run_native_source_cli(argv[1:]))
     if argv and argv[0] in {"artifacts", "status"}:
         sys.exit(run_artifact_cli(argv))
     if argv and argv[0] == "source-pack":
@@ -827,6 +831,7 @@ def entrypoint() -> None:
         "card",
         "index",
         "acceptance",
+        "acceptance-preview",
         "classify",
         "writeback",
         "retrieve",

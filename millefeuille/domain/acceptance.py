@@ -120,6 +120,128 @@ class AcceptanceBatchWriteResult:
         }
 
 
+_PREVIEW_COUNT_KEYS = frozenset(
+    (
+        "source_pack",
+        "handoff_rows",
+        "native_extraction",
+        "ocr_extraction",
+        "route",
+        "structure",
+        "summary",
+        "card",
+        "index",
+        "duplicate_scan",
+        "passed_stages_before_acceptance",
+    )
+)
+
+
+def preview_acceptance_summary(
+    *,
+    source_pack_root: str | Path,
+    run_id: str,
+    paper_id: str | None = None,
+    item_key: str | None = None,
+    handoff_path: str | Path | None = None,
+    duplicate_scan_path: str | Path | None = None,
+    artifact_root: str | Path | None = None,
+    stage_manifest: str | Path | None = None,
+) -> dict[str, Any]:
+    """Inspect saved metadata, not semantic acceptance or an approved write plan."""
+    try:
+        resolved = resolve_run_artifacts(
+            source_pack_root=source_pack_root,
+            run_id=run_id,
+            paper_id=paper_id,
+            item_key=item_key,
+            artifact_root=artifact_root,
+            stage_manifest=stage_manifest,
+        )
+        summary = _build_acceptance_summary(
+            resolved=resolved,
+            handoff_path=handoff_path,
+            duplicate_scan_path=duplicate_scan_path,
+        )
+        for identity in (summary.paper_id, summary.run_id):
+            if identity in {".", ".."} or not _SAFE_BATCH_LOCATOR.fullmatch(identity):
+                raise MillefeuilleContractError("unsafe identity")
+        checks = []
+        for check in summary.checks:
+            if check.name not in {
+                "source-pack",
+                "handoff",
+                "extract-native",
+                "extract-ocr",
+                "route",
+                "structure",
+                "summarize",
+                "card",
+                "index",
+                "duplicate-scan",
+            }:
+                raise MillefeuilleContractError("unsupported check")
+            checks.append({"name": check.name, "status": check.status.value})
+        duplicate_evidence_present = type(
+            summary.duplicate_scan.get("matched_existing")
+        ) is bool and summary.duplicate_scan.get("status") not in {
+            "not-run",
+            "not-started",
+            "not_started",
+            "planned",
+            "pending",
+        }
+        if not duplicate_evidence_present:
+            for check in checks:
+                if check["name"] == "duplicate-scan":
+                    check["status"] = AcceptanceCheckStatus.NEEDS_REVIEW.value
+        review_codes = {
+            check["name"] + ":needs-review"
+            for check in checks
+            if check["status"] == AcceptanceCheckStatus.NEEDS_REVIEW.value
+        }
+        if summary.review_reasons:
+            review_codes.add("saved-evidence-review-required")
+        if not duplicate_evidence_present:
+            review_codes.add("duplicate-scan-evidence-unavailable")
+        return {
+            "schema_version": "millefeuille-acceptance-preview/v0.1",
+            "status": "planned",
+            "mode": "preview",
+            "recorded": False,
+            "limitations": [
+                "saved-metadata-only-not-semantic-whole-paper-acceptance",
+                "duplicate-check-pass-is-not-negative-scan-proof",
+                "not-an-exact-mutation-plan-or-approval",
+            ],
+            "writes": 0,
+            "provider_calls": 0,
+            "paper_id": summary.paper_id,
+            "run_id": summary.run_id,
+            "candidate_status": (
+                AcceptanceStatus.NEEDS_REVIEW.value
+                if review_codes
+                else summary.status.value
+            ),
+            "scope": "saved-structural-evidence-only",
+            "semantic_acceptance_performed": False,
+            "write_authorized": False,
+            "input_snapshot_bound": False,
+            "duplicate_scan_evidence_present": duplicate_evidence_present,
+            "checks": checks,
+            "counts": {
+                key: value
+                for key, value in summary.counts.items()
+                if key in _PREVIEW_COUNT_KEYS and type(value) is int and value >= 0
+            },
+            "review_codes": sorted(review_codes),
+        }
+    except (MillefeuilleContractError, OSError, ValueError, TypeError, KeyError):
+        raise MillefeuilleContractError(
+            "acceptance-preview: saved-evidence-invalid-or-unavailable"
+        ) from None
+
+
 def write_acceptance_summary(
     *,
     source_pack_root: str | Path,
@@ -717,6 +839,17 @@ def _build_handoff_context(
     }
 
 
+def historical_versions_match(handoff_version: Any, source_version: Any) -> bool:
+    """Equal nonnegative integer snapshots, never proof of remote freshness."""
+    return (
+        type(handoff_version) is int
+        and type(source_version) is int
+        and handoff_version >= 0
+        and source_version >= 0
+        and handoff_version == source_version
+    )
+
+
 def _build_multi_source_handoff_context(
     *,
     resolved: ResolvedRunArtifacts,
@@ -752,6 +885,10 @@ def _build_multi_source_handoff_context(
             == source["identity"]["canonical_filename"]
             and actual[key].get("sha256") == source["sha256"]
             and actual[key].get("file_size_bytes") == source["byte_size"]
+            and historical_versions_match(
+                actual[key].get("zotero_version"),
+                source["identity"].get("zotero_version"),
+            )
             for key, source in expected.items()
         )
     )
@@ -763,6 +900,8 @@ def _build_multi_source_handoff_context(
         "matched": matched,
         "match_count": len(item_rows),
         "source_count": len(sources),
+        "version_comparison": "historical-snapshot-only",
+        "remote_freshness_verified": False,
         "attachment_keys": sorted(expected),
         "sha256_present": bool(item_rows)
         and all(row.get("sha256") is not None for row in item_rows),

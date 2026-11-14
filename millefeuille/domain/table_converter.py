@@ -339,11 +339,10 @@ def _extract_table_rows(
                 in_cell = False
                 current_cell_tokens = []
 
-        elif token.type == "tr_close":
+        elif token.type == "tr_close" and current_row:
             # End of row
-            if current_row:
-                rows.append(current_row)
-                current_row = []
+            rows.append(current_row)
+            current_row = []
 
     # Handle case where last row doesn't have tr_close (shouldn't happen, but defensive)
     if current_row:

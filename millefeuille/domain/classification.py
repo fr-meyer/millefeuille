@@ -357,6 +357,9 @@ def _prepare_classification_action_from_evidence(
     )
     _require_passing_acceptance(resolved)
     evidence = _load_classification_action_evidence(action_evidence_path)
+    from millefeuille.domain.taxonomy import validate_external_classification_taxonomy
+
+    validate_external_classification_taxonomy(evidence, run_id=resolved.run_id)
     action_id = str(evidence["action_id"])
     mode = ClassificationMode(str(evidence["mode"]))
     outcome = ClassificationActionOutcome(str(evidence["outcome"]))
@@ -634,6 +637,9 @@ def _prepare_classification_from_evidence(
     _require_passing_acceptance(resolved)
 
     evidence = _load_classification_evidence(evidence_path)
+    from millefeuille.domain.taxonomy import validate_external_classification_taxonomy
+
+    validate_external_classification_taxonomy(evidence, run_id=resolved.run_id)
     taxonomy_version = str(evidence["taxonomy_version"])
     mode = ClassificationMode(str(evidence.get("mode", "single")))
     rejected_alternatives = [
@@ -734,6 +740,10 @@ def _require_passing_acceptance(resolved: ResolvedRunArtifacts) -> None:
         raise MillefeuilleContractError(
             "classification preview requires an acceptance summary with status pass"
         )
+    if len(resolved.source_pack_manifest.get("sources", [])) > 1:
+        from millefeuille.domain.semantic_acceptance import require_semantic_companion
+
+        require_semantic_companion(resolved)
     expected_acceptance_identity = {
         "paper_id": resolved.paper_id,
         "run_id": resolved.run_id,
@@ -748,9 +758,25 @@ def _require_passing_acceptance(resolved: ResolvedRunArtifacts) -> None:
             )
 
 
-def _persist_classification(
+def render_classification_outputs(
     prepared: _PreparedClassification,
-) -> ClassificationWriteResult:
+) -> dict[str, bytes]:
+    import json
+
+    from millefeuille.domain.acceptance_output_plan import json_bytes
+
+    outputs = {}
+
+    def write_json_object(path, payload):
+        outputs[relative_ref(path, prepared.resolved.run_dir)] = json_bytes(payload)
+
+    def write_text(path, text):
+        outputs[relative_ref(path, prepared.resolved.run_dir)] = text.encode("utf-8")
+
+    def write_jsonl_records(path, records):
+        lines = [json.dumps(record, ensure_ascii=False) for record in records]
+        write_text(path, ("\n".join(lines) + "\n") if lines else "")
+
     resolved = prepared.resolved
     decision = prepared.decision
     plan = prepared.plan
@@ -846,15 +872,25 @@ def _persist_classification(
             "plan_ref": relative_ref(prepared.preview_path, resolved.run_dir),
         },
     )
-    persist_run_artifacts(
-        resolved,
-        stage_manifest=stage_manifest,
-        artifact_index=artifact_index,
-    )
+    write_json_object(resolved.stage_manifest_path, stage_manifest.to_dict())
+    write_json_object(resolved.artifact_index_path, artifact_index.to_dict())
+    if len(outputs) != 10:
+        raise MillefeuilleContractError("classification output paths overlap")
+    return outputs
+
+
+def _persist_classification(
+    prepared: _PreparedClassification,
+) -> ClassificationWriteResult:
+    # Legacy compatibility writer, not a journaled publication executor.
+    for ref, payload in render_classification_outputs(prepared).items():
+        target = prepared.resolved.run_dir / ref
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
     return ClassificationWriteResult(
-        paper_id=resolved.paper_id,
-        run_id=resolved.run_id,
-        status=decision.status.value,
+        paper_id=prepared.resolved.paper_id,
+        run_id=prepared.resolved.run_id,
+        status=prepared.decision.status.value,
         plan_path=prepared.plan_path,
         decision_json_path=prepared.decision_json_path,
         writeback_preview_path=prepared.preview_path,
@@ -1268,6 +1304,10 @@ def _load_classification_action_evidence(path: str | Path) -> dict[str, Any]:
         "mode",
         "outcome",
         "taxonomy_version",
+        "taxonomy_lock",
+        "taxonomy_lock_identity",
+        "primary_entry_id",
+        "strongest_rejected_entry_id",
         "prior_decision_ref",
         "primary_path",
         "confidence",

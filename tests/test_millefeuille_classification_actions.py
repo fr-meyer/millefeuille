@@ -36,6 +36,39 @@ PRIMARY_PATH = "Methods > Normalization & training dynamics"
 CORRECTED_PATH = "Methods > Optimization & training dynamics"
 
 
+def action_lock_fields():
+    from millefeuille.domain.taxonomy import (
+        create_taxonomy_lock,
+        seal_taxonomy_registry,
+    )
+    from tests.test_millefeuille_classification_model import ClassificationModelTests
+
+    registry = ClassificationModelTests.make_registry()
+    entries = registry["entries"]
+    by_id = {e["entry_id"]: e for e in entries}
+    by_id["L2-TRAINING"]["label"] = "Normalization & training dynamics"
+    by_id["L2-ARCHITECTURE"]["label"] = "Optimization & training dynamics"
+    app = dict(by_id["L1-METHODS"], entry_id="L1-APPS", label="Applications")
+    vision = dict(
+        by_id["L2-TRAINING"], entry_id="L2-VISION", parent_id="L1-APPS", label="Vision"
+    )
+    registry = {k: v for k, v in registry.items() if k != "content_identity"}
+    registry.update(
+        entries=sorted(entries + [app, vision], key=lambda e: e["entry_id"]),
+        taxonomy_version="taxonomy-v1",
+    )
+    registry = seal_taxonomy_registry(registry)
+    lock = create_taxonomy_lock(
+        registry,
+        lock_id="actions",
+        scope_type="single-run",
+        scope_id=RUN_ID,
+        locked_by="synthetic",
+        locked_at="2026-11-12T00:00:00Z",
+    )
+    return {"taxonomy_lock": lock, "taxonomy_lock_identity": lock["content_identity"]}
+
+
 def _write_json(path: Path, payload: dict[str, object]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -69,6 +102,14 @@ def _prepare_classified_run(
     if acceptance_exit != 0:
         raise AssertionError(f"fixture acceptance failed with {acceptance_exit}")
     classification_path = _write_classification_evidence_json(tempdir)
+    payload = json.loads(classification_path.read_text(encoding="utf-8"))
+    payload.update(action_lock_fields())
+    payload.update(
+        taxonomy_version="taxonomy-v1",
+        primary_entry_id="L2-TRAINING",
+        primary_path=PRIMARY_PATH,
+    )
+    _write_json(classification_path, payload)
     if unresolved:
         payload = json.loads(classification_path.read_text(encoding="utf-8"))
         payload["review_reasons"] = ["taxonomy fit remains ambiguous"]
@@ -132,6 +173,10 @@ def _write_action_evidence(
             }
         ],
     }
+    payload.update(action_lock_fields())
+    payload["primary_entry_id"] = (
+        "L2-TRAINING" if primary_path == PRIMARY_PATH else "L2-ARCHITECTURE"
+    )
     if review_reasons is not None:
         payload["review_reasons"] = review_reasons
     if taxonomy_change_request is not None:
@@ -585,3 +630,26 @@ class TestMillefeuilleClassificationActions(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReleasedActionGuardTests(unittest.TestCase):
+    def test_arbitrary_corrected_path_refuses_before_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, run = _prepare_classified_run(tmp)
+            before = _snapshot_files(run)
+            path = _write_action_evidence(
+                Path(tmp) / "arbitrary.json",
+                outcome="corrected",
+                primary_path="Unreleased > Arbitrary invented class",
+            )
+            from tests.test_persistence_guards import locked_evidence
+
+            payload = json.loads(path.read_text())
+            lock = locked_evidence(RUN_ID)
+            payload.update(lock)
+            payload["primary_path"] = "Unreleased > Arbitrary invented class"
+            _write_json(path, payload)
+            self.assertEqual(
+                run_stage_cli(_action_args(root, path), stdout=StringIO()), 2
+            )
+            self.assertEqual(before, _snapshot_files(run))

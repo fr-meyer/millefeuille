@@ -282,6 +282,9 @@ def _write_classification_evidence_json(tempdir: str) -> Path:
         json.dumps(
             {
                 "schema_version": ("millefeuille-classification-fixture-evidence/v0.1"),
+                **_released_classification_binding(
+                    "Methods > Normalization & training dynamics"
+                ),
                 "taxonomy_version": "taxonomy-v1",
                 "mode": "single",
                 "primary_path": "Methods > Normalization & training dynamics",
@@ -923,3 +926,79 @@ class TestMillefeuilleStageCli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _released_classification_binding(
+    primary_path, taxonomy_version="taxonomy-v1", run_id=RUN_ID
+):
+    """A genuine released synthetic registry, not a validator exemption."""
+    from millefeuille.domain.taxonomy import (
+        create_taxonomy_lock,
+        seal_taxonomy_registry,
+    )
+
+    paths = {primary_path, "Applications > Vision"}
+    entries = []
+    parents = {}
+    primary_id = None
+    for index, path in enumerate(sorted(paths)):
+        parent, label = path.split(" > ", 1)
+        if parent not in parents:
+            parents[parent] = "P" + str(len(parents))
+            entries.append(
+                {
+                    "entry_id": parents[parent],
+                    "level": 1,
+                    "parent_id": None,
+                    "label": parent,
+                    "definition": "Synthetic definition",
+                    "include_when": ["Synthetic fit"],
+                    "exclude_when": ["Synthetic mismatch"],
+                    "boundary_notes": [],
+                    "status": "active",
+                    "replacement_id": None,
+                }
+            )
+        entry_id = "L" + str(index)
+        if path == primary_path:
+            primary_id = entry_id
+        entries.append(
+            {
+                "entry_id": entry_id,
+                "level": 2,
+                "parent_id": parents[parent],
+                "label": label,
+                "definition": "Synthetic definition",
+                "include_when": ["Synthetic fit"],
+                "exclude_when": ["Synthetic mismatch"],
+                "boundary_notes": [],
+                "status": "active",
+                "replacement_id": None,
+            }
+        )
+    registry = seal_taxonomy_registry(
+        {
+            "schema_version": "millefeuille-taxonomy-registry/v0.1",
+            "registry_id": "synthetic",
+            "taxonomy_version": taxonomy_version,
+            "previous_version": None,
+            "previous_content_identity": None,
+            "status": "released",
+            "governing_basis": "Primary intellectual contribution",
+            "owner_id": "synthetic",
+            "entries": entries,
+        }
+    )
+    lock = create_taxonomy_lock(
+        registry,
+        lock_id="synthetic",
+        scope_type="single-run",
+        scope_id=run_id,
+        locked_by="synthetic",
+        locked_at="2026-11-12T00:00:00Z",
+    )
+    return {
+        "taxonomy_lock": lock,
+        "taxonomy_lock_identity": lock["content_identity"],
+        "primary_entry_id": primary_id,
+    }

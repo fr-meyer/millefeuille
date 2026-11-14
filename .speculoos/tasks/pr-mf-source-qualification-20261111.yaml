@@ -1,0 +1,26 @@
+id: pr-mf-source-qualification-20261111
+title: Offline actual PDF source qualification with honest review boundaries
+status: in-progress
+branch: feat/pr-mf-source-qualification-20261111
+base_branch: dev
+base_sha: 84890910cd617ce5a96440d0bad30c4b1ca92cf9
+write_paths:
+  - millefeuille/domain/source_qualification.py
+  - tests/test_millefeuille_real_source_qualification.py
+  - specs/millefeuille-pipeline/supported-sources.md
+  - .speculoos/tasks/pr-mf-source-qualification-20261111.yaml
+scope:
+  - Original valid PDF inputs through opt-in actual product decoder seam
+  - Native invariants and complex-layout review, duplicate and fault contracts
+  - Preserve OPEN_G2 scanned and mixed live Mistral qualification
+limitations:
+  - Optional PyPDF2 capability not installed by declared dependencies
+  - Seam not wired into upstream planner or CLI
+  - No hostile-document resource isolation or glyph layout fidelity
+  - No live providers, private corpus, publication, release or deployment
+validation:
+  focused: Nine tests passed with five layout subcases, reused dependencies
+  s05: Existing upstream order permutation and attachment-qualified pages regression
+  evidence: Parent-owned implementation-2236/source-qualification/source-results.json
+publication_authority: None, local commit only; parent owns integration
+programme_completion: false

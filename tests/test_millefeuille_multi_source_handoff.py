@@ -36,6 +36,7 @@ def _fixture(root: Path):
             "file_size_bytes": source["byte_size"],
             "is_pdf": True,
             "verification_strength": "full",
+            "zotero_version": source["identity"]["zotero_version"],
         }
         for source in manifest["sources"]
     ]
@@ -71,6 +72,12 @@ class MultiSourceHandoffTests(unittest.TestCase):
             resolved, rows = _fixture(root)
             cases = {
                 "missing": rows[:1],
+                "version-drift": [rows[0], {**rows[1], "zotero_version": 2}],
+                "version-missing": [
+                    rows[0],
+                    {k: v for k, v in rows[1].items() if k != "zotero_version"},
+                ],
+                "version-malformed": [rows[0], {**rows[1], "zotero_version": "1"}],
                 "wrong-hash": [rows[0], {**rows[1], "sha256": "0" * 64}],
                 "missing-hash": [
                     rows[0],

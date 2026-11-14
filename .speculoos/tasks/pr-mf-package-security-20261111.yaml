@@ -1,0 +1,35 @@
+id: pr-mf-package-security-20261111
+title: Qualify saved run-package no-follow and recovery boundaries
+status: in-progress
+branch: feat/pr-mf-run-package-preview-20261111
+base_branch: dev
+base_sha: 78108520608625a364ecf373df5214c2de500717
+write_paths:
+  - tests/test_millefeuille_run_package_security.py
+  - specs/millefeuille-pipeline/multi-source-run-package.md
+  - .speculoos/tasks/pr-mf-package-security-20261111.yaml
+github:
+  issue: null
+  pull_request: null
+  url: null
+  head_sha: null
+scope:
+  - Synthetic offline negative coverage for existing planner and recovery guards
+  - Document nontransactional inventory and advisory-lock limitations
+acceptance:
+  - Unsafe input entries and symlinked root fail before package writes
+  - Nonregular recovery input fails without blocking and is preserved
+  - Recovery output substitution fails while preserving created outputs
+  - Newly added input after approval blocks publication and recovery
+  - Existing package regressions and whole-repository Ruff checks pass
+publication_boundary:
+  statement: Local synthetic qualification only; no provider, private paper, publication, replay, commit, push, merge or release.
+documentation_impact:
+  status: updated
+  rationale: Records tested guards and precise residual concurrent-tree limitations.
+publish_authority: Bounded offline owner approval 2026-11-11; parent owns integration and external gates.
+private_data_scan: Synthetic fixtures only; no private paper trees read.
+
+qualification_source_head: ea5072cae7fc2882275678af287624c581ccb5f6
+qualification_result: Existing implementation failed closed in 12 synthetic cases; no production guard added.
+integration_owner: Parent programme; external publication remains separately gated.

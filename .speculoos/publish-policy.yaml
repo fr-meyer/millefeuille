@@ -62,3 +62,11 @@ scrub_patterns:
     regex: "%PDF-"
   - name: zotero-api-key-looking-token
     regex: "\\b[A-Za-z0-9]{24}\\b"
+
+release_safety:
+  ci_effects: read-only-tests-only
+  release_actor: human_web
+  approvals: [promotion, dependent-final-main-tag-assets, package-publication, activation-if-selected]
+  final_main_rebuild_required: true
+  current_review_authority: unresolved-requires-supported-live-readback
+  enforcement_class: repository_declared

@@ -98,6 +98,9 @@ def _write_classification_evidence(
         ],
         "rejected_alternatives": [],
     }
+    from tests.test_millefeuille_stage_cli import _released_classification_binding
+
+    payload.update(_released_classification_binding(primary_path, taxonomy_version))
     if review_reasons:
         payload["review_reasons"] = review_reasons
     if adjudication_required:
@@ -112,6 +115,21 @@ def _write_batch_manifest(
     taxonomy_version: object = "taxonomy-v1",
     runs: list[dict[str, object]],
 ) -> None:
+    from tests.test_millefeuille_stage_cli import _released_classification_binding
+
+    for row in runs:
+        ref = row.get("evidence_ref")
+        if not isinstance(ref, str) or ".." in Path(ref).parts:
+            continue
+        evidence_path = path.parent / ref
+        if evidence_path.is_file():
+            payload = json.loads(evidence_path.read_bytes())
+            payload.update(
+                _released_classification_binding(
+                    payload["primary_path"], payload["taxonomy_version"], row["run_id"]
+                )
+            )
+            _write_json(evidence_path, payload)
     _write_json(
         path,
         {

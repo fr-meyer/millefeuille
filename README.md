@@ -1,6 +1,6 @@
 # Millefeuille
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)
+![Version](https://img.shields.io/badge/package_version-0.5.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/fr-meyer/millefeuille?utm_source=oss&utm_medium=github&utm_campaign=fr-meyer%2Fmillefeuille&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
@@ -1305,3 +1305,39 @@ Published GPT summary batches use retrieval manifest/result v0.2 with explicit
 published-run refs and complete pinned-root source/publication snapshots. Original
 summary identity, locators and lineage are retained; v0.1 inline batches remain
 compatible. See [published summary retrieval](specs/millefeuille-pipeline/published-summary-retrieval.md).
+
+### Offline run-package preview
+
+```sh
+millefeuille source-pack run-package-preview --source-pack-root /path/to/source-packs --item-key ITEM1234 --run-id saved-run --json
+```
+
+Verifies an existing multi-source native run and emits metadata only: planned
+files, input inventory and `preview_sha256`, with `status: planned`, `writes: 0`
+and `provider_calls: 0`. Omit `--json` for a concise human summary. No content
+generation, publication, recovery, approval or provider calls are performed.
+See [operator guidance](specs/millefeuille-pipeline/multi-source-run-package.md).
+
+Package metadata is 0.5.0, not a new release claim. CI has no release mutation job.
+Promotion, tags, assets, package publication and activation remain separately
+approved: see [release policy](specs/millefeuille-pipeline/release-version-policy.md).
+
+### Read-only native fixture inspection
+
+With the optional `native` extra available, use the packaged entrypoint:
+
+```sh
+millefeuille inspect-native --pdf original.pdf --sha256 HEX --format json --trusted-original-fixture
+```
+
+Restricted to trusted original synthetic fixtures, not untrusted/production PDFs:
+no CPU/memory isolation exists. Caps: 1 MiB input, 32 pages, 1 MiB decoded UTF-8
+text; oversize content is refused, not truncated. Default stdout contains hashes,
+counts, tool/limitations and source-hash-qualified page routes, no source prose.
+`--include-text` explicitly authorizes full source plaintext disclosure to stdout
+(and caller captures/logs), within those limits. No files, credentials, provider
+requests or fallback are used. Empty pages are `needs-ocr`, never success.
+All observations remain `needs-review`. A reviewer may explicitly use observations
+to prepare existing native evidence inputs; no upstream stages are automatically
+fed or altered. Scanned/mixed OCR success remains OPEN_G2; layout fidelity remains
+unqualified. See [source limitations](specs/millefeuille-pipeline/supported-sources.md).

@@ -1,13 +1,13 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-098-reconcile-delivery-ledgers
+canonical_task: pr-mf-approved-completion-20261112
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: chore/pr-098-ledger-reconciliation
+  working_branch: feat/pr-mf-approved-completion-20261112-1851
 status:
   phase: implementation
   pret_a_coder: ready
@@ -16,9 +16,12 @@ release_policy:
   branch_model: feature-branch-to-dev
   stable_branch: main
   integration_branch: dev
-  tag_policy: no-release-in-bootstrap
+  tag_policy: separately-approved-human-web-final-main-only
   release_gate: separate-explicit-approval
 review_policy:
+  current_authority_status: unresolved-requires-supported-live-readback
+  enforcement_class: repository_declared
+  reconciliation: Historical actors retained, no new reviewer or waiver selected.
   self_managed:
     policy: optional
     fallback_role: emergency_fallback
@@ -83,7 +86,7 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
+    status: historical-not-refreshed
     number: 98
     url: https://github.com/fr-meyer/millefeuille/pull/98
     base_branch: dev
@@ -119,7 +122,7 @@ gates:
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: pr-098-reconcile-delivery-ledgers
+current_task: pr-mf-approved-completion-20261112
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from millefeuille.clients import MistralClient, MistralOCRError
+from millefeuille.clients.mistral_client import MistralAPIError
 from millefeuille.domain.config import MistralOCRConfig
 
 
@@ -15,31 +16,32 @@ class TestMistralOCRModelAttribution(unittest.TestCase):
     def _client(response: object) -> tuple[MistralClient, MagicMock]:
         sdk = MagicMock()
         sdk.ocr.process.return_value = response
-        with patch(
-            "millefeuille.clients.mistral_client.Mistral",
-            return_value=sdk,
-        ):
-            client = MistralClient(
-                MistralOCRConfig(
-                    api_key="fixture",
-                    model="mistral-ocr-4-1",
-                    include_image_base64=False,
-                )
-            )
+        # Test-only legacy attribution harness. Never initializes SDK or enables
+        # the deliberately disabled production constructor/provider route.
+        client = MistralClient.__new__(MistralClient)
+        client.config = MistralOCRConfig(
+            api_key="fixture", model="mistral-ocr-latest", include_image_base64=False
+        )
+        client.client = sdk
+        client._uploaded_files = {}
         client._uploaded_files["document-1"] = "https://example.invalid/document.pdf"
         return client, sdk
+
+    def test_production_constructor_refuses_before_config_access(self):
+        with self.assertRaisesRegex(MistralAPIError, "offline-default"):
+            MistralClient(object())
 
     def test_records_exact_requested_and_returned_model_ids(self):
         client, sdk = self._client(SimpleNamespace(model="mistral-ocr-4-1", pages=[]))
 
         execution = client.process_pdf_with_attribution("document-1")
 
-        self.assertEqual(execution.requested_model, "mistral-ocr-4-1")
+        self.assertEqual(execution.requested_model, "mistral-ocr-latest")
         self.assertEqual(execution.returned_model, "mistral-ocr-4-1")
         self.assertEqual(execution.pages, [])
         self.assertEqual(
             sdk.ocr.process.call_args.kwargs["model"],
-            "mistral-ocr-4-1",
+            "mistral-ocr-latest",
         )
 
     def test_attributed_boundary_rejects_missing_returned_model(self):

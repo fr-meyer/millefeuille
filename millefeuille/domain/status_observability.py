@@ -577,6 +577,10 @@ def _join_status(
     index_join = _join_index(context, blockers)
     acceptance_join = _join_acceptance(context, blockers)
     classification_join = _join_classification(context, blockers)
+    if classification_join["status"] == "classified" and (
+        acceptance_join["state"] != "observed" or acceptance_join["status"] != "pass"
+    ):
+        blockers.append("classification: passing acceptance not observed")
     writeback_join = _join_writeback(context, blockers)
     observation_claims = _canonical_observation_claims(
         context,
@@ -848,9 +852,30 @@ def _join_acceptance(
         )
     if summary.status.value != "pass":
         blockers.append(f"acceptance: {summary.status.value}")
+    semantic_status = summary.status.value
+    if len((context.source_pack_payload or {}).get("sources", [])) > 1:
+        from types import SimpleNamespace
+
+        from millefeuille.domain.semantic_acceptance import require_semantic_companion
+
+        try:
+            require_semantic_companion(
+                SimpleNamespace(
+                    run_dir=context.run_dir,
+                    paper_id=context.paper_id,
+                    run_id=context.run_id,
+                    source_hash=context.source_hash,
+                    source_pack_manifest=context.source_pack_payload,
+                    source_pack_dir=context.source_pack_dir,
+                    artifact_index=context.artifact_index,
+                )
+            )
+        except (MillefeuilleContractError, ValueError, OSError):
+            semantic_status = "needs-review"
+            blockers.append("acceptance: semantic source review missing or stale")
     return {
         "state": "observed",
-        "status": summary.status.value,
+        "status": semantic_status,
         "content_digest": _digest_object(payload),
     }
 

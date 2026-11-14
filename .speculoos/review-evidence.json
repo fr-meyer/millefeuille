@@ -1,8 +1,14 @@
 {
   "schema_version": "0.1",
   "requirements": {
-    "required_sources": ["local_validation", "github_checks"],
-    "optional_sources": ["self_managed", "mergeguez_review"],
+    "required_sources": [
+      "local_validation",
+      "github_checks"
+    ],
+    "optional_sources": [
+      "self_managed",
+      "mergeguez_review"
+    ],
     "reviewers": {
       "self_managed": {
         "policy": "optional"
@@ -14,8 +20,12 @@
     "reviewer_groups": {
       "required_pr_review": {
         "policy": "required",
-        "primary": ["mergeguez_review"],
-        "fallback_any_of": ["self_managed"],
+        "primary": [
+          "mergeguez_review"
+        ],
+        "fallback_any_of": [
+          "self_managed"
+        ],
         "summary": "Mergeguez review evidence is the primary required PR-review source.",
         "fallback_summary": "Self-managed evidence is accepted only if hosted Mergeguez review is unavailable."
       }
@@ -24,31 +34,31 @@
   "sources": {
     "local_validation": {
       "kind": "local_validation",
-      "status": "passed",
-      "summary": "PR #98 metadata parse, completed-ledger consistency, branch-truth invariants, and diff checks passed on the current branch.",
-      "evidence_ref": ".speculoos/tasks/pr-098-reconcile-delivery-ledgers.yaml",
-      "updated_at": "pr-098-reconcile-delivery-ledgers"
+      "status": "not-current",
+      "summary": "Current exact-head local validation pending integration.",
+      "evidence_ref": null,
+      "updated_at": "2026-11-12-approved-completion"
     },
     "github_checks": {
       "kind": "github_checks",
       "status": "pending-live-read",
-      "summary": "Live GitHub checks for PR #98 must pass before merge.",
-      "evidence_ref": "https://github.com/fr-meyer/millefeuille/pull/98/checks",
-      "updated_at": "pr-098-reconcile-delivery-ledgers"
+      "summary": "Current exact-head evidence is not obtained; historical PR98 is not current enforcement.",
+      "evidence_ref": null,
+      "updated_at": "2026-11-12-approved-completion"
     },
     "self_managed": {
       "kind": "self_managed",
-      "status": "pending",
-      "summary": "Self-managed review remains an emergency fallback if hosted Mergeguez review is unavailable.",
+      "status": "pending-live-read",
+      "summary": "Current exact-head evidence is not obtained; historical PR98 is not current enforcement.",
       "evidence_ref": null,
-      "updated_at": "pr-098-reconcile-delivery-ledgers"
+      "updated_at": "2026-11-12-approved-completion"
     },
     "mergeguez_review": {
       "kind": "mergeguez_review",
       "status": "pending-live-read",
-      "summary": "Exact-head Mergeguez review is required for PR #98 before merge.",
-      "evidence_ref": "https://github.com/fr-meyer/millefeuille/pull/98",
-      "updated_at": "pr-098-reconcile-delivery-ledgers"
+      "summary": "Current exact-head evidence is not obtained; historical PR98 is not current enforcement.",
+      "evidence_ref": null,
+      "updated_at": "2026-11-12-approved-completion"
     }
   }
 }

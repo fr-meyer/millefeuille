@@ -1,0 +1,32 @@
+id: pr-mf-run-package-preview-20261111
+title: Expose provider-free saved run-package preview CLI
+status: in-progress
+branch: feat/pr-mf-run-package-preview-20261111
+base_branch: dev
+write_paths:
+  - millefeuille/cli/source_pack.py
+  - tests/test_millefeuille_run_package_preview_cli.py
+  - README.md
+  - specs/millefeuille-pipeline/multi-source-run-package.md
+  - .speculoos/tasks/pr-mf-run-package-preview-20261111.yaml
+github:
+  issue: null
+  pull_request: null
+  url: null
+  head_sha: null
+scope:
+  - Delegate metadata-only run-package-preview to the existing domain planner
+  - Preserve intake and expose no publication or approval flags
+acceptance:
+  - Exact preview fingerprint and inventory with planned status and zero writes and provider calls
+  - Deterministic JSON and concise human output without paper content
+  - Invalid identities, missing inputs, drift and OS read errors fail closed
+  - Synthetic inventory unchanged and existing intake regression passes
+  - Focused tests, Ruff, metadata and private-data checks pass
+publication_boundary:
+  statement: Local code, synthetic tests and docs only. No provider, OCR, Zotero, OpenKB, credential, durable source-pack, index, release or external write. Publication requires separate approval and broker gates.
+documentation_impact:
+  status: updated
+  rationale: README and pipeline spec describe invocation, metadata and non-goals.
+publish_authority: Owner approval on 2026-11-11 covers bounded local implementation; no upstream operation performed.
+private_data_scan: Required; fixtures synthetic, no actual private papers read.
