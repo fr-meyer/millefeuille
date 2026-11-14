@@ -27,8 +27,36 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def canonical_bytes(data):
+    return (json.dumps(data, sort_keys=True, indent=2, ensure_ascii=False,
+                       allow_nan=False) + "\n").encode("utf-8")
+
+
 def save(path, data):
-    path.write_text(json.dumps(data, sort_keys=True, indent=2) + "\n")
+    path.write_bytes(canonical_bytes(data))
+
+
+def binding(raw):
+    return dict(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+
+
+DIAGNOSTICS = {
+    b"UnicodeEncodeError": "UNICODE_ENCODE_ERROR",
+    b"UnicodeDecodeError": "UNICODE_DECODE_ERROR",
+    b"UnicodeError": "UNICODE_ERROR",
+    b"LookupError": "LOOKUP_ERROR",
+    b"ModuleNotFoundError": "MODULE_NOT_FOUND_ERROR",
+    b"ImportError": "IMPORT_ERROR",
+    b"PermissionError": "PERMISSION_ERROR",
+    b"FileNotFoundError": "FILE_NOT_FOUND_ERROR",
+    b"MemoryError": "MEMORY_ERROR",
+}
+
+
+def diagnostic_class(raw):
+    found = {DIAGNOSTICS[token] for token in DIAGNOSTICS
+             if re.search(rb"(?:^|[\r\n])" + token + rb":", raw)}
+    return next(iter(found)) if len(found) == 1 else "UNKNOWN"
 
 
 class PhaseError(RuntimeError):
@@ -60,73 +88,85 @@ class Runner:
 
     def run(self, phase, args, cwd=None, output=None):
         capture.require(re.fullmatch(r"[a-z0-9-]{1,64}", phase), "unsafe phase label")
-        rec = dict(phase=phase, state="STARTED", outcome=None, returncode=None, cleanup="not-needed")
+        rec = dict(phase=phase,state="STARTED",outcome=None,returncode=None,
+                   cleanup="not-needed",stderr=None)
         self.records.append(rec)
-        self.journal()  # Attempt is durable evidence BEFORE launch.
-        child, reader, raw, exceeded = None, None, bytearray(), threading.Event()
-        def drain():
+        self.journal()
+        child,readers,raw = None,[],bytearray()
+        exceeded,drain_failed = threading.Event(),threading.Event()
+        err_sample,err_hash,err_count = bytearray(),hashlib.sha256(),[0]
+        def drain_stdout():
             try:
                 while True:
-                    chunk = child.stdout.read(65536)
-                    if not chunk:
-                        return
-                    if len(raw) + len(chunk) > capture.MAX_BYTES:
-                        exceeded.set()
-                        child.kill()
-                        return
+                    chunk=child.stdout.read(65536)
+                    if not chunk: return
+                    if len(raw)+len(chunk)>capture.MAX_BYTES:
+                        exceeded.set();child.kill();return
                     raw.extend(chunk)
             except BaseException:
-                exceeded.set()
+                drain_failed.set()
+        def drain_stderr():
+            try:
+                while True:
+                    chunk=child.stderr.read(65536)
+                    if not chunk: return
+                    err_count[0]+=len(chunk)
+                    err_hash.update(chunk)
+                    err_sample.extend(chunk[:max(0,32768-len(err_sample))])
+                    if err_count[0]>1048576:
+                        exceeded.set();child.kill();return
+            except BaseException:
+                drain_failed.set()
         try:
-            capture.require(time.monotonic() - self.started < 900, "cooperative stage deadline")
-            child = subprocess.Popen([str(x) for x in args], cwd=cwd or self.root,
-                                     env=self.env, stdin=subprocess.DEVNULL,
-                                     stdout=subprocess.PIPE if output else subprocess.DEVNULL,
-                                     stderr=subprocess.DEVNULL)
-            if output:
-                reader = threading.Thread(target=drain, daemon=True)
-                reader.start()
+            capture.require(time.monotonic()-self.started<900,"cooperative stage deadline")
+            child=subprocess.Popen([str(x) for x in args],cwd=cwd or self.root,
+                env=self.env,stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE if output else subprocess.DEVNULL,stderr=subprocess.PIPE)
+            readers=[threading.Thread(target=drain_stderr,daemon=True)]
+            if output: readers.append(threading.Thread(target=drain_stdout,daemon=True))
+            for reader in readers: reader.start()
             child.wait(timeout=180)
-            if reader:
-                reader.join(timeout=5)
-            if exceeded.is_set() or (reader and reader.is_alive()):
-                rec["outcome"] = "OUTPUT_CAP_OR_DRAIN"
+            for reader in readers: reader.join(timeout=5)
+            if exceeded.is_set() or drain_failed.is_set() or any(r.is_alive() for r in readers):
+                rec["outcome"]="OUTPUT_CAP_OR_DRAIN"
                 raise PhaseError("sanitized phase output failure")
             if child.returncode:
-                rec["outcome"] = "NONZERO"
+                rec["outcome"]="NONZERO"
                 raise PhaseError("sanitized phase nonzero")
-            rec["outcome"] = "OK"
-            if output:
-                output.write_bytes(raw)
+            rec["outcome"]="OK"
+            if output: output.write_bytes(raw)
             return bytes(raw)
         except subprocess.TimeoutExpired:
-            rec["outcome"] = "TIMEOUT"
+            rec["outcome"]="TIMEOUT"
             raise PhaseError("sanitized phase timeout") from None
         except OSError:
-            rec["outcome"] = "LAUNCH_OR_IO_FAILURE" if child is None else "IO_FAILURE"
+            rec["outcome"]="LAUNCH_OR_IO_FAILURE" if child is None else "IO_FAILURE"
             raise PhaseError("sanitized phase I/O failure") from None
         except BaseException:
-            rec["outcome"] = rec["outcome"] or "VALIDATION_OR_CONTROL_FAILURE"
+            rec["outcome"]=rec["outcome"] or "VALIDATION_OR_CONTROL_FAILURE"
             raise
         finally:
             try:
                 if child:
                     if child.poll() is None:
-                        child.kill()  # Direct owned process only, not universal descendant proof.
-                        child.wait(timeout=5)
-                    rec["returncode"] = child.returncode
-                    if reader:
-                        reader.join(timeout=5)
-                        if reader.is_alive():
-                            raise PhaseError("drain cleanup incomplete")
-                        child.stdout.close()
-                    rec["cleanup"] = "DIRECT_CHILD_REAPED"
+                        child.kill();child.wait(timeout=5)
+                    rec["returncode"]=child.returncode
+                    for reader in readers: reader.join(timeout=5)
+                    if any(r.is_alive() for r in readers):
+                        raise PhaseError("drain cleanup incomplete")
+                    if output: child.stdout.close()
+                    child.stderr.close()
+                    rec["cleanup"]="DIRECT_CHILD_REAPED"
             except BaseException:
-                rec["cleanup"] = "FAILED"
-                rec["outcome"] = "CLEANUP_FAILURE"
+                rec["cleanup"]="FAILED"
+                rec["outcome"]="CLEANUP_FAILURE"
                 raise PhaseError("sanitized cleanup failure") from None
             finally:
-                rec["state"] = "FINISHED"
+                rec["stderr"]=dict(observed_bytes=err_count[0],sha256=err_hash.hexdigest(),
+                    truncated=err_count[0]>32768,stream_complete=child is not None and not drain_failed.is_set()
+                        and not exceeded.is_set() and not any(r.is_alive() for r in readers),
+                    diagnostic_class=diagnostic_class(bytes(err_sample)))
+                rec["state"]="FINISHED"
                 self.journal()
 
 
@@ -134,32 +174,59 @@ def footprint(root):
     return sum(p.stat().st_size for p in root.rglob("*") if p.is_file())
 
 
+def verify_receipts(root, require_success=True):
+    raw=(root/"OUTCOME.json").read_bytes()
+    outcome=json.loads(raw)
+    capture.require(outcome.get("schema")=="p09-outcome/v4","outcome schema")
+    capture.require(raw==canonical_bytes(outcome),"noncanonical outcome")
+    journal=(root/"COMMANDS.json").read_bytes()
+    capture.require(outcome["commands"]==binding(journal),"commands binding mismatch")
+    capture.require(journal==canonical_bytes(json.loads(journal)),"noncanonical commands")
+    summary=root/"SUMMARY.json"
+    if outcome["qualification_success"]:
+        capture.require(outcome["status"]=="SUCCESS_FINITE_PROVENANCE"
+                        and outcome["summary_absent"] is False,"success status")
+        data=summary.read_bytes()
+        capture.require(outcome["summary"]==binding(data),"summary binding mismatch")
+        capture.require(data==canonical_bytes(json.loads(data)),"noncanonical summary")
+    else:
+        capture.require(outcome["status"]=="FAILED" and outcome["summary"] is None
+            and outcome["summary_absent"] and not summary.exists(),"failed summary contract")
+    if require_success: capture.require(outcome["qualification_success"],"failed stage")
+    return outcome
+
+
 def finalize(root, result, records, failure=None, cap=CAP):
-    summary = root / "SUMMARY.json"
+    summary=root/"SUMMARY.json"
     summary.unlink(missing_ok=True)
-    journal = json.dumps(records, sort_keys=True, indent=2) + "\n"
-    outcome = dict(status="FAILED", cause=failure or "FINAL_VALIDATION", qualification_success=False)
+    journal=canonical_bytes(records)
+    (root/"COMMANDS.json").write_bytes(journal)
     try:
-        capture.require(failure is None, "stage failed")
-        capture.require(all(x["state"] == "FINISHED" and x["outcome"] == "OK"
-                            for x in records), "unsuccessful phase")
-        projected = json.dumps(result, sort_keys=True, indent=2) + "\n"
-        outcome = dict(status="SUCCESS_FINITE_PROVENANCE", qualification_success=True,
-                       summary_sha256=hashlib.sha256(projected.encode()).hexdigest())
-        final = json.dumps(outcome, sort_keys=True, indent=2) + "\n"
-        existing = footprint(root)
-        existing -= sum((root / n).stat().st_size for n in ["COMMANDS.json", "OUTCOME.json"]
-                        if (root / n).exists())
-        capture.require(existing + len(projected.encode()) + len(journal.encode())
-                        + len(final.encode()) <= cap, "projected retention cap")
-        (root / "COMMANDS.json").write_text(journal)
-        summary.write_text(projected)  # Last after all checks; OUTCOME is authoritative.
-        (root / "OUTCOME.json").write_text(final)
+        capture.require(failure is None,"stage failed")
+        capture.require(all(x["state"]=="FINISHED" and x["outcome"]=="OK" for x in records),
+                        "unsuccessful phase")
+        projected=canonical_bytes(result)
+        outcome=dict(schema="p09-outcome/v4",status="SUCCESS_FINITE_PROVENANCE",
+            qualification_success=True,commands=binding(journal),summary=binding(projected),
+            summary_absent=False)
+        final=canonical_bytes(outcome)
+        existing=footprint(root)-len(journal)
+        if (root/"OUTCOME.json").exists(): existing-=(root/"OUTCOME.json").stat().st_size
+        capture.require(existing+len(projected)+len(journal)+len(final)<=cap,"projected retention cap")
+        summary.write_bytes(projected)
+        capture.require(summary.read_bytes()==projected and
+            (root/"COMMANDS.json").read_bytes()==journal,"persisted bytes differ")
+        (root/"OUTCOME.json").write_bytes(final)
+        capture.require((root/"OUTCOME.json").read_bytes()==final,"outcome persisted bytes differ")
+        verify_receipts(root)
     except BaseException:
         summary.unlink(missing_ok=True)
-        save(root / "OUTCOME.json", dict(status="FAILED", cause=failure or "FINAL_VALIDATION_OR_RETENTION",
-                                         qualification_success=False))
-        (root / "COMMANDS.json").write_text(journal)
+        actual=(root/"COMMANDS.json").read_bytes()
+        failed=dict(schema="p09-outcome/v4",status="FAILED",qualification_success=False,
+            cause=failure or "FINAL_VALIDATION_OR_RETENTION",commands=binding(actual),
+            summary=None,summary_absent=True)
+        save(root/"OUTCOME.json",failed)
+        verify_receipts(root,require_success=False)
         raise PhaseError("stage failed; sanitized OUTCOME authoritative") from None
 
 
@@ -330,7 +397,8 @@ def main(source, root):
     env = {k:v for k,v in os.environ.items() if k in {"PATH","SYSTEMROOT","WINDIR","COMSPEC","PATHEXT","TEMP","TMP"}}
     home = root/"home"; home.mkdir()
     env.update(HOME=str(home),USERPROFILE=str(home),PYTHONNOUSERSITE="1",PYTHONDONTWRITEBYTECODE="1",
-               PIP_CONFIG_FILE=os.devnull,PIP_DISABLE_PIP_VERSION_CHECK="1")
+               PIP_CONFIG_FILE=os.devnull,PIP_DISABLE_PIP_VERSION_CHECK="1",
+               PYTHONUTF8="1",PYTHONIOENCODING="utf-8")
     run = Runner(root,env)
     result, failure = None, None
     try:

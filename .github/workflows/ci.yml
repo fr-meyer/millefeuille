@@ -1,6 +1,6 @@
 # CANDIDATE replacement for existing .github/workflows/ci.yml on a tooling branch ONLY.
 # Broker must verify branch dispatch support; no main/default-branch mutation assumed.
-name: P09 clean dependency provenance proposal v3
+name: P09 clean dependency provenance proposal v4
 on:
   workflow_dispatch:
     inputs:
@@ -38,13 +38,18 @@ jobs:
         env:
           TOOLING_SHA: ${{ inputs.tooling_sha }}
           PYTHONDONTWRITEBYTECODE: '1'
+          PYTHONUTF8: '1'
+          PYTHONIOENCODING: 'utf-8'
         run: |
-          import os, pathlib, re, subprocess, sys
+          import hashlib, os, pathlib, re, subprocess, sys
           sha = os.environ['TOOLING_SHA']
           assert re.fullmatch('[0-9a-f]{40}', sha)
           actual = subprocess.check_output(['git','-C','tooling','rev-parse','HEAD'], text=True).strip()
           assert actual == sha
           script = pathlib.Path('tooling/scripts/p09/stage.py').resolve()
+          expected = {'capture.py': 'f81c137da71f690fb6fe0de61a652902ba4de9a5875b198853e7aa79e52c320d', 'stage.py': 'e4f9f6eb3ad0b7f11fb1a36689b7b6d891589d8c3377dde09349c9c4151579d5'}
+          for name, digest in expected.items():
+              assert hashlib.sha256((script.parent / name).read_bytes()).hexdigest() == digest
           root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'p09-qualified'
           subprocess.run([sys.executable,'-B',str(script),'--source',str(pathlib.Path('product').resolve()),'--root',str(root)], check=True, timeout=960)
       - name: Retain only sanitized validated evidence in job log
