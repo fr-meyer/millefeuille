@@ -21,6 +21,7 @@ from millefeuille.domain.semantic_acceptance import (
     digest,
     validate_semantic_decision,
 )
+from tests.platform_capabilities import requires_pinned_root_reads
 
 
 class SemanticAcceptanceTests(unittest.TestCase):
@@ -175,6 +176,7 @@ class SemanticAcceptanceTests(unittest.TestCase):
                 plan_exact_outputs(root=root, outputs={"aaa": b"new", "bad": b"bad"})
             self.assertFalse((root / "aaa").exists())
 
+    @requires_pinned_root_reads
     def test_six_output_plan_is_pure_and_binds_manifest_updates(self):
         from millefeuille.domain.acceptance import _build_acceptance_summary
         from millefeuille.domain.semantic_output_plan import plan_semantic_acceptance

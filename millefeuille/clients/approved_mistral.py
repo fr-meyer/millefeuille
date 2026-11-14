@@ -5,7 +5,6 @@ replace OwnedHTTPWorker qualify factory logic only, never real network behavior.
 """
 
 import contextlib
-import fcntl
 import os
 from pathlib import Path
 import re
@@ -24,7 +23,26 @@ from ..domain.ocr_lifecycle import (
     digest,
     multipart,
 )
-from ..domain.ocr_request_budget import OCRBudgetError
+from ..domain.ocr_request_budget import OCRBudgetError, fcntl
+
+
+def supports_approved_ocr() -> bool:
+    """Require existing POSIX lock, no-follow and owned-process primitives."""
+    return (
+        os.name == "posix"
+        and fcntl is not None
+        and all(hasattr(fcntl, name) for name in ("flock", "LOCK_EX", "LOCK_NB"))
+        and all(
+            hasattr(os, name)
+            for name in ("O_NOFOLLOW", "O_DIRECTORY", "fsync", "set_blocking", "killpg")
+        )
+    )
+
+
+def _require_approved_ocr() -> None:
+    if not supports_approved_ocr():
+        raise OCRBudgetError("unsupported-approved-ocr-platform")
+
 
 # Self-contained child: token arrives only over a private pipe. No shell, SDK,
 # environment credentials, proxy, redirects or retries. Parent bounds stdout.
@@ -70,6 +88,7 @@ except BaseException:
 
 class OwnedHTTPWorker:
     def send(self, method, url, body, content_type, token, cap, seconds):
+        _require_approved_ocr()
         import base64
         import selectors
 
@@ -209,6 +228,7 @@ class ApprovedMistralLifecycle:
 
     @classmethod
     def approved(cls, graph, capability, *, verifier, token_resolver, ledger):
+        _require_approved_ocr()
         if (
             type(graph) is not ApprovedGraph
             or type(verifier) is not OperatorHMACVerifier

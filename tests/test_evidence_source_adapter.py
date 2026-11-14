@@ -14,6 +14,7 @@ from millefeuille.domain.source_qualification import (
     NativeSourceObservation,
     compare_native_sources,
 )
+from tests.platform_capabilities import requires_pinned_root_reads
 from tests.test_evidence_answer import fixture, request
 
 
@@ -29,6 +30,7 @@ class _CountingReader:
 
 
 class RemainingEvidenceSourceTests(unittest.TestCase):
+    @requires_pinned_root_reads
     def test_s06_alias_source_hash_refuses_before_evidence_reads(self):
         with tempfile.TemporaryDirectory() as temp:
             corpus, reader = fixture(Path(temp))
@@ -81,6 +83,7 @@ class RemainingEvidenceSourceTests(unittest.TestCase):
                     )
                 self.assertEqual(counted.calls, [])
 
+    @requires_pinned_root_reads
     def test_s06_distinct_sources_still_produce_literal_evidence(self):
         with tempfile.TemporaryDirectory() as temp:
             corpus, reader = fixture(Path(temp))

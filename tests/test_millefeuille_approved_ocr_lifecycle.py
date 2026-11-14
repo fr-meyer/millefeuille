@@ -13,6 +13,7 @@ from unittest.mock import patch
 from millefeuille.clients.approved_mistral import (
     ApprovedMistralLifecycle,
     OwnedHTTPWorker,
+    supports_approved_ocr,
 )
 from millefeuille.domain.ocr_lifecycle import (
     ApprovedGraph,
@@ -23,6 +24,12 @@ from millefeuille.domain.ocr_lifecycle import (
     digest,
 )
 from millefeuille.domain.ocr_request_budget import OCRBudgetError
+
+requires_ocr_platform = unittest.skipUnless(
+    supports_approved_ocr(),
+    "requires OCR no-follow ledger, POSIX flock and platform primitives",
+)
+
 
 TOKEN = "synthetic-token-not-real"
 KEY = b"synthetic-trust-key-only-0000000000"
@@ -161,6 +168,7 @@ class FactoryTests(unittest.TestCase):
                 self.factory(resolver=lambda *_, token=token: token)
             self.assertFalse(self.path.exists())
 
+    @requires_ocr_platform
     def test_complete_concrete_lifecycle_and_secret_redaction(self):
         client = self.factory()
         calls = self.fake(client)
@@ -186,6 +194,7 @@ class FactoryTests(unittest.TestCase):
             client.run_document("a", DATA)
         self.assertEqual(len(calls), 5)
 
+    @requires_ocr_platform
     def test_unknown_upload_no_guessed_cleanup_and_no_replay(self):
         client = self.factory()
         calls = self.fake(client, lambda *_: True)
@@ -197,6 +206,7 @@ class FactoryTests(unittest.TestCase):
         self.assertEqual(client._states["a:upload"], "unknown")
         self.assertEqual(client._states["a:delete"], "reserved")
 
+    @requires_ocr_platform
     def test_unknown_ocr_runs_only_reserved_finalizers(self):
         client = self.factory()
         calls = self.fake(client, lambda m, u: u.endswith("/ocr"))
@@ -207,6 +217,7 @@ class FactoryTests(unittest.TestCase):
         self.assertEqual(client._states["a:ocr"], "unknown")
         self.assertEqual(client._states["a:delete"], "validated")
 
+    @requires_ocr_platform
     def test_parse_failed_is_not_semantic_success(self):
         client = self.factory()
         self.fake(client)
@@ -219,6 +230,7 @@ class FactoryTests(unittest.TestCase):
         self.assertTrue(client.receipts["a:ocr"]["wire_observed"])
         self.assertEqual(client.receipts["a:ocr"]["semantic_status"], "parse-failed")
 
+    @requires_ocr_platform
     def test_cross_document_and_arbitrary_route_zero_wire(self):
         client = self.factory()
         calls = self.fake(client)
@@ -232,6 +244,7 @@ class FactoryTests(unittest.TestCase):
                 client._send(doc, kind, path)
         self.assertEqual(calls, [])
 
+    @requires_ocr_platform
     def test_ordinary_deadline_preserves_finalization_window(self):
         client = self.factory()
         calls = self.fake(client)
@@ -248,6 +261,7 @@ class FactoryTests(unittest.TestCase):
             client.run_document("a", DATA)
         self.assertEqual([m for m, _, _ in calls], ["POST", "GET", "GET", "DELETE"])
 
+    @requires_ocr_platform
     def test_existing_ledger_never_reset(self):
         self.factory()
         before = self.path.read_bytes()
@@ -255,6 +269,7 @@ class FactoryTests(unittest.TestCase):
             self.factory()
         self.assertEqual(before, self.path.read_bytes())
 
+    @requires_ocr_platform
     def test_input_drift_before_wire(self):
         client = self.factory()
         calls = self.fake(client)
@@ -266,6 +281,7 @@ class FactoryTests(unittest.TestCase):
 class OwnedWorkerLocalDeadlineTests(unittest.TestCase):
     """Actual owned process deadline, substituted inert program, no network."""
 
+    @requires_ocr_platform
     def test_sleeping_child_killed_reaped_with_bound(self):
         import millefeuille.clients.approved_mistral as module
 
@@ -296,6 +312,7 @@ class OwnedWorkerLocalDeadlineTests(unittest.TestCase):
         self.assertEqual(len(children), 1)
         self.assertIsNotNone(children[0].returncode)
 
+    @requires_ocr_platform
     def test_excess_stdout_is_bounded_and_reaped(self):
         import millefeuille.clients.approved_mistral as module
 
@@ -315,6 +332,7 @@ class OwnedWorkerLocalDeadlineTests(unittest.TestCase):
 
 class FactoryHTTPMockTests(FactoryTests):
     # Explicit load_tests below avoids counting inherited methods twice.
+    @requires_ocr_platform
     def test_httpx_mock_status_429_and_redirect_never_retried(self):
         import httpx
 

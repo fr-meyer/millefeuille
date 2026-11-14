@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+import platform
 import sys
 import unittest
 
@@ -67,4 +68,30 @@ requires_posix_batch_publication = unittest.skipUnless(
 requires_unsupported_posix_batch_publication = unittest.skipIf(
     POSIX_BATCH_PUBLICATION,
     "requires a platform without POSIX atomic batch publication",
+)
+
+
+def supports_pinned_root_reads() -> bool:
+    """Match the descriptor operations required by RootArtifactReader tests."""
+    return (
+        os.name == "posix"
+        and hasattr(os, "O_NOFOLLOW")
+        and hasattr(os, "O_DIRECTORY")
+        and os.open in os.supports_dir_fd
+        and os.stat in os.supports_dir_fd
+        and os.stat in os.supports_follow_symlinks
+        and os.scandir in os.supports_fd
+    )
+
+
+PINNED_ROOT_READS = supports_pinned_root_reads()
+LINUX_NATIVE_ISOLATION = sys.platform == "linux" and platform.machine() == "x86_64"
+
+requires_pinned_root_reads = unittest.skipUnless(
+    PINNED_ROOT_READS,
+    "requires pinned descriptor-relative no-follow source-pack reads",
+)
+requires_linux_native_isolation = unittest.skipUnless(
+    LINUX_NATIVE_ISOLATION,
+    "requires the Linux x86-64 native decoder isolation adapter",
 )

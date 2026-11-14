@@ -19,8 +19,14 @@ from millefeuille.domain.ocr_request_budget import (
     read_ledger,
     reconcile_operation,
     reserve_operation,
+    supports_ocr_ledger,
 )
 from millefeuille.domain.source_qualification import qualify_untrusted_native_source
+
+requires_ocr_platform = unittest.skipUnless(
+    supports_ocr_ledger(),
+    "requires OCR no-follow ledger, POSIX flock and platform primitives",
+)
 
 
 class BudgetTests(unittest.TestCase):
@@ -49,6 +55,7 @@ class BudgetTests(unittest.TestCase):
             ops, 6, 60, 30, ("delete",), ("status",), "synthetic-offline-only", True
         )
 
+    @requires_ocr_platform
     def test_all_operations_reserved_before_actual_wire_and_no_replay(self):
         with tempfile.TemporaryDirectory() as root:
             ledger = Path(root) / "ledger"
@@ -77,6 +84,7 @@ class BudgetTests(unittest.TestCase):
             finally:
                 adapter.close()
 
+    @requires_ocr_platform
     def test_every_operation_failure_retains_liability_without_retry(self):
         for operation in self.graph().operations:
             for status in (302, 429, 500):
@@ -117,6 +125,7 @@ class BudgetTests(unittest.TestCase):
                         finally:
                             adapter.close()
 
+    @requires_ocr_platform
     def test_timeout_cancel_and_response_cap_no_retry(self):
         for failure in ("timeout", "cancel", "large"):
             with tempfile.TemporaryDirectory() as root:
@@ -145,6 +154,7 @@ class BudgetTests(unittest.TestCase):
                 finally:
                     adapter.close()
 
+    @requires_ocr_platform
     def test_rolling_and_resolved_model(self):
         with tempfile.TemporaryDirectory() as root:
             adapter = BoundedMistralAdapter.isolated_mock(
@@ -169,6 +179,7 @@ class BudgetTests(unittest.TestCase):
             finally:
                 adapter.close()
 
+    @requires_ocr_platform
     def test_invalid_graph_and_durability_failure_send_nothing(self):
         for graph in (
             replace(self.graph(), account_price_verified=False),
@@ -237,6 +248,7 @@ class SafetyRegressions(BudgetTests):
             wire.assert_not_called()
             self.assertFalse((Path(root) / "ledger").exists())
 
+    @requires_ocr_platform
     def test_graph_order_and_cleanup(self):
         with tempfile.TemporaryDirectory() as root:
             ledger = Path(root) / "ledger"
@@ -254,6 +266,7 @@ class SafetyRegressions(BudgetTests):
                     operations=(replace(self.graph().operations[0], method="GET"),),
                 ).validate()
 
+    @requires_ocr_platform
     def test_damaged_tail_never_reinitialized(self):
         with tempfile.TemporaryDirectory() as root:
             ledger = Path(root) / "ledger"
@@ -271,6 +284,7 @@ class SafetyRegressions(BudgetTests):
             with self.assertRaises(FileExistsError):
                 initialize_ledger(self.graph(), ledger)
 
+    @requires_ocr_platform
     def test_compressed_stream_refused_without_iteration(self):
         class PoisonStream(httpx.SyncByteStream):
             def __iter__(self):
@@ -292,6 +306,7 @@ class SafetyRegressions(BudgetTests):
             finally:
                 adapter.close()
 
+    @requires_ocr_platform
     def test_slow_header_mock_retains_unknown(self):
         import time
 
@@ -314,6 +329,7 @@ class SafetyRegressions(BudgetTests):
             finally:
                 adapter.close()
 
+    @requires_ocr_platform
     def test_wrong_family_and_malformed_shapes(self):
         for body in (
             b'{"model":"other-model","pages":[{"index":0,"markdown":"x"}]}',
@@ -342,6 +358,7 @@ class SafetyRegressions(BudgetTests):
                 finally:
                     adapter.close()
 
+    @requires_ocr_platform
     def test_crash_reopen_unknown_and_terminal_no_duplicate(self):
         import os
 
@@ -371,6 +388,7 @@ class SafetyRegressions(BudgetTests):
                 with self.assertRaises(OCRBudgetError):
                     reserve_operation(self.graph(), "upload", ledger)
 
+    @requires_ocr_platform
     def test_busy_ledger_nonblocking(self):
         import fcntl
 
@@ -386,6 +404,7 @@ class SafetyRegressions(BudgetTests):
 class ClosedJSONTests(unittest.TestCase):
     def test_duplicate_keys_utf8_and_nonfinite_refused(self):
         from millefeuille.clients.mistral_client import bounded_json
+
         for raw in (b'{"index":0,"index":1}', b'{"x":NaN}', b'{"x":"\xff"}'):
             with self.subTest(raw=raw), self.assertRaises((ValueError, UnicodeError)):
                 bounded_json(raw)

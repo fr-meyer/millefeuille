@@ -13,6 +13,7 @@ from unittest import mock
 
 from millefeuille.domain import secure_io
 from millefeuille.domain.millefeuille import MillefeuilleContractError
+from tests.platform_capabilities import requires_pinned_root_reads
 
 
 def _stat_like(
@@ -465,6 +466,7 @@ if __name__ == "__main__":
 class BudgetedDirectoryTests(unittest.TestCase):
     """Exercise public readers, real directory iterators and the actual OS seam."""
 
+    @requires_pinned_root_reads
     def test_limits_snapshot_revalidation_and_bounded_entry_stats(self):
         import os
         from unittest.mock import patch
@@ -530,6 +532,7 @@ class BudgetedDirectoryTests(unittest.TestCase):
                         reader.revalidate_snapshot()
                     self.assertEqual(counts, {"next": 513, "stat": 512})
 
+    @requires_pinned_root_reads
     def test_reviewed_root_513_does_not_expand_generic_or_nested_limit(self):
         from millefeuille.domain.evidence_source_adapter import ReadBudget
         from millefeuille.domain.millefeuille import MillefeuilleContractError
@@ -584,6 +587,7 @@ class BudgetedDirectoryTests(unittest.TestCase):
             dup.assert_not_called()
             scan.assert_not_called()
 
+    @requires_pinned_root_reads
     def test_default_scan_budget_cannot_finish_two_512_entry_scans(self):
         from millefeuille.domain.evidence_source_adapter import (
             BudgetExhaustedError,
@@ -603,6 +607,7 @@ class BudgetedDirectoryTests(unittest.TestCase):
                     reader.revalidate_snapshot()
                 self.assertTrue(budget.exhausted)
 
+    @requires_pinned_root_reads
     def test_exhausted_snapshot_has_zero_noncleanup_io(self):
         from unittest.mock import patch
 
@@ -631,6 +636,7 @@ class BudgetedDirectoryTests(unittest.TestCase):
                     for spy in [opened, fst, scan, dup]:
                         spy.assert_not_called()
 
+    @requires_pinned_root_reads
     def test_directory_iterator_and_entry_stat_are_predebited_on_every_axis(self):
         import os
         from unittest.mock import patch
@@ -693,6 +699,7 @@ class BudgetedDirectoryTests(unittest.TestCase):
                 os.close(fd)
 
 
+@requires_pinned_root_reads
 class OutputPlannerBudgetTests(unittest.TestCase):
     def test_real_before_images_share_ledger_and_protect_missing_outputs(self):
         from millefeuille.domain.acceptance_output_plan import plan_exact_outputs

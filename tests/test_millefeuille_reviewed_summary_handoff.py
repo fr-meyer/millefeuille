@@ -11,12 +11,14 @@ from millefeuille.domain.reviewed_summary_handoff import (
     SCHEMA,
     retrieve_reviewed_summary_refs,
 )
+from tests.platform_capabilities import requires_pinned_root_reads
 
 
 def digest(data):
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
+@requires_pinned_root_reads
 class ReviewedHandoffTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

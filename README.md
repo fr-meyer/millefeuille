@@ -143,6 +143,9 @@ not expose through Python's POSIX descriptor APIs:
 | Legacy single-run retrieval | Supported | Supported |
 | Atomic retrieval-batch publication | Supported and fully tested | Fails closed before publication |
 | Exclusive no-follow model-provenance output | Supported and fully tested | Fails closed before output creation |
+| Pinned-root evidence reads and reviewed-summary handoffs | Supported and fully tested | Fails closed before source-pack I/O |
+| OCR operation ledgers and owned HTTP worker | POSIX locks/no-follow primitives required | Fails closed before ledger I/O, credentials or worker launch |
+| Kernel-isolated native PDF decoding | Linux x86-64 adapter | Explicit unsupported-platform refusal before input read |
 
 Capability-marked tests for POSIX locks, descriptor-relative mutation checks,
 and atomic no-replace publication still run in every Ubuntu matrix job. Windows
@@ -150,6 +153,13 @@ jobs skip only those unsupported success/race scenarios and instead exercise
 the corresponding fail-closed contracts. macOS is not yet part of the supported
 CI matrix; its atomic filesystem semantics must be validated before support is
 declared.
+
+Unsupported capability scenarios are reported as skips, never feature passes.
+Windows executes the corresponding refusal tests; a green matrix would not
+claim Windows support for pinned-root evidence, OCR ledgers, or native decoding.
+Portable secure-file reads and legacy retrieval retain their existing guarded
+Windows path; no POSIX safety check is relaxed to substitute that path for
+pinned-root or mutation operations.
 
 ## Runtime Prerequisites
 

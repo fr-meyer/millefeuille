@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from millefeuille.cli.native_source import run_native_source_cli
+from tests.platform_capabilities import requires_linux_native_isolation
 from tests.test_millefeuille_real_source_qualification import synthetic_pdf
 
 
@@ -43,6 +44,7 @@ class NativeSourceCLITests(unittest.TestCase):
         self.assertEqual(result.stderr, "")
         return result.returncode, json.loads(result.stdout), result.stdout
 
+    @requires_linux_native_isolation
     def test_default_metadata_and_explicit_full_text(self):
         raw = synthetic_pdf(
             [
@@ -68,6 +70,7 @@ class NativeSourceCLITests(unittest.TestCase):
             ["First 17.25\nSecond 42", "Page two 99"],
         )
 
+    @requires_linux_native_isolation
     def test_empty_and_mixed_pages_need_ocr_not_success(self):
         for pages in ([[]], [[(20, 700, "Native 17")], []]):
             code, result, _ = self.invoke(
@@ -78,6 +81,7 @@ class NativeSourceCLITests(unittest.TestCase):
             self.assertEqual(result["pages"][-1]["route"], "needs-ocr")
             self.assertEqual(result["page_count"], len(pages))
 
+    @requires_linux_native_isolation
     def test_matching_hash_refusals(self):
         from PyPDF2 import PdfWriter
 
@@ -96,6 +100,7 @@ class NativeSourceCLITests(unittest.TestCase):
             self.assertEqual(result["reason"], reason)
             self.assertNotIn("synthetic-only", stdout)
 
+    @requires_linux_native_isolation
     def test_untrusted_uses_hard_boundary_without_trust_bypass(self):
         code, result, _ = self.invoke(b"anything")
         self.assertEqual(code, 2)
@@ -145,6 +150,7 @@ class NativeSourceCLITests(unittest.TestCase):
                 )
             self.assertEqual(caught.exception.reason, "native-decoder-unavailable")
 
+    @requires_linux_native_isolation
     def test_input_and_page_limits_refuse(self):
         for raw, reason in [
             (b"%PDF-" + b"x" * (2**20), "native-boundary-failure"),

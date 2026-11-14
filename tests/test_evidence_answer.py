@@ -13,6 +13,7 @@ from millefeuille.domain.evidence_source_adapter import (
 )
 from millefeuille.domain.semantic_acceptance import digest
 from millefeuille.domain.semantic_scenario_evaluator import evaluate_frozen_scenarios
+from tests.platform_capabilities import requires_pinned_root_reads
 
 
 def fixture(root, value="12"):
@@ -290,6 +291,7 @@ def generated_scenarios(tmp):
     return gold, responses, review, result
 
 
+@requires_pinned_root_reads
 class EvidenceTests(unittest.TestCase):
     def test_eight_actual_producer_adapter_evaluator(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -447,6 +449,7 @@ class SerialBudgetRegressions(unittest.TestCase):
                 budgeted_read("/not-read", "fixture", max_bytes=1)
         metadata.assert_not_called()
 
+    @requires_pinned_root_reads
     def test_directory_enumeration_and_revalidation_are_incrementally_bounded(self):
         import os
         import tempfile

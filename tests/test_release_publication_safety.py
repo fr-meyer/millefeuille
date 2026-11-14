@@ -23,13 +23,17 @@ class ReleasePublicationSafetyTests(unittest.TestCase):
         self.assertEqual(set(workflow["jobs"]), {"test"})
         job = workflow["jobs"]["test"]
         self.assertNotIn("permissions", job)
+        self.assertEqual(job["timeout-minutes"], "20")
+        self.assertEqual(job["strategy"]["max-parallel"], "2")
+        self.assertEqual(job["strategy"]["fail-fast"], "false")
         steps = job["steps"]
         self.assertEqual(steps[0]["with"]["persist-credentials"], "false")
+        self.assertTrue(all("cache" not in step.get("with", {}) for step in steps))
         self.assertEqual(
             [step["run"] for step in steps if "run" in step],
             [
-                "python -m pip install --upgrade pip\n"
-                'python -m pip install --editable ".[test,native]"\n',
+                "python -m pip install --no-cache-dir --upgrade pip\n"
+                'python -m pip install --no-cache-dir --editable ".[test,native]"\n',
                 "python -m ruff check .",
                 "python -m unittest discover -v",
             ],

@@ -3,17 +3,38 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import fcntl
 import hashlib
 import json
 import math
 import os
 from pathlib import Path
+import sys
 import time
+
+try:
+    import fcntl
+except (ImportError, OSError):
+    fcntl = None
 
 
 class OCRBudgetError(ValueError):
     """Safe refusal without provider payloads or credentials."""
+
+
+def supports_ocr_ledger() -> bool:
+    """Require Linux boot identity and the existing no-follow lock primitives."""
+    return (
+        os.name == "posix"
+        and sys.platform.startswith("linux")
+        and fcntl is not None
+        and all(hasattr(fcntl, name) for name in ("flock", "LOCK_EX", "LOCK_NB"))
+        and all(hasattr(os, name) for name in ("O_NOFOLLOW", "O_DIRECTORY", "fsync"))
+    )
+
+
+def _require_ocr_ledger() -> None:
+    if not supports_ocr_ledger():
+        raise OCRBudgetError("unsupported-ocr-ledger-platform")
 
 
 @dataclass(frozen=True)
@@ -112,6 +133,7 @@ def _binding(graph: RequestGraph) -> str:
 
 def initialize_ledger(graph: RequestGraph, ledger: Path) -> None:
     """Pre-reserve the entire graph, including cleanup and unknown reconciliation."""
+    _require_ocr_ledger()
     graph.validate()
     state = {
         "schema": "millefeuille-ocr-request-ledger/v2",
@@ -182,6 +204,7 @@ def _read_state(stream, graph):
 
 def read_ledger(graph, ledger):
     """Bounded independent reopen; never repairs or reinitializes state."""
+    _require_ocr_ledger()
     fd = os.open(ledger, os.O_RDONLY | os.O_NOFOLLOW)
     with os.fdopen(fd, "rb") as stream:
         return _read_state(stream, graph)
@@ -193,6 +216,7 @@ def _update(graph, ledger, operation_id, target, expected):
     No rename/inode-lock race; lock acquisition is nonblocking. A crash before
     fsync can retain unknown liability, never grants replay after unknown.
     """
+    _require_ocr_ledger()
     graph.validate()
     fd = os.open(ledger, os.O_RDWR | os.O_NOFOLLOW)
     with os.fdopen(fd, "r+b") as stream:

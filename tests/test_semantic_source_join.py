@@ -14,8 +14,10 @@ from millefeuille.domain.semantic_source_join import (
     validate_source_review,
 )
 from tests.fixtures.offline_core_source_fixture import budget, plan_inputs, prepare
+from tests.platform_capabilities import requires_posix_batch_publication
 
 
+@requires_posix_batch_publication
 class CanonicalJoinTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
