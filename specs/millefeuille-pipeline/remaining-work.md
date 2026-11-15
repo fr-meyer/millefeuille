@@ -45,7 +45,8 @@
   three-role reviews, forward apply records, and forward-only rollback without
   generating labels or mutating active batches.
 - Current integration branch is `dev`; stable branch is `main`.
-- Current package version is `0.4.0`.
+- Current package version is `0.5.0`. No next SemVer is selected by this plan;
+  the package version alone is not release authorization or publication evidence.
 - PRs #120-#126 add a grounded GPT-only batch manifest, exact MF-100 approval
   preview and trusted-record validation, a durable one-use reservation broker,
   receipt-bound batch execution, and an immutable no-write summary output plan.
@@ -118,13 +119,18 @@ Private GCP acceptance records (no paper text or credentials are committed):
 
 1. Finish broader source intake, scanned/OCR and edge-case coverage, using the
    rolling `mistral-ocr-latest` default and recording actual resolved provenance.
-2. Complete live multi-source upstream publication and GPT generation. The
-   verified CollaGAN main paper and supplement were natively extracted on GCP
-   (19 pages), and a [whole-pack upstream plan](multi-source-upstream.md) passed
-   live no-write validation. Its seven planned files are not yet in the durable
-   pack. MF-114 [whole-pack card/index materialization](multi-source-materialization.md)
-   has synthetic downstream acceptance coverage; live end-to-end acceptance
-   remains open.
+2. Complete the remaining multi-source acceptance, reusing existing publication
+   and generation evidence rather than repeating it. The 2026-11-15 saved-file
+   reconciliation verifies the CollaGAN main paper and supplement native text
+   (19 pages), saved generation input and all 23 summary text hashes.
+   [Whole-pack materialization](multi-source-materialization.md) records the
+   saved upstream/card/index work; older pending language in the
+   [upstream plan](multi-source-upstream.md) is historical, not current status.
+   This local custody check is not fresh remote readback, scientific acceptance
+   or current-candidate query qualification. The saved downstream acceptance,
+   classification and writeback stages remain unaccepted. Private reference
+   cases now bind claims to exact attachment/page anchors, but reference
+   consistency alone does not demonstrate product answers or abstention.
 3. Maintain the explicit [component model boundaries](component-model-boundaries.md)
    and operation-specific request/actual model evidence. Keep production GPT only
    while Grok OAuth is inactive; vendor API defaults cannot substitute for OAuth.
@@ -139,6 +145,60 @@ Private GCP acceptance records (no paper text or credentials are committed):
 6. Stabilize version and changelog, review promotion to `main`, then consider a
    separately approved tag and package release. Optional worktree hygiene and old
    OpenClaw deployment reconciliation remain separate operational work.
+
+## Complete the Existing Open PRs
+
+The remaining programme includes resolving the three PRs observed open on
+2026-11-15, all targeting dev:
+
+- [#171](https://github.com/fr-meyer/millefeuille/pull/171): verified multi-source
+  run-package planning.
+- [#175](https://github.com/fr-meyer/millefeuille/pull/175): native metadata
+  transactions and Windows qualification (draft at the check).
+- [#176](https://github.com/fr-meyer/millefeuille/pull/176): POSIX metadata
+  protection and Windows write refusal (draft at the check).
+
+Before creating overlapping work, compare each PR's scope and diff with current
+dev and the qualified candidate. Preserve and finish useful outstanding work,
+obtain the supported independent review and applicable checks, and integrate it
+through the approved publication path. If a PR is superseded, first verify that
+no required unique change would be lost, then close it with links to its
+replacement and disposition evidence. Age or overlapping titles alone do not
+establish supersession; completing the programme does not mean blindly merging
+all three.
+
+This outcome is complete only when each PR has an explained merged or closed
+disposition and its required work is accounted for in the accepted project
+scope. An unresolved blocker remains open work. The implementation model chooses
+the appropriate decomposition and order; existing review, publication, merge and
+private-data gates still apply. This plan records no merge or closure itself.
+
+## Reuse Evidence and Avoid Duplicate Implementation
+
+The pipeline below is a capability map, not a list of wholly unimplemented
+features. Reconcile remaining outcomes with current source and accepted evidence:
+
+- Reuse unchanged qualified tests, package/provenance evidence and applicable
+  historical pilot acceptance; rerun only invalidated or genuinely missing proof.
+- Consolidate the overlapping metadata-transaction work in PRs #175 and #176.
+  At the heads checked on 2026-11-15, 25 of their 28 shared changed paths have
+  identical blobs, including all nine shared product-source files. Preserve and
+  separately evaluate the unique Windows harness, CI, policy and documentation.
+- PR #171 already has later forms of its run-package module and tests in dev.
+  The 2026-11-15 local semantic comparison found no missing product delta: the
+  later implementation strengthens origin inventory and preserves interrupted
+  outputs for explicit recovery. Independent review must confirm this before
+  a superseded disposition; no PR closure has been performed.
+- Keep optional ConDB/ChatIndex lanes and unrelated operational housekeeping
+  optional. Do not expand core completion into every possible integration.
+- Full native Windows write support is distinct from tested safe Windows
+  refusal. Any deferral must be explicit; failed qualification is never a pass.
+- One real-paper exercise can support several acceptance outcomes. Keep those
+  assertions distinct without repeating the same processing for every ledger row.
+
+These principles remove duplicated effort, not safety checks, required source
+coverage, independent review, or accepted product scope. No requirement is
+waived and no PR disposition is performed by this assessment.
 
 ## Pipeline
 
@@ -155,7 +215,9 @@ Private GCP acceptance records (no paper text or credentials are committed):
 2. **Feature PR To `dev`**
    - Publish feature branch through the approved Mergeguez broker path.
    - Open a user-authored PR to `dev`.
-   - Request exact-head Mergeguez review and wait for checks.
+   - Resolve the supported current review actor, obtain exact-head independent
+     review, and wait for applicable required checks. Retired reviewer wording
+     does not waive review or establish a GitHub-enforced gate.
    - Manual gate: GitHub publication, PR creation, review request, and merge.
 
 3. **Read-Only Zotero Discovery Dogfood**
