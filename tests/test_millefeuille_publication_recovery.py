@@ -1,6 +1,7 @@
 """Synthetic reservation guards, not production publication proof."""
 
 from dataclasses import replace
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from millefeuille.cli.stages import run_stage_cli
+from millefeuille.domain import secure_io
 from millefeuille.domain.acceptance_output_plan import plan_exact_outputs
 from millefeuille.domain.classification import write_classification_from_evidence
 from millefeuille.domain.classification_output_plan import (
@@ -19,6 +22,7 @@ from millefeuille.domain.publication_journal import (
     reserve_publication,
     validate_rollback_postimages,
 )
+from tests.platform_capabilities import requires_secure_nofollow_writes
 from tests.test_millefeuille_classification_batch import (
     _accept_run,
     _write_classification_evidence,
@@ -32,6 +36,9 @@ from tests.test_millefeuille_stage_cli import (
 
 
 class ClassificationPlanTests(unittest.TestCase):
+    # Success needs secure acceptance writes. UnsupportedAcceptanceFixtureTests
+    # separately verifies the real fixture refusal without filesystem changes.
+    @requires_secure_nofollow_writes
     def test_all_ten_renderings_match_legacy_without_planner_writes(self):
         for adjudication in (False, True):
             with (
@@ -75,6 +82,63 @@ class ClassificationPlanTests(unittest.TestCase):
                 for output in plan_classification_from_evidence(**args):
                     self.assertEqual(output.before_bytes, output.payload)
                     self.assertEqual(output.before_sha256, output.sha256)
+
+
+class UnsupportedAcceptanceFixtureTests(unittest.TestCase):
+    def assert_acceptance_refuses_without_writes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, _run = _prepare_fixture_run(tmp)
+            handoff = _write_handoff_jsonl(tmp)
+            before = {
+                p.relative_to(root): p.read_bytes()
+                for p in root.rglob("*")
+                if p.is_file()
+            }
+            entries = sorted(p.relative_to(root) for p in root.rglob("*"))
+            stdout, stderr = StringIO(), StringIO()
+            code = run_stage_cli(
+                [
+                    "acceptance",
+                    "--source-pack-root",
+                    str(root),
+                    "--paper-id",
+                    PAPER_ID,
+                    "--run-id",
+                    RUN_ID,
+                    "--handoff",
+                    str(handoff),
+                ],
+                stdout=stdout,
+                stderr=stderr,
+            )
+            self.assertEqual(code, 2)
+            self.assertEqual(
+                stderr.getvalue(),
+                "millefeuille acceptance: transaction input tree requires "
+                "no-follow filesystem reads on this platform\n",
+            )
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertEqual(
+                entries, sorted(p.relative_to(root) for p in root.rglob("*"))
+            )
+            self.assertEqual(
+                before,
+                {
+                    p.relative_to(root): p.read_bytes()
+                    for p in root.rglob("*")
+                    if p.is_file()
+                },
+            )
+
+    def test_native_missing_nofollow_refuses_fixture_before_writes(self):
+        if secure_io._supports_no_follow():
+            self.skipTest("native runtime supports O_NOFOLLOW; refusal tested below")
+        self.assert_acceptance_refuses_without_writes()
+
+    def test_missing_nofollow_refuses_fixture_before_writes(self):
+        # Remove a capability only, never manufacture successful secure writes.
+        with patch.object(secure_io, "_supports_no_follow", return_value=False):
+            self.assert_acceptance_refuses_without_writes()
 
 
 @unittest.skipUnless(os.name == "posix", "POSIX reservation contract")

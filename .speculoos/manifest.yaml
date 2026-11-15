@@ -7,7 +7,7 @@ repository:
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: feat/pr-mf-approved-completion-20261112-1851
+  working_branch: fix/pr-mf-integrated-completion-20261115
 status:
   phase: implementation
   pret_a_coder: ready

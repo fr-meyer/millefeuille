@@ -83,8 +83,34 @@ class ReleasePublicationSafetyTests(unittest.TestCase):
         )
         self.assertEqual(
             manifest["review_policy"]["current_authority_status"],
-            "unresolved-requires-supported-live-readback",
+            "pullfrog-supported-identity-pending-repository-activation-and-exact-pr-evidence",
         )
+
+    def test_supported_review_declaration_does_not_claim_native_approval(self):
+        policy = metadata(".speculoos/manifest.yaml")["review_policy"]
+        review = policy["pullfrog_review"]
+        self.assertEqual(review["policy"], "primary")
+        self.assertEqual(review["bot_login"], "pullfrog[bot]")
+        self.assertEqual(review["app_id"], "1768019")
+        self.assertEqual(review["repository_activation"], "not-established")
+        self.assertEqual(
+            review["acceptance"],
+            {
+                "distinct_pr_author": "required",
+                "exact_pr_base_head_sha": "required",
+                "complete_changed_file_coverage": "required",
+                "native_review_verdict": "APPROVED",
+                "blocking_findings": "zero",
+                "unresolved_review_threads": "zero",
+                "successful_check_alone_is_approval": "false",
+                "commented_review_is_approval": "false",
+            },
+        )
+        self.assertEqual(policy["required_pr_review"]["primary"], ["pullfrog_review"])
+        self.assertEqual(policy["required_pr_review"]["fallback_any_of"], [])
+        self.assertEqual(policy["self_managed"]["fallback_role"], "supplemental-only")
+        for retired in ("legacy_pullfrog", "legacy_coderabbit", "mergeguez_review"):
+            self.assertEqual(policy[retired]["policy"], "disabled")
 
     def test_final_main_sequence_is_documented_without_selecting_version(self):
         preflight = (

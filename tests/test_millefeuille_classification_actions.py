@@ -22,7 +22,10 @@ from millefeuille.domain.stage_runtime import (
     load_jsonl_records,
     load_stage_manifest,
 )
-from tests.platform_capabilities import requires_posix_batch_publication
+from tests.platform_capabilities import (
+    requires_posix_batch_publication,
+    requires_secure_nofollow_writes,
+)
 from tests.test_millefeuille_stage_cli import (
     PAPER_ID,
     RUN_ID,
@@ -635,6 +638,9 @@ if __name__ == "__main__":
 
 
 class ReleasedActionGuardTests(unittest.TestCase):
+    # Success needs secure acceptance writes. UnsupportedAcceptanceFixtureTests
+    # separately verifies the real fixture refusal without filesystem changes.
+    @requires_secure_nofollow_writes
     def test_arbitrary_corrected_path_refuses_before_write(self):
         with tempfile.TemporaryDirectory() as tmp:
             root, run = _prepare_classified_run(tmp)

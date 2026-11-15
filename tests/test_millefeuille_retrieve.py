@@ -503,24 +503,20 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
                     source_pack_root / "zotero" / PAPER_ID / "manifest.json"
                 ),
                 ["--paper-id", PAPER_ID],
-                "source-pack manifest must not be a symbolic link",
             ),
             (
                 lambda _source_pack_root, run_dir: run_dir / "stage-manifest.json",
                 ["--title", "Fixture Paper"],
-                "stage manifest must not be a symbolic link",
             ),
             (
                 lambda _source_pack_root, run_dir: run_dir / "artifact-index.json",
                 ["--doi", "10.1234/fixture.one"],
-                "artifact index must not be a symbolic link",
             ),
         )
-        for path_factory, locator_args, expected_error in cases:
+        for path_factory, locator_args in cases:
             with (
                 self.subTest(
                     locator_args=locator_args,
-                    expected_error=expected_error,
                 ),
                 tempfile.TemporaryDirectory() as tempdir,
             ):
@@ -541,20 +537,44 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
                 target.symlink_to(outside)
                 stderr = StringIO()
 
-                exit_code = run_stage_cli(
-                    [
-                        "retrieve",
-                        "--source-pack-root",
-                        str(source_pack_root),
-                        *locator_args,
-                        "--run-id",
-                        RUN_ID,
-                    ],
-                    stderr=stderr,
-                )
+                outside_identity = outside.stat()
+                real_read = os.read
+
+                def observe_read(fd, size, identity=outside_identity, read=real_read):
+                    opened = os.fstat(fd)
+                    self.assertNotEqual(
+                        (opened.st_dev, opened.st_ino),
+                        (identity.st_dev, identity.st_ino),
+                        "private symlink target reached a byte read",
+                    )
+                    return read(fd, size)
+
+                stdout = StringIO()
+                with mock.patch.object(os, "read", side_effect=observe_read):
+                    exit_code = run_stage_cli(
+                        [
+                            "retrieve",
+                            "--source-pack-root",
+                            str(source_pack_root),
+                            *locator_args,
+                            "--run-id",
+                            RUN_ID,
+                        ],
+                        stderr=stderr,
+                        stdout=stdout,
+                    )
 
                 self.assertEqual(exit_code, 2)
-                self.assertIn(expected_error, stderr.getvalue())
+                expected_error = (
+                    "metadata entry is unsafe"
+                    if os.name == "posix" and secure_io._supports_no_follow()
+                    else "metadata must not be a symbolic link or reparse point: "
+                    f"{target}"
+                )
+                self.assertEqual(
+                    stderr.getvalue(), f"millefeuille retrieve: {expected_error}\n"
+                )
+                self.assertEqual(stdout.getvalue(), "")
                 self.assertNotIn("PRIVATE SYMLINK CONTENT", stderr.getvalue())
 
     @unittest.skipUnless(
