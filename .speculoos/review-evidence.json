@@ -3,31 +3,32 @@
   "requirements": {
     "required_sources": [
       "local_validation",
-      "github_checks"
+      "github_checks",
+      "pullfrog_review"
     ],
     "optional_sources": [
-      "self_managed",
-      "mergeguez_review"
+      "self_managed"
     ],
     "reviewers": {
       "self_managed": {
         "policy": "optional"
       },
       "mergeguez_review": {
-        "policy": "optional"
+        "policy": "disabled"
+      },
+      "pullfrog_review": {
+        "policy": "required"
       }
     },
     "reviewer_groups": {
       "required_pr_review": {
         "policy": "required",
         "primary": [
-          "mergeguez_review"
+          "pullfrog_review"
         ],
-        "fallback_any_of": [
-          "self_managed"
-        ],
-        "summary": "Mergeguez review evidence is the primary required PR-review source.",
-        "fallback_summary": "Self-managed evidence is accepted only if hosted Mergeguez review is unavailable."
+        "fallback_any_of": [],
+        "summary": "Pullfrog distinct-author native exact-PR/base/head review required before merge, not PR creation.",
+        "fallback_summary": "Self-managed review is supplemental only; retired Mergeguez must not be retried or accepted."
       }
     }
   },
@@ -59,6 +60,33 @@
       "summary": "Current exact-head evidence is not obtained; historical PR98 is not current enforcement.",
       "evidence_ref": null,
       "updated_at": "2026-11-12-approved-completion"
+    },
+    "pullfrog_review": {
+      "kind": "pullfrog_review",
+      "status": "pending-live-read",
+      "summary": "pullfrog[bot] app 1768019 supported; repository activation and current exact-PR evidence not established. COMMENTED/check success is not APPROVED.",
+      "evidence_ref": null,
+      "updated_at": "2026-11-15-supported-review-declaration"
     }
+  },
+  "normalization": {
+    "status": "pending-supported-adapter",
+    "enforcement_class": "repository_declared",
+    "legacy_source": "reviewers.mergeguez_review cannot satisfy pullfrog_review",
+    "acceptance_requirements": [
+      "exact_pr_number",
+      "exact_base_branch",
+      "exact_head_branch",
+      "exact_head_sha",
+      "distinct_pr_author",
+      "native_reviewer_login_pullfrog[bot]",
+      "trusted_app_id_1768019",
+      "complete_changed_file_coverage",
+      "native_verdict_APPROVED",
+      "zero_blocking_findings",
+      "zero_unresolved_review_threads",
+      "live_github_checks"
+    ],
+    "declaration_is_acceptance": false
   }
 }
