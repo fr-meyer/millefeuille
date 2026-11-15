@@ -1,7 +1,7 @@
 id: pr-mf-approved-completion-20261112
 title: Approved remaining programme implementation
-status: local-implementation
-branch: feat/pr-mf-approved-completion-20261112-1851
+status: ready-for-native-pr-review
+branch: fix/pr-mf-integrated-completion-20261115
 base_branch: dev
 qualification_baseline: 6144efd8f7b2347743994ab85b3614ae90f67cbf
 authority: Owner 2026-11-12 18:51 KST approves reviewed remaining plan and implementation
@@ -10,7 +10,10 @@ execution_mode: native-session
 tracking: Existing thirteen cards remain tracking-only, never claimed or dispatched
 historical_task: pr-mf-release-safety-20261111
 historical_review: .speculoos/history/review-evidence-pr098.json
-review_authority: Local independent review then current supported broker and GitHub readback before publication
+review_authority: Local independent review and publication checks before PR creation; distinct exact-head Pullfrog native review and GitHub readback before merge
+current_programme_authority: Owner 2026-11-14 approves remaining programme; 2026-11-15 requests completion
+reused_qualified_source: f0dc10a9e3ff005ff442f14e5f5129b7515dcd0f
+acceptance_status: Local changed-source checks complete; scientific, canonical-PDF, runtime-fault, native-review and release gates remain explicit
 enforcement_class: repository_declared
 consumed_private_scope: NO_REPLAY
 version: No next SemVer selected; retain 0.5.0 and Hydra compatibility until release decision
@@ -25,7 +28,7 @@ safety:
   - Fresh private read and upload scopes must be exact and bound before access
   - No replay of consumed receipts, fabricated model provenance or implicit provider retry
   - Semantic acceptance precedes classification and all canonical writes are exact and journaled
-  - Private repository stays private; approved broker only; no raw push
+  - Preserve live repository visibility (public at 2026-11-15 readback); approved broker only, no raw push or implicit visibility change
   - Actual main trigger safety before promotion, actual-main assets then separate approval
   - No disk expansion; preserve recovery and at least 64GiB free
 acceptance:
