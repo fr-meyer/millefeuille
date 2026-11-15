@@ -143,6 +143,7 @@ not expose through Python's POSIX descriptor APIs:
 | Legacy single-run retrieval | Supported | Supported |
 | Atomic retrieval-batch publication | Supported and fully tested | Fails closed before publication |
 | Exclusive no-follow model-provenance output | Supported and fully tested | Fails closed before output creation |
+| Metadata/acceptance transactions and artifact/offline-stage persistence | Supported where required POSIX primitives are available | Unsupported; refuses before effects |
 | Pinned-root evidence reads and reviewed-summary handoffs | Supported and fully tested | Fails closed before source-pack I/O |
 | OCR operation ledgers and owned HTTP worker | POSIX locks/no-follow primitives required | Fails closed before ledger I/O, credentials or worker launch |
 | Kernel-isolated native PDF decoding | Linux x86-64 adapter | Explicit unsupported-platform refusal before input read |

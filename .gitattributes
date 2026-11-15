@@ -16,3 +16,8 @@
 /tests/test_scientific_fidelity.py text eol=lf
 
 /tests/test_s04_repair.py text eol=lf
+
+# Preserve portable metadata source byte normalization from PR176.
+/millefeuille/domain/millefeuille.py text eol=lf
+/millefeuille/domain/secure_io.py text eol=lf
+/millefeuille/domain/metadata_transaction.py text eol=lf
