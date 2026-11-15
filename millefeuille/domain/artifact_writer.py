@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from millefeuille.domain.artifacts import ArtifactIndex, write_artifact_index
+from millefeuille.domain.artifacts import ArtifactIndex
 from millefeuille.domain.card_fixtures import (
     CARD_JSON_REF,
     CARD_MARKDOWN_REF,
@@ -30,6 +30,11 @@ from millefeuille.domain.extraction_fixtures import (
 )
 from millefeuille.domain.index_fixtures import (
     INDEX_STATUS_REF,
+)
+from millefeuille.domain.metadata_transaction import (
+    require_metadata_write_support,
+    write_metadata_text,
+    write_metadata_transaction,
 )
 from millefeuille.domain.millefeuille import (
     ManualGate,
@@ -139,10 +144,12 @@ def write_dry_run_artifacts(
         )
         planned_runs.append((item, paper_id, item_rows, run_context))
 
+    if planned_runs:
+        require_metadata_write_support()
+
     results: list[ArtifactWriteResult] = []
     for item, paper_id, item_rows, run_context in planned_runs:
         run_dir = run_context.run_dir
-        run_dir.mkdir(parents=True, exist_ok=True)
 
         stage_manifest = build_dry_run_stage_manifest(
             item=item,
@@ -162,7 +169,6 @@ def write_dry_run_artifacts(
             index_ready=run_context.retrieval_index_status_ref is not None,
         )
         stage_manifest_path = run_dir / "stage-manifest.json"
-        write_stage_manifest(stage_manifest, stage_manifest_path)
 
         artifact_index = build_dry_run_artifact_index(
             item=item,
@@ -189,7 +195,22 @@ def write_dry_run_artifacts(
             index_records=run_context.index_records,
         )
         artifact_index_path = run_dir / "artifact-index.json"
-        write_artifact_index(artifact_index, artifact_index_path)
+        # Prepare and validate both DTOs before any metadata effect.
+        stage_manifest = StageManifest.from_dict(stage_manifest.to_dict())
+        artifact_index = ArtifactIndex.from_dict(artifact_index.to_dict())
+        write_metadata_transaction(
+            run_dir,
+            {
+                "stage-manifest.json": json.dumps(
+                    stage_manifest.to_dict(), indent=2, sort_keys=True
+                )
+                + "\n",
+                "artifact-index.json": json.dumps(
+                    artifact_index.to_dict(), indent=2, sort_keys=True
+                )
+                + "\n",
+            },
+        )
 
         results.append(
             ArtifactWriteResult(
@@ -292,11 +313,8 @@ def paper_id_for_item(item: DiscoveredItem) -> str:
 
 
 def write_stage_manifest(manifest: StageManifest, path: str | Path) -> None:
-    output_path = Path(path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(manifest.to_dict(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    write_metadata_text(
+        path, json.dumps(manifest.to_dict(), indent=2, sort_keys=True) + "\n"
     )
 
 

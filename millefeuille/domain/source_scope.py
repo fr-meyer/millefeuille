@@ -143,9 +143,23 @@ def resolve_multi_source_pack(
 
 
 def verify_multi_source_pack(
-    pack: Path, *, item_key: str, paper_id: str, scope: MultiSourceScope
+    pack: Path,
+    *,
+    item_key: str,
+    paper_id: str,
+    scope: MultiSourceScope,
+    artifact_reader=None,
 ) -> None:
-    manifest = load_source_pack_manifest(pack / "manifest.json")
+    if artifact_reader is None:
+        manifest = load_source_pack_manifest(pack / "manifest.json")
+        reader = read_bytes_no_follow
+    else:
+        from millefeuille.domain.source_packs import parse_source_pack_manifest
+
+        manifest = parse_source_pack_manifest(
+            artifact_reader.load_json_object(pack / "manifest.json", "source manifest")
+        )
+        reader = artifact_reader.read_bytes
     if manifest.get("schema_version") != SOURCE_PACK_MULTI_MANIFEST_SCHEMA_VERSION:
         raise MillefeuilleContractError(
             "whole-pack evidence requires a v0.2 source pack"
@@ -195,9 +209,7 @@ def verify_multi_source_pack(
             raise MillefeuilleContractError(
                 "multi-source PDF byte_size must be non-negative"
             )
-        payload = read_bytes_no_follow(
-            pack / source["ref"], "multi-source PDF", max_bytes=size
-        )
+        payload = reader(pack / source["ref"], "multi-source PDF", max_bytes=size)
         if len(payload) != size:
             raise MillefeuilleContractError("multi-source PDF byte_size drift")
         if hashlib.sha256(payload).hexdigest() != source["sha256"]:

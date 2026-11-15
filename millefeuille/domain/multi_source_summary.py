@@ -89,7 +89,13 @@ def build_multi_source_summary_package(
             "multi-source summary paper or page identity drift"
         )
     scope = MultiSourceScope.from_dict(route.get("source_scope"))
-    verify_multi_source_pack(pack, item_key=item_key, paper_id=paper_id, scope=scope)
+    verify_multi_source_pack(
+        pack,
+        item_key=item_key,
+        paper_id=paper_id,
+        scope=scope,
+        artifact_reader=artifact_reader,
+    )
     for record in (route, structure, native):
         if (
             record.get("paper_id") != paper_id

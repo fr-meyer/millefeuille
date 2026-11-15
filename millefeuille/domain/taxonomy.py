@@ -1428,3 +1428,55 @@ def _canonical_string_sequence(
         for entry in value
     ]
     return sorted(normalized)
+
+
+def validate_external_classification_taxonomy(payload, *, run_id):
+    """No fixture/title exemption from released lock/content/version binding."""
+    lock_payload = payload.get("taxonomy_lock")
+    if not isinstance(lock_payload, dict):
+        raise MillefeuilleContractError(
+            "classification requires released taxonomy lock"
+        )
+    lock = validate_taxonomy_lock(lock_payload)
+    if (
+        payload.get("taxonomy_version") != lock["taxonomy_version"]
+        or payload.get("taxonomy_lock_identity") != lock["content_identity"]
+        or lock["scope_type"] != "single-run"
+        or lock["scope_id"] != run_id
+    ):
+        raise MillefeuilleContractError(
+            "classification taxonomy version/content/scope drift"
+        )
+    entries = {e["entry_id"]: e for e in lock["registry_snapshot"]["entries"]}
+    paths = {}
+    for entry in entries.values():
+        if entry["level"] == 2 and entry["status"] == "active":
+            paths[entry["entry_id"]] = (
+                entries[entry["parent_id"]]["label"] + " > " + entry["label"]
+            )
+    primary = payload.get("primary_entry_id")
+    if (
+        not isinstance(primary, str)
+        or primary not in paths
+        or payload.get("primary_path") != paths[primary]
+    ):
+        raise MillefeuilleContractError(
+            "classification primary path not in released registry"
+        )
+    alternate = payload.get("strongest_rejected_entry_id")
+    if alternate is not None and (
+        alternate == primary
+        or alternate not in paths
+        or payload.get("strongest_rejected_path") != paths[alternate]
+    ):
+        raise MillefeuilleContractError(
+            "classification alternative not in released registry"
+        )
+    if alternate is None and payload.get("strongest_rejected_path") is not None:
+        raise MillefeuilleContractError("classification alternative identity missing")
+    for rejected in payload.get("rejected_alternatives", []):
+        if not isinstance(rejected, dict) or rejected.get("path") not in paths.values():
+            raise MillefeuilleContractError(
+                "classification rejected path outside registry"
+            )
+    return lock

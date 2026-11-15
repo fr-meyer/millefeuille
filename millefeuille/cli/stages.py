@@ -10,6 +10,7 @@ import sys
 from typing import Any, TextIO
 
 from millefeuille.domain.acceptance import (
+    preview_acceptance_summary,
     write_acceptance_batch_summary,
     write_acceptance_summary,
 )
@@ -110,7 +111,18 @@ def run_stage_cli(
     if mode_exit is not None:
         return mode_exit
     try:
-        if args.command == "structure-prepare":
+        if args.command == "acceptance-preview":
+            payload = preview_acceptance_summary(
+                source_pack_root=args.source_pack_root,
+                run_id=args.run_id,
+                paper_id=args.paper_id,
+                item_key=args.item_key,
+                handoff_path=args.handoff,
+                duplicate_scan_path=args.duplicate_scans,
+                artifact_root=args.artifact_root,
+                stage_manifest=args.stage_manifest,
+            )
+        elif args.command == "structure-prepare":
             result = prepare_local_structures_from_route_evidence(
                 route_evidence_paths=args.route_evidence,
                 output_dir=args.output_dir,
@@ -423,6 +435,20 @@ def _build_parser() -> argparse.ArgumentParser:
     summarize_prepare.add_argument("--output-dir", required=True)
     summarize_prepare.add_argument("--profile")
     summarize_prepare.add_argument("--json", action="store_true")
+
+    preview = subparsers.add_parser(
+        "acceptance-preview",
+        help="Inspect saved evidence without recording acceptance.",
+    )
+    preview.add_argument("--source-pack-root", required=True)
+    _add_artifact_locator_args(preview)
+    identity = preview.add_mutually_exclusive_group(required=True)
+    identity.add_argument("--paper-id")
+    identity.add_argument("--item-key")
+    preview.add_argument("--run-id", required=True)
+    preview.add_argument("--handoff")
+    preview.add_argument("--duplicate-scans")
+    preview.add_argument("--json", action="store_true")
 
     acceptance = subparsers.add_parser(
         "acceptance",

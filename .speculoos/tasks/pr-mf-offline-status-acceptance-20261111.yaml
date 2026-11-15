@@ -1,0 +1,25 @@
+id: pr-mf-offline-status-acceptance-20261111
+title: Prevent classified status from implying skipped acceptance passed
+status: in-progress
+branch: openclaw/millefeuille-offline-integration-20261111-1715
+base_branch: dev
+write_paths:
+  - millefeuille/domain/status_observability.py
+  - tests/test_millefeuille_status_observability.py
+  - specs/millefeuille-pipeline/status-observability.md
+  - .speculoos/tasks/pr-mf-offline-status-acceptance-20261111.yaml
+scope:
+  - Cross-join observed passing acceptance before classified completion
+  - Preserve individual skipped and classified states without inferred success
+acceptance:
+  - Regression fails before fix on incorrectly complete preview
+  - Corrected report remains incomplete and strict CLI exits 2
+  - Existing complete previews remain compatible
+  - Full offline unittest suite, Ruff and metadata parsing pass
+publication_boundary:
+  statement: Local offline code, synthetic tests and docs only. No provider, OCR, Zotero, OpenKB, credential, canonical source-pack, release or external write. Separate exact approval required for publication.
+documentation_impact:
+  status: updated
+  rationale: Status contract explains skipped acceptance and classified completion.
+publish_authority: Owner 2026-11-11 17:15 KST approved local implementation only; no publication performed.
+private_data_scan: Required; changed bytes contain synthetic tests and public source only.

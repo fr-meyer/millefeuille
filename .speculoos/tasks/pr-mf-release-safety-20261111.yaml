@@ -1,0 +1,16 @@
+id: pr-mf-release-safety-20261111
+title: Local release and publication safety reconciliation
+status: local-implementation
+branch: feat/pr-mf-release-safety-20261111-2236
+base_branch: dev
+qualification_baseline: 49da8e09510ca4de6f311f5fd7fafa5a004298d4
+authority: Owner local implementation approval 2026-11-11 22:36 KST
+publication_boundary: No network, publication, merge, release, credentials or deployment.
+historical_task: pr-098-reconcile-delivery-ledgers
+review_authority: Unresolved; historical declarations retained, supported live readback required.
+branch_policy: Matches declared feat/pr-* dev-target pattern; dev ancestry and current controls require revalidation before publication.
+acceptance:
+  - Six read-only CI test cells and no mutation job
+  - Human-web release and dependent final-main asset approval mandatory
+  - No version or tag selected and legacy Hydra retained
+  - PR98 evidence retained without current external status claim

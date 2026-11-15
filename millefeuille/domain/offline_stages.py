@@ -41,6 +41,7 @@ from millefeuille.domain.index_fixtures import (
     load_retrieval_index_status,
     write_indexes_from_evidence,
 )
+from millefeuille.domain.metadata_transaction import require_metadata_write_support
 from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
     StageName,
@@ -122,6 +123,7 @@ def write_offline_fixture_stage(
     stage_manifest: str | Path | None = None,
 ) -> OfflineStageWriteResult:
     stage_name = _coerce_fixture_stage(stage)
+    require_metadata_write_support()
     resolved = resolve_run_artifacts(
         source_pack_root=source_pack_root,
         run_id=run_id,

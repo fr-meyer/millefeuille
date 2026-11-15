@@ -1,0 +1,34 @@
+id: pr-mf-source-matrix-20261111
+title: Qualify offline difficult-source matrix without claiming live acceptance
+status: in-progress
+branch: feat/pr-mf-run-package-preview-20261111
+base_branch: dev
+base_sha: 78108520608625a364ecf373df5214c2de500717
+write_paths:
+  - tests/test_millefeuille_difficult_source_matrix.py
+  - specs/millefeuille-pipeline/difficult-source-qualification.md
+  - .speculoos/tasks/pr-mf-source-matrix-20261111.yaml
+scope:
+  - Map eleven source categories to exact existing tests and evidence limits
+  - Add only missing native and OCR route dependency branch contracts
+  - Preserve explicit unproven real PDF extraction and live provider gates
+acceptance:
+  - Focused existing selection passes with platform skip documented
+  - Two new tests cover seven negative and three positive route combinations
+  - Ruff, diff whitespace and metadata parse pass
+  - No production code or external operations
+validation:
+  existing: 50 tests, 49 passed, 1 unsupported-platform capability test skipped
+  added: 2 tests, 2 passed, no skips
+  logs: ignored .local-validation/source-matrix-*.log
+publication_boundary:
+  statement: Offline synthetic contracts only. No credentials, protected artifacts, acquisition, network, provider, OCR, model, Zotero, source/index live writes, approval consumption or publication.
+documentation_impact:
+  status: updated
+  rationale: Exact source-category evidence matrix separates fixture contracts from live acceptance.
+policy_drift: Stale manifest PR98 and retired review declarations are not live GitHub enforcement evidence. Parent owns reconciliation.
+publish_authority: Parent owns integration and publication; this child makes no upstream mutation.
+private_data_scan: New files contain only synthetic labels, test identifiers and repository metadata.
+
+qualification_source_head: 025cd2161941ad14a907b444cf7cbaf16f60e634
+integration_owner: Parent programme, no production code delta.

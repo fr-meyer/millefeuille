@@ -1,0 +1,24 @@
+id: pr-mf-acceptance-preview-20261111
+title: Read-only saved acceptance inspection
+status: in-progress
+branch: openclaw/millefeuille-acceptance-preview-20261111-1849
+base_branch: dev
+implementation_base_sha: 4b050753a27480c89a9455e05140fab2e902e8e0
+write_paths:
+  - millefeuille/domain/acceptance.py
+  - millefeuille/cli/stages.py
+  - millefeuille/cli/main.py
+  - tests/test_millefeuille_acceptance_preview.py
+  - specs/millefeuille-pipeline/acceptance-preview.md
+  - .speculoos/tasks/pr-mf-acceptance-preview-20261111.yaml
+scope:
+  - Reuse exact resolver and builder without persistence
+  - Export allowlisted metadata only with explicit limitations
+  - Require review for missing or explicitly unrun duplicate scan evidence in previews
+acceptance:
+  - Read-only file and directory census, writer guards, CLI and privacy tests pass
+  - Real native two-source upstream and handoff checks reject drift and missing or duplicated rows
+  - Legacy writer output and behavior remain unchanged
+  - Full offline suite, Ruff and metadata validation pass
+publication_boundary: Local synthetic implementation only; no live or external writes authorized.
+policy_note: Existing manifest and surface task pointers are historical declarations, not live GitHub enforcement evidence.

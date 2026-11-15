@@ -13,6 +13,7 @@ from unittest import mock
 
 from millefeuille.domain import secure_io
 from millefeuille.domain.millefeuille import MillefeuilleContractError
+from tests.platform_capabilities import requires_pinned_root_reads
 
 
 def _stat_like(
@@ -460,3 +461,362 @@ class TestMillefeuilleSecureIo(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BudgetedDirectoryTests(unittest.TestCase):
+    """Exercise public readers, real directory iterators and the actual OS seam."""
+
+    @requires_pinned_root_reads
+    def test_limits_snapshot_revalidation_and_bounded_entry_stats(self):
+        import os
+        from unittest.mock import patch
+
+        from millefeuille.domain.evidence_source_adapter import ReadBudget
+        from millefeuille.domain.millefeuille import MillefeuilleContractError
+        from millefeuille.domain.secure_io import RootArtifactReader
+        from millefeuille.domain.semantic_acceptance import semantic_read_scope
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for n in range(512):
+                (root / str(n)).touch()
+            counts = {"next": 0, "stat": 0}
+            real_scan = os.scandir
+
+            class Entry:
+                def __init__(self, entry):
+                    self.entry = entry
+                    self.name = entry.name
+
+                def stat(self, **kwargs):
+                    counts["stat"] += 1
+                    return self.entry.stat(**kwargs)
+
+            class Scan:
+                def __init__(self, fd):
+                    self.iterator = real_scan(fd)
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    self.iterator.close()
+
+                def __next__(self):
+                    counts["next"] += 1
+                    return Entry(next(self.iterator))
+
+            budget = ReadBudget(max_opens=20000, max_scans=20000)
+            with semantic_read_scope(budget), RootArtifactReader(root) as reader:  # noqa: SIM117 (explicit budget lifetime)
+                with patch("os.scandir", side_effect=Scan):
+                    self.assertEqual(
+                        len(reader.list_directory_names(root, "fixture")), 512
+                    )
+                    self.assertEqual(counts, {"next": 513, "stat": 512})
+                    reader.revalidate_snapshot()
+                    self.assertEqual(counts, {"next": 1026, "stat": 1024})
+                    self.assertEqual(budget.scans, 1028)  # scan-open + 512 + EOF, twice
+                    with patch("os.dup") as dup:  # noqa: SIM117 (explicit budget lifetime)
+                        with self.assertRaisesRegex(
+                            MillefeuilleContractError, "entry_limit changed"
+                        ):
+                            reader.list_directory_names(
+                                root, "fixture", entry_limit=513
+                            )
+                        dup.assert_not_called()
+                    (root / "added").touch()
+                    counts.update(next=0, stat=0)
+                    with self.assertRaisesRegex(
+                        MillefeuilleContractError, "512 entries"
+                    ):
+                        reader.revalidate_snapshot()
+                    self.assertEqual(counts, {"next": 513, "stat": 512})
+
+    @requires_pinned_root_reads
+    def test_reviewed_root_513_does_not_expand_generic_or_nested_limit(self):
+        from millefeuille.domain.evidence_source_adapter import ReadBudget
+        from millefeuille.domain.millefeuille import MillefeuilleContractError
+        from millefeuille.domain.reviewed_summary_handoff import BudgetedPackageReader
+        from millefeuille.domain.secure_io import RootArtifactReader
+        from millefeuille.domain.semantic_acceptance import semantic_read_scope
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for n in range(512):
+                (root / str(n)).touch()
+            (root / "manifest.json").write_text("{}")
+            budget = ReadBudget(max_opens=20000, max_scans=20000)
+            with semantic_read_scope(budget), BudgetedPackageReader(root) as reader:
+                self.assertEqual(
+                    len(reader.list_directory_names(root, "reviewed", entry_limit=513)),
+                    513,
+                )
+                reader.revalidate_snapshot()
+                self.assertEqual(reader._directory_snapshots[Path(".")][3], 513)
+                (root / "extra-payload").touch()
+                with self.assertRaisesRegex(MillefeuilleContractError, "513 entries"):
+                    reader.revalidate_snapshot()
+            with RootArtifactReader(root) as reader:  # noqa: SIM117 (explicit budget lifetime)
+                with self.assertRaisesRegex(MillefeuilleContractError, "512 entries"):
+                    reader.list_directory_names(root, "generic")
+            # A different nested directory has no inherited reviewed-root capability.
+            (root / "extra-payload").unlink()
+            (root / "manifest.json").unlink()
+            nested = root / "nested"
+            nested.mkdir()
+            for n in range(513):
+                (nested / str(n)).touch()
+            with RootArtifactReader(root) as reader:  # noqa: SIM117 (explicit budget lifetime)
+                with self.assertRaisesRegex(MillefeuilleContractError, "512 entries"):
+                    reader.list_directory_names(nested, "nested")
+
+    def test_entry_limit_validation_before_any_io(self):
+        from unittest.mock import patch
+
+        from millefeuille.domain.millefeuille import MillefeuilleContractError
+        from millefeuille.domain.secure_io import RootArtifactReader
+
+        reader = RootArtifactReader("/not-opened")
+        with patch("os.dup") as dup, patch("os.scandir") as scan:
+            for invalid in [True, False, 0, -1, 514, 512.0, None, float("inf")]:
+                with self.subTest(invalid=invalid):  # noqa: SIM117 (explicit budget lifetime)
+                    with self.assertRaises(MillefeuilleContractError):
+                        reader.list_directory_names(
+                            "/not-opened", "invalid", entry_limit=invalid
+                        )
+            dup.assert_not_called()
+            scan.assert_not_called()
+
+    @requires_pinned_root_reads
+    def test_default_scan_budget_cannot_finish_two_512_entry_scans(self):
+        from millefeuille.domain.evidence_source_adapter import (
+            BudgetExhaustedError,
+            ReadBudget,
+        )
+        from millefeuille.domain.secure_io import RootArtifactReader
+        from millefeuille.domain.semantic_acceptance import semantic_read_scope
+
+        with tempfile.TemporaryDirectory() as tmp:
+            for n in range(512):
+                Path(tmp, str(n)).touch()
+            budget = ReadBudget(max_opens=20000)  # retain default 1024 scans
+            with semantic_read_scope(budget), RootArtifactReader(tmp) as reader:
+                reader.list_directory_names(tmp, "fixture")
+                self.assertEqual(budget.scans, 514)
+                with self.assertRaises(BudgetExhaustedError):
+                    reader.revalidate_snapshot()
+                self.assertTrue(budget.exhausted)
+
+    @requires_pinned_root_reads
+    def test_exhausted_snapshot_has_zero_noncleanup_io(self):
+        from unittest.mock import patch
+
+        from millefeuille.domain.evidence_source_adapter import (
+            BudgetExhaustedError,
+            ReadBudget,
+        )
+        from millefeuille.domain.secure_io import RootArtifactReader
+        from millefeuille.domain.semantic_acceptance import semantic_read_scope
+
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "one").write_bytes(b"one")
+            budget = ReadBudget()
+            with semantic_read_scope(budget), RootArtifactReader(tmp) as reader:
+                reader.list_directory_names(tmp, "fixture")
+                with self.assertRaises(BudgetExhaustedError):
+                    budget.debit(read_bytes=budget.max_read_bytes + 1)
+                with (
+                    patch("os.open") as opened,
+                    patch("os.fstat") as fst,
+                    patch("os.scandir") as scan,
+                    patch("os.dup") as dup,
+                ):
+                    with self.assertRaises(BudgetExhaustedError):
+                        reader.revalidate_snapshot()
+                    for spy in [opened, fst, scan, dup]:
+                        spy.assert_not_called()
+
+    @requires_pinned_root_reads
+    def test_directory_iterator_and_entry_stat_are_predebited_on_every_axis(self):
+        import os
+        from unittest.mock import patch
+
+        from millefeuille.domain.evidence_source_adapter import (
+            BudgetExhaustedError,
+            ReadBudget,
+        )
+        from millefeuille.domain.secure_io import RootArtifactReader
+        from millefeuille.domain.semantic_acceptance import semantic_read_scope
+
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "one").touch()
+            fd = os.open(tmp, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                for limits, expected_next in [
+                    ({"max_scans": 1}, 0),
+                    ({"max_read_bytes": 1}, 1),
+                    ({"max_opens": 1}, 1),
+                ]:
+                    counts = {"next": 0, "stat": 0}
+                    budget = ReadBudget(**limits)
+                    real_scan = os.scandir
+
+                    class Entry:
+                        name = "one"
+
+                        def stat(self, *, counts=counts, **kwargs):
+                            counts["stat"] += 1
+                            self.fail_if_called = True
+                            raise AssertionError("stat after exhausted budget")
+
+                    class Scan:
+                        def __init__(self, fd, real_scan=real_scan):
+                            self.scan = real_scan(fd)
+
+                        def __enter__(self):
+                            return self
+
+                        def __exit__(self, *args):
+                            self.scan.close()
+
+                        def __next__(self, counts=counts):
+                            counts["next"] += 1
+                            next(self.scan)
+                            return Entry()
+
+                    with (
+                        self.subTest(limits=limits),
+                        semantic_read_scope(budget),
+                        patch("os.scandir", side_effect=Scan),
+                    ):
+                        with self.assertRaises(BudgetExhaustedError):
+                            RootArtifactReader._directory_entries(
+                                fd, path=Path(tmp), label="fixture"
+                            )
+                        self.assertEqual(counts, {"next": expected_next, "stat": 0})
+                        self.assertTrue(budget.exhausted)
+            finally:
+                os.close(fd)
+
+
+@requires_pinned_root_reads
+class OutputPlannerBudgetTests(unittest.TestCase):
+    def test_real_before_images_share_ledger_and_protect_missing_outputs(self):
+        from millefeuille.domain.acceptance_output_plan import plan_exact_outputs
+        from millefeuille.domain.evidence_source_adapter import ReadBudget
+        from millefeuille.domain.secure_io import RootArtifactReader
+        from millefeuille.domain.semantic_acceptance import semantic_read_scope
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "reports").mkdir()
+            (root / "stage-manifest.json").write_bytes(b"manifest before")
+            (root / "artifact-index.json").write_bytes(b"index before")
+            outputs = {
+                "stage-manifest.json": b"manifest after",
+                "artifact-index.json": b"index after",
+                **{"reports/" + str(n) + ".json": b"{}" for n in range(4)},
+            }
+            ledger = ReadBudget()
+            with semantic_read_scope(ledger), RootArtifactReader(root) as reader:
+                plan = plan_exact_outputs(
+                    root=root, outputs=outputs, artifact_reader=reader
+                )
+                self.assertIs(reader.budget_identity, ledger)
+                self.assertGreater(
+                    ledger.read_bytes, len(b"manifest beforeindex before")
+                )
+                self.assertGreater(ledger.opens, 10)
+                self.assertEqual(len(plan), 6)
+                self.assertEqual(sum(p.before_bytes is not None for p in plan), 2)
+                self.assertEqual(len(reader._missing_file_snapshots), 4)
+            self.assertEqual(
+                (root / "stage-manifest.json").read_bytes(), b"manifest before"
+            )
+
+    def test_exhausted_or_foreign_capability_zero_actual_planner_io(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from contextvars import copy_context
+        from unittest.mock import patch
+
+        from millefeuille.domain.acceptance_output_plan import plan_exact_outputs
+        from millefeuille.domain.evidence_source_adapter import (
+            BudgetExhaustedError,
+            ReadBudget,
+        )
+        from millefeuille.domain.millefeuille import MillefeuilleContractError
+        from millefeuille.domain.secure_io import RootArtifactReader
+        from millefeuille.domain.semantic_acceptance import semantic_read_scope
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            ledger = ReadBudget()
+            with semantic_read_scope(ledger), RootArtifactReader(root) as reader:
+                context = copy_context()
+                with ThreadPoolExecutor(max_workers=1) as pool:  # noqa: SIM117 (explicit I/O boundary)
+                    with patch("os.open") as opened, patch("os.stat") as metadata:
+                        with self.assertRaises(MillefeuilleContractError):
+                            pool.submit(
+                                context.run,
+                                plan_exact_outputs,
+                                root=root,
+                                outputs={"new": b"x"},
+                                artifact_reader=reader,
+                            ).result()
+                        opened.assert_not_called()
+                        metadata.assert_not_called()
+                with self.assertRaises(BudgetExhaustedError):
+                    ledger.debit(opens=ledger.max_opens + 1)
+                with (
+                    patch("os.open") as opened,
+                    patch("os.fstat") as fst,
+                    patch("pathlib.Path.exists") as exists,
+                    patch("pathlib.Path.lstat") as lst,
+                ):
+                    with self.assertRaises(BudgetExhaustedError):
+                        plan_exact_outputs(
+                            root=root, outputs={"new": b"x"}, artifact_reader=reader
+                        )
+                    for spy in [opened, fst, exists, lst]:
+                        spy.assert_not_called()
+            with patch("os.open") as opened:
+                with self.assertRaisesRegex(MillefeuilleContractError, "capability"):
+                    plan_exact_outputs(
+                        root=root, outputs={"new": b"x"}, artifact_reader=reader
+                    )
+                opened.assert_not_called()
+
+    def test_before_image_growth_refuses_with_only_reserved_sentinel_read(self):
+        import os
+        from unittest.mock import patch
+
+        from millefeuille.domain.acceptance_output_plan import plan_exact_outputs
+        from millefeuille.domain.evidence_source_adapter import ReadBudget
+        from millefeuille.domain.millefeuille import MillefeuilleContractError
+        from millefeuille.domain.secure_io import RootArtifactReader
+        from millefeuille.domain.semantic_acceptance import semantic_read_scope
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = root / "a"
+            target.write_bytes(b"old")
+            ledger = ReadBudget()
+            actual_read = os.read
+            sizes = []
+
+            def grow(fd, size):
+                sizes.append(size)
+                with target.open("ab") as output:
+                    output.write(b"unreserved growth")
+                return actual_read(fd, size)
+
+            with semantic_read_scope(ledger), RootArtifactReader(root) as reader:
+                with patch("os.read", side_effect=grow):  # noqa: SIM117 (explicit I/O boundary)
+                    with self.assertRaises(MillefeuilleContractError):
+                        plan_exact_outputs(
+                            root=root,
+                            outputs={"a": b"new", "z": b"later"},
+                            artifact_reader=reader,
+                        )
+                self.assertEqual(sizes, [4])  # advertised 3 bytes + one reserved probe
+                self.assertFalse((root / "z").exists())

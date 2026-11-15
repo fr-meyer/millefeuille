@@ -1,0 +1,27 @@
+id: pr-mf-ruff-table-row-20261111
+title: Restore whole-repository Ruff baseline without changing table rows
+status: in-progress
+branch: feat/pr-mf-run-package-preview-20261111
+base_branch: dev
+write_paths:
+  - millefeuille/domain/table_converter.py
+  - tests/test_millefeuille_table_row_guard.py
+  - .speculoos/tasks/pr-mf-ruff-table-row-20261111.yaml
+scope:
+  - Combine equivalent final tr_close and nonempty-row guards for SIM102
+  - Preserve empty cells, numeric text, uneven padding and trailing rows
+acceptance:
+  - Five synthetic row-preservation tests pass on both base and repaired source
+  - Whole-repository Ruff and format, metadata and diff checks pass
+  - Full isolated suite has no failures; skipped tests reported separately
+publication_boundary:
+  statement: Local code and synthetic tests only. No Zotero, OCR, OpenKB, credential changes, private artifacts, release or external effects. Publication and review retain exact approval gates.
+documentation_impact:
+  status: none
+  rationale: Equivalent internal guard only; no public interface or supported behavior changes.
+private_data_scan: Required; all fixture values synthetic.
+github:
+  issue: null
+  pull_request: null
+  url: null
+  head_sha: null

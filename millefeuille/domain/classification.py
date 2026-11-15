@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import re
 from typing import Any
 
 from millefeuille.domain.acceptance import ACCEPTANCE_SUMMARY_REF
+from millefeuille.domain.metadata_transaction import (
+    capture_input_files,
+    capture_metadata_binding,
+    capture_run_inputs,
+    metadata_read_guard,
+    write_metadata_transaction,
+)
 from millefeuille.domain.millefeuille import (
     ClassificationActionOutcome,
     ClassificationActionRecord,
@@ -21,8 +30,10 @@ from millefeuille.domain.millefeuille import (
     RejectedAlternativeRecord,
     StageName,
     StageStatus,
+    ZoteroWritebackPlanRecord,
 )
 from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
+from millefeuille.domain.secure_io import read_bytes_no_follow, read_text_no_follow
 from millefeuille.domain.stage_runtime import (
     ResolvedRunArtifacts,
     load_json_object,
@@ -156,6 +167,7 @@ class _PreparedClassification:
     taxonomy_requests_path: Path
     preview_path: Path
     batch_report_path: Path
+    check_inputs: Callable[[], None]
 
 
 @dataclass(frozen=True)
@@ -357,6 +369,9 @@ def _prepare_classification_action_from_evidence(
     )
     _require_passing_acceptance(resolved)
     evidence = _load_classification_action_evidence(action_evidence_path)
+    from millefeuille.domain.taxonomy import validate_external_classification_taxonomy
+
+    validate_external_classification_taxonomy(evidence, run_id=resolved.run_id)
     action_id = str(evidence["action_id"])
     mode = ClassificationMode(str(evidence["mode"]))
     outcome = ClassificationActionOutcome(str(evidence["outcome"]))
@@ -631,9 +646,53 @@ def _prepare_classification_from_evidence(
         artifact_root=artifact_root,
         stage_manifest=stage_manifest,
     )
+    # Seal authority and source material before consuming any classification input.
+    extra_inputs = [Path(evidence_path), resolved.run_dir / ACCEPTANCE_SUMMARY_REF]
+    if len(resolved.source_pack_manifest.get("sources", [])) > 1:
+        extra_inputs.extend(
+            [
+                resolved.run_dir / "reports/semantic-decision.json",
+                resolved.run_dir / "reports/semantic-review-inventory.json",
+            ]
+        )
+    authority_guard = capture_run_inputs(
+        resolved.source_pack_root,
+        resolved.source_pack_dir,
+        resolved.run_dir,
+        extra_inputs,
+    )
+    if capture_metadata_binding(resolved.source_pack_dir / "manifest.json") != (
+        resolved.source_manifest_binding
+    ):
+        raise MillefeuilleContractError("classification source manifest drift")
+    semantic_guard = None
+    if len(resolved.source_pack_manifest.get("sources", [])) > 1:
+        from millefeuille.domain.semantic_acceptance import safe_ref
+
+        inventory = load_json_object(
+            resolved.run_dir / "reports/semantic-review-inventory.json",
+            "semantic review inventory",
+        )
+        decision = load_json_object(
+            resolved.run_dir / "reports/semantic-decision.json", "semantic decision"
+        )
+        semantic_paths = [
+            resolved.run_dir / safe_ref(entry["ref"])
+            for entry in inventory.get("evidence", [])
+        ]
+        roots = {"run": resolved.run_dir, "source-pack": resolved.source_pack_dir}
+        semantic_paths.extend(
+            roots[entry["root"]] / safe_ref(entry["ref"])
+            for entry in decision.get("material_binding", {}).get("files", [])
+        )
+        semantic_guard = capture_input_files(semantic_paths)
+        authority_guard()
     _require_passing_acceptance(resolved)
 
     evidence = _load_classification_evidence(evidence_path)
+    from millefeuille.domain.taxonomy import validate_external_classification_taxonomy
+
+    validate_external_classification_taxonomy(evidence, run_id=resolved.run_id)
     taxonomy_version = str(evidence["taxonomy_version"])
     mode = ClassificationMode(str(evidence.get("mode", "single")))
     rejected_alternatives = [
@@ -662,6 +721,20 @@ def _prepare_classification_from_evidence(
         run_dir=resolved.run_dir,
     )
 
+    refs_guard = capture_input_files(
+        [
+            Path(ref) if Path(ref).is_absolute() else resolved.run_dir / ref
+            for ref in evidence_refs
+        ]
+    )
+
+    def check_inputs() -> None:
+        authority_guard()
+        refs_guard()
+        if semantic_guard is not None:
+            semantic_guard()
+
+    check_inputs()
     decision_dir = resolved.run_dir / DECISION_DIR_REF
     decision_json_path = decision_dir / f"{resolved.paper_id}.json"
     decision_markdown_path = decision_dir / f"{resolved.paper_id}.md"
@@ -722,6 +795,7 @@ def _prepare_classification_from_evidence(
         taxonomy_requests_path=taxonomy_requests_path,
         preview_path=preview_path,
         batch_report_path=resolved.run_dir / BATCH_REPORT_REF,
+        check_inputs=check_inputs,
     )
 
 
@@ -734,6 +808,10 @@ def _require_passing_acceptance(resolved: ResolvedRunArtifacts) -> None:
         raise MillefeuilleContractError(
             "classification preview requires an acceptance summary with status pass"
         )
+    if len(resolved.source_pack_manifest.get("sources", [])) > 1:
+        from millefeuille.domain.semantic_acceptance import require_semantic_companion
+
+        require_semantic_companion(resolved)
     expected_acceptance_identity = {
         "paper_id": resolved.paper_id,
         "run_id": resolved.run_id,
@@ -748,9 +826,115 @@ def _require_passing_acceptance(resolved: ResolvedRunArtifacts) -> None:
             )
 
 
-def _persist_classification(
+def _classification_writeback_binding(
+    resolved: ResolvedRunArtifacts,
+    preview_path: Path,
+    preview_payload: dict[str, Any],
+    classification_status: ClassificationStatus,
+):
+    """Keep a verified materialized plan for an unchanged preview only."""
+    preview_binding = {
+        "mode": "preview",
+        "status": "previewed",
+        "plan_ref": relative_ref(preview_path, resolved.run_dir),
+    }
+    materialized_binding = {
+        "mode": "preview",
+        "status": "previewed",
+        "plan_ref": "zotero-writeback-plan.json",
+    }
+    if classification_status != ClassificationStatus.CLASSIFIED:
+        return preview_binding, None
+    classify_stage = next(
+        (
+            stage
+            for stage in resolved.stage_manifest.stages
+            if stage.name == StageName.CLASSIFY
+        ),
+        None,
+    )
+    if classify_stage is None or classify_stage.status != StageStatus.PASSED:
+        return preview_binding, None
+    if resolved.artifact_index.zotero_writeback != materialized_binding:
+        return preview_binding, None
+    writeback_stage = next(
+        (
+            stage
+            for stage in resolved.stage_manifest.stages
+            if stage.name == StageName.WRITEBACK
+        ),
+        None,
+    )
+    if writeback_stage is None or writeback_stage.status != StageStatus.PASSED:
+        return preview_binding, None
+    plan_path = resolved.run_dir / materialized_binding["plan_ref"]
+    note = preview_payload.get("note_markdown")
+    has_note = isinstance(note, str) and bool(note.strip())
+    note_ref = "reports/zotero-writeback-note.md" if has_note else None
+    expected_outputs = [materialized_binding["plan_ref"]]
+    if note_ref:
+        expected_outputs.append(note_ref)
+    if writeback_stage.outputs != expected_outputs:
+        return preview_binding, None
+    expected_plan = ZoteroWritebackPlanRecord(
+        paper_id=resolved.paper_id,
+        run_id=resolved.run_id,
+        source_hash=resolved.source_hash,
+        mode="preview",
+        status="previewed",
+        add_tags=list(preview_payload.get("add_tags", [])),
+        remove_tags=list(preview_payload.get("remove_tags", [])),
+        note_markdown_ref=note_ref,
+        destination_collection=preview_payload.get("destination_collection"),
+        classification_ref=(
+            str(preview_payload.get("classification_ref", "")).strip() or None
+        ),
+        execution_notes=["preview-only plan; no live Zotero mutation"],
+    ).to_dict()
+    inputs = [preview_path, plan_path]
+    if note_ref:
+        inputs.append(resolved.run_dir / note_ref)
+    expected_preview_bytes = (
+        json.dumps(preview_payload, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    expected_plan_bytes = (
+        json.dumps(expected_plan, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    with metadata_read_guard(resolved.run_dir):
+        input_guard = capture_input_files(inputs)
+        if read_bytes_no_follow(preview_path, "writeback preview") != (
+            expected_preview_bytes
+        ):
+            return preview_binding, None
+        if read_bytes_no_follow(plan_path, "writeback plan") != expected_plan_bytes:
+            return preview_binding, None
+        if note_ref:
+            note_path = resolved.run_dir / note_ref
+            if read_text_no_follow(note_path, "writeback note") != note.strip() + "\n":
+                return preview_binding, None
+        input_guard()
+    return materialized_binding, input_guard
+
+
+def render_classification_outputs(
     prepared: _PreparedClassification,
-) -> ClassificationWriteResult:
+) -> dict[str, bytes]:
+    import json
+
+    from millefeuille.domain.acceptance_output_plan import json_bytes
+
+    outputs = {}
+
+    def write_json_object(path, payload):
+        outputs[relative_ref(path, prepared.resolved.run_dir)] = json_bytes(payload)
+
+    def write_text(path, text):
+        outputs[relative_ref(path, prepared.resolved.run_dir)] = text.encode("utf-8")
+
+    def write_jsonl_records(path, records):
+        lines = [json.dumps(record, ensure_ascii=False) for record in records]
+        write_text(path, ("\n".join(lines) + "\n") if lines else "")
+
     resolved = prepared.resolved
     decision = prepared.decision
     plan = prepared.plan
@@ -846,15 +1030,45 @@ def _persist_classification(
             "plan_ref": relative_ref(prepared.preview_path, resolved.run_dir),
         },
     )
-    persist_run_artifacts(
+    write_json_object(resolved.stage_manifest_path, stage_manifest.to_dict())
+    write_json_object(resolved.artifact_index_path, artifact_index.to_dict())
+    if len(outputs) != 10:
+        raise MillefeuilleContractError("classification output paths overlap")
+    return outputs
+
+
+def _persist_classification(
+    prepared: _PreparedClassification,
+) -> ClassificationWriteResult:
+    resolved = prepared.resolved
+    binding, guard = _classification_writeback_binding(
         resolved,
-        stage_manifest=stage_manifest,
-        artifact_index=artifact_index,
+        prepared.preview_path,
+        prepared.preview_payload,
+        prepared.decision.status,
+    )
+    outputs = render_classification_outputs(prepared)
+    index_ref = relative_ref(resolved.artifact_index_path, resolved.run_dir)
+    index = json.loads(outputs[index_ref])
+    index["zotero_writeback"] = binding
+    outputs[index_ref] = (json.dumps(index, indent=2, sort_keys=True) + "\n").encode()
+
+    def check_inputs() -> None:
+        prepared.check_inputs()
+        if guard is not None:
+            guard()
+
+    write_metadata_transaction(
+        resolved.run_dir,
+        {ref: payload.decode("utf-8") for ref, payload in outputs.items()},
+        expected_before=resolved.metadata_snapshot,
+        expected_directory_identity=resolved.run_dir_identity,
+        check_inputs=check_inputs,
     )
     return ClassificationWriteResult(
-        paper_id=resolved.paper_id,
-        run_id=resolved.run_id,
-        status=decision.status.value,
+        paper_id=prepared.resolved.paper_id,
+        run_id=prepared.resolved.run_id,
+        status=prepared.decision.status.value,
         plan_path=prepared.plan_path,
         decision_json_path=prepared.decision_json_path,
         writeback_preview_path=prepared.preview_path,
@@ -1268,6 +1482,10 @@ def _load_classification_action_evidence(path: str | Path) -> dict[str, Any]:
         "mode",
         "outcome",
         "taxonomy_version",
+        "taxonomy_lock",
+        "taxonomy_lock_identity",
+        "primary_entry_id",
+        "strongest_rejected_entry_id",
         "prior_decision_ref",
         "primary_path",
         "confidence",

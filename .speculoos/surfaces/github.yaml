@@ -16,14 +16,20 @@ notes:
   - Branch, PR, review, merge, and optional Project writes should use approved Mergeguez/broker commands.
   - PR #41 recorded the first live Millefeuille golden-run evidence fixture and local OpenKB proxy route decision.
 current_task:
-  id: pr-098-reconcile-delivery-ledgers
-  pull_request: 98
+  id: pr-mf-approved-completion-20261112
+  pull_request: null
   project_item: unavailable
   pull_request_project_item: unavailable
+  branch: feat/pr-mf-approved-completion-20261112-1851
+  status: local-implementation
+  project_status: not-refreshed
+  remote_identity: not-refreshed
+historical_current_task:
+  id: pr-098-reconcile-delivery-ledgers
+  pull_request: 98
   branch: chore/pr-098-ledger-reconciliation
-  status: In Progress
-  project_status: unavailable
-pull_request: 98
+  note: Historical snapshot retained, not current remote state or review authority.
+pull_request: null
 completed_pull_requests:
   - id: pr-036-speculoos-millefeuille-bootstrap
     number: 36

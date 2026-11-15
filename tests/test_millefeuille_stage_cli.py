@@ -38,6 +38,8 @@ from millefeuille.domain.stage_runtime import load_stage_manifest, resolve_run_a
 from millefeuille.domain.structure_fixtures import write_structures_from_evidence
 from millefeuille.domain.summary_fixtures import write_summaries_from_evidence
 from millefeuille.domain.writeback import WRITEBACK_PLAN_REF
+from tests.metadata_fixtures import write_fixture_metadata
+from tests.platform_capabilities import requires_posix_batch_publication
 from tests.test_millefeuille_source_pack_writer import (
     _evidence,
     _make_handoff_row,
@@ -133,7 +135,7 @@ def _prepare_fixture_run(tempdir: str) -> tuple[Path, Path]:
         run_id=RUN_ID,
     )
 
-    write_dry_run_artifacts(
+    write_fixture_metadata(
         items=[_make_item()],
         handoff_rows=[_make_handoff_row()],
         config=ArtifactExportConfig(
@@ -159,7 +161,7 @@ def _prepare_source_pack_run(tempdir: str) -> tuple[Path, Path]:
         source_pack_root=source_pack_root,
         created_at="2026-07-14T01:00:00+00:00",
     )
-    write_dry_run_artifacts(
+    write_fixture_metadata(
         items=[_make_item()],
         handoff_rows=[_make_handoff_row()],
         config=ArtifactExportConfig(
@@ -282,6 +284,9 @@ def _write_classification_evidence_json(tempdir: str) -> Path:
         json.dumps(
             {
                 "schema_version": ("millefeuille-classification-fixture-evidence/v0.1"),
+                **_released_classification_binding(
+                    "Methods > Normalization & training dynamics"
+                ),
                 "taxonomy_version": "taxonomy-v1",
                 "mode": "single",
                 "primary_path": "Methods > Normalization & training dynamics",
@@ -315,6 +320,7 @@ def _write_classification_evidence_json(tempdir: str) -> Path:
 
 
 class TestMillefeuilleStageCli(unittest.TestCase):
+    @requires_posix_batch_publication
     def test_acceptance_command_writes_summary_and_updates_status(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -354,6 +360,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
             artifact_index = load_artifact_index(run_dir / "artifact-index.json")
             self.assertIn("acceptance_summary", artifact_index.artifacts)
 
+    @requires_posix_batch_publication
     def test_acceptance_and_index_resume_reject_each_noncanonical_index_ref(self):
         for field_name in (
             "selected_fulltext_ref",
@@ -435,6 +442,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
                         handoff_enabled=True,
                     )
 
+    @requires_posix_batch_publication
     def test_classify_and_writeback_commands_materialize_preview_artifacts(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -499,6 +507,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
                 "previewed",
             )
 
+    @requires_posix_batch_publication
     def test_run_retrieve_and_models_commands_cover_full_preview_chain(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -676,6 +685,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
             ["off", "on", "auto"],
         )
 
+    @requires_posix_batch_publication
     def test_run_executes_full_fixture_pipeline_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_source_pack_run(tempdir)
@@ -726,6 +736,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
             )
             self.assertEqual(_snapshot_files(source_pack_root), first_snapshot)
 
+    @requires_posix_batch_publication
     def test_run_resume_revalidates_outputs_without_stage_evidence(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, _run_dir = _prepare_source_pack_run(tempdir)
@@ -799,6 +810,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
             self.assertIn("canonical pipeline order", stderr.getvalue())
             self.assertFalse(acceptance_path.exists())
 
+    @requires_posix_batch_publication
     def test_classification_failure_does_not_leave_partial_preview(self):
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
@@ -923,3 +935,79 @@ class TestMillefeuilleStageCli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _released_classification_binding(
+    primary_path, taxonomy_version="taxonomy-v1", run_id=RUN_ID
+):
+    """A genuine released synthetic registry, not a validator exemption."""
+    from millefeuille.domain.taxonomy import (
+        create_taxonomy_lock,
+        seal_taxonomy_registry,
+    )
+
+    paths = {primary_path, "Applications > Vision"}
+    entries = []
+    parents = {}
+    primary_id = None
+    for index, path in enumerate(sorted(paths)):
+        parent, label = path.split(" > ", 1)
+        if parent not in parents:
+            parents[parent] = "P" + str(len(parents))
+            entries.append(
+                {
+                    "entry_id": parents[parent],
+                    "level": 1,
+                    "parent_id": None,
+                    "label": parent,
+                    "definition": "Synthetic definition",
+                    "include_when": ["Synthetic fit"],
+                    "exclude_when": ["Synthetic mismatch"],
+                    "boundary_notes": [],
+                    "status": "active",
+                    "replacement_id": None,
+                }
+            )
+        entry_id = "L" + str(index)
+        if path == primary_path:
+            primary_id = entry_id
+        entries.append(
+            {
+                "entry_id": entry_id,
+                "level": 2,
+                "parent_id": parents[parent],
+                "label": label,
+                "definition": "Synthetic definition",
+                "include_when": ["Synthetic fit"],
+                "exclude_when": ["Synthetic mismatch"],
+                "boundary_notes": [],
+                "status": "active",
+                "replacement_id": None,
+            }
+        )
+    registry = seal_taxonomy_registry(
+        {
+            "schema_version": "millefeuille-taxonomy-registry/v0.1",
+            "registry_id": "synthetic",
+            "taxonomy_version": taxonomy_version,
+            "previous_version": None,
+            "previous_content_identity": None,
+            "status": "released",
+            "governing_basis": "Primary intellectual contribution",
+            "owner_id": "synthetic",
+            "entries": entries,
+        }
+    )
+    lock = create_taxonomy_lock(
+        registry,
+        lock_id="synthetic",
+        scope_type="single-run",
+        scope_id=run_id,
+        locked_by="synthetic",
+        locked_at="2026-11-12T00:00:00Z",
+    )
+    return {
+        "taxonomy_lock": lock,
+        "taxonomy_lock_identity": lock["content_identity"],
+        "primary_entry_id": primary_id,
+    }

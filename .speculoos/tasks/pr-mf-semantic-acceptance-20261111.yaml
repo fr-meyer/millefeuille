@@ -1,0 +1,20 @@
+id: pr-mf-semantic-acceptance-20261111
+title: Snapshot semantic evidence and pure publication planning
+status: in-progress
+branch: feat/pr-mf-semantic-acceptance-20261111-2236
+base_branch: dev
+scope:
+  - Historical multi-source Zotero version comparison without freshness claims
+  - Hash-bound source review companion and multi-source classification/status gates
+  - Pure exact-output planning without canonical writes or approval authority
+non_goals:
+  - Private corpus reads, provider calls, Zotero effects, publication or deployment
+  - Reviewer authentication or privileged mutation executor
+notes:
+  - Local source implementation only; no PR or merge claim
+  - Repository declarations are not evidence of GitHub enforcement
+  - Retain historical structural and Hydra compatibility
+validation:
+  - python -m unittest tests.test_millefeuille_semantic_acceptance
+  - python -m unittest discover -s tests
+  - python -m ruff check

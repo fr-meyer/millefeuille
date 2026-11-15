@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
+from contextvars import ContextVar
 import errno
 import json
 import os
@@ -21,6 +22,22 @@ _StatObjectIdentity = tuple[int, int, int]
 _StatStabilitySnapshot = tuple[int, ...]
 _StatRecord = tuple[_StatObjectIdentity, _StatStabilitySnapshot]
 _READ_CHUNK_BYTES = 65_536
+_READ_BUDGET = ContextVar("semantic_read_budget", default=None)
+
+
+def _debit_metadata(*, opens=0, read_bytes=0):
+    """Conservative logical metadata charges before filesystem operations."""
+    budget = _READ_BUDGET.get()
+    if budget is not None:
+        budget.debit(opens=opens, read_bytes=read_bytes)
+
+
+def _entry_limit(value):
+    if type(value) is not int or not 1 <= value <= 513:
+        raise MillefeuilleContractError(
+            "directory entry_limit must be an integer in 1..513"
+        )
+    return value
 
 
 def _validated_max_bytes(max_bytes: int | None, *, label: str) -> int | None:
@@ -225,6 +242,7 @@ def _open_or_create_directory_path_no_follow(
                     f"{label} path must not contain parent traversal: {target}"
                 )
             try:
+                _debit_metadata(opens=2, read_bytes=1)
                 next_fd = _open_relative_directory_fd(current_fd, part)
             except FileNotFoundError:
                 # Another writer may win the creation race. The no-follow open
@@ -310,6 +328,16 @@ def _open_regular_file_fd(
     parent_fd, name = _open_parent_directory_fd(path, label=label)
     flags = _regular_file_read_flags(no_follow=True)
     try:
+        # Reject named nonregular entries before opening, including under a
+        # trusted guard that refuses FIFO descriptors independently of us.
+        # Keep O_NONBLOCK and the post-open identity checks for substitution races.
+        named_before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if stat.S_ISLNK(named_before.st_mode):
+            raise MillefeuilleContractError(
+                f"{label} must not be a symbolic link: {path}"
+            )
+        if not stat.S_ISREG(named_before.st_mode):
+            raise MillefeuilleContractError(f"{label} is not a regular file: {path}")
         fd = os.open(name, flags, dir_fd=parent_fd)
     except FileNotFoundError as exc:
         os.close(parent_fd)
@@ -323,6 +351,9 @@ def _open_regular_file_fd(
         raise MillefeuilleContractError(
             f"could not open {label} {path}: {exc}"
         ) from exc
+    except BaseException:
+        os.close(parent_fd)
+        raise
 
     try:
         opened_stat = os.fstat(fd)
@@ -602,6 +633,7 @@ class RootArtifactReader:
         self.root = Path(root).absolute()
         self._root_fd: int | None = None
         self._root_identity: tuple[int, int] | None = None
+        self.budget_identity = None
         self._file_snapshots: dict[Path, tuple[str, _StatRecord]] = {}
         self._missing_file_snapshots: dict[Path, str] = {}
         self._directory_snapshots: dict[
@@ -610,12 +642,15 @@ class RootArtifactReader:
                 str,
                 _StatRecord,
                 tuple[tuple[str, _StatRecord], ...],
+                int,
             ],
         ] = {}
 
     def __enter__(self) -> RootArtifactReader:
         if self._root_fd is not None:
             raise MillefeuilleContractError("source-pack reader is already open")
+        self.budget_identity = _READ_BUDGET.get()
+        _debit_metadata(opens=len(self.root.parts) + 1, read_bytes=1)
         self._root_fd = _open_directory_path_no_follow(
             self.root,
             label="source-pack root",
@@ -646,6 +681,7 @@ class RootArtifactReader:
 
     def verify_root(self) -> None:
         self._require_open()
+        _debit_metadata(opens=len(self.root.parts) + 1, read_bytes=1)
         candidate_fd = _open_directory_path_no_follow(
             self.root,
             label="source-pack root",
@@ -712,18 +748,20 @@ class RootArtifactReader:
                     f"{label} appeared after batch preflight: {target}"
                 )
 
-        for relative, (label, expected_stat, expected_entries) in sorted(
+        for relative, (label, expected_stat, expected_entries, entry_limit) in sorted(
             self._directory_snapshots.items(),
             key=lambda item: item[0].as_posix(),
         ):
             target = self.root / relative
             directory_fd = self._open_relative_directory(relative, label=label)
             try:
+                _debit_metadata(opens=1, read_bytes=1)
                 current_stat = _stat_record(os.fstat(directory_fd))
                 current_entries = self._directory_entries(
                     directory_fd,
                     path=target,
                     label=label,
+                    entry_limit=entry_limit,
                 )
                 if current_stat != expected_stat or current_entries != expected_entries:
                     raise MillefeuilleContractError(
@@ -774,12 +812,15 @@ class RootArtifactReader:
             label=label,
         )
         try:
+            _debit_metadata(read_bytes=opened_stat.st_size + 1)
             payload = _read_opened_file_bytes(
                 fd,
                 opened_stat,
                 path=target,
                 label=label,
-                max_bytes=max_bytes,
+                max_bytes=min(max_bytes, opened_stat.st_size)
+                if max_bytes is not None
+                else opened_stat.st_size,
             )
             self._require_unchanged_regular_file(
                 parent_fd=parent_fd,
@@ -832,10 +873,58 @@ class RootArtifactReader:
             raise MillefeuilleContractError(f"{label} must be an object")
         return payload
 
-    def list_directory_names(self, path: str | Path, label: str) -> list[str]:
+    def require_budget_capability(self, root):
+        budget = _READ_BUDGET.get()
+        if (
+            budget is None
+            or self.budget_identity is not budget
+            or Path(root) != self.root
+        ):
+            raise MillefeuilleContractError(
+                "shared planning reader capability required"
+            )
+        budget.debit()
+        self._require_open()
+
+    def read_before_image(self, path, label, *, max_bytes):
+        self.require_budget_capability(self.root)
+        if not self.probe_regular_file(path, label):
+            return None, None
+        parent_fd, fd, name, metadata, target = self._open_regular_file(
+            path, label=label
+        )
+        try:
+            if metadata.st_size > max_bytes:
+                raise MillefeuilleContractError("before-image exceeds planning bound")
+            _debit_metadata(read_bytes=metadata.st_size + 1)
+            before = _read_opened_file_bytes(
+                fd, metadata, path=target, label=label, max_bytes=metadata.st_size
+            )
+            self._require_unchanged_regular_file(
+                parent_fd=parent_fd,
+                fd=fd,
+                name=name,
+                path=target,
+                label=label,
+                expected_stat=metadata,
+            )
+            self._remember_regular_file(target, label, metadata)
+            return before, metadata
+        finally:
+            os.close(fd)
+            os.close(parent_fd)
+
+    def list_directory_names(
+        self, path: str | Path, label: str, *, entry_limit: int = 512
+    ) -> list[str]:
+        entry_limit = _entry_limit(entry_limit)
         relative = self._relative(path, label=label)
+        previous = self._directory_snapshots.get(relative)
+        if previous is not None and previous[3] != entry_limit:
+            raise MillefeuilleContractError("directory snapshot entry_limit changed")
         directory_fd = self._open_relative_directory(relative, label=label)
         try:
+            _debit_metadata(opens=1, read_bytes=1)
             before_stat = os.fstat(directory_fd)
             if not stat.S_ISDIR(before_stat.st_mode):
                 raise MillefeuilleContractError(f"{label} is not a directory")
@@ -843,13 +932,15 @@ class RootArtifactReader:
                 directory_fd,
                 path=self.root / relative,
                 label=label,
+                entry_limit=entry_limit,
             )
+            _debit_metadata(opens=1, read_bytes=1)
             after_stat = os.fstat(directory_fd)
             if _stat_record(before_stat) != _stat_record(after_stat):
                 raise MillefeuilleContractError(
                     f"{label} changed while listed: {self.root / relative}"
                 )
-            snapshot = (label, _stat_record(after_stat), entries)
+            snapshot = (label, _stat_record(after_stat), entries, entry_limit)
             previous = self._directory_snapshots.get(relative)
             if previous is not None and previous != snapshot:
                 raise MillefeuilleContractError(
@@ -917,18 +1008,35 @@ class RootArtifactReader:
         *,
         path: Path,
         label: str,
+        entry_limit: int = 512,
     ) -> tuple[tuple[str, _StatRecord], ...]:
+        entry_limit = _entry_limit(entry_limit)
         try:
-            names = sorted(os.listdir(directory_fd))
-            return tuple(
-                (
-                    name,
-                    _stat_record(
-                        os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-                    ),
-                )
-                for name in names
-            )
+            # Bound initial enumeration and every snapshot revalidation alike.
+            # At most entry_limit entries are retained, including revalidation.
+
+            budget = _READ_BUDGET.get()
+            if budget is not None:
+                budget.debit(opens=1, scans=1)
+            entries = []
+            with os.scandir(directory_fd) as iterator:
+                while True:
+                    if budget is not None:
+                        budget.debit(read_bytes=1, scans=1)
+                    try:
+                        entry = next(iterator)
+                    except StopIteration:
+                        break
+                    if len(entries) >= entry_limit:
+                        raise MillefeuilleContractError(
+                            f"{label} directory inventory exceeds {entry_limit} entries"
+                        )
+                    if budget is not None:
+                        budget.debit(read_bytes=1, opens=1)
+                    entries.append(
+                        (entry.name, _stat_record(entry.stat(follow_symlinks=False)))
+                    )
+            return tuple(sorted(entries, key=lambda item: item[0]))
         except FileNotFoundError as exc:
             raise MillefeuilleContractError(
                 f"{label} changed while listed: {path}"
@@ -958,9 +1066,11 @@ class RootArtifactReader:
         return relative
 
     def _open_relative_directory(self, relative: Path, *, label: str) -> int:
+        _debit_metadata(opens=1)
         current_fd = os.dup(self._require_open())
         try:
             for part in relative.parts:
+                _debit_metadata(opens=2, read_bytes=1)
                 next_fd = _open_relative_directory_fd(current_fd, part)
                 os.close(current_fd)
                 current_fd = next_fd
@@ -996,6 +1106,7 @@ class RootArtifactReader:
         name = relative.parts[-1]
         flags = _regular_file_read_flags(no_follow=True)
         try:
+            _debit_metadata(opens=1)
             fd = os.open(name, flags, dir_fd=parent_fd)
         except FileNotFoundError as exc:
             os.close(parent_fd)
@@ -1009,7 +1120,11 @@ class RootArtifactReader:
             raise MillefeuilleContractError(
                 f"could not open {label} {target}: {exc}"
             ) from exc
+        except Exception:
+            os.close(parent_fd)
+            raise
         try:
+            _debit_metadata(opens=1, read_bytes=1)
             opened_stat = os.fstat(fd)
             if not stat.S_ISREG(opened_stat.st_mode):
                 raise MillefeuilleContractError(
@@ -1039,6 +1154,7 @@ class RootArtifactReader:
         label: str,
         expected_stat: os.stat_result,
     ) -> None:
+        _debit_metadata(opens=2, read_bytes=2)
         fd_stat = os.fstat(fd)
         try:
             named_stat = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)

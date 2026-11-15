@@ -7,6 +7,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+from millefeuille.domain.metadata_transaction import (
+    metadata_path_read_guard,
+    write_metadata_text,
+)
 from millefeuille.domain.millefeuille import (
     MillefeuilleContractError,
     StageStatus,
@@ -179,16 +183,14 @@ class ArtifactIndex:
 
 
 def load_artifact_index(path: str | Path) -> ArtifactIndex:
-    payload = load_json_object_no_follow(path, "artifact index")
-    return ArtifactIndex.from_dict(payload)
+    with metadata_path_read_guard(path):
+        payload = load_json_object_no_follow(path, "artifact index")
+        return ArtifactIndex.from_dict(payload)
 
 
 def write_artifact_index(index: ArtifactIndex, path: str | Path) -> None:
-    index_path = Path(path)
-    index_path.parent.mkdir(parents=True, exist_ok=True)
-    index_path.write_text(
-        json.dumps(index.to_dict(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    write_metadata_text(
+        path, json.dumps(index.to_dict(), indent=2, sort_keys=True) + "\n"
     )
 
 

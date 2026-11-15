@@ -42,7 +42,10 @@ record and its ref must occur literally in the unique owning
   indexed canonical artifacts. Written lane result refs must be stable local
   regular files and stage outputs.
 - Acceptance identity, source-pack ref, result status, and stage status must
-  agree.
+  agree. A classified decision cannot make the run complete without an observed
+  passing acceptance summary. Explicitly skipping acceptance preserves that
+  skipped stage and the classified claim, but blocks overall completion; it
+  never implies that acceptance passed.
 - Classification is intentionally single-paper on this surface. Its one plan
   entry binds the observed paper and indexed decision ref; plan and decision
   mode, taxonomy version, and status agree exactly.

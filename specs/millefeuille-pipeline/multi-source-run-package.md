@@ -54,3 +54,42 @@ declare those states successful. Restoring inputs does not grant a new approval.
 The CollaGAN main paper and supplement have a read-only plan and in-memory
 resolver check. Permanent publication, a verified two-row handoff report,
 whole-paper acceptance and duplicate review remain separately gated steps.
+
+## Read-only operator CLI
+
+Use `millefeuille source-pack run-package-preview --source-pack-root PATH
+--item-key KEY --run-id ID [--json]` to invoke the existing planner. JSON includes
+the exact planner preview and input inventory plus `preview_sha256`,
+`status: planned` and `writes: 0`; `provider_calls` remains zero. Human output
+contains identity, fingerprint and counts, not paper text. Unchanged inputs and
+filesystem identity produce stable output. Contract or OS read failures produce
+concise stderr, nonzero status and no success output; argument misuse exits 2.
+
+There are no publication, recovery, approval or write flags. A preview is neither
+publication nor acceptance, nor an atomic snapshot of a concurrently changing
+tree. Preserve the fingerprint and inventory for any separately governed later
+operation; changed inputs require revalidation. Intake is unchanged. No summary
+generation, OCR, Zotero or OpenKB request, credential, writeback or release
+authority is implied.
+
+## Synthetic security qualification (2026-11-11)
+
+The dedicated tests/test_millefeuille_run_package_security.py matrix exercises
+file/directory/dangling symlinks, FIFOs and Unix sockets in the input inventory;
+a symlinked source-root ancestor; nonregular first outputs during recovery;
+first-output substitution after recovery's second write; and newly added input
+files after approval for both publication and recovery. These supplement the
+existing directory-identity, input-byte drift, output substitution and partial
+publication tests. All fixtures are synthetic. Resolver stubs isolate package
+boundary checks; they do not establish semantic validation of arbitrary papers.
+
+This qualification does not justify a new production guard: these cases already
+fail closed on the reviewed implementation. It does not establish whole-tree
+transaction isolation. Validation precedes inventory, directory enumeration and
+individual reads occur at different times, and uncooperative writers can mutate
+entries after the last check. An input inventory binds file refs and bytes,
+not every input inode or empty directory identity. Byte-identical regular-file
+replacement is not by itself evidence drift. Advisory locking requires writer
+cooperation; use a quiescent input tree for separately approved publication.
+No claim is made that every OS race, hard-link alias, mount substitution or
+adversarial mutation schedule is eliminated by these checks.

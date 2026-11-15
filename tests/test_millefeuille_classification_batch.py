@@ -19,6 +19,7 @@ from millefeuille.domain.classification import (
 )
 from millefeuille.domain.index_fixtures import INDEX_STATUS_REF
 from millefeuille.domain.summary_fixtures import SUMMARY_ARTIFACT_REF
+from tests.platform_capabilities import requires_posix_batch_publication
 from tests.test_millefeuille_stage_cli import (
     PAPER_ID,
     RUN_ID,
@@ -98,6 +99,9 @@ def _write_classification_evidence(
         ],
         "rejected_alternatives": [],
     }
+    from tests.test_millefeuille_stage_cli import _released_classification_binding
+
+    payload.update(_released_classification_binding(primary_path, taxonomy_version))
     if review_reasons:
         payload["review_reasons"] = review_reasons
     if adjudication_required:
@@ -112,6 +116,21 @@ def _write_batch_manifest(
     taxonomy_version: object = "taxonomy-v1",
     runs: list[dict[str, object]],
 ) -> None:
+    from tests.test_millefeuille_stage_cli import _released_classification_binding
+
+    for row in runs:
+        ref = row.get("evidence_ref")
+        if not isinstance(ref, str) or ".." in Path(ref).parts:
+            continue
+        evidence_path = path.parent / ref
+        if evidence_path.is_file():
+            payload = json.loads(evidence_path.read_bytes())
+            payload.update(
+                _released_classification_binding(
+                    payload["primary_path"], payload["taxonomy_version"], row["run_id"]
+                )
+            )
+            _write_json(evidence_path, payload)
     _write_json(
         path,
         {
@@ -147,6 +166,7 @@ def _snapshot_classification_outputs(source_pack_root: Path) -> dict[str, bytes]
     }
 
 
+@requires_posix_batch_publication
 class TestMillefeuilleClassificationBatch(unittest.TestCase):
     def test_batch_classification_routes_sorted_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tempdir:

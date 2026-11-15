@@ -36,8 +36,6 @@ from millefeuille.clients.exceptions import (
 )
 from millefeuille.clients.mistral_client import MistralClient
 from millefeuille.clients.ocr_client import OCRClient
-from millefeuille.clients.pageindex_client import PageIndexClient
-from millefeuille.clients.pageindex_tree_client import PageIndexTreeClient
 from millefeuille.clients.zotero_client import ZoteroClient
 from millefeuille.domain.config import (
     PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER,
@@ -122,6 +120,9 @@ def initialize_clients(
             raise ConfigError(
                 "OCR config is not PageIndexOCRConfig for provider 'pageindex'"
             )
+        # Import the HTTP-backed implementation only for this enabled provider.
+        from millefeuille.clients.pageindex_client import PageIndexClient
+
         ocr_client = PageIndexClient(cfg.ocr)
     else:
         raise ConfigError(f"Unknown OCR provider: {provider}")
@@ -483,6 +484,9 @@ def initialize_tree_processor(
         f"(credentials from {credential_source})..."
     )
 
+    # Offline CLI imports must not initialize the provider HTTP dependency stack.
+    from millefeuille.clients.pageindex_tree_client import PageIndexTreeClient
+
     tree_client = PageIndexTreeClient(
         cfg.tree_structure,
         base_url,
@@ -804,6 +808,10 @@ overrides; the packaged placeholder defaults are not accepted.
 def entrypoint() -> None:
     """Dispatch read-only subcommands before falling back to Hydra."""
     argv = sys.argv[1:]
+    if argv and argv[0] == "inspect-native":
+        from millefeuille.cli.native_source import run_native_source_cli
+
+        sys.exit(run_native_source_cli(argv[1:]))
     if argv and argv[0] in {"artifacts", "status"}:
         sys.exit(run_artifact_cli(argv))
     if argv and argv[0] == "source-pack":
@@ -827,6 +835,7 @@ def entrypoint() -> None:
         "card",
         "index",
         "acceptance",
+        "acceptance-preview",
         "classify",
         "writeback",
         "retrieve",

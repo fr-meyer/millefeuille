@@ -17,6 +17,7 @@ from millefeuille.domain.artifacts import (
     resolve_artifact_index_path,
     write_artifact_index,
 )
+from tests.platform_capabilities import requires_posix_batch_publication
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "millefeuille_artifact_index"
@@ -53,6 +54,15 @@ class TestArtifactIndexDomain(unittest.TestCase):
         self.assertEqual(resolved, COMPLETE_INDEX)
 
     def test_write_round_trip_preserves_schema_shape(self):
+        from millefeuille.domain.artifacts import ArtifactIndex
+
+        index = load_artifact_index(COMPLETE_INDEX)
+        self.assertEqual(
+            ArtifactIndex.from_dict(index.to_dict()).to_dict(), index.to_dict()
+        )
+
+    @requires_posix_batch_publication
+    def test_write_native_round_trip_preserves_schema_shape(self):
         index = load_artifact_index(COMPLETE_INDEX)
         with tempfile.TemporaryDirectory() as tempdir:
             output_path = Path(tempdir) / "artifact-index.json"

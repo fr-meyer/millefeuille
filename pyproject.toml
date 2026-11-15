@@ -40,6 +40,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+native = ["PyPDF2>=3.0.1,<4"]
 test = [
     "jsonschema>=4.23",
     "ruff>=0.9",

@@ -4,7 +4,7 @@
     "commit_actor": "human_approved_agent_assisted",
     "push_actor": "mergeguez_branch_broker",
     "pr_actor": "franck_user_pr_author",
-    "review_actor": "mergeguez_review",
+    "review_actor": "pullfrog_review",
     "merge_actor": "user_api",
     "promotion_merge_actor": "user_api",
     "release_actor": "human_web"
@@ -16,7 +16,7 @@
       "head_patterns": ["chore/pr-*", "docs/pr-*", "feat/pr-*", "fix/pr-*", "test/pr-*"],
       "push_actor": "mergeguez_branch_broker",
       "pr_actor": "franck_user_pr_author",
-      "review_actor": "mergeguez_review",
+      "review_actor": "pullfrog_review",
       "merge_actor": "mergeguez_dev_merge",
       "native_review_requires_distinct_author": true,
       "exact_pr_base_head_sha_required": true,
@@ -30,7 +30,7 @@
       "base_refs": ["main"],
       "head_refs": ["dev"],
       "pr_actor": "franck_user_pr_author",
-      "review_actor": "mergeguez_review",
+      "review_actor": "pullfrog_review",
       "merge_actor": "user_api",
       "native_review_requires_distinct_author": true,
       "exact_pr_base_head_sha_required": true,
@@ -71,18 +71,19 @@
       "credential_location": "private_host_config",
       "requires_explicit_approval": true,
       "secrets_in_repo": false,
-      "attribution": "GitHub user-authored pull requests for native Mergeguez review compatibility"
+      "attribution": "GitHub user-authored pull requests for native distinct-author review compatibility"
     },
     "mergeguez_review": {
       "kind": "github_app_installation_broker",
       "roles": ["review_actor"],
-      "status": "available_host_broker",
+      "status": "retired_disabled",
       "bot_login": "mergeguez[bot]",
       "forbidden_pr_author_logins_for_native_review": ["mergeguez[bot]"],
       "credential_location": "host_broker",
       "requires_explicit_approval": false,
       "secrets_in_repo": false,
-      "attribution": "native GitHub PR review and check-run evidence only"
+      "attribution": "native GitHub PR review and check-run evidence only",
+      "enabled": false
     },
     "mergeguez_dev_merge": {
       "kind": "github_app_installation_broker",
@@ -101,8 +102,8 @@
         "exact_base_branch",
         "exact_head_branch",
         "exact_head_sha",
-        "required_mergeguez_review_and_checks",
-        "zero_blocking_mergeguez_findings",
+        "required_pullfrog_review_and_checks",
+        "zero_blocking_pullfrog_findings",
         "merged_by_verification"
       ]
     },
@@ -121,7 +122,7 @@
         "exact_base_branch",
         "exact_head_branch",
         "exact_head_sha",
-        "required_mergeguez_review_and_checks",
+        "required_pullfrog_review_and_checks",
         "explicit_approval",
         "merged_by_verification"
       ]
@@ -143,6 +144,19 @@
       "requires_explicit_approval": false,
       "secrets_in_repo": false,
       "attribution": "ignored local reviewer evidence only; no push, publish, or merge authority"
+    },
+    "pullfrog_review": {
+      "kind": "github_app",
+      "roles": ["review_actor"],
+      "status": "supported_identity_pending_repository_activation_and_exact_pr_evidence",
+      "bot_login": "pullfrog[bot]",
+      "app_id": 1768019,
+      "forbidden_pr_author_logins_for_native_review": ["pullfrog[bot]"],
+      "exact_pr_base_head_sha_required": true,
+      "repository_activation": "not_established",
+      "requires_explicit_approval": false,
+      "secrets_in_repo": false,
+      "attribution": "native GitHub PR review and trusted app checks; declaration is not activation or acceptance"
     }
   }
 }

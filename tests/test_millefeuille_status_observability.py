@@ -26,6 +26,8 @@ from millefeuille.domain.status_observability import (
     compute_status_observation_digest,
     load_status_observation,
 )
+from tests.metadata_fixtures import apply_complete_preview_fixture
+from tests.platform_capabilities import POSIX_BATCH_PUBLICATION
 from tests.test_millefeuille_stage_cli import (
     PAPER_ID,
     RUN_ID,
@@ -78,6 +80,47 @@ def _canonical_digest(payload: object) -> str:
 
 
 def _prepare_complete_preview(tempdir: str) -> tuple[Path, Path]:
+    if POSIX_BATCH_PUBLICATION:
+        return _prepare_complete_preview_native(tempdir)
+    source_pack_root, run_dir = _prepare_fixture_run(tempdir)
+    apply_complete_preview_fixture(source_pack_root, run_dir)
+    return source_pack_root, run_dir
+
+
+def _snapshot(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def _observation_payload(
+    *,
+    kind: str,
+    source_hash: str,
+    summary: dict[str, object],
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "schema_version": STATUS_OBSERVATION_SCHEMA_VERSION,
+        "kind": kind,
+        "authority": {
+            "source": STATUS_OBSERVATION_SOURCE,
+            "authoritative": False,
+        },
+        "paper_id": PAPER_ID,
+        "run_id": RUN_ID,
+        "source_hash": source_hash,
+        "summary": summary,
+    }
+    payload["integrity"] = {
+        "algorithm": "sha256",
+        "content_digest": compute_status_observation_digest(payload),
+    }
+    return payload
+
+
+def _prepare_complete_preview_native(tempdir: str) -> tuple[Path, Path]:
     source_pack_root, run_dir = _prepare_fixture_run(tempdir)
     handoff = _write_handoff_jsonl(tempdir)
     classification = _write_classification_evidence_json(tempdir)
@@ -182,6 +225,49 @@ def _observation_payload(
 
 
 class TestStatusCanonicalJoin(unittest.TestCase):
+    def test_classified_run_cannot_complete_with_acceptance_explicitly_skipped(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root, run_dir = _prepare_complete_preview(tempdir)
+            index_path = run_dir / "artifact-index.json"
+            stage_path = run_dir / "stage-manifest.json"
+            index = _read_json(index_path)
+            manifest = _read_json(stage_path)
+            index["artifacts"].pop("acceptance_summary")
+            index["stages"]["acceptance"]["status"] = "skipped"
+            stage = next(s for s in manifest["stages"] if s["name"] == "acceptance")
+            stage["status"] = "skipped"
+            stage["outputs"] = []
+            _write_json(index_path, index)
+            _write_json(stage_path, manifest)
+            report = build_status_report(
+                source_pack_root=root, paper_id=PAPER_ID, run_id=RUN_ID
+            )
+            self.assertEqual(report["classification"]["status"], "classified")
+            self.assertEqual(report["acceptance"]["state"], "not-observed")
+            self.assertFalse(report["status"]["complete"])
+            self.assertIn(
+                "classification: passing acceptance not observed",
+                report["status"]["blocking_items"],
+            )
+            stdout = StringIO()
+            result = run_artifact_cli(
+                [
+                    "status",
+                    "--source-pack-root",
+                    str(root),
+                    "--paper-id",
+                    PAPER_ID,
+                    "--run-id",
+                    RUN_ID,
+                    "--strict",
+                    "--json",
+                ],
+                stdout=stdout,
+                stderr=StringIO(),
+            )
+            self.assertEqual(result, 2)
+            self.assertFalse(json.loads(stdout.getvalue())["status"]["complete"])
+
     def test_preview_join_is_deterministic_read_only_and_sanitized(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root, _run_dir = _prepare_complete_preview(tempdir)

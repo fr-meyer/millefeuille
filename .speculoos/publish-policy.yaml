@@ -27,7 +27,7 @@ actor_policy:
     - human_approved_agent_assisted
     - mergeguez_branch_broker
     - franck_user_pr_author
-    - mergeguez_review
+    - pullfrog_review
     - user_api
   required_branch_policy:
     base_branch: dev
@@ -42,7 +42,7 @@ actor_policy:
     - exact_base_branch
     - exact_head_branch
     - exact_head_sha
-    - exact_head_mergeguez_review
+    - exact_head_pullfrog_review
     - live_github_checks
     - user_api_merge_actor
 planning_only:
@@ -62,3 +62,11 @@ scrub_patterns:
     regex: "%PDF-"
   - name: zotero-api-key-looking-token
     regex: "\\b[A-Za-z0-9]{24}\\b"
+
+release_safety:
+  ci_effects: read-only-tests-only
+  release_actor: human_web
+  approvals: [promotion, dependent-final-main-tag-assets, package-publication, activation-if-selected]
+  final_main_rebuild_required: true
+  current_review_authority: pullfrog-supported-identity-pending-repository-activation-and-exact-pr-evidence
+  enforcement_class: repository_declared

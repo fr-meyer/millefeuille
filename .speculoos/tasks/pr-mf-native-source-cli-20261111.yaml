@@ -1,0 +1,19 @@
+id: pr-mf-native-source-cli-20261111
+title: Packaged read-only native fixture inspection
+status: implemented-local
+base_branch: dev
+base_sha: 6a40709
+scope:
+  - Minimal inspect-native dispatch preserving Hydra and stage commands
+  - Optional native decoder extra and metadata-only default
+  - Explicit full plaintext stdout disclosure and trusted fixture gate
+limitations:
+  - No CPU or memory isolation; untrusted and production PDFs unsupported
+  - No upstream automatic extraction or canonical writes
+  - S02 and S03 remain OPEN_G2
+  - Existing visual and semantic fidelity limitations retained
+validation:
+  command: python3.11 -B -m unittest discover -s tests -p test_millefeuille_native_source_cli.py
+  evidence: implementation-2236/native-cli/
+publication_authority: Local commit only
+programme_completion: false

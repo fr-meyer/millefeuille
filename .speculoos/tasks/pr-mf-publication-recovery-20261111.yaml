@@ -1,0 +1,16 @@
+schema_version: 0.1
+id: pr-mf-publication-recovery-20261111
+repository: fr-meyer/millefeuille
+status: local-implementation-unpublished
+base_branch: dev
+scope: classification-render-and-conservative-reservation
+publication_executor: unsupported
+production_publication: not-authorized
+review: independent-parent-review-required
+changed_files:
+  - millefeuille/domain/classification.py
+  - millefeuille/domain/classification_output_plan.py
+  - millefeuille/domain/publication_journal.py
+  - tests/test_millefeuille_publication_recovery.py
+  - specs/millefeuille-pipeline/publication-recovery.md
+  - .speculoos/tasks/pr-mf-publication-recovery-20261111.yaml

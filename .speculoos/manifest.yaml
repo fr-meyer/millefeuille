@@ -1,13 +1,13 @@
 schema_version: 0.1
 project: Millefeuille
 workflow: speculoos-v1
-canonical_task: pr-098-reconcile-delivery-ledgers
+canonical_task: pr-mf-approved-completion-20261112
 repository:
   upstream: null
   fork: fr-meyer/millefeuille
   local_path: null
   base_branch: dev
-  working_branch: chore/pr-098-ledger-reconciliation
+  working_branch: fix/pr-mf-integrated-completion-20261115
 status:
   phase: implementation
   pret_a_coder: ready
@@ -16,12 +16,15 @@ release_policy:
   branch_model: feature-branch-to-dev
   stable_branch: main
   integration_branch: dev
-  tag_policy: no-release-in-bootstrap
+  tag_policy: separately-approved-human-web-final-main-only
   release_gate: separate-explicit-approval
 review_policy:
+  current_authority_status: pullfrog-supported-identity-pending-repository-activation-and-exact-pr-evidence
+  enforcement_class: repository_declared
+  reconciliation: Supported Pullfrog selected; retired Mergeguez disabled. Activation and exact PR evidence pending.
   self_managed:
     policy: optional
-    fallback_role: emergency_fallback
+    fallback_role: supplemental-only
     evidence_source: ignored local --self-review-artifact JSON
   legacy_pullfrog:
     policy: disabled
@@ -30,17 +33,31 @@ review_policy:
     policy: disabled
     evidence_source: historical-only
   mergeguez_review:
+    policy: disabled
+    evidence_source: historical-only-retired-do-not-retry
+  pullfrog_review:
     policy: primary
-    evidence_source: broker pr-state reviewers/reviews/checks normalized by
-      review-evidence and merge-plan
+    bot_login: pullfrog[bot]
+    app_id: 1768019
+    repository_activation: not-established
+    evidence_source: native exact-PR/base/head reviews and trusted app checks
+    adapter_status: pending-supported-normalization-not-legacy-reviewers.mergeguez_review
+    acceptance:
+      distinct_pr_author: required
+      exact_pr_base_head_sha: required
+      complete_changed_file_coverage: required
+      native_review_verdict: APPROVED
+      blocking_findings: zero
+      unresolved_review_threads: zero
+      successful_check_alone_is_approval: false
+      commented_review_is_approval: false
   required_pr_review:
     policy: required
     primary:
-      - mergeguez_review
-    fallback_any_of:
-      - self_managed
-    fallback_summary: self_managed is an emergency fallback when hosted
-      Mergeguez review is unavailable.
+      - pullfrog_review
+    fallback_any_of: []
+    fallback_summary: Self-managed review is supplemental only, not a native review substitute.
+
 validation:
   unit_tests:
     status: not-current
@@ -83,7 +100,7 @@ surfaces:
     file: .speculoos/surfaces/github.yaml
   github_pull_request:
     enabled: true
-    status: open
+    status: historical-not-refreshed
     number: 98
     url: https://github.com/fr-meyer/millefeuille/pull/98
     base_branch: dev
@@ -100,8 +117,11 @@ lanes:
     enabled: true
     role: implementation-and-review
   mergeguez_review:
+    enabled: false
+    role: retired-historical-only
+  pullfrog_review:
     enabled: true
-    role: exact-head-pr-review
+    role: declared-review-pending-repository-activation
   cursor_worker:
     enabled: false
     role: not-used-for-bootstrap
@@ -113,13 +133,15 @@ gates:
     - metadata-parse-pass
     - changed-file-private-data-scan-pass
     - publish-check-pass
+  # Native review is before merge, not admission to create the PR.
+  # Auto settings are declarations, not new execution or activation authority.
   before_merge:
-    - exact-head-mergeguez-review
+    - exact-head-pullfrog-review
     - github-checks-pass
     - review-evidence-ready
     - no-live-credential-or-provider-write
     - auto-merge-allowed-only-for-dev-target
-current_task: pr-098-reconcile-delivery-ledgers
+current_task: pr-mf-approved-completion-20261112
 history:
   completed_tasks:
     - id: pr-036-speculoos-millefeuille-bootstrap

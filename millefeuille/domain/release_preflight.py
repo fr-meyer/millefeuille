@@ -52,6 +52,10 @@ def write_release_candidate_preflight(
     candidate_version: str | None = None,
     artifact_root: str | Path | None = None,
     stage_manifest: str | Path | None = None,
+    writeback_disposition: dict | None = None,
+    approved_disposition_identity: str | None = None,
+    input_admission=None,
+    code_admission=None,
 ) -> ReleasePreflightResult:
     resolved = resolve_run_artifacts(
         source_pack_root=source_pack_root,
@@ -73,9 +77,22 @@ def write_release_candidate_preflight(
     manual_gates_remaining = [
         gate.value for gate in resolved.stage_manifest.manual_gates
     ]
+    no_writeback = False
+    if writeback_disposition is not None:
+        validate_no_writeback_disposition(
+            writeback_disposition,
+            resolved=resolved,
+            approved_identity=approved_disposition_identity,
+            current_version=current_version,
+            candidate_version=candidate_version,
+            input_admission=input_admission,
+            code_admission=code_admission,
+        )
+        no_writeback = True
     readiness = (
         "ready-for-rc-review"
-        if {"acceptance", "classify", "writeback"}.issubset(set(completed_stages))
+        if {"acceptance", "classify"}.issubset(set(completed_stages))
+        and ("writeback" in completed_stages or no_writeback)
         else "needs-review"
     )
     record = ReleaseCandidatePreflightRecord(
@@ -153,3 +170,100 @@ def _render_markdown(
     else:
         lines.append("- `[none recorded in stage manifest]`")
     return "\n".join(lines) + "\n"
+
+
+def no_writeback_binding(*, resolved, current_version, candidate_version):
+    """Relevant local state, not absence of remote writeback evidence."""
+    from millefeuille.domain.acceptance_output_plan import json_bytes
+    from millefeuille.domain.secure_io import read_bytes_no_follow
+    from millefeuille.domain.semantic_acceptance import digest
+
+    refs = [
+        "reports/acceptance-summary.json",
+        "reports/semantic-decision.json",
+        "classification/classification-plan.json",
+        "classification/decision-records/" + resolved.paper_id + ".json",
+        "classification/zotero-writeback-preview.json",
+    ]
+    return {
+        "paper_id": resolved.paper_id,
+        "run_id": resolved.run_id,
+        "source_hash": resolved.source_hash,
+        "current_version": current_version,
+        "candidate_version": candidate_version,
+        "stage_manifest": digest(json_bytes(resolved.stage_manifest.to_dict())),
+        "artifacts": {
+            ref: digest(
+                read_bytes_no_follow(
+                    resolved.run_dir / ref, "no-writeback binding", max_bytes=2097152
+                )
+            )
+            for ref in refs
+        },
+    }
+
+
+def validate_no_writeback_disposition(
+    disposition,
+    *,
+    resolved,
+    approved_identity,
+    current_version,
+    candidate_version,
+    input_admission=None,
+    code_admission=None,
+):
+    """Approval identity must be provided by the authenticated caller separately."""
+    from millefeuille.domain.acceptance_output_plan import json_bytes
+    from millefeuille.domain.millefeuille import MillefeuilleContractError
+    from millefeuille.domain.semantic_acceptance import digest
+    from millefeuille.domain.semantic_publication_orchestrator import (
+        verify_bound_manifest,
+    )
+
+    migrated = input_admission is not None or code_admission is not None
+    expected = {
+        "schema": (
+            "millefeuille-writeback-disposition/v2"
+            if migrated
+            else "millefeuille-writeback-disposition/v1"
+        ),
+        "enabled": False,
+        "disposition": "explicit_approved_no_writeback",
+        "remote_operations": 0,
+        "release_preflight_consumer_result": "pass",
+    }
+    if (
+        not isinstance(disposition, dict)
+        or set(disposition)
+        != set(expected)
+        | {"approval_identity", "binding", "code_manifest", "input_manifest"}
+        | ({"input_admission", "code_admission"} if migrated else set())
+        or any(disposition.get(k) != v for k, v in expected.items())
+        or not isinstance(disposition.get("approval_identity"), str)
+        or not disposition["approval_identity"].strip()
+        or not approved_identity
+        or digest(json_bytes(disposition)) != approved_identity
+    ):
+        raise MillefeuilleContractError(
+            "explicit hash-bound no-writeback approval required"
+        )
+    if migrated:
+        from millefeuille.domain.semantic_publication_orchestrator import (
+            WorkloadAdmission,
+        )
+
+        for kind, admission in [("input", input_admission), ("code", code_admission)]:
+            if (
+                not isinstance(admission, WorkloadAdmission)
+                or disposition[kind + "_admission"] != admission.binding()
+            ):
+                raise MillefeuilleContractError("no-writeback workload admission drift")
+    verify_bound_manifest(disposition["code_manifest"], admission=code_admission)
+    verify_bound_manifest(disposition["input_manifest"], admission=input_admission)
+    if disposition["binding"] != no_writeback_binding(
+        resolved=resolved,
+        current_version=current_version,
+        candidate_version=candidate_version,
+    ):
+        raise MillefeuilleContractError("no-writeback disposition drift")
