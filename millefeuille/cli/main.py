@@ -36,8 +36,6 @@ from millefeuille.clients.exceptions import (
 )
 from millefeuille.clients.mistral_client import MistralClient
 from millefeuille.clients.ocr_client import OCRClient
-from millefeuille.clients.pageindex_client import PageIndexClient
-from millefeuille.clients.pageindex_tree_client import PageIndexTreeClient
 from millefeuille.clients.zotero_client import ZoteroClient
 from millefeuille.domain.config import (
     PACKAGED_PLACEHOLDER_DOWNLOAD_FOLDER,
@@ -122,6 +120,9 @@ def initialize_clients(
             raise ConfigError(
                 "OCR config is not PageIndexOCRConfig for provider 'pageindex'"
             )
+        # Import the HTTP-backed implementation only for this enabled provider.
+        from millefeuille.clients.pageindex_client import PageIndexClient
+
         ocr_client = PageIndexClient(cfg.ocr)
     else:
         raise ConfigError(f"Unknown OCR provider: {provider}")
@@ -482,6 +483,9 @@ def initialize_tree_processor(
         f"Initializing tree structure processor "
         f"(credentials from {credential_source})..."
     )
+
+    # Offline CLI imports must not initialize the provider HTTP dependency stack.
+    from millefeuille.clients.pageindex_tree_client import PageIndexTreeClient
 
     tree_client = PageIndexTreeClient(
         cfg.tree_structure,
