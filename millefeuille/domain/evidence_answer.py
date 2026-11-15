@@ -70,7 +70,7 @@ def _request(r):
     if (
         r["schema_version"] != "millefeuille-evidence-question/v1"
         or r["intent"] not in {"explain", "procedure", "numeric", "compare", "page"}
-        or r["match"] not in {"all_terms", "exact_phrase"}
+        or r["match"] not in {"all_terms", "exact_phrase", "layout_all_terms"}
         or r["evidence_kind"] not in {"prose", "procedure", "table", "any"}
         or r["relation"] not in {"side_by_side_only", "none"}
     ):
@@ -126,6 +126,31 @@ def _norm(s):
     return unicodedata.normalize("NFC", s).casefold()
 
 
+def _layout_text(s):
+    """Search-only projection; never replace source or citation bytes.
+
+    Single physical line breaks are eligible, not paragraph/page boundaries.
+    Wrapped lexical hyphens cannot be distinguished from layout hyphens.
+    """
+    s = _norm(s)
+
+    # Use Unicode letter categories, including decomposed combining marks.
+    def letter_before(index):
+        while index >= 0 and unicodedata.category(s[index]).startswith("M"):
+            index -= 1
+        return index >= 0 and s[index].isalpha()
+
+    pattern = r"[-\u00ad][ \t]*(?:\r\n|\n|\r)[ \t]*|\u00ad"
+
+    def join(match):
+        end = match.end()
+        if letter_before(match.start() - 1) and end < len(s) and s[end].isalpha():
+            return ""
+        return match.group()
+
+    return re.sub(pattern, join, s)
+
+
 def answer_evidence(
     *,
     request: EvidenceQuestionV1,
@@ -177,6 +202,14 @@ def answer_evidence(
         _request(request)
     except (ValueError, TypeError, KeyError):
         return finish()
+    layout = request["match"] == "layout_all_terms"
+    if layout:
+        result["explanation"]["limitations"].append(
+            "layout_all_terms: search-only removal of letter-internal soft hyphens "
+            "and hyphen plus single line break; lexical hyphens at line ends "
+            "may also join. Matches are not exact source-byte matches; original "
+            "excerpts and citations are unchanged. No semantic entailment."
+        )
     try:
         if (
             corpus["schema_version"] != "millefeuille-evidence-corpus/v1"
@@ -253,7 +286,7 @@ def answer_evidence(
             ):
                 proof["visited_spans"] += 1
                 proof["unread_refs"].remove(span["span_id"])
-                text = _norm(span["text_utf8"])
+                text = (_layout_text if layout else _norm)(span["text_utf8"])
                 match = all(
                     re.search(r"(?<!\w)" + re.escape(_norm(t)) + r"(?!\w)", text)
                     for t in request["terms"]
