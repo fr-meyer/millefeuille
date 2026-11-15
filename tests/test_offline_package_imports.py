@@ -92,7 +92,7 @@ class OfflinePackageImportTests(unittest.TestCase):
             self.assertEqual(len(package.__all__), len(set(package.__all__)))
             self.assertTrue(set(package.__all__) <= set(dir(package)))
             with self.assertRaisesRegex(AttributeError, "no attribute"):
-                package.not_a_public_export
+                _ = package.not_a_public_export
             self.assertNotIn("not_a_public_export", vars(package))
             # Type-checking declarations preserve every original export target.
             tree = ast.parse(Path(package.__file__).read_text())
