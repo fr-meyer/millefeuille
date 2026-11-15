@@ -30,7 +30,7 @@ and named descriptor identity/stability, compares expected digest, then seals.
 Short/changed/oversize/hash-mismatched sources never reach parsing. Failed staging
 is discarded by boundary cleanup. Reserve full 16 MiB read and staging charges
 before access, retain charges on failure. Child maps sealed exact bytes and
-rechecks digest under existing filter. Child raw/BytesIO copies remain finite
+rechecks digest under existing filter. Child raw/private backing copies remain finite
 under RLIMIT_AS; parent does not aggregate original payload in RAM.
 
 Parent regular-file I/O deadline checks are cooperative between operations.
@@ -53,3 +53,16 @@ qualification. Dynamic native tests (including malformed PDFs, 32/33 pages,
 >1 MiB valid original, 16 MiB boundary, CPU/memory/output refusal) require separate
 genuine runtime admission and exact-head independent review. No F04/R6 execution
 or workaround; private qualification additionally requires fresh exact scope.
+
+Logical read contract: the parser receives a read-only seekable facade, not a
+BytesIO subclass. read/read1/readinto/readinto1 reserve min(request, available)
+before access; EOF and zero-length reads cost zero. Oversized requests fail
+atomically, not with a partial budget prefix. readline reserves its entire
+possible bounded remainder before scanning, without refund for early newline;
+readlines/iteration use that same conservative route. Line-heavy inputs may
+refuse earlier than their returned-byte total. No getbuffer/getvalue/buffer
+protocol or writable backing handle is exposed. PyPDF2 3.0.1's three recovery
+getbuffer branches fall back to seek(0), metered read(-1), and seek(saved).
+Repeated recovery scans spend the same cumulative budget. This is parser API
+accounting, not a sandbox against arbitrary Python reflection. Pure standalone
+class tests run no child or real parser; malformed/xref qualification stays gated.

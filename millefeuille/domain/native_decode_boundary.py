@@ -217,29 +217,86 @@ try:
         if not raw.startswith(b"%PDF-"):
             raise ValueError("unsupported-format")
 
-        class BoundedMemory(io.BytesIO):
-            charged = 0
+        class BoundedMemory:
+            # No inherited byte routes or public backing buffer. This is parser
+            # interface accounting, not protection against Python reflection.
+            __slots__ = ("__source", "__size", "charged")
 
-            def read(self, n=-1):
-                # Charge before decoder memory reads; no host filesystem I/O exists.
-                amount = max(0, len(raw) - self.tell()) if n < 0 else n
+            def __init__(self, data):
+                self.__source = io.BytesIO(data)
+                self.__size = len(data)
+                self.charged = 0
+
+            def tell(self):
+                return self.__source.tell()
+
+            def seek(self, offset, whence=0):
+                return self.__source.seek(offset, whence)
+
+            def _reserve(self, n):
+                # Refuse before access, including partial reads near EOF.
+                available = max(0, self.__size - self.tell())
+                amount = available if n < 0 else min(n, available)
                 if self.charged + amount > read_cap:
                     raise ValueError("logical-read-budget-exhausted")
                 self.charged += amount
-                return super().read(n)
+                return amount
+
+            def read(self, n=-1):
+                amount = self._reserve(n)
+                return self.__source.read(amount)
+
+            read1 = read
 
             def readinto(self, buffer):
-                data = self.read(len(buffer))
-                buffer[: len(data)] = data
-                return len(data)
+                view = memoryview(buffer).cast("B")
+                if view.readonly:
+                    raise TypeError("readinto requires a writable buffer")
+                amount = self._reserve(view.nbytes)
+                return self.__source.readinto(view[:amount])
+
+            readinto1 = readinto
 
             def readline(self, n=-1):
-                # PyPDF2 generally uses read/seek; still meter this alternate API.
-                data = super().readline(n)
-                self.charged += len(data)
-                if self.charged > read_cap:
-                    raise ValueError("logical-read-budget-exhausted")
-                return data
+                # Reserve the entire possible line BEFORE scanning. No refund
+                # for early newline, no uncharged search or byte-at-a-time loop.
+                amount = self._reserve(n)
+                return self.__source.readline(amount)
+
+            def readlines(self, hint=-1):
+                lines = []
+                total = 0
+                for line in self:
+                    lines.append(line)
+                    total += len(line)
+                    if hint > 0 and total >= hint:
+                        break
+                return lines
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                line = self.readline()
+                if not line:
+                    raise StopIteration
+                return line
+
+            @property
+            def closed(self):
+                return self.__source.closed
+
+            def close(self):
+                self.__source.close()
+
+            def readable(self):
+                return not self.closed
+
+            def seekable(self):
+                return not self.closed
+
+            def writable(self):
+                return False
 
         stream = BoundedMemory(raw)
         reader = PyPDF2.PdfReader(stream, strict=True)
