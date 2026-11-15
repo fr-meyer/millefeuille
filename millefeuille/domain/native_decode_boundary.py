@@ -234,6 +234,10 @@ try:
                 return self.__source.seek(offset, whence)
 
             def _reserve(self, n):
+                # Invalid sizes must not poison accounting before I/O refuses.
+                # Parser NumberObject sizes are int subclasses.
+                if not isinstance(n, int):
+                    raise TypeError("read size must be an integer")
                 # Refuse before access, including partial reads near EOF.
                 available = max(0, self.__size - self.tell())
                 amount = available if n < 0 else min(n, available)

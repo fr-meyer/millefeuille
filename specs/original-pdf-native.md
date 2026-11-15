@@ -56,8 +56,10 @@ or workaround; private qualification additionally requires fresh exact scope.
 
 Logical read contract: the parser receives a read-only seekable facade, not a
 BytesIO subclass. read/read1/readinto/readinto1 reserve min(request, available)
-before access; EOF and zero-length reads cost zero. Oversized requests fail
-atomically, not with a partial budget prefix. readline reserves its entire
+before access; EOF and zero-length reads cost zero. Read sizes must be integers
+(including parser integer subclasses); invalid sizes are refused before accounting
+or cursor changes, so non-finite values cannot poison subsequent checks. Oversized
+requests fail atomically, not with a partial budget prefix. readline reserves its entire
 possible bounded remainder before scanning, without refund for early newline;
 readlines/iteration use that same conservative route. Line-heavy inputs may
 refuse earlier than their returned-byte total. No getbuffer/getvalue/buffer

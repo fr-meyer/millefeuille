@@ -132,6 +132,29 @@ class StreamBudgetTests(unittest.TestCase):
             stream.read(1)
         self.assertEqual(stream.tell(), 0)
 
+    def test_invalid_sizes_do_not_poison_budget(self):
+        for route in ("read", "read1", "readline"):
+            for size in (float("nan"), float("inf"), float("-inf"), 1.5, "2", None):
+                with self.subTest(route=route, size=repr(size)):
+                    stream = stream_class(cap=4)(b"abcdef")
+                    with self.assertRaises(TypeError):
+                        getattr(stream, route)(size)
+                    self.assertEqual((stream.tell(), stream.charged), (0, 0))
+                    self.assertEqual(stream.read(4), b"abcd")
+                    self.assertEqual(stream.charged, 4)
+                    stream.seek(0)
+                    with self.assertRaisesRegex(
+                        ValueError, "logical-read-budget-exhausted"
+                    ):
+                        stream.read(1)
+
+        class IntegerSize(int):
+            pass
+
+        stream = stream_class(cap=2)(b"abc")
+        self.assertEqual(stream.read(IntegerSize(2)), b"ab")
+        self.assertEqual(stream.charged, 2)
+
     def test_partial_eof_and_seek_size_do_not_overcharge(self):
         stream = stream_class(cap=2)(b"abcd")
         self.assertEqual(stream.seek(0, 2), 4)
