@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from millefeuille.domain import secure_io
 from millefeuille.domain.millefeuille import MillefeuilleContractError
 from millefeuille.domain.native_decode_boundary import NativeResourceLimits
 from millefeuille.domain.original_pdf import bind_original_pages, inspect_original_pdf
@@ -91,6 +92,37 @@ class OriginalPDFTests(unittest.TestCase):
         self.assertEqual(result["charged_read_bytes"], 0)
         self.assertEqual(NativeResourceLimits().max_input_bytes, 1048576)
 
+    def assert_streaming_refused_before_io(self):
+        with (
+            patch.object(secure_io, "_open_regular_file_fd") as open_source,
+            patch.object(secure_io.os, "write") as write_destination,
+            patch.object(secure_io.os, "fstat") as stat_destination,
+        ):
+            deadline = unittest.mock.Mock()
+            with self.assertRaisesRegex(
+                MillefeuilleContractError, "unsupported streaming source policy"
+            ):
+                copy_verified_file_no_follow(
+                    "/never-read",
+                    -1,
+                    expected_sha256="a" * 64,
+                    max_bytes=16777216,
+                    check_deadline=deadline,
+                )
+            open_source.assert_not_called()
+            write_destination.assert_not_called()
+            stat_destination.assert_not_called()
+            deadline.assert_not_called()
+
+    def test_missing_nofollow_refuses_streaming_before_io(self):
+        # Remove a capability only; never emulate successful secure Windows I/O.
+        with patch.object(secure_io, "_supports_no_follow", return_value=False):
+            self.assert_streaming_refused_before_io()
+
+    @unittest.skipIf(secure_io._supports_no_follow(), "native O_NOFOLLOW available")
+    def test_native_missing_nofollow_refuses_streaming_before_io(self):
+        self.assert_streaming_refused_before_io()
+
     def transfer(self, path, destination, cap, expected, deadline=lambda: None):
         return copy_verified_file_no_follow(
             path,
@@ -100,6 +132,9 @@ class OriginalPDFTests(unittest.TestCase):
             check_deadline=deadline,
         )
 
+    @unittest.skipUnless(
+        secure_io._supports_no_follow(), "streaming custody requires O_NOFOLLOW"
+    )
     def test_stream_complete_above_legacy_and_exact_cap(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryFile() as dest:
             source = Path(root) / "synthetic.pdf"
@@ -122,6 +157,9 @@ class OriginalPDFTests(unittest.TestCase):
             dest.seek(0)
             self.assertEqual(hashlib.sha256(dest.read()).hexdigest(), digest)
 
+    @unittest.skipUnless(
+        secure_io._supports_no_follow(), "streaming custody requires O_NOFOLLOW"
+    )
     def test_oversize_empty_hash_and_deadline(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryFile() as dest:
             source = Path(root) / "synthetic.pdf"
@@ -142,6 +180,9 @@ class OriginalPDFTests(unittest.TestCase):
                     lambda: (_ for _ in ()).throw(TimeoutError()),
                 )
 
+    @unittest.skipUnless(
+        secure_io._supports_no_follow(), "streaming custody requires O_NOFOLLOW"
+    )
     def test_symlink_refused(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryFile() as dest:
             source = Path(root) / "file"
@@ -151,6 +192,9 @@ class OriginalPDFTests(unittest.TestCase):
             with self.assertRaises(MillefeuilleContractError):
                 self.transfer(link, dest, 1, hashlib.sha256(b"x").hexdigest())
 
+    @unittest.skipUnless(
+        secure_io._supports_no_follow(), "streaming custody requires O_NOFOLLOW"
+    )
     def test_mutation_after_read_refused(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryFile() as dest:
             source = Path(root) / "file"
@@ -168,6 +212,9 @@ class OriginalPDFTests(unittest.TestCase):
             ):
                 self.transfer(source, dest, 1, hashlib.sha256(b"x").hexdigest())
 
+    @unittest.skipUnless(
+        secure_io._supports_no_follow(), "streaming custody requires O_NOFOLLOW"
+    )
     def test_exact_16mib_and_one_byte_over(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryFile() as dest:
             source = Path(root) / "synthetic"
@@ -185,6 +232,9 @@ class OriginalPDFTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "source-size-out-of-bounds"):
                 self.transfer(source, dest, 16777216, expected.hexdigest())
 
+    @unittest.skipUnless(
+        secure_io._supports_no_follow(), "streaming custody requires O_NOFOLLOW"
+    )
     def test_short_read_and_partial_write(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryFile() as dest:
             source = Path(root) / "synthetic"
