@@ -49,3 +49,17 @@ A future staged backend must retain exact before/input/root bindings, no foreign
 overwrite, bounded recovery and the documented trusted/cooperating-owner model.
 Metadata file identity may change on replacement, as in the production POSIX
 transaction; run-directory and input identity requirements remain unchanged.
+
+## Consumed snapshots and unchanged outputs
+
+Byte-identical outputs retain their verified inode even when other entries change.
+They remain in the plan and final readback, without staged replacement or rollback
+mutation. An immutable input may also be an unchanged output; changed immutable
+dependencies are never silently exempted.
+
+Resolution captures stage/index/source bindings before parsing and checks them
+afterward, including pinned artifact-reader snapshots. Classification binds
+acceptance, evidence, referenced evidence and source/semantic materials before
+consumption, then rechecks throughout commit. Revocation rejects publication. If
+it occurs after installation, owned outputs are restored and the conservative
+recovery barrier remains when input/pre-state validation fails.

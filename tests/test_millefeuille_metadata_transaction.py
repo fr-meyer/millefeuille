@@ -638,10 +638,17 @@ class ArtifactWriterRegression(unittest.TestCase):
             resolved = _resolved(root)
             stage = resolved.stage_manifest.to_dict()
             stage["stages"][0]["notes"].append("before-export rollback fixture")
+            # Both members must differ: unchanged outputs intentionally retain inodes.
+            index = resolved.artifact_index.to_dict()
+            index["zotero_writeback"] = {
+                "mode": "preview",
+                "status": "previewed",
+                "plan_ref": "synthetic-before-export.json",
+            }
             stage_runtime.persist_run_artifacts(
                 resolved,
                 stage_manifest=stage_runtime.StageManifest.from_dict(stage),
-                artifact_index=resolved.artifact_index,
+                artifact_index=stage_runtime.ArtifactIndex.from_dict(index),
             )
             self.assertEqual(_resolved(root).stage_manifest.to_dict(), stage)
             before = {
@@ -1206,6 +1213,8 @@ class ClassificationWritebackIdempotenceRegression(unittest.TestCase):
 
             def capture(paths):
                 actual_guard = original_capture(paths)
+                if note not in paths:
+                    return actual_guard
 
                 def check():
                     if not injected:

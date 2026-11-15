@@ -412,10 +412,19 @@ def write_metadata_transaction(
                 }
             )
         check_directory()
-        if all(
-            e["before"] is not None and e["before"]["data"] == e["data"]
-            for e in entries
-        ):
+        for entry in entries:
+            entry["unchanged"] = (
+                entry["before"] is not None and entry["before"]["data"] == entry["data"]
+            )
+            if entry["unchanged"]:
+                entry["after"] = entry["before"]
+        if all(e["unchanged"] for e in entries):
+            for entry in entries:
+                if _binding(_state(entry["parent_fd"], entry["relative"].name)) != (
+                    _binding(entry["before"])
+                ):
+                    raise MillefeuilleContractError("metadata unchanged-output drift")
+            check_directory()
             return
         packet = [
             {
@@ -442,6 +451,8 @@ def write_metadata_transaction(
         journal_identity = _identity(os.fstat(journal_fd))
         os.fsync(root_fd)
         for entry in entries:
+            if entry["unchanged"]:
+                continue
             number = entry["number"]
             if entry["before"] is not None:
                 write_new_text_no_follow(
@@ -478,6 +489,8 @@ def write_metadata_transaction(
             current = _state(entry["parent_fd"], entry["relative"].name)
             if _binding(current) != _binding(entry["before"]):
                 raise MillefeuilleContractError("metadata changed before commit")
+            if entry["unchanged"]:
+                continue
             entry["attempted"] = True
             _rename_entry(
                 journal_fd,

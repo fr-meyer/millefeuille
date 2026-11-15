@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -11,6 +12,8 @@ from typing import Any
 from millefeuille.domain.acceptance import ACCEPTANCE_SUMMARY_REF
 from millefeuille.domain.metadata_transaction import (
     capture_input_files,
+    capture_metadata_binding,
+    capture_run_inputs,
     metadata_read_guard,
     write_metadata_transaction,
 )
@@ -164,6 +167,7 @@ class _PreparedClassification:
     taxonomy_requests_path: Path
     preview_path: Path
     batch_report_path: Path
+    check_inputs: Callable[[], None]
 
 
 @dataclass(frozen=True)
@@ -642,6 +646,47 @@ def _prepare_classification_from_evidence(
         artifact_root=artifact_root,
         stage_manifest=stage_manifest,
     )
+    # Seal authority and source material before consuming any classification input.
+    extra_inputs = [Path(evidence_path), resolved.run_dir / ACCEPTANCE_SUMMARY_REF]
+    if len(resolved.source_pack_manifest.get("sources", [])) > 1:
+        extra_inputs.extend(
+            [
+                resolved.run_dir / "reports/semantic-decision.json",
+                resolved.run_dir / "reports/semantic-review-inventory.json",
+            ]
+        )
+    authority_guard = capture_run_inputs(
+        resolved.source_pack_root,
+        resolved.source_pack_dir,
+        resolved.run_dir,
+        extra_inputs,
+    )
+    if capture_metadata_binding(resolved.source_pack_dir / "manifest.json") != (
+        resolved.source_manifest_binding
+    ):
+        raise MillefeuilleContractError("classification source manifest drift")
+    semantic_guard = None
+    if len(resolved.source_pack_manifest.get("sources", [])) > 1:
+        from millefeuille.domain.semantic_acceptance import safe_ref
+
+        inventory = load_json_object(
+            resolved.run_dir / "reports/semantic-review-inventory.json",
+            "semantic review inventory",
+        )
+        decision = load_json_object(
+            resolved.run_dir / "reports/semantic-decision.json", "semantic decision"
+        )
+        semantic_paths = [
+            resolved.run_dir / safe_ref(entry["ref"])
+            for entry in inventory.get("evidence", [])
+        ]
+        roots = {"run": resolved.run_dir, "source-pack": resolved.source_pack_dir}
+        semantic_paths.extend(
+            roots[entry["root"]] / safe_ref(entry["ref"])
+            for entry in decision.get("material_binding", {}).get("files", [])
+        )
+        semantic_guard = capture_input_files(semantic_paths)
+        authority_guard()
     _require_passing_acceptance(resolved)
 
     evidence = _load_classification_evidence(evidence_path)
@@ -676,6 +721,20 @@ def _prepare_classification_from_evidence(
         run_dir=resolved.run_dir,
     )
 
+    refs_guard = capture_input_files(
+        [
+            Path(ref) if Path(ref).is_absolute() else resolved.run_dir / ref
+            for ref in evidence_refs
+        ]
+    )
+
+    def check_inputs() -> None:
+        authority_guard()
+        refs_guard()
+        if semantic_guard is not None:
+            semantic_guard()
+
+    check_inputs()
     decision_dir = resolved.run_dir / DECISION_DIR_REF
     decision_json_path = decision_dir / f"{resolved.paper_id}.json"
     decision_markdown_path = decision_dir / f"{resolved.paper_id}.md"
@@ -736,6 +795,7 @@ def _prepare_classification_from_evidence(
         taxonomy_requests_path=taxonomy_requests_path,
         preview_path=preview_path,
         batch_report_path=resolved.run_dir / BATCH_REPORT_REF,
+        check_inputs=check_inputs,
     )
 
 
@@ -992,12 +1052,18 @@ def _persist_classification(
     index = json.loads(outputs[index_ref])
     index["zotero_writeback"] = binding
     outputs[index_ref] = (json.dumps(index, indent=2, sort_keys=True) + "\n").encode()
+
+    def check_inputs() -> None:
+        prepared.check_inputs()
+        if guard is not None:
+            guard()
+
     write_metadata_transaction(
         resolved.run_dir,
         {ref: payload.decode("utf-8") for ref, payload in outputs.items()},
         expected_before=resolved.metadata_snapshot,
         expected_directory_identity=resolved.run_dir_identity,
-        check_inputs=guard,
+        check_inputs=check_inputs,
     )
     return ClassificationWriteResult(
         paper_id=prepared.resolved.paper_id,

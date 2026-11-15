@@ -58,6 +58,7 @@ class ResolvedRunArtifacts:
     artifact_index: ArtifactIndex
     metadata_snapshot: dict[str, dict | None] | None = None
     run_dir_identity: tuple[int, int] | None = None
+    source_manifest_binding: dict | None = None
 
 
 def resolve_run_artifacts(
@@ -111,6 +112,12 @@ def resolve_run_artifacts(
             stage_manifest_path, "stage manifest", root=run_dir
         )
     with metadata_read_guard(run_dir) as run_identity:
+        # Capture before parsing; never bind a stale DTO to a later snapshot.
+        metadata_snapshot = {
+            relative_ref(path, run_dir): capture_metadata_binding(path)
+            for path in (stage_manifest_path, artifact_index_path)
+        }
+        source_binding = capture_metadata_binding(manifest_path)
         if artifact_reader is None:
             ensure_no_follow_regular_file(
                 manifest_path,
@@ -165,6 +172,18 @@ def resolve_run_artifacts(
             artifact_index=artifact_index,
             source_pack_dir=source_pack_dir,
         )
+        for path in (stage_manifest_path, artifact_index_path):
+            if (
+                capture_metadata_binding(path)
+                != metadata_snapshot[relative_ref(path, run_dir)]
+            ):
+                raise MillefeuilleContractError("metadata changed while parsing")
+        if capture_metadata_binding(manifest_path) != source_binding:
+            raise MillefeuilleContractError(
+                "source-pack manifest changed while parsing"
+            )
+        if artifact_reader is not None:
+            artifact_reader.revalidate_snapshot()
         return ResolvedRunArtifacts(
             paper_id=resolved_paper_id,
             run_id=resolved_run_id,
@@ -177,15 +196,9 @@ def resolve_run_artifacts(
             artifact_index_path=artifact_index_path,
             stage_manifest=stage_manifest,
             artifact_index=artifact_index,
-            metadata_snapshot={
-                relative_ref(stage_manifest_path, run_dir): capture_metadata_binding(
-                    stage_manifest_path
-                ),
-                relative_ref(artifact_index_path, run_dir): capture_metadata_binding(
-                    artifact_index_path
-                ),
-            },
+            metadata_snapshot=metadata_snapshot,
             run_dir_identity=run_identity,
+            source_manifest_binding=source_binding,
         )
 
 
