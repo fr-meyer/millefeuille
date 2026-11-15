@@ -11,7 +11,6 @@ import unittest
 from unittest.mock import patch
 
 from millefeuille.cli.stages import run_stage_cli
-from millefeuille.domain.acceptance import write_acceptance_summary
 from millefeuille.domain.classification_model import (
     OUTPUT_SCHEMA,
     prepare_classification_model_plan,
@@ -26,6 +25,7 @@ from millefeuille.domain.model_executor import (
 from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
 from millefeuille.domain.summary_fixtures import load_hierarchical_summary
 from millefeuille.domain.taxonomy import create_taxonomy_lock, seal_taxonomy_registry
+from tests.metadata_fixtures import write_fixture_acceptance
 from tests.test_millefeuille_stage_cli import (
     PAPER_ID,
     RUN_ID,
@@ -42,7 +42,7 @@ class ClassificationModelTests(unittest.TestCase):
         self.handoff = self.run / "reports/model-classification-handoff.jsonl"
         self.handoff.parent.mkdir(exist_ok=True)
         self.handoff.write_bytes(_write_handoff_jsonl(self.temp.name).read_bytes())
-        write_acceptance_summary(
+        write_fixture_acceptance(
             source_pack_root=self.root,
             run_id=RUN_ID,
             paper_id=PAPER_ID,

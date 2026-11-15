@@ -26,6 +26,8 @@ from millefeuille.domain.status_observability import (
     compute_status_observation_digest,
     load_status_observation,
 )
+from tests.metadata_fixtures import apply_complete_preview_fixture
+from tests.platform_capabilities import POSIX_BATCH_PUBLICATION
 from tests.test_millefeuille_stage_cli import (
     PAPER_ID,
     RUN_ID,
@@ -78,6 +80,47 @@ def _canonical_digest(payload: object) -> str:
 
 
 def _prepare_complete_preview(tempdir: str) -> tuple[Path, Path]:
+    if POSIX_BATCH_PUBLICATION:
+        return _prepare_complete_preview_native(tempdir)
+    source_pack_root, run_dir = _prepare_fixture_run(tempdir)
+    apply_complete_preview_fixture(source_pack_root, run_dir)
+    return source_pack_root, run_dir
+
+
+def _snapshot(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def _observation_payload(
+    *,
+    kind: str,
+    source_hash: str,
+    summary: dict[str, object],
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "schema_version": STATUS_OBSERVATION_SCHEMA_VERSION,
+        "kind": kind,
+        "authority": {
+            "source": STATUS_OBSERVATION_SOURCE,
+            "authoritative": False,
+        },
+        "paper_id": PAPER_ID,
+        "run_id": RUN_ID,
+        "source_hash": source_hash,
+        "summary": summary,
+    }
+    payload["integrity"] = {
+        "algorithm": "sha256",
+        "content_digest": compute_status_observation_digest(payload),
+    }
+    return payload
+
+
+def _prepare_complete_preview_native(tempdir: str) -> tuple[Path, Path]:
     source_pack_root, run_dir = _prepare_fixture_run(tempdir)
     handoff = _write_handoff_jsonl(tempdir)
     classification = _write_classification_evidence_json(tempdir)

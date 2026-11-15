@@ -19,8 +19,6 @@ from tests.test_millefeuille_stage_cli import (
     PAPER_ID,
     RUN_ID,
     _prepare_fixture_run,
-    _write_classification_evidence_json,
-    _write_handoff_jsonl,
 )
 
 
@@ -587,7 +585,7 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
 
             self.assertEqual(exit_code, 2)
             self.assertIn(
-                "stage manifest path must not contain symbolic links",
+                "path must not contain symbolic links",
                 stderr.getvalue(),
             )
 
@@ -621,27 +619,9 @@ class TestMillefeuilleRetrieve(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tempdir:
             source_pack_root, run_dir = _prepare_fixture_run(tempdir)
-            handoff_path = _write_handoff_jsonl(tempdir)
-            classification_path = _write_classification_evidence_json(tempdir)
-            pipeline_exit = run_stage_cli(
-                [
-                    "run",
-                    "--source-pack-root",
-                    str(source_pack_root),
-                    "--paper-id",
-                    PAPER_ID,
-                    "--run-id",
-                    RUN_ID,
-                    "--stages",
-                    "acceptance,classify,writeback",
-                    "--handoff",
-                    str(handoff_path),
-                    "--classification-evidence",
-                    str(classification_path),
-                ],
-                stdout=StringIO(),
-            )
-            self.assertEqual(pipeline_exit, 0)
+            from tests.metadata_fixtures import apply_complete_preview_fixture
+
+            apply_complete_preview_fixture(source_pack_root, run_dir)
             preview_path = run_dir / "classification" / "zotero-writeback-preview.json"
             preview_payload = _read_json(preview_path)
             preview_payload["paper_id"] = "zotero-WRONG"

@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import re
 from typing import Any
 
 from millefeuille.domain.acceptance import ACCEPTANCE_SUMMARY_REF
+from millefeuille.domain.metadata_transaction import (
+    capture_input_files,
+    metadata_read_guard,
+    write_metadata_transaction,
+)
 from millefeuille.domain.millefeuille import (
     ClassificationActionOutcome,
     ClassificationActionRecord,
@@ -21,8 +27,10 @@ from millefeuille.domain.millefeuille import (
     RejectedAlternativeRecord,
     StageName,
     StageStatus,
+    ZoteroWritebackPlanRecord,
 )
 from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
+from millefeuille.domain.secure_io import read_bytes_no_follow, read_text_no_follow
 from millefeuille.domain.stage_runtime import (
     ResolvedRunArtifacts,
     load_json_object,
@@ -758,6 +766,96 @@ def _require_passing_acceptance(resolved: ResolvedRunArtifacts) -> None:
             )
 
 
+def _classification_writeback_binding(
+    resolved: ResolvedRunArtifacts,
+    preview_path: Path,
+    preview_payload: dict[str, Any],
+    classification_status: ClassificationStatus,
+):
+    """Keep a verified materialized plan for an unchanged preview only."""
+    preview_binding = {
+        "mode": "preview",
+        "status": "previewed",
+        "plan_ref": relative_ref(preview_path, resolved.run_dir),
+    }
+    materialized_binding = {
+        "mode": "preview",
+        "status": "previewed",
+        "plan_ref": "zotero-writeback-plan.json",
+    }
+    if classification_status != ClassificationStatus.CLASSIFIED:
+        return preview_binding, None
+    classify_stage = next(
+        (
+            stage
+            for stage in resolved.stage_manifest.stages
+            if stage.name == StageName.CLASSIFY
+        ),
+        None,
+    )
+    if classify_stage is None or classify_stage.status != StageStatus.PASSED:
+        return preview_binding, None
+    if resolved.artifact_index.zotero_writeback != materialized_binding:
+        return preview_binding, None
+    writeback_stage = next(
+        (
+            stage
+            for stage in resolved.stage_manifest.stages
+            if stage.name == StageName.WRITEBACK
+        ),
+        None,
+    )
+    if writeback_stage is None or writeback_stage.status != StageStatus.PASSED:
+        return preview_binding, None
+    plan_path = resolved.run_dir / materialized_binding["plan_ref"]
+    note = preview_payload.get("note_markdown")
+    has_note = isinstance(note, str) and bool(note.strip())
+    note_ref = "reports/zotero-writeback-note.md" if has_note else None
+    expected_outputs = [materialized_binding["plan_ref"]]
+    if note_ref:
+        expected_outputs.append(note_ref)
+    if writeback_stage.outputs != expected_outputs:
+        return preview_binding, None
+    expected_plan = ZoteroWritebackPlanRecord(
+        paper_id=resolved.paper_id,
+        run_id=resolved.run_id,
+        source_hash=resolved.source_hash,
+        mode="preview",
+        status="previewed",
+        add_tags=list(preview_payload.get("add_tags", [])),
+        remove_tags=list(preview_payload.get("remove_tags", [])),
+        note_markdown_ref=note_ref,
+        destination_collection=preview_payload.get("destination_collection"),
+        classification_ref=(
+            str(preview_payload.get("classification_ref", "")).strip() or None
+        ),
+        execution_notes=["preview-only plan; no live Zotero mutation"],
+    ).to_dict()
+    inputs = [preview_path, plan_path]
+    if note_ref:
+        inputs.append(resolved.run_dir / note_ref)
+    expected_preview_bytes = (
+        json.dumps(preview_payload, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    expected_plan_bytes = (
+        json.dumps(expected_plan, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    with metadata_read_guard(resolved.run_dir):
+        input_guard = capture_input_files(inputs)
+        if read_bytes_no_follow(preview_path, "writeback preview") != (
+            expected_preview_bytes
+        ):
+            return preview_binding, None
+        if read_bytes_no_follow(plan_path, "writeback plan") != expected_plan_bytes:
+            return preview_binding, None
+        if note_ref:
+            note_path = resolved.run_dir / note_ref
+            if read_text_no_follow(note_path, "writeback note") != note.strip() + "\n":
+                return preview_binding, None
+        input_guard()
+    return materialized_binding, input_guard
+
+
 def render_classification_outputs(
     prepared: _PreparedClassification,
 ) -> dict[str, bytes]:
@@ -882,11 +980,25 @@ def render_classification_outputs(
 def _persist_classification(
     prepared: _PreparedClassification,
 ) -> ClassificationWriteResult:
-    # Legacy compatibility writer, not a journaled publication executor.
-    for ref, payload in render_classification_outputs(prepared).items():
-        target = prepared.resolved.run_dir / ref
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(payload)
+    resolved = prepared.resolved
+    binding, guard = _classification_writeback_binding(
+        resolved,
+        prepared.preview_path,
+        prepared.preview_payload,
+        prepared.decision.status,
+    )
+    outputs = render_classification_outputs(prepared)
+    index_ref = relative_ref(resolved.artifact_index_path, resolved.run_dir)
+    index = json.loads(outputs[index_ref])
+    index["zotero_writeback"] = binding
+    outputs[index_ref] = (json.dumps(index, indent=2, sort_keys=True) + "\n").encode()
+    write_metadata_transaction(
+        resolved.run_dir,
+        {ref: payload.decode("utf-8") for ref, payload in outputs.items()},
+        expected_before=resolved.metadata_snapshot,
+        expected_directory_identity=resolved.run_dir_identity,
+        check_inputs=guard,
+    )
     return ClassificationWriteResult(
         paper_id=prepared.resolved.paper_id,
         run_id=prepared.resolved.run_id,
