@@ -1305,6 +1305,72 @@ def read_bytes_no_follow(
         os.close(parent_fd)
 
 
+def copy_verified_file_no_follow(
+    path, destination_fd, *, expected_sha256, max_bytes, check_deadline
+):
+    """Stream complete stable bytes to private staging; caller discards on failure.
+
+    64 KiB transient chunks; no portable write fallback. Deadline checks between
+    regular-file operations are cooperative, not hard host I/O termination.
+    """
+    import hashlib
+    import re
+
+    if (
+        type(max_bytes) is not int
+        or not 0 < max_bytes <= 16777216
+        or type(expected_sha256) is not str
+        or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None
+        or not _supports_no_follow()
+    ):
+        raise MillefeuilleContractError("unsupported streaming source policy")
+    check_deadline()
+    parent_fd, fd, name, opened = _open_regular_file_fd(Path(path), label="native PDF")
+    try:
+        if not 0 < opened.st_size <= max_bytes:
+            raise ValueError("source-size-out-of-bounds")
+        destination = os.fstat(destination_fd)
+        if (
+            not stat.S_ISREG(destination.st_mode)
+            or destination.st_size != 0
+            or os.lseek(destination_fd, 0, os.SEEK_CUR) != 0
+            or _stat_object_identity(destination) == _stat_object_identity(opened)
+        ):
+            raise ValueError("invalid-staging-file")
+        hasher = hashlib.sha256()
+        size = 0
+        while size < opened.st_size:
+            check_deadline()
+            chunk = os.read(fd, min(65536, opened.st_size - size))
+            if not chunk:
+                raise ValueError("short-source-read")
+            hasher.update(chunk)
+            offset = 0
+            while offset < len(chunk):
+                check_deadline()
+                written = os.write(destination_fd, memoryview(chunk)[offset:])
+                if written <= 0:
+                    raise ValueError("short-staging-write")
+                offset += written
+            size += len(chunk)
+        for final in (
+            os.fstat(fd),
+            os.stat(name, dir_fd=parent_fd, follow_symlinks=False),
+        ):
+            if _stat_object_identity(final) != _stat_object_identity(
+                opened
+            ) or _stat_stability_snapshot(final) != _stat_stability_snapshot(opened):
+                raise ValueError("source-identity-drift")
+        check_deadline()
+        digest = hasher.hexdigest()
+        if digest != expected_sha256:
+            raise ValueError("source-hash-drift")
+        return size, digest
+    finally:
+        os.close(fd)
+        os.close(parent_fd)
+
+
 def read_text_no_follow(
     path: str | Path,
     label: str,

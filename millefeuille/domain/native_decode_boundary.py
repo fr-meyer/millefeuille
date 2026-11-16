@@ -32,6 +32,12 @@ class NativeResourceLimits:
     max_fds: int = 16
 
 
+# Explicit opt-in, never a change to legacy policy.
+ORIGINAL_PDF_LIMITS = NativeResourceLimits(
+    max_input_bytes=16777216, max_read_bytes=67108864
+)
+
+
 _CHILD = r"""import os, sys, mmap, ctypes, resource, hashlib, json, io, errno, time
 
 try:
@@ -58,6 +64,11 @@ try:
     infd = int(sys.argv[2])
     outfd = int(sys.argv[3])
     mode = sys.argv[4]
+    profile = sys.argv[5]
+    if profile not in ("legacy", "original-pdf-v1"):
+        raise RuntimeError()
+    input_cap = 16777216 if profile == "original-pdf-v1" else 1048576
+    read_cap = 67108864 if profile == "original-pdf-v1" else 4194304
     out = mmap.mmap(outfd, 262144)
 
     class F(ctypes.Structure):
@@ -137,7 +148,7 @@ try:
     size = int(size)
     if (
         not header.endswith(b"\n")
-        or not 0 < size <= 1048576
+        or not 0 < size <= input_cap
         or len(expected) != 64
         or any(c not in "0123456789abcdef" for c in expected)
     ):
@@ -206,29 +217,90 @@ try:
         if not raw.startswith(b"%PDF-"):
             raise ValueError("unsupported-format")
 
-        class BoundedMemory(io.BytesIO):
-            charged = 0
+        class BoundedMemory:
+            # No inherited byte routes or public backing buffer. This is parser
+            # interface accounting, not protection against Python reflection.
+            __slots__ = ("__source", "__size", "charged")
 
-            def read(self, n=-1):
-                # Charge before decoder memory reads; no host filesystem I/O exists.
-                amount = max(0, len(raw) - self.tell()) if n < 0 else n
-                if self.charged + amount > 4194304:
+            def __init__(self, data):
+                self.__source = io.BytesIO(data)
+                self.__size = len(data)
+                self.charged = 0
+
+            def tell(self):
+                return self.__source.tell()
+
+            def seek(self, offset, whence=0):
+                return self.__source.seek(offset, whence)
+
+            def _reserve(self, n):
+                # Invalid sizes must not poison accounting before I/O refuses.
+                # Parser NumberObject sizes are int subclasses.
+                if not isinstance(n, int):
+                    raise TypeError("read size must be an integer")
+                # Refuse before access, including partial reads near EOF.
+                available = max(0, self.__size - self.tell())
+                amount = available if n < 0 else min(n, available)
+                if self.charged + amount > read_cap:
                     raise ValueError("logical-read-budget-exhausted")
                 self.charged += amount
-                return super().read(n)
+                return amount
+
+            def read(self, n=-1):
+                amount = self._reserve(n)
+                return self.__source.read(amount)
+
+            read1 = read
 
             def readinto(self, buffer):
-                data = self.read(len(buffer))
-                buffer[: len(data)] = data
-                return len(data)
+                view = memoryview(buffer).cast("B")
+                if view.readonly:
+                    raise TypeError("readinto requires a writable buffer")
+                amount = self._reserve(view.nbytes)
+                return self.__source.readinto(view[:amount])
+
+            readinto1 = readinto
 
             def readline(self, n=-1):
-                # PyPDF2 generally uses read/seek; still meter this alternate API.
-                data = super().readline(n)
-                self.charged += len(data)
-                if self.charged > 4194304:
-                    raise ValueError("logical-read-budget-exhausted")
-                return data
+                # Reserve the entire possible line BEFORE scanning. No refund
+                # for early newline, no uncharged search or byte-at-a-time loop.
+                amount = self._reserve(n)
+                return self.__source.readline(amount)
+
+            def readlines(self, hint=-1):
+                lines = []
+                total = 0
+                for line in self:
+                    lines.append(line)
+                    total += len(line)
+                    if hint > 0 and total >= hint:
+                        break
+                return lines
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                line = self.readline()
+                if not line:
+                    raise StopIteration
+                return line
+
+            @property
+            def closed(self):
+                return self.__source.closed
+
+            def close(self):
+                self.__source.close()
+
+            def readable(self):
+                return not self.closed
+
+            def seekable(self):
+                return not self.closed
+
+            def writable(self):
+                return False
 
         stream = BoundedMemory(raw)
         reader = PyPDF2.PdfReader(stream, strict=True)
@@ -412,7 +484,10 @@ def _inspect_mapped_pdf(input_manifest, resource_limits=None, *, _probe="decode"
         or not hasattr(os, "memfd_create")
     ):
         return result
-    if resource_limits is not None and resource_limits != NativeResourceLimits():
+    if resource_limits is not None and (
+        type(resource_limits) is not NativeResourceLimits
+        or resource_limits not in (NativeResourceLimits(), ORIGINAL_PDF_LIMITS)
+    ):
         result["reason"] = "unsupported-resource-policy"
         return result
     if (
@@ -427,7 +502,12 @@ def _inspect_mapped_pdf(input_manifest, resource_limits=None, *, _probe="decode"
         return result
     import fcntl
 
-    from millefeuille.domain.secure_io import read_bytes_no_follow
+    from millefeuille.domain.secure_io import (
+        copy_verified_file_no_follow,
+        read_bytes_no_follow,
+    )
+
+    limits = resource_limits or NativeResourceLimits()
 
     started = time.monotonic()
     child = None
@@ -467,6 +547,7 @@ def _inspect_mapped_pdf(input_manifest, resource_limits=None, *, _probe="decode"
                     str(infd),
                     str(outfd),
                     _probe,
+                    "original-pdf-v1" if limits == ORIGINAL_PDF_LIMITS else "legacy",
                 ],
                 pass_fds=(right.fileno(), infd, outfd),
                 stdin=subprocess.DEVNULL,
@@ -486,19 +567,33 @@ def _inspect_mapped_pdf(input_manifest, resource_limits=None, *, _probe="decode"
                 receipt += chunk
             if receipt != b"CAPABLE\n":
                 raise ValueError("sandbox-unavailable-before-input")
-            raw = read_bytes_no_follow(
-                input_manifest["path"], "native PDF", max_bytes=1048576
-            )
-            digest = hashlib.sha256(raw).hexdigest()
-            result["charged_read_bytes"] = len(raw)
+            if limits == ORIGINAL_PDF_LIMITS:
+                # Charge the finite ceiling before any original payload access,
+                # including failed/partial transfers. Never refund unknown I/O.
+                result["charged_read_bytes"] = limits.max_input_bytes
+                result["charged_staging_bytes"] = limits.max_input_bytes
+                size, digest = copy_verified_file_no_follow(
+                    input_manifest["path"],
+                    infd,
+                    expected_sha256=input_manifest["sha256"],
+                    max_bytes=limits.max_input_bytes,
+                    check_deadline=remaining,
+                )
+            else:
+                raw = read_bytes_no_follow(
+                    input_manifest["path"], "native PDF", max_bytes=1048576
+                )
+                size = len(raw)
+                digest = hashlib.sha256(raw).hexdigest()
+                result["charged_read_bytes"] = size
+                if digest != input_manifest["sha256"]:
+                    raise ValueError("source-hash-drift")
+                if not raw:
+                    raise ValueError("unsupported-format")
+                offset = 0
+                while offset < size:
+                    offset += os.write(infd, raw[offset:])
             result["evidence"]["input_sha256"] = digest
-            if digest != input_manifest["sha256"]:
-                raise ValueError("source-hash-drift")
-            if not raw:
-                raise ValueError("unsupported-format")
-            offset = 0
-            while offset < len(raw):
-                offset += os.write(infd, raw[offset:])
             fcntl.fcntl(
                 infd,
                 fcntl.F_ADD_SEALS,
@@ -508,7 +603,7 @@ def _inspect_mapped_pdf(input_manifest, resource_limits=None, *, _probe="decode"
                 | fcntl.F_SEAL_SEAL,
             )
             left.settimeout(remaining())
-            left.sendall(str(len(raw)).encode() + b" " + digest.encode() + b"\n")
+            left.sendall(str(size).encode() + b" " + digest.encode() + b"\n")
         finally:
             left.close()
             right.close()
@@ -535,6 +630,10 @@ def _inspect_mapped_pdf(input_manifest, resource_limits=None, *, _probe="decode"
         result["reason"] = "wall-budget-exhausted"
     except BaseException as exc:
         safe = {
+            "source-size-out-of-bounds",
+            "source-identity-drift",
+            "short-source-read",
+            "short-staging-write",
             "sandbox-unavailable-before-input",
             "source-hash-drift",
             "unsupported-format",
@@ -570,6 +669,6 @@ def _inspect_mapped_pdf(input_manifest, resource_limits=None, *, _probe="decode"
         result["evidence"]["child_runtime"] = time.monotonic() - started
         result["evidence"]["post_filter_fd_io_bytes"] = 0
         result["evidence"]["io_policy"] = (
-            "sealed-input<=1MiB;fixed-output<=256KiB;no-syscall-io"
+            f"sealed-input<={limits.max_input_bytes};fixed-output<=256KiB;no-syscall-io"
         )
     return result
