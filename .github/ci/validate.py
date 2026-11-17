@@ -27,7 +27,22 @@ def source(root, policy):
             not path.is_absolute() and ".." not in path.parts, "invalid source name"
         )
         expected = policy["ci_overlays"].get(name, expected)
-        require(digest((root / name).read_bytes()) == expected, "source pin mismatch")
+        raw = (root / name).read_bytes()
+        actual = digest(raw)
+        if actual != expected:
+            print(
+                json.dumps(
+                    {
+                        "source_mismatch": name,
+                        "expected": expected,
+                        "actual": actual,
+                        "has_crlf": b"\r\n" in raw,
+                        "lf_digest_matches": digest(raw.replace(b"\r\n", b"\n"))
+                        == expected,
+                    }
+                )
+            )
+        require(actual == expected, "source pin mismatch")
     for relative, expected in policy["ci_inputs"].items():
         require(digest((root / relative).read_bytes()) == expected, "CI input mismatch")
     print(json.dumps({"source_files_verified": len(policy["files"])}))
@@ -145,30 +160,55 @@ for prefix in ('requests','urllib3','millefeuille.clients.pageindex_client',
             result.returncode == 0 and not result.stdout and not result.stderr,
             "installed import/privacy check failed",
         )
-        help_result = subprocess.run(
-            [str(Path(sys.executable).parent / "millefeuille"), "--help"],
-            cwd=temporary,
-            capture_output=True,
-            timeout=30,
-            check=False,
-        )
-        require(
-            help_result.returncode == 0
-            and len(help_result.stdout) <= 65536
-            and b"usage:" in help_result.stdout.lower(),
-            "installed CLI check failed",
-        )
-        require(
-            b"PRIVATE FAILURE OBSERVATION"
-            not in help_result.stdout + help_result.stderr,
-            "success diagnostics leak",
-        )
+        help_checks = []
+        for command in (
+            [],
+            ["writeback-operator"],
+            ["classification-operator"],
+            ["live-operator"],
+        ):
+            help_result = subprocess.run(
+                [str(Path(sys.executable).parent / "millefeuille"), *command, "--help"],
+                cwd=temporary,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+            marker = (
+                b"usage: millefeuille " + command[0].encode()
+                if command
+                else b"powered by Hydra"
+            )
+            check = {
+                "command": command or ["hydra"],
+                "exit": help_result.returncode,
+                "stdout_bytes": len(help_result.stdout),
+                "stderr_bytes": len(help_result.stderr),
+                "stdout_sha256": digest(help_result.stdout),
+                "stderr_sha256": digest(help_result.stderr),
+                "help_marker": marker in help_result.stdout,
+                "diagnostics_leak": b"PRIVATE FAILURE OBSERVATION"
+                in help_result.stdout + help_result.stderr,
+            }
+            help_checks.append(check)
+            Path(output).write_text(
+                json.dumps({"cli_checks": help_checks}, indent=2) + chr(10)
+            )
+            require(
+                check["exit"] == 0
+                and 0 < check["stdout_bytes"] <= 65536
+                and check["stderr_bytes"] <= 65536
+                and check["help_marker"]
+                and not check["diagnostics_leak"],
+                "installed CLI check failed; fixed metadata receipt retained",
+            )
     report = {
         "installed_source_files": count,
         "provenance": True,
         "offline_import": True,
         "observer_default_off": True,
         "cli": True,
+        "cli_checks": help_checks,
     }
     Path(output).write_text(json.dumps(report, indent=2) + chr(10))
     print(json.dumps(report))

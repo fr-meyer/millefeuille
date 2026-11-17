@@ -25,6 +25,8 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         python-version: ['3.11', '3.12', '3.13']
     steps:
+      - name: Preserve exact checkout bytes
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -58,6 +60,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Preserve exact checkout bytes
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -76,6 +80,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Preserve exact checkout bytes
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -97,14 +103,34 @@ jobs:
         run: |
           python -m venv "$RUNNER_TEMP/wheel-env"
           python -m venv "$RUNNER_TEMP/sdist-env"
-          "$RUNNER_TEMP/wheel-env/bin/python" -m pip install --no-index --find-links wheelhouse dist/*.whl
-          "$RUNNER_TEMP/sdist-env/bin/python" -m pip install --no-index --find-links wheelhouse dist/from-sdist/*.whl
+          "$RUNNER_TEMP/wheel-env/bin/python" -m pip install --no-index --find-links wheelhouse "$(echo dist/*.whl)[test,native]"
+          "$RUNNER_TEMP/sdist-env/bin/python" -m pip install --no-index --find-links wheelhouse "$(echo dist/from-sdist/*.whl)[test,native]"
       - name: Installed provenance and privacy outside source, network isolated
         shell: bash
         run: |
+          status=0
           for kind in wheel sdist; do
-            sudo unshare --net -- bash -c 'set -eu; ip link set lo up; export HOME="$4"; cd "$5"; exec setpriv --reuid "$1" --regid "$2" --init-groups "$3" -I -B "$6/.github/ci/validate.py" installed "$6/.github/ci/source-pins.json" "$6/.ci-output/installed-$7.json"' ci "$(id -u)" "$(id -g)" "$RUNNER_TEMP/$kind-env/bin/python" "$HOME" "$RUNNER_TEMP" "$GITHUB_WORKSPACE" "$kind"
+            sudo unshare --net -- bash -c 'set -eu; ip link set lo up; export HOME="$4"; unset PYTHONPATH PYTHONHOME; cd "$5"; exec setpriv --reuid "$1" --regid "$2" --init-groups "$3" -I -B "$6/.github/ci/validate.py" installed "$6/.github/ci/source-pins.json" "$6/.ci-output/installed-$7.json"' ci "$(id -u)" "$(id -g)" "$RUNNER_TEMP/$kind-env/bin/python" "$HOME" "$RUNNER_TEMP" "$GITHUB_WORKSPACE" "$kind" || status=1
           done
+          exit "$status"
+      - name: Installed wheel and rebuilt-sdist regression suites
+        shell: bash
+        run: |
+          status=0
+          for kind in wheel sdist; do
+            if [ "$kind" = wheel ]; then artifact=("$GITHUB_WORKSPACE"/dist/*.whl); else artifact=("$GITHUB_WORKSPACE"/dist/from-sdist/*.whl); fi
+            sudo unshare --net -- bash -c 'set -eu; ip link set lo up; unset PYTHONPATH PYTHONHOME; cd "$5"; exec setpriv --reuid "$1" --regid "$2" --init-groups "$3" -I -B "$6/.github/ci/installed_tests.py" "$6" "$8" "$7" "$9"' ci "$(id -u)" "$(id -g)" "$RUNNER_TEMP/$kind-env/bin/python" "$HOME" "$RUNNER_TEMP" "$GITHUB_WORKSPACE" "$kind" "${artifact[0]}" "$(git rev-parse HEAD)" || status=1
+          done
+          exit "$status"
+      - name: Upload installed outcomes even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: installed-results-${{ github.event.pull_request.head.sha || github.sha }}
+          retention-days: 3
+          include-hidden-files: true
+          if-no-files-found: warn
+          path: .ci-output/installed-*.json
       - name: Upload screened packages and fixed provenance only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
