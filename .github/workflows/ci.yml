@@ -44,7 +44,7 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          sudo unshare --net -- bash -c 'set -eu; ip link set lo up; export HOME="$4" PATH="$5"; exec setpriv --reuid "$1" --regid "$2" --init-groups "$3" -B -m unittest discover -v' ci "$(id -u)" "$(id -g)" "$(command -v python)" "$HOME" "$PATH"
+          sudo unshare --net -- bash -c 'set -eu; ip link set lo up; export HOME="$4" PATH="$5"; exec setpriv --reuid "$1" --regid "$2" --init-groups "$3" -B .github/ci/run_tests.py' ci "$(id -u)" "$(id -g)" "$(command -v python)" "$HOME" "$PATH"
       - name: Offline Windows Python tests
         if: runner.os == 'Windows'
         shell: pwsh
@@ -52,7 +52,7 @@ jobs:
           $python = (Get-Command python).Source
           $rule = New-NetFirewallRule -DisplayName 'Millefeuille CI Python offline' -Direction Outbound -Program $python -RemoteAddress Internet -Action Block
           if ($rule.Enabled -ne 'True') { throw 'Offline firewall not active' }
-          python -B -m unittest discover -v
+          python -B .github/ci/run_tests.py
 
   optimized:
     runs-on: ubuntu-latest
@@ -70,7 +70,7 @@ jobs:
       - name: Optimized offline tests
         shell: bash
         run: |
-          sudo unshare --net -- bash -c 'set -eu; ip link set lo up; export HOME="$4" PATH="$5"; exec setpriv --reuid "$1" --regid "$2" --init-groups "$3" -O -B -m unittest discover -v' ci "$(id -u)" "$(id -g)" "$(command -v python)" "$HOME" "$PATH"
+          sudo unshare --net -- bash -c 'set -eu; ip link set lo up; export HOME="$4" PATH="$5"; exec setpriv --reuid "$1" --regid "$2" --init-groups "$3" -O -B .github/ci/run_tests.py' ci "$(id -u)" "$(id -g)" "$(command -v python)" "$HOME" "$PATH"
 
   distributions:
     runs-on: ubuntu-latest

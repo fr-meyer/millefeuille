@@ -28,6 +28,8 @@ def source(root, policy):
         )
         expected = policy["ci_overlays"].get(name, expected)
         require(digest((root / name).read_bytes()) == expected, "source pin mismatch")
+    for relative, expected in policy["ci_inputs"].items():
+        require(digest((root / relative).read_bytes()) == expected, "CI input mismatch")
     print(json.dumps({"source_files_verified": len(policy["files"])}))
 
 
@@ -71,12 +73,19 @@ def archives(root, policy):
             metadata = any(p.endswith((".dist-info", ".egg-info")) for p in parts)
             require(
                 name in policy["files"]
+                or name in policy["ci_inputs"]
+                or name == ".github/ci/source-pins.json"
                 or metadata
                 or name in {"PKG-INFO", "setup.cfg"},
                 "unexpected archive content",
             )
-            if name in packages:
-                require(digest(data) == packages[name], "packaged source mismatch")
+            if name in policy["files"]:
+                expected = policy["ci_overlays"].get(name, policy["files"][name])
+                require(digest(data) == expected, "packaged source mismatch")
+            elif name in policy["ci_inputs"]:
+                require(digest(data) == policy["ci_inputs"][name], "CI input mismatch")
+            elif name == ".github/ci/source-pins.json":
+                require(json.loads(data) == policy, "packaged policy mismatch")
         require(set(packages) <= set(members), "package source omitted")
         rows.append(
             {

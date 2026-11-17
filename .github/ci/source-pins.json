@@ -1,7 +1,13 @@
 {
   "candidate": "observation-v3-unaccepted",
+  "ci_inputs": {
+    ".github/ci/run_tests.py": "e731e09cf19ccf7f89d33a495f25928d01c2cbaad2e2770e9f06aeb335c6cf1b",
+    ".github/ci/suite_observations.py": "1d3d9eb792b581cdea165958ef416fa7f1d0affa83abd1ced3c187bd8652d7ea",
+    ".github/ci/suite_runner.py": "0a6981d9ae9757d05cfc04200283cd52eda48dd9f8e58ea433eb7e29c9919833",
+    ".github/ci/validate.py": "fe786618057cf2777be30a58ff126f4f17cd58b8af86e7c8e89a3fe4c22bdfeb"
+  },
   "ci_overlays": {
-    ".github/workflows/ci.yml": "3b424448746538bc4c983cbaa7bf60a26e47937274df9b8647bcae69b69ffb0a"
+    ".github/workflows/ci.yml": "a48284f3e271b3af46d971972f1bf5dc155594dabccdd98daffd1fc2a5b3dacb"
   },
   "files": {
     ".gitattributes": "06fbceb84182f41b4e227a525d27c97ee3d4302d1504bf7d5c238bb77273eb8b",
