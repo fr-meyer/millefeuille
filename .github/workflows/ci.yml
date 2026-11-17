@@ -56,6 +56,16 @@ jobs:
           if ($rule.Enabled -ne 'True') { throw 'Offline firewall not active' }
           python -B .github/ci/run_tests.py
 
+      - name: Upload structured full-suite outcomes even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: full-suite-${{ matrix.os }}-${{ matrix.python-version }}-${{ github.event.pull_request.head.sha || github.sha }}
+          retention-days: 3
+          include-hidden-files: true
+          if-no-files-found: warn
+          path: .ci-output/tests.json
+
   optimized:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -76,6 +86,16 @@ jobs:
         run: |
           sudo unshare --net -- bash -c 'set -eu; ip link set lo up; export HOME="$4" PATH="$5"; exec setpriv --reuid "$1" --regid "$2" --init-groups "$3" -O -B .github/ci/run_tests.py' ci "$(id -u)" "$(id -g)" "$(command -v python)" "$HOME" "$PATH"
 
+      - name: Upload structured full-suite outcomes even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: full-suite-optimized-${{ github.event.pull_request.head.sha || github.sha }}
+          retention-days: 3
+          include-hidden-files: true
+          if-no-files-found: warn
+          path: .ci-output/tests.json
+
   distributions:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -91,6 +111,7 @@ jobs:
           python-version: '3.12'
       - run: python -B .github/ci/validate.py source .github/ci/source-pins.json
       - name: Cloud dependency preparation and independent builds
+        id: screened_build
         shell: bash
         run: |
           python -m pip install build setuptools wheel
@@ -132,6 +153,7 @@ jobs:
           if-no-files-found: warn
           path: .ci-output/installed-*.json
       - name: Upload screened packages and fixed provenance only
+        if: always() && steps.screened_build.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cloud-distributions-${{ github.event.pull_request.head.sha || github.sha }}

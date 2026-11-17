@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Exact reviewed workflow bytes replace the old three-command-only contract.
 # Any workflow change still needs explicit source review and a pin update.
 APPROVED_WORKFLOW_SHA256 = (
-    "a48284f3e271b3af46d971972f1bf5dc155594dabccdd98daffd1fc2a5b3dacb"
+    "a0d3d3a746b5063f768c16253e812be0d941666cfcd90aae0e2a18184a16085b"
 )
 
 

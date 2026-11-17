@@ -10,7 +10,9 @@
     ".github/ci/validate.py": "3f4bad8533631443f94986d9a5d9987be77229132a2cb9e1fc0f12a1c0f1b29f"
   },
   "ci_overlays": {
-    ".github/workflows/ci.yml": "699d8768ba1fe0a32798b58ed9899190c5eec943de19682c438038897154177b"
+    ".github/workflows/ci.yml": "a0d3d3a746b5063f768c16253e812be0d941666cfcd90aae0e2a18184a16085b",
+    "tests/test_cross_platform_ci.py": "af3789c1fee4cf52ccc424d1fd6ccdc692e6d2aed489538da72bfb5359df1756",
+    "tests/test_release_publication_safety.py": "421555fb933b3e8d839d1c36b4aa9c6bca49a21ca9759f7babe9a16b07a872af"
   },
   "files": {
     ".gitattributes": "06fbceb84182f41b4e227a525d27c97ee3d4302d1504bf7d5c238bb77273eb8b",
