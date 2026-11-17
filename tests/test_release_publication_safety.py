@@ -1,5 +1,7 @@
 """Offline release boundary contracts, not hosted CI or actor verification."""
 
+import copy
+import hashlib
 import json
 from pathlib import Path
 import unittest
@@ -8,41 +10,112 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Exact reviewed workflow bytes replace the old three-command-only contract.
+# Any workflow change still needs explicit source review and a pin update.
+APPROVED_WORKFLOW_SHA256 = (
+    "a48284f3e271b3af46d971972f1bf5dc155594dabccdd98daffd1fc2a5b3dacb"
+)
+
 
 def metadata(path):
     return yaml.load((ROOT / path).read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
 
 
 class ReleasePublicationSafetyTests(unittest.TestCase):
-    def test_every_trigger_has_only_read_only_test_job(self):
-        workflow = metadata(".github/workflows/ci.yml")
+    def assert_read_only_cloud_workflow(self, workflow):
         self.assertEqual(
             set(workflow["on"]), {"push", "pull_request", "workflow_dispatch"}
         )
         self.assertEqual(workflow["permissions"], {"contents": "read"})
-        self.assertEqual(set(workflow["jobs"]), {"test"})
+        self.assertEqual(set(workflow["jobs"]), {"test", "optimized", "distributions"})
+        self.assertEqual(workflow["concurrency"]["cancel-in-progress"], "false")
+        allowed_actions = {
+            "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        }
+        for job in workflow["jobs"].values():
+            self.assertNotIn("permissions", job)
+            self.assertNotIn("environment", job)
+            self.assertNotIn("env", job)
+            self.assertEqual(job["timeout-minutes"], "20")
+            checkout = [
+                step
+                for step in job["steps"]
+                if step.get("uses", "").startswith("actions/checkout@")
+            ]
+            self.assertEqual(len(checkout), 1)
+            self.assertEqual(checkout[0]["with"]["persist-credentials"], "false")
+            self.assertEqual(
+                checkout[0]["with"]["ref"],
+                "${{ github.event.pull_request.head.sha || github.sha }}",
+            )
+            for step in job["steps"]:
+                self.assertNotIn("env", step)
+                self.assertNotIn("continue-on-error", step)
+                self.assertNotIn("cache", step.get("with", {}))
+                if "uses" in step:
+                    self.assertIn(step["uses"], allowed_actions)
+            encoded = json.dumps(job)
+            self.assertNotIn("secrets.", encoded)
+            self.assertNotIn("secrets[", encoded)
+            self.assertNotIn("id-token", encoded)
         job = workflow["jobs"]["test"]
-        self.assertNotIn("permissions", job)
-        self.assertEqual(job["timeout-minutes"], "20")
         self.assertEqual(job["strategy"]["max-parallel"], "2")
         self.assertEqual(job["strategy"]["fail-fast"], "false")
-        steps = job["steps"]
-        self.assertEqual(steps[0]["with"]["persist-credentials"], "false")
-        self.assertTrue(all("cache" not in step.get("with", {}) for step in steps))
-        self.assertEqual(
-            [step["run"] for step in steps if "run" in step],
-            [
-                "python -m pip install --no-cache-dir --upgrade pip\n"
-                'python -m pip install --no-cache-dir --editable ".[test,native]"\n',
-                "python -m ruff check .",
-                "python -m unittest discover -v",
-            ],
-        )
-        self.assertFalse(any("env" in step for step in steps))
         matrix = job["strategy"]["matrix"]
         self.assertEqual(matrix["os"], ["ubuntu-latest", "windows-latest"])
         self.assertEqual(matrix["python-version"], ["3.11", "3.12", "3.13"])
         self.assertEqual(set(matrix), {"os", "python-version"})
+        for name in ("optimized", "distributions"):
+            self.assertEqual(workflow["jobs"][name]["runs-on"], "ubuntu-latest")
+        # Pin all commands, conditionals, action inputs and triggers, not just
+        # their names. Unreviewed release-capable steps cannot hide behind
+        # read-only permissions or benign labels.
+        approved = metadata(".github/workflows/ci.yml")
+        self.assertEqual(
+            hashlib.sha256(
+                (ROOT / ".github/workflows/ci.yml").read_bytes()
+            ).hexdigest(),
+            APPROVED_WORKFLOW_SHA256,
+        )
+        self.assertEqual(workflow, approved)
+
+    def test_every_trigger_has_only_read_only_test_job(self):
+        self.assert_read_only_cloud_workflow(metadata(".github/workflows/ci.yml"))
+
+    def test_cloud_contract_rejects_privilege_and_execution_drift(self):
+        original = metadata(".github/workflows/ci.yml")
+        changes = [
+            lambda w: w.update(permissions={"contents": "write"}),
+            lambda w: w["on"].update(pull_request_target={}),
+            lambda w: w["jobs"].update(release={}),
+            lambda w: w["jobs"]["test"].update(permissions={"contents": "write"}),
+            lambda w: w["jobs"]["test"].update(environment="production"),
+            lambda w: w["jobs"]["test"].update(env={"TOKEN": "secret"}),
+            lambda w: w["jobs"]["test"].update({"timeout-minutes": "21"}),
+            lambda w: w["jobs"]["test"]["strategy"].update({"max-parallel": "3"}),
+            lambda w: w["jobs"]["test"]["strategy"].update({"fail-fast": "true"}),
+            lambda w: w["jobs"]["test"]["steps"].append({"run": "git push"}),
+            lambda w: w["jobs"]["test"]["steps"].append(
+                {"uses": "actions/checkout@main"}
+            ),
+            lambda w: w["jobs"]["test"]["steps"].append(
+                {"run": "true", "continue-on-error": "true"}
+            ),
+            lambda w: w["jobs"]["test"]["steps"].append(
+                {"run": "echo ${{ secrets.TOKEN }}"}
+            ),
+            lambda w: w["jobs"]["test"]["steps"].append(
+                {"run": "python -m unittest tests.selected"}
+            ),
+        ]
+        for index, change in enumerate(changes):
+            with self.subTest(mutation=index):
+                workflow = copy.deepcopy(original)
+                change(workflow)
+                with self.assertRaises(AssertionError):
+                    self.assert_read_only_cloud_workflow(workflow)
 
     def test_no_other_workflow_can_mutate_release(self):
         self.assertEqual(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import unittest
 
@@ -9,6 +10,11 @@ import yaml
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
+# The reviewed adapter discovers the complete suite once and accounts for
+# every occurrence, without selection or failure suppression.
+FULL_SUITE_ADAPTER_SHA256 = (
+    "e731e09cf19ccf7f89d33a495f25928d01c2cbaad2e2770e9f06aeb335c6cf1b"
+)
 
 
 class CrossPlatformCIContractTests(unittest.TestCase):
@@ -30,7 +36,13 @@ class CrossPlatformCIContractTests(unittest.TestCase):
             step.get("run", "") for step in workflow["jobs"]["test"]["steps"]
         )
         self.assertIn("python -m ruff check .", commands)
-        self.assertIn("python -m unittest discover -v", commands)
+        self.assertEqual(commands.count(".github/ci/run_tests.py"), 2)
+        for marker in ("unshare --net", "New-NetFirewallRule", "-Action Block"):
+            self.assertIn(marker, commands)
+        adapter = REPOSITORY_ROOT / ".github/ci/run_tests.py"
+        self.assertEqual(
+            hashlib.sha256(adapter.read_bytes()).hexdigest(), FULL_SUITE_ADAPTER_SHA256
+        )
 
     def test_readme_documents_capability_boundaries(self):
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
