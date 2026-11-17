@@ -17,6 +17,10 @@
   ],
   "additionalProperties": false,
   "properties": {
+    "requested_stages": {
+      "type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": true,
+      "items": {"enum": ["summarize_page", "summarize_section", "summarize_full_paper"]}
+    },
     "schema_version": {"const": "millefeuille-summary-preparation/v0.1"},
     "status": {"const": "prepared-no-call"},
     "paper_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$"},

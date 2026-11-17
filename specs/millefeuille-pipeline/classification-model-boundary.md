@@ -1,7 +1,7 @@
 # Classification Model Request Boundary
 
 The read-only planner prepares a genuine `classify` executor task for one
-accepted paper. It pins openai/gpt-5.6-sol, xhigh, subscription OAuth, one
+accepted paper. It pins openai/gpt-6-astra, xhigh, subscription OAuth, one
 attempt and no fallback. It does not execute the request or publish a decision.
 
 The bundled `research-default.classify` preview reports the same pinned model,

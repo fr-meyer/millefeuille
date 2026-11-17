@@ -8,7 +8,7 @@ Millefeuille job used that model. Configuration inspection performs no model cal
 | Component and operation | Configured or default model | Evidence and qualification |
 | --- | --- | --- |
 | Millefeuille local structure preparation | No model | `local_structure.py` uses `local-markdown-headings-v0.1`; the research profile now matches this builder. |
-| Millefeuille page, section, whole-paper summaries, cards and classification | `openai/gpt-5.6-sol`, `xhigh` | Typed requests require subscription OAuth, reject API keys and have no fallback. GPT-only dispatch rejects foreign profile defaults before transport. |
+| Millefeuille page, section, whole-paper summaries, cards and classification | `openai/gpt-6-astra`, `xhigh` | Typed requests require subscription OAuth, reject API keys and have no fallback. GPT-only dispatch rejects foreign profile defaults before transport. |
 | Millefeuille native pilot index materialization | No new model call | The five completed pilots reuse verified saved summaries and structure. They do not invoke vendor compilation, `build_index`, concept/entity generation or an embedding model. This does not establish live generated-query coverage. |
 | OpenKB installed package | `0.4.5` | Active `openkb-mvp` environment resolves to the dated `openkb-0.4.5-pageindex-0.3.0.dev3` runtime. |
 | OpenKB native compile and native query | `mistral/mistral-medium-3-5` | The separate `.openkb/config.yaml` names this model. `openkb/indexer.py:183-203` passes the selected model to PageIndex; package fallback is `gpt-5.4`. This is not the Millefeuille OAuth route. |

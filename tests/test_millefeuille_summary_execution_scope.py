@@ -35,7 +35,7 @@ def _approved_pair(
     paper_id: str,
     calls: int,
     *,
-    model: str = "gpt-5.6-sol",
+    model: str = "gpt-6-astra",
     approved_at: datetime | None = None,
 ):
     now = (approved_at or datetime.now(UTC)).replace(microsecond=0)

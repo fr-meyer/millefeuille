@@ -27,7 +27,7 @@ DEFAULT_MODEL_PROFILE_BUNDLE: dict[str, Any] = {
             },
             "summarize_page": {
                 "backend": "chat",
-                "model": "openai/gpt-5.6-sol",
+                "model": "openai/gpt-6-astra",
                 "provider": "openai",
                 "auth_lane": "openclaw-native-codex-oauth",
                 "fallback_policy": "none",
@@ -38,7 +38,7 @@ DEFAULT_MODEL_PROFILE_BUNDLE: dict[str, Any] = {
             },
             "summarize_section": {
                 "backend": "chat",
-                "model": "openai/gpt-5.6-sol",
+                "model": "openai/gpt-6-astra",
                 "provider": "openai",
                 "auth_lane": "openclaw-native-codex-oauth",
                 "fallback_policy": "none",
@@ -49,7 +49,7 @@ DEFAULT_MODEL_PROFILE_BUNDLE: dict[str, Any] = {
             },
             "summarize_full_paper": {
                 "backend": "chat",
-                "model": "openai/gpt-5.6-sol",
+                "model": "openai/gpt-6-astra",
                 "provider": "openai",
                 "auth_lane": "openclaw-native-codex-oauth",
                 "fallback_policy": "none",
@@ -60,7 +60,7 @@ DEFAULT_MODEL_PROFILE_BUNDLE: dict[str, Any] = {
             },
             "paper_card": {
                 "backend": "chat",
-                "model": "openai/gpt-5.6-sol",
+                "model": "openai/gpt-6-astra",
                 "provider": "openai",
                 "auth_lane": "openclaw-native-codex-oauth",
                 "fallback_policy": "none",
@@ -71,7 +71,7 @@ DEFAULT_MODEL_PROFILE_BUNDLE: dict[str, Any] = {
             },
             "classify": {
                 "backend": "chat",
-                "model": "openai/gpt-5.6-sol",
+                "model": "openai/gpt-6-astra",
                 "provider": "openai",
                 "auth_lane": "openclaw-native-codex-oauth",
                 "fallback_policy": "none",

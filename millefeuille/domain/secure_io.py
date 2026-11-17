@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 import errno
 import json
@@ -277,6 +277,43 @@ def _open_or_create_directory_path_no_follow(
         ) from exc
 
 
+_DIRECTORY_READ_SCOPE = ContextVar("directory_read_scope", default=None)
+
+
+@contextmanager
+def held_directory_reads():
+    """Reuse directory handles within one synchronous plan, never file bytes."""
+    directories = {}
+    token = _DIRECTORY_READ_SCOPE.set(directories)
+    try:
+        yield
+    finally:
+        _DIRECTORY_READ_SCOPE.reset(token)
+        for fd in directories.values():
+            os.close(fd)
+
+
+def _held_parent_directory_fd(target: Path, *, label: str, directories) -> int:
+    key = Path(target.anchor)
+    if key not in directories:
+        directories[key] = _open_directory_fd(key)
+    current = directories[key]
+    for part in target.parts[1:-1]:
+        key = key / part
+        named = os.stat(part, dir_fd=current, follow_symlinks=False)
+        if not stat.S_ISDIR(named.st_mode):
+            raise MillefeuilleContractError(
+                f"{label} path contains a symbolic link or non-directory: {target}"
+            )
+        if key not in directories:
+            directories[key] = _open_relative_directory_fd(current, part)
+        child = directories[key]
+        if _stat_object_identity(named) != _stat_object_identity(os.fstat(child)):
+            raise MillefeuilleContractError(f"{label} directory changed: {target}")
+        current = child
+    return os.dup(current)
+
+
 def _open_parent_directory_fd(path: Path, *, label: str) -> tuple[int, str]:
     if not _supports_no_follow():
         raise MillefeuilleContractError(
@@ -288,6 +325,17 @@ def _open_parent_directory_fd(path: Path, *, label: str) -> tuple[int, str]:
     parts = target.parts[1:] if target.is_absolute() else target.parts
     if not parts or parts[-1] in {"", ".", ".."}:
         raise MillefeuilleContractError(f"{label} is not a regular file: {target}")
+
+    directories = _DIRECTORY_READ_SCOPE.get()
+    if directories is not None and target.is_absolute() and ".." not in parts:
+        try:
+            return _held_parent_directory_fd(
+                target, label=label, directories=directories
+            ), parts[-1]
+        except OSError as exc:
+            raise MillefeuilleContractError(
+                f"could not open {label} path {target}: {exc}"
+            ) from exc
 
     current_fd = _open_directory_fd(anchor)
     try:

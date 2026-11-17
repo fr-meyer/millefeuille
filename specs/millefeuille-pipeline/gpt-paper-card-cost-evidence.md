@@ -1,6 +1,6 @@
 # GPT paper-card cost evidence
 
-The GPT card route pins `openai/gpt-5.6-sol`, subscription OAuth, no fallback,
+The GPT card route pins `openai/gpt-6-astra`, subscription OAuth, no fallback,
 one call and a zero incremental API charge scope. The shared OpenClaw adapter
 reports observed tokens but leaves `result.cost` unknown when the provider
 does not return a bill. Card validation preserves that raw unknown value.

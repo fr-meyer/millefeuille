@@ -3,7 +3,7 @@
 The `OpenClawModelClient` executes one provider-neutral model-executor request
 through the installed OpenClaw `agent exec` command. It is a low-level adapter;
 no pipeline stage calls it automatically. The current executable lane is
-`openai/gpt-5.6-sol` through subscription OAuth; xAI/Grok execution is deferred
+`openai/gpt-6-astra` through subscription OAuth; xAI/Grok execution is deferred
 until a subscription is active and a separate reviewed change enables it.
 A live GPT call still requires the run's exact approved-live scope and
 output-contract validation.
@@ -61,7 +61,7 @@ read-only auth status. No live model call or paper text was used for this slice.
 
 `millefeuille.domain.gpt_oauth_canary.run_gpt_oauth_canary` is a supervised,
 single-call acceptance boundary. It sends one fixed synthetic JSON prompt to
-`openai/gpt-5.6-sol` with `thinking=xhigh`, no fallback, no tools, and no paper
+`openai/gpt-6-astra` with `thinking=xhigh`, no fallback, no tools, and no paper
 content. It accepts only an exact approved-live operator packet and MF-100
 receipt for the local `gpt-oauth-canary` fixture, one item, one `model.execute`
 operation, one provider call, a zero incremental API-spend cap, private local

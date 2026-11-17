@@ -134,6 +134,7 @@ def run_stage_cli(
                 structure_evidence_paths=args.structure_evidence,
                 output_dir=args.output_dir,
                 profile=args.profile,
+                requested_stages=args.summary_stage,
             )
             payload = result.to_dict()
         elif args.command in {stage.value for stage in OFFLINE_FIXTURE_STAGES}:
@@ -434,6 +435,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     summarize_prepare.add_argument("--output-dir", required=True)
     summarize_prepare.add_argument("--profile")
+    summarize_prepare.add_argument(
+        "--summary-stage",
+        action="append",
+        help="Repeat in page, section, full-paper order; omit to select all.",
+    )
     summarize_prepare.add_argument("--json", action="store_true")
 
     preview = subparsers.add_parser(

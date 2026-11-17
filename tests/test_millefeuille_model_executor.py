@@ -47,7 +47,7 @@ class TestModelExecutorContract(unittest.TestCase):
     def _request(
         self,
         *,
-        requested_model: str = "openai/gpt-5.6-sol",
+        requested_model: str = "openai/gpt-6-astra",
         input_payload: bytes = b'{"locator":"p.1"}',
         fallback_models: list[str] | None = None,
         retry_on: list[str] | None = None,
@@ -75,8 +75,8 @@ class TestModelExecutorContract(unittest.TestCase):
     def _attempt(
         *,
         sequence: int = 1,
-        model: str = "openai/gpt-5.6-sol",
-        actual_model: str | None = "openai/gpt-5.6-sol",
+        model: str = "openai/gpt-6-astra",
+        actual_model: str | None = "openai/gpt-6-astra",
         status: str = "succeeded",
         started_at: str = "2026-08-27T12:00:01Z",
         completed_at: str = "2026-08-27T12:00:02Z",
@@ -190,7 +190,7 @@ class TestModelExecutorContract(unittest.TestCase):
                 task_kind="summarize_page",
                 unit_id="page-1",
                 source_locators=["p.1"],
-                requested_model="openai/gpt-5.6-sol",
+                requested_model="openai/gpt-6-astra",
                 thinking="high",
                 prompt_template_id="summarize-page",
                 prompt_template_version="summary-page-v1",
@@ -251,7 +251,7 @@ class TestModelExecutorContract(unittest.TestCase):
             unit_id="paper-1",
             source_locators=["p.1", "p.2"],
             input_payload=b'{"pages":["p.1","p.2"]}',
-            requested_model="openai/gpt-5.6-sol",
+            requested_model="openai/gpt-6-astra",
             thinking="xhigh",
             prompt_template_version="structure-v1",
             output_schema_id="paper-structure",
@@ -260,14 +260,14 @@ class TestModelExecutorContract(unittest.TestCase):
 
         self.assertEqual(request["task"]["kind"], "structure")
         self.assertEqual(request["prompt_template"]["id"], "structure")
-        self.assertEqual(request["requested_model"], "openai/gpt-5.6-sol")
+        self.assertEqual(request["requested_model"], "openai/gpt-6-astra")
         self.request_validator.validate(request)
 
     def test_rejects_unknown_models_api_key_auth_and_hidden_fallback(self):
         with self.assertRaisesRegex(MillefeuilleContractError, "not allowed"):
             self._request(requested_model="grok-4.6")
         with self.assertRaisesRegex(MillefeuilleContractError, "not allowed"):
-            self._request(requested_model="openai/gpt-5.6-sol-xhigh")
+            self._request(requested_model="openai/gpt-6-astra-xhigh")
 
         api_key = self._request()
         api_key["authentication"] = {
@@ -306,7 +306,7 @@ class TestModelExecutorContract(unittest.TestCase):
             validate_model_executor_request(unsorted)
 
         repeated = deepcopy(request)
-        repeated["fallback"]["models"] = ["openai/gpt-5.6-sol"]
+        repeated["fallback"]["models"] = ["openai/gpt-6-astra"]
         with self.assertRaisesRegex(MillefeuilleContractError, "must not repeat"):
             validate_model_executor_request(repeated)
 
@@ -321,7 +321,7 @@ class TestModelExecutorContract(unittest.TestCase):
         )
         self.result_validator.validate(result)
         self.assertEqual(result["authentication"]["class"], "subscription_oauth")
-        self.assertEqual(result["actual_model"], "openai/gpt-5.6-sol")
+        self.assertEqual(result["actual_model"], "openai/gpt-6-astra")
         self.assertEqual(result["thinking"], "xhigh")
         self.assertTrue(str(result["output"]["sha256"]).startswith("sha256:"))
         serialized = json.dumps(result, sort_keys=True)
@@ -336,7 +336,7 @@ class TestModelExecutorContract(unittest.TestCase):
         output = b'{"summary":"ok"}'
         attempts = [
             self._attempt(
-                model="openai/gpt-5.6-sol",
+                model="openai/gpt-6-astra",
                 actual_model=None,
                 status="failed",
                 completed_at="2026-08-27T12:00:02Z",

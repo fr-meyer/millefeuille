@@ -127,8 +127,14 @@ class TestOpenClawModelClient(unittest.TestCase):
             with closing(sqlite3.connect(database)) as connection:
                 connection.execute("PRAGMA user_version = 19")
                 connection.execute(
-                    "CREATE TABLE auth_profile_store (store_key TEXT PRIMARY KEY, "
-                    "store_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+                    "CREATE TABLE auth_profile_state (state_key TEXT NOT NULL "
+                    "PRIMARY KEY, state_json TEXT NOT NULL, "
+                    "updated_at INTEGER NOT NULL) STRICT"
+                )
+                connection.execute(
+                    "CREATE TABLE auth_profile_store ("
+                    "store_key TEXT NOT NULL PRIMARY KEY, "
+                    "store_json TEXT NOT NULL, updated_at INTEGER NOT NULL) STRICT"
                 )
                 connection.execute(
                     "INSERT INTO auth_profile_store VALUES ('primary', ?, 0)",
@@ -174,6 +180,72 @@ class TestOpenClawModelClient(unittest.TestCase):
                     str(agent_dir / "absent"), "openai:research"
                 )
             )
+
+    def test_auth_schema_versions_and_layout_fail_closed(self):
+        canonical = (
+            "store_key TEXT NOT NULL PRIMARY KEY, store_json TEXT NOT NULL, "
+            "updated_at INTEGER NOT NULL"
+        )
+        layouts = [
+            (canonical, " STRICT", True),
+            (canonical, "", False),
+            (
+                "store_json TEXT NOT NULL, store_key TEXT NOT NULL PRIMARY KEY, "
+                "updated_at INTEGER NOT NULL",
+                " STRICT",
+                False,
+            ),
+            (canonical + ", extra TEXT", " STRICT", False),
+            (canonical.replace("NOT NULL PRIMARY KEY", "PRIMARY KEY"), "", False),
+        ]
+        for version in (0, 18, 19, 20, 21, 22, 23, 24, 25, 26, 999):
+            for columns, suffix, valid in layouts:
+                with (
+                    self.subTest(version=version, columns=columns, suffix=suffix),
+                    tempfile.TemporaryDirectory() as directory,
+                ):
+                    db = Path(directory) / "openclaw-agent.sqlite"
+                    with closing(sqlite3.connect(db)) as connection:
+                        connection.execute(f"PRAGMA user_version = {version}")
+                        connection.execute(
+                            f"CREATE TABLE auth_profile_store ({columns}){suffix}"
+                        )
+                        connection.execute(
+                            "CREATE TABLE auth_profile_state (state_key TEXT "
+                            "NOT NULL PRIMARY KEY, state_json TEXT NOT NULL, "
+                            "updated_at INTEGER NOT NULL) STRICT"
+                        )
+                        connection.execute(
+                            "INSERT INTO auth_profile_store "
+                            "(store_key, store_json, updated_at) VALUES (?, ?, 0)",
+                            (
+                                "primary",
+                                json.dumps(
+                                    {
+                                        "version": 1,
+                                        "profiles": {
+                                            "openai:research": {
+                                                "type": "oauth",
+                                                "provider": "openai",
+                                                "access": "synthetic-access",
+                                                "expires": (time.time() + 600) * 1000,
+                                            }
+                                        },
+                                    }
+                                ),
+                            ),
+                        )
+                        connection.commit()
+                    self.assertEqual(
+                        _has_agent_local_oauth_profile(directory, "openai:research"),
+                        valid and 19 <= version <= 25,
+                    )
+                    with closing(sqlite3.connect(db)) as connection:
+                        connection.execute("DROP TABLE auth_profile_state")
+                        connection.commit()
+                    self.assertFalse(
+                        _has_agent_local_oauth_profile(directory, "openai:research")
+                    )
 
     def test_shared_oauth_only_fails_before_agent_execution(self):
         runner = _QueuedRunner([_completed(_auth_status("openai"))])
@@ -225,7 +297,7 @@ class TestOpenClawModelClient(unittest.TestCase):
     def _request(
         self,
         *,
-        model: str = "openai/gpt-5.6-sol",
+        model: str = "openai/gpt-6-astra",
         payload: bytes = b'{"return":{"canary":"ok"}}',
         fallback_models: list[str] | None = None,
         timeout_seconds: int = 30,
@@ -262,7 +334,7 @@ class TestOpenClawModelClient(unittest.TestCase):
                 _completed(
                     _model_response(
                         "openai",
-                        "gpt-5.6-sol",
+                        "gpt-6-astra",
                         '{"canary":"ok"}',
                     )
                 ),
@@ -293,7 +365,7 @@ class TestOpenClawModelClient(unittest.TestCase):
 
         self.assertEqual(execution.output, b'{"canary":"ok"}')
         self.assertEqual(execution.result["status"], "succeeded")
-        self.assertEqual(execution.result["actual_model"], "openai/gpt-5.6-sol")
+        self.assertEqual(execution.result["actual_model"], "openai/gpt-6-astra")
         self.assertEqual(
             execution.result["authentication"],
             {
@@ -304,7 +376,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         command = runner.commands[1]
         self.assertEqual(command[:3], ["openclaw", "agent", "exec"])
         self.assertEqual(command[command.index("--message-file") + 1], "-")
-        self.assertEqual(command[command.index("--model") + 1], "openai/gpt-5.6-sol")
+        self.assertEqual(command[command.index("--model") + 1], "openai/gpt-6-astra")
         self.assertEqual(command[command.index("--thinking") + 1], "xhigh")
         self.assertNotIn(payload.decode(), command)
         self.assertEqual(runner.kwargs[1]["input"], payload.decode())
@@ -334,7 +406,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         )
         self.assertEqual(
             runner.runtime_configs[0]["agents"]["defaults"]["models"][
-                "openai/gpt-5.6-sol"
+                "openai/gpt-6-astra"
             ]["agentRuntime"],
             {"id": "openclaw"},
         )
@@ -392,8 +464,14 @@ class TestOpenClawModelClient(unittest.TestCase):
             with closing(sqlite3.connect(database)) as connection:
                 connection.execute("PRAGMA user_version = 19")
                 connection.execute(
-                    "CREATE TABLE auth_profile_store (store_key TEXT PRIMARY KEY, "
-                    "store_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+                    "CREATE TABLE auth_profile_state (state_key TEXT NOT NULL "
+                    "PRIMARY KEY, state_json TEXT NOT NULL, "
+                    "updated_at INTEGER NOT NULL) STRICT"
+                )
+                connection.execute(
+                    "CREATE TABLE auth_profile_store ("
+                    "store_key TEXT NOT NULL PRIMARY KEY, "
+                    "store_json TEXT NOT NULL, updated_at INTEGER NOT NULL) STRICT"
                 )
                 connection.execute(
                     "INSERT INTO auth_profile_store VALUES ('primary', ?, 0)",
@@ -450,7 +528,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         client = OpenClawModelClient(command_runner=runner)
 
         with self.assertRaisesRegex(
-            MillefeuilleContractError, "supports only openai/gpt-5.6-sol"
+            MillefeuilleContractError, "supports only openai/gpt-6-astra"
         ):
             client.execute(
                 request=self._request(model="xai/grok-4.6", payload=payload),
@@ -477,7 +555,7 @@ class TestOpenClawModelClient(unittest.TestCase):
                 selected_profile = self.asserted_pin[0]
                 if selected_profile in self.available_profile_ids:
                     return _completed(
-                        _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+                        _model_response("openai", "gpt-6-astra", '{"canary":"ok"}')
                     )
                 return subprocess.CompletedProcess(
                     args=command,
@@ -496,6 +574,15 @@ class TestOpenClawModelClient(unittest.TestCase):
         self.assertEqual(runner.asserted_pin, ["openai:research"])
         self.assertEqual(execution.result["status"], "failed")
         self.assertIsNone(execution.output)
+
+    def test_ambiguous_provider_preflight_refuses_without_execution(self):
+        status = _auth_status("openai")
+        status["auth"]["providers"].append(deepcopy(status["auth"]["providers"][0]))
+        runner = _QueuedRunner([_completed(status)])
+        with self.assertRaises(MillefeuilleContractError):
+            OpenClawModelClient(command_runner=runner).preflight_auth()
+        self.assertEqual(len(runner.commands), 1)
+        self.assertNotIn("exec", runner.commands[0])
 
     def test_non_oauth_profile_fails_before_provider_execution(self):
         status = _auth_status("openai")
@@ -549,7 +636,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         runner = _QueuedRunner(
             [
                 _completed(auth),
-                _completed(_model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')),
+                _completed(_model_response("openai", "gpt-6-astra", '{"canary":"ok"}')),
             ]
         )
         execution = OpenClawModelClient(command_runner=runner).execute(
@@ -585,7 +672,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         )
         for usage, expected in samples:
             with self.subTest(usage=usage):
-                response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+                response = _model_response("openai", "gpt-6-astra", '{"canary":"ok"}')
                 response["usage"] = usage
                 runner = _QueuedRunner(
                     [_completed(_auth_status("openai")), _completed(response)]
@@ -598,7 +685,7 @@ class TestOpenClawModelClient(unittest.TestCase):
                 self.assertEqual(execution.result["status"], "succeeded")
                 self.assertEqual(execution.result["usage"], expected)
 
-        response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+        response = _model_response("openai", "gpt-6-astra", '{"canary":"ok"}')
         runner = _QueuedRunner(
             [_completed(_auth_status("openai")), _completed(response)]
         )
@@ -638,7 +725,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         runner = _QueuedRunner(
             [
                 _completed(_auth_status("openai")),
-                _completed(_model_response("openai", "gpt-5.5", '{"canary":"ok"}')),
+                _completed(_model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')),
             ]
         )
         client = OpenClawModelClient(command_runner=runner)
@@ -665,7 +752,7 @@ class TestOpenClawModelClient(unittest.TestCase):
                 _completed(
                     _model_response(
                         "openai",
-                        "gpt-5.6-sol",
+                        "gpt-6-astra",
                         '{"canary":"wrong"}',
                     )
                 ),
@@ -701,7 +788,7 @@ class TestOpenClawModelClient(unittest.TestCase):
                 runner = _QueuedRunner(
                     [
                         _completed(_auth_status("openai")),
-                        _completed(_model_response("openai", "gpt-5.6-sol", output)),
+                        _completed(_model_response("openai", "gpt-6-astra", output)),
                     ]
                 )
                 execution = OpenClawModelClient(command_runner=runner).execute(
@@ -718,7 +805,7 @@ class TestOpenClawModelClient(unittest.TestCase):
 
     def test_duplicate_outer_response_field_fails_closed(self):
         payload = b'{"return":{"canary":"ok"}}'
-        response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+        response = _model_response("openai", "gpt-6-astra", '{"canary":"ok"}')
         raw = json.dumps(response).replace('"ok": true', '"ok": false, "ok": true')
         runner = _QueuedRunner(
             [
@@ -741,7 +828,7 @@ class TestOpenClawModelClient(unittest.TestCase):
 
     def test_tool_use_fails_closed_without_output_binding(self):
         payload = b'{"return":{"canary":"ok"}}'
-        response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+        response = _model_response("openai", "gpt-6-astra", '{"canary":"ok"}')
         response["toolSummary"] = {"calls": 1, "tools": ["read"]}
         runner = _QueuedRunner(
             [_completed(_auth_status("openai")), _completed(response)]
@@ -762,7 +849,7 @@ class TestOpenClawModelClient(unittest.TestCase):
 
     def test_openclaw_omits_zero_use_summaries_and_trims_final_text(self):
         payload = b'{"return":{"canary":"ok"}}'
-        response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+        response = _model_response("openai", "gpt-6-astra", '{"canary":"ok"}')
         del response["toolSummary"]
         del response["bridgeCalls"]
         response["payloads"] = [
@@ -782,7 +869,7 @@ class TestOpenClawModelClient(unittest.TestCase):
 
     def test_multiple_visible_payloads_fail_even_when_joined_json_is_valid(self):
         payload = b'{"return":{"canary":"ok"}}'
-        response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+        response = _model_response("openai", "gpt-6-astra", '{"canary":"ok"}')
         response["payloads"] = [
             {"text": '{"canary":'},
             {"text": '"ok"}'},
@@ -806,7 +893,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         payload = b'{"return":{"canary":"ok"}}'
         for missing in ("codeModeEngaged", "assistantTurns"):
             with self.subTest(missing=missing):
-                response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+                response = _model_response("openai", "gpt-6-astra", '{"canary":"ok"}')
                 del response[missing]
                 runner = _QueuedRunner(
                     [_completed(_auth_status("openai")), _completed(response)]
@@ -827,7 +914,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         payload = b'{"return":{"canary":"ok"}}'
         for field in ("toolSummary", "bridgeCalls"):
             with self.subTest(field=field):
-                response = _model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')
+                response = _model_response("openai", "gpt-6-astra", '{"canary":"ok"}')
                 response[field] = None
                 runner = _QueuedRunner(
                     [_completed(_auth_status("openai")), _completed(response)]
@@ -849,7 +936,7 @@ class TestOpenClawModelClient(unittest.TestCase):
         runner = _QueuedRunner(
             [
                 _completed(_auth_status("openai")),
-                _completed(_model_response("openai", "gpt-5.6-sol", '{"canary":"ok"}')),
+                _completed(_model_response("openai", "gpt-6-astra", '{"canary":"ok"}')),
             ]
         )
 

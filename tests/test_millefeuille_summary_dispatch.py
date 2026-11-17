@@ -111,7 +111,7 @@ class TestSummaryDispatch(unittest.TestCase):
                 len({unit.request["idempotency_key"] for unit in batch.units}), 3
             )
             for unit in batch.units:
-                self.assertEqual(unit.request["requested_model"], "openai/gpt-5.6-sol")
+                self.assertEqual(unit.request["requested_model"], "openai/gpt-6-astra")
                 self.assertEqual(unit.request["thinking"], "xhigh")
                 self.assertEqual(
                     unit.request["fallback"], {"policy": "none", "models": []}

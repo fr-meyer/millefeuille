@@ -38,7 +38,7 @@ from millefeuille.domain.operator_preflight import (
 from millefeuille.domain.secure_io import read_bytes_no_follow
 
 _PROMPT = b'Return only this JSON object, with no explanation: {"canary":"ok"}'
-_MODEL = "openai/gpt-5.6-sol"
+_MODEL = "openai/gpt-6-astra"
 _SELECTOR = "gpt-oauth-canary"
 _STOP_CONDITIONS = (
     "auth-failure",
@@ -265,7 +265,7 @@ def _require_canary_scope(
         or source.resolved_item_count != 1
         or provider is None
         or (provider.provider_id, provider.model_id, provider.profile_id)
-        != ("openai", "gpt-5.6-sol", "openclaw-subscription-oauth")
+        != ("openai", "gpt-6-astra", "openclaw-subscription-oauth")
         or packet.max_provider_calls != 1
         or packet.max_cost_usd_micros != 0
         or packet.disposal_policy.pdfs != "not-applicable"

@@ -69,8 +69,8 @@ class ModelExecutionPlanTests(unittest.TestCase):
             "schema_version": "millefeuille-model-execution-evidence/v0.1",
             "profile": "research-default",
             "stage": "summarize_full_paper",
-            "requested_model": "openai/gpt-5.6-sol",
-            "resolved_model": "openai/gpt-5.6-sol",
+            "requested_model": "openai/gpt-6-astra",
+            "resolved_model": "openai/gpt-6-astra",
             "provider": "openai",
             "backend": "chat",
             "reasoning_effort": "xhigh",
@@ -109,7 +109,7 @@ class ModelExecutionPlanTests(unittest.TestCase):
             plan["schema_version"],
             "millefeuille-model-execution-plan/v0.1",
         )
-        self.assertEqual(plan["requested_model"], "openai/gpt-5.6-sol")
+        self.assertEqual(plan["requested_model"], "openai/gpt-6-astra")
         self.assertEqual(plan["provider"], "openai")
         self.assertEqual(
             plan["authentication"]["lane"],
@@ -303,9 +303,13 @@ class ModelExecutionPlanTests(unittest.TestCase):
         )
         self.assertEqual(record["profile"], plan["profile"])
         self.assertEqual(record["stage"], plan["stage"])
-        self.assertEqual(record["requested_model"], "openai/gpt-5.6-sol")
-        self.assertEqual(record["resolved_model"], "openai/gpt-5.6-sol")
+        self.assertEqual(record["requested_model"], "openai/gpt-6-astra")
+        self.assertEqual(record["resolved_model"], "openai/gpt-6-astra")
         self.assertEqual(record["usage"]["total_tokens"], 154)
+        historical = deepcopy(record)
+        historical["requested_model"] = "openai/gpt-5.6-sol"
+        historical["resolved_model"] = "openai/gpt-5.6-sol"
+        self.assertEqual(validate_model_provenance_record(historical), historical)
         compatible_evidence = self._research_execution_evidence()
         compatible_evidence["output_refs"] = [
             "summaries/hierarchical-summary.json",

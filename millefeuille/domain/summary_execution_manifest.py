@@ -18,7 +18,7 @@ from millefeuille.domain.summary_dispatch import GPT_MODEL, SummaryDispatchBatch
 from millefeuille.domain.summary_results import verify_summary_dispatch_batch
 
 SUMMARY_EXECUTION_MANIFEST_SCHEMA_VERSION = (
-    "millefeuille-summary-execution-manifest/v0.1"
+    "millefeuille-summary-execution-manifest/v0.2"
 )
 
 
@@ -67,12 +67,15 @@ def plan_summary_execution_manifest(
         "paper_id": batch.paper_id,
         "preparation_sha256": batch.preparation_sha256,
         "requested_model": GPT_MODEL,
+        "reasoning_effort": "xhigh",
         "required_auth_class": "subscription_oauth",
         "fallback_policy": "none",
         "work_unit_count": len(units),
         "provider_calls_performed": 0,
         "units": units,
     }
+    if batch.requested_stages is not None:
+        document["requested_stages"] = list(batch.requested_stages)
     encoded = (
         json.dumps(
             document,

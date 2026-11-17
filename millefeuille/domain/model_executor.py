@@ -25,7 +25,7 @@ MODEL_EXECUTOR_RESULT_SCHEMA_VERSION = "millefeuille-model-executor-result/v0.1"
 
 ALLOWED_EXECUTOR_MODELS = frozenset(
     {
-        "openai/gpt-5.6-sol",
+        "openai/gpt-6-astra",
         "xai/grok-4.6",
     }
 )

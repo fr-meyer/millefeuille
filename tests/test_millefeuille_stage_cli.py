@@ -578,7 +578,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
             ):
                 self.assertEqual(
                     research_profile[stage_name]["model"],
-                    "openai/gpt-5.6-sol",
+                    "openai/gpt-6-astra",
                 )
                 self.assertEqual(
                     research_profile[stage_name]["reasoning_effort"],
@@ -598,7 +598,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
                 research_profile["paper_card"],
                 {
                     "backend": "chat",
-                    "model": "openai/gpt-5.6-sol",
+                    "model": "openai/gpt-6-astra",
                     "provider": "openai",
                     "auth_lane": "openclaw-native-codex-oauth",
                     "fallback_policy": "none",
@@ -612,7 +612,7 @@ class TestMillefeuilleStageCli(unittest.TestCase):
                 research_profile["classify"],
                 {
                     "backend": "chat",
-                    "model": "openai/gpt-5.6-sol",
+                    "model": "openai/gpt-6-astra",
                     "provider": "openai",
                     "auth_lane": "openclaw-native-codex-oauth",
                     "fallback_policy": "none",

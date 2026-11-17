@@ -30,6 +30,68 @@ def run_source_pack_cli(
         raw_args = raw_args[1:]
     args = parser.parse_args(raw_args)
 
+    if args.command == "materialize-imported":
+        from millefeuille.domain.openkb_source_materialization import (
+            materialize_imported_source,
+        )
+
+        try:
+            payload = materialize_imported_source(
+                imported=args.imported,
+                pdf=args.pdf,
+                source_pack_root=args.source_pack_root,
+                structure_output=args.structure_output,
+                protected_staging_root=args.protected_staging_root,
+            )
+            print(json.dumps(payload, indent=2, sort_keys=True), file=out)
+            return 0
+        except (
+            MillefeuilleContractError,
+            OSError,
+            ValueError,
+            KeyError,
+            TypeError,
+        ) as exc:
+            print(
+                f"millefeuille source-pack materialize-imported: {type(exc).__name__}",
+                file=err,
+            )
+            return 2
+
+    if args.command in {"import-openkb", "retrieve-imported"}:
+        from millefeuille.domain.openkb_import import (
+            import_openkb,
+            retrieve_imported_pages,
+        )
+
+        try:
+            if args.command == "import-openkb":
+                payload = import_openkb(
+                    pack=args.pack,
+                    pdf=args.pdf,
+                    source_sha256=args.source_sha256,
+                    manifest_sha256=args.manifest_sha256,
+                    evidence_sha256=args.evidence_sha256,
+                    protected_staging_root=args.protected_staging_root,
+                    output=args.output,
+                )
+            else:
+                payload = retrieve_imported_pages(output=args.output, pages=args.page)
+            print(json.dumps(payload, indent=2, sort_keys=True), file=out)
+            return 0
+        except (
+            MillefeuilleContractError,
+            OSError,
+            ValueError,
+            KeyError,
+            TypeError,
+        ) as exc:
+            print(
+                f"millefeuille source-pack {args.command}: {type(exc).__name__}",
+                file=err,
+            )
+            return 2
+
     if args.command == "run-package-preview":
         return _run_package_preview(args, out=out, err=err)
 
@@ -124,4 +186,31 @@ def _build_parser() -> argparse.ArgumentParser:
     preview_parser.add_argument("--item-key", required=True)
     preview_parser.add_argument("--run-id", required=True)
     preview_parser.add_argument("--json", action="store_true")
+    import_parser = subparsers.add_parser(
+        "import-openkb",
+        help="Convert pinned existing OpenKB extraction evidence, not accepted runs.",
+    )
+    for name in (
+        "pack",
+        "pdf",
+        "source-sha256",
+        "manifest-sha256",
+        "evidence-sha256",
+        "output",
+    ):
+        import_parser.add_argument("--" + name, required=True)
+    import_parser.add_argument("--protected-staging-root")
+    retrieve_parser = subparsers.add_parser(
+        "retrieve-imported",
+        help="Select hash-checked imported pages, not accepted-run retrieval.",
+    )
+    retrieve_parser.add_argument("--output", required=True)
+    retrieve_parser.add_argument("--page", type=int, action="append", required=True)
+    materialize_parser = subparsers.add_parser(
+        "materialize-imported",
+        help="Materialize source, route and structure from imported evidence.",
+    )
+    materialize_parser.add_argument("--protected-staging-root")
+    for name in ("imported", "pdf", "source-pack-root", "structure-output"):
+        materialize_parser.add_argument("--" + name, required=True)
     return parser

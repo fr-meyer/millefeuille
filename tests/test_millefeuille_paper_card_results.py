@@ -68,15 +68,15 @@ class TestGptPaperCardResults(unittest.TestCase):
         result = materialize_model_executor_result(
             request=self.plan.request,
             status="succeeded",
-            actual_model="openai/gpt-5.6-sol",
+            actual_model="openai/gpt-6-astra",
             auth_profile_ref=profile,
             started_at="2026-09-26T01:00:00Z",
             completed_at="2026-09-26T01:00:02Z",
             attempts=[
                 {
                     "sequence": 1,
-                    "model": "openai/gpt-5.6-sol",
-                    "actual_model": "openai/gpt-5.6-sol",
+                    "model": "openai/gpt-6-astra",
+                    "actual_model": "openai/gpt-6-astra",
                     "status": "succeeded",
                     "started_at": "2026-09-26T01:00:00Z",
                     "completed_at": "2026-09-26T01:00:02Z",

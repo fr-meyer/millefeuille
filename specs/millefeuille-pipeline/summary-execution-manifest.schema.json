@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/fr-meyer/millefeuille/specs/millefeuille-pipeline/summary-execution-manifest.schema.json",
-  "title": "Millefeuille summary execution manifest v0.1",
+  "title": "Millefeuille summary execution manifest v0.2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,6 +10,7 @@
     "paper_id",
     "preparation_sha256",
     "requested_model",
+    "reasoning_effort",
     "required_auth_class",
     "fallback_policy",
     "work_unit_count",
@@ -17,18 +18,23 @@
     "units"
   ],
   "properties": {
-    "schema_version": {"const": "millefeuille-summary-execution-manifest/v0.1"},
+    "requested_stages": {
+      "type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": true,
+      "items": {"enum": ["summarize_page", "summarize_section", "summarize_full_paper"]}
+    },
+    "schema_version": {"const": "millefeuille-summary-execution-manifest/v0.2"},
     "status": {"const": "planned-no-call"},
     "paper_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$"},
     "preparation_sha256": {"$ref": "#/$defs/digest"},
-    "requested_model": {"const": "openai/gpt-5.6-sol"},
+    "requested_model": {"const": "openai/gpt-6-astra"},
+    "reasoning_effort": {"const": "xhigh"},
     "required_auth_class": {"const": "subscription_oauth"},
     "fallback_policy": {"const": "none"},
-    "work_unit_count": {"type": "integer", "minimum": 2},
+    "work_unit_count": {"type": "integer", "minimum": 1},
     "provider_calls_performed": {"const": 0},
     "units": {
       "type": "array",
-      "minItems": 2,
+      "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,

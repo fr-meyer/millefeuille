@@ -808,6 +808,20 @@ overrides; the packaged placeholder defaults are not accepted.
 def entrypoint() -> None:
     """Dispatch read-only subcommands before falling back to Hydra."""
     argv = sys.argv[1:]
+    if argv and argv[0] == "writeback-operator":
+        from millefeuille.cli.writeback_operator import run_writeback_operator_cli
+
+        sys.exit(run_writeback_operator_cli(argv[1:]))
+    if argv and argv[0] == "classification-operator":
+        from millefeuille.cli.classification_operator import (
+            run_classification_operator_cli,
+        )
+
+        sys.exit(run_classification_operator_cli(argv[1:]))
+    if argv and argv[0] == "live-operator":
+        from millefeuille.cli.live_operator import run_live_operator_cli
+
+        sys.exit(run_live_operator_cli(argv[1:]))
     if argv and argv[0] == "inspect-native":
         from millefeuille.cli.native_source import run_native_source_cli
 

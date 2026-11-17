@@ -115,7 +115,7 @@ def validate_gpt_summary_approval_preview(
         or packet.source_pack_root != str(source_pack_root)
         or provider is None
         or (provider.provider_id, provider.model_id, provider.profile_id)
-        != ("openai", "gpt-5.6-sol", "openclaw-subscription-oauth")
+        != ("openai", "gpt-6-astra", "openclaw-subscription-oauth")
         or packet.max_provider_calls != len(plan.batch.units)
         or packet.max_cost_usd_micros != 0
         or (disposal.pdfs, disposal.provider_payloads, disposal.temporary_files)
