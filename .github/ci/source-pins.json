@@ -11,7 +11,7 @@
   },
   "ci_overlays": {
     ".github/workflows/ci.yml": "a0d3d3a746b5063f768c16253e812be0d941666cfcd90aae0e2a18184a16085b",
-    "tests/test_cross_platform_ci.py": "af3789c1fee4cf52ccc424d1fd6ccdc692e6d2aed489538da72bfb5359df1756",
+    "tests/test_cross_platform_ci.py": "a5dd72b78df2e4e830517c2971e8462391050f33a1176ccaed9618b8c3be0445",
     "tests/test_release_publication_safety.py": "421555fb933b3e8d839d1c36b4aa9c6bca49a21ca9759f7babe9a16b07a872af"
   },
   "files": {

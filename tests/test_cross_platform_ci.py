@@ -13,7 +13,7 @@ WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 # The reviewed adapter discovers the complete suite once and accounts for
 # every occurrence, without selection or failure suppression.
 FULL_SUITE_ADAPTER_SHA256 = (
-    "e731e09cf19ccf7f89d33a495f25928d01c2cbaad2e2770e9f06aeb335c6cf1b"
+    "b5813a04616d54617953aa6eb144ce4246846091afd8e47061efe74f16ea2c55"
 )
 
 
