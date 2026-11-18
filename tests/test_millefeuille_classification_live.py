@@ -1,12 +1,13 @@
 """Synthetic exact-scope classification controller tests; no real authority."""
 
-from contextlib import redirect_stdout
+from contextlib import ExitStack, contextmanager, redirect_stdout
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 import io
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -87,6 +88,61 @@ def pair(inputs, plan, publication=None):
     }
     p["integrity"]["content_digest"] = compute_operator_preflight_packet_digest(p)
     return OperatorPreflightPacket.from_dict(p), ApprovedLiveReceipt.from_dict(r)
+
+
+@contextmanager
+def portable_cli_admission(test, args):
+    """Controlled downstream unit coverage, not native Windows CLI support."""
+    native_os = cli.os
+    if native_os.name != "nt":
+        yield
+        return
+
+    def refused():
+        # The real guard must reject before metadata, approval or any effect.
+        with ExitStack() as stack:
+            effects = [
+                stack.enter_context(patch.object(cli, name))
+                for name in (
+                    "read_bytes_no_follow",
+                    "prepare",
+                    "_approval",
+                    "validate_scope",
+                    "execute_classification",
+                    "_publication_approval",
+                    "request",
+                )
+            ]
+            effects.append(
+                stack.enter_context(patch.object(live, "OpenClawModelClient"))
+            )
+            with test.assertRaisesRegex(
+                ValueError, "^unprivileged POSIX operator required$"
+            ):
+                cli._operate(SimpleNamespace())
+            with redirect_stdout(io.StringIO()) as output:
+                test.assertEqual(cli.run_classification_operator_cli(args), 3)
+            test.assertEqual(
+                json.loads(output.getvalue()),
+                {
+                    "status": "stopped",
+                    "publication": "not-confirmed",
+                    "retry": "forbidden-without-fresh-review",
+                },
+            )
+            for effect in effects:
+                effect.assert_not_called()
+
+    refused()
+    try:
+        # Replace only this module binding, never os.name or filesystem semantics.
+        with patch.object(
+            cli, "os", SimpleNamespace(name="posix", geteuid=lambda: 1000)
+        ):
+            yield
+    finally:
+        test.assertIs(cli.os, native_os)
+        refused()
 
 
 class TestClassificationLive(unittest.TestCase):
@@ -208,10 +264,14 @@ class TestClassificationLive(unittest.TestCase):
             with self.assertRaisesRegex(
                 ValueError, "^classification broker requires Linux root$"
             ):
-                broker._process({
-                    "inputs": self.inputs, "packet": self.packet.to_dict(),
-                    "receipt": self.receipt.to_dict(), "outcome": outcome,
-                })
+                broker._process(
+                    {
+                        "inputs": self.inputs,
+                        "packet": self.packet.to_dict(),
+                        "receipt": self.receipt.to_dict(),
+                        "outcome": outcome,
+                    }
+                )
             authority.assert_not_called()
             validate.assert_not_called()
             consume.assert_not_called()
@@ -226,15 +286,18 @@ class TestClassificationLive(unittest.TestCase):
             outcome = live.ClassificationOutcome(
                 self.receipt.content_digest, scope.identity(self.plan), execution
             )
-            self.assertEqual(len(live.validated_files(
-                inputs=self.inputs, outcome=outcome
-            )), 3)
+            self.assertEqual(
+                len(live.validated_files(inputs=self.inputs, outcome=outcome)), 3
+            )
             self.assert_native_broker_refusal()
-            self.assert_native_broker_refusal({
-                "execution_receipt_digest": self.receipt.content_digest,
-                "plan_sha256": scope.identity(self.plan),
-                "result": execution.result, "output": execution.output.decode(),
-            })
+            self.assert_native_broker_refusal(
+                {
+                    "execution_receipt_digest": self.receipt.content_digest,
+                    "plan_sha256": scope.identity(self.plan),
+                    "result": execution.result,
+                    "output": execution.output.decode(),
+                }
+            )
             return
         from contextlib import ExitStack
         import sqlite3
@@ -378,42 +441,45 @@ class TestClassificationLive(unittest.TestCase):
             "--inputs",
             str(input_path),
         ]
-        for flag, value in (("packet", self.packet), ("receipt", self.receipt)):
-            path = root / (flag + ".json")
-            path.write_text(json.dumps(value.to_dict()))
-            args += ["--" + flag, str(path)]
-        outcome = live.ClassificationOutcome(
-            self.receipt.content_digest, scope.identity(self.plan), self.execution()
-        )
-        files = live.validated_files(inputs=self.inputs, outcome=outcome)
-        p, r = pair(self.inputs, self.plan, live.output_identity(files))
-        with (
-            patch.object(
-                cli, "execute_classification", return_value=outcome
-            ) as execute,
-            patch.object(
-                cli, "_publication_approval", return_value={"packet": p, "receipt": r}
-            ),
-            patch.object(
-                cli,
-                "request",
-                return_value={"status": "published-proposal-not-classified"},
-            ) as publish,
-            redirect_stdout(io.StringIO()) as output,
-        ):
-            self.assertEqual(cli.run_classification_operator_cli(args), 0)
-            execute.assert_called_once()
-            publish.assert_called_once()
-            self.assertIs(publish.call_args.kwargs["outcome"], outcome)
-        self.assertNotIn("rationale", output.getvalue())
-        with (
-            patch.object(cli, "execute_classification", return_value=outcome),
-            patch.object(cli, "_publication_approval", side_effect=EOFError),
-            patch.object(cli, "request") as publish,
-            redirect_stdout(io.StringIO()),
-        ):
-            self.assertEqual(cli.run_classification_operator_cli(args), 3)
-            publish.assert_not_called()
+        with portable_cli_admission(self, ["plan", "--inputs", str(input_path)]):
+            for flag, value in (("packet", self.packet), ("receipt", self.receipt)):
+                path = root / (flag + ".json")
+                path.write_text(json.dumps(value.to_dict()))
+                args += ["--" + flag, str(path)]
+            outcome = live.ClassificationOutcome(
+                self.receipt.content_digest, scope.identity(self.plan), self.execution()
+            )
+            files = live.validated_files(inputs=self.inputs, outcome=outcome)
+            p, r = pair(self.inputs, self.plan, live.output_identity(files))
+            with (
+                patch.object(
+                    cli, "execute_classification", return_value=outcome
+                ) as execute,
+                patch.object(
+                    cli,
+                    "_publication_approval",
+                    return_value={"packet": p, "receipt": r},
+                ),
+                patch.object(
+                    cli,
+                    "request",
+                    return_value={"status": "published-proposal-not-classified"},
+                ) as publish,
+                redirect_stdout(io.StringIO()) as output,
+            ):
+                self.assertEqual(cli.run_classification_operator_cli(args), 0)
+                execute.assert_called_once()
+                publish.assert_called_once()
+                self.assertIs(publish.call_args.kwargs["outcome"], outcome)
+            self.assertNotIn("rationale", output.getvalue())
+            with (
+                patch.object(cli, "execute_classification", return_value=outcome),
+                patch.object(cli, "_publication_approval", side_effect=EOFError),
+                patch.object(cli, "request") as publish,
+                redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(cli.run_classification_operator_cli(args), 3)
+                publish.assert_not_called()
 
     def test_summary_receipt_or_missing_root_socket_cannot_authorize(self):
         packet, receipt = _approved_pair(
@@ -436,31 +502,37 @@ class TestClassificationLive(unittest.TestCase):
         root = Path(self.inputs["source_pack_root"])
         input_path = root / "cli-inputs.json"
         input_path.write_text(json.dumps(self.inputs))
-        for action in ("plan", "preflight"):
-            args = [action, "--inputs", str(input_path)]
-            if action == "preflight":
-                for flag, value in (("packet", self.packet), ("receipt", self.receipt)):
-                    path = root / (flag + ".json")
-                    path.write_text(json.dumps(value.to_dict()))
-                    args += ["--" + flag, str(path)]
+        with portable_cli_admission(self, ["plan", "--inputs", str(input_path)]):
+            for action in ("plan", "preflight"):
+                args = [action, "--inputs", str(input_path)]
+                if action == "preflight":
+                    for flag, value in (
+                        ("packet", self.packet),
+                        ("receipt", self.receipt),
+                    ):
+                        path = root / (flag + ".json")
+                        path.write_text(json.dumps(value.to_dict()))
+                        args += ["--" + flag, str(path)]
+                with (
+                    patch.object(
+                        live,
+                        "OpenClawModelClient",
+                        side_effect=AssertionError("auth forbidden"),
+                    ),
+                    redirect_stdout(io.StringIO()) as output,
+                ):
+                    self.assertEqual(cli.run_classification_operator_cli(args), 0)
+                self.assertEqual(json.loads(output.getvalue())["provider_calls"], 0)
             with (
-                patch.object(
-                    live,
-                    "OpenClawModelClient",
-                    side_effect=AssertionError("auth forbidden"),
-                ),
+                patch.object(cli, "_operate", side_effect=KeyboardInterrupt),
                 redirect_stdout(io.StringIO()) as output,
             ):
-                self.assertEqual(cli.run_classification_operator_cli(args), 0)
-            self.assertEqual(json.loads(output.getvalue())["provider_calls"], 0)
-        with (
-            patch.object(cli, "_operate", side_effect=KeyboardInterrupt),
-            redirect_stdout(io.StringIO()) as output,
-        ):
+                self.assertEqual(
+                    cli.run_classification_operator_cli(
+                        ["plan", "--inputs", str(input_path)]
+                    ),
+                    3,
+                )
             self.assertEqual(
-                cli.run_classification_operator_cli(
-                    ["plan", "--inputs", str(input_path)]
-                ),
-                3,
+                json.loads(output.getvalue())["publication"], "not-confirmed"
             )
-        self.assertEqual(json.loads(output.getvalue())["publication"], "not-confirmed")

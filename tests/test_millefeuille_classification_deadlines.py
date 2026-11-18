@@ -14,6 +14,7 @@ from millefeuille.domain import classification_live_broker as b
 class ClassificationDeadlines(unittest.TestCase):
     def assert_peer_unavailable(self):
         from unittest.mock import Mock
+
         channel = Mock()
         with patch.object(b, "_process") as process:
             with self.assertRaisesRegex(
@@ -181,6 +182,7 @@ class ClassificationDeadlines(unittest.TestCase):
         from tests.test_millefeuille_classification_live import (
             TestClassificationLive,
             pair,
+            portable_cli_admission,
         )
 
         fixture = TestClassificationLive()
@@ -229,12 +231,24 @@ class ClassificationDeadlines(unittest.TestCase):
             lstat=lambda: SimpleNamespace(st_mode=0o140660, st_uid=0),
         )
         done = threading.Event()
+        received = threading.Event()
+        frame_timeouts = []
+        real_read_exact = b._read_exact
+
+        def observed_read(channel, size, deadline=None):
+            try:
+                return real_read_exact(channel, size, deadline)
+            except TimeoutError:
+                if isinstance(channel, Channel):
+                    frame_timeouts.append((size, deadline is not None))
+                raise
 
         def peer():
             try:
                 deadline = time.monotonic() + 1
                 size = struct.unpack("!I", b._read_exact(right, 4, deadline))[0]
                 b._read_exact(right, size, deadline)
+                received.set()
                 for delay, data in (
                     (0.025, struct.pack("!I", 2)),
                     (0.04, b"{"),
@@ -250,9 +264,21 @@ class ClassificationDeadlines(unittest.TestCase):
         thread.start()
         try:
             with (
+                portable_cli_admission(self, args),
+                patch.object(b, "_read_exact", side_effect=observed_read),
                 patch.object(b, "EXCHANGE_SECONDS", 0.07),
                 patch.object(b, "SOCKET", namespace),
-                patch.object(b.socket, "socket", return_value=Channel()),
+                # Real socketpair transport, not native Windows AF_UNIX support.
+                # Replace only the broker binding, never the global socket module.
+                patch.object(
+                    b,
+                    "socket",
+                    SimpleNamespace(
+                        AF_UNIX=getattr(socket, "AF_UNIX", object()),
+                        SOCK_STREAM=socket.SOCK_STREAM,
+                        socket=lambda *args: Channel(),
+                    ),
+                ),
                 patch.object(b, "_require_peer_uid"),
                 patch.object(
                     cli,
@@ -270,6 +296,10 @@ class ClassificationDeadlines(unittest.TestCase):
                 self.assertEqual(cli.run_classification_operator_cli(args), 3)
                 self.assertLess(time.monotonic() - start, 0.25)
                 execute.assert_called_once()
+                self.assertTrue(received.is_set())
+                self.assertEqual(len(frame_timeouts), 1)
+                self.assertIn(frame_timeouts[0][0], (4, 2))
+                self.assertTrue(frame_timeouts[0][1])
             self.assertEqual(
                 json.loads(output.getvalue().splitlines()[-1])["publication"],
                 "not-confirmed",
