@@ -191,6 +191,38 @@ class TestSummaryStageSelection(unittest.TestCase):
             "source_pack_root": self.root,
             "artifact_root": self.root,
         }
+        if os.name == "nt":
+            preview = validate_gpt_summary_approval_preview(
+                **scope, packet=packet, receipt=receipt
+            )
+            self.assertEqual(preview.request_count, 10)
+            self.assertEqual(len(self.plan.batch.units), 10)
+            before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+            with (
+                patch.object(trusted.os, "open", wraps=trusted.os.open) as opened,
+                patch.object(live, "request_gpt_summary_reservation") as reserve,
+                patch.object(_FakeClient, "execute") as execute,
+            ):
+                with self.assertRaisesRegex(
+                    MillefeuilleContractError,
+                    "^trusted approval requires no-follow support$",
+                ):
+                    trusted.validate_trusted_gpt_summary_approval(
+                        **scope, packet=packet, receipt=receipt
+                    )
+                for call in opened.call_args_list:
+                    self.assertFalse(
+                        call.args[1] & (os.O_WRONLY | os.O_RDWR | os.O_CREAT)
+                    )
+                    self.assertNotEqual(
+                        str(call.args[0]), str(trusted._TRUSTED_APPROVAL_PATH)
+                    )
+                reserve.assert_not_called()
+                execute.assert_not_called()
+            self.assertEqual(
+                before, {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+            )
+            return
         record = {
             "schema_version": trusted._TRUSTED_APPROVAL_SCHEMA,
             "receipt_id": receipt.receipt_id,
@@ -258,7 +290,30 @@ class TestSummaryStageSelection(unittest.TestCase):
             "--json",
         ]
         out, err = StringIO(), StringIO()
-        self.assertEqual(run_stage_cli(args, stdout=out, stderr=err), 0, err.getvalue())
+        if os.name == "nt":
+            before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+            self.assertEqual(run_stage_cli(args, stdout=out, stderr=err), 2)
+            self.assertIn(
+                "summary preparation output requires no-follow filesystem writes",
+                err.getvalue(),
+            )
+            self.assertEqual(out.getvalue(), "")
+            self.assertFalse(output.exists())
+            self.assertEqual(
+                before, {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+            )
+            # Continue the same portable single-stage plan/schema assertions with
+            # genuine existing no-call constructor output, not a fake CLI success.
+            dispatch_tests.portable_preparation_fixture(
+                self.evidence["route_evidence_path"],
+                self.evidence["structure_evidence_path"],
+                output,
+                ["summarize_full_paper"],
+            )
+        else:
+            self.assertEqual(
+                run_stage_cli(args, stdout=out, stderr=err), 0, err.getvalue()
+            )
         plan = plan_grounded_gpt_summary_batch(
             **{
                 **self.evidence,

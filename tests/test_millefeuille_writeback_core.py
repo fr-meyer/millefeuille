@@ -24,6 +24,17 @@ from tests.test_millefeuille_classification_actions import (
 )
 
 
+def native_request_roots(test, root):
+    """Use native absolute test inputs, without bypassing absolute-path checks."""
+    from millefeuille.domain import writeback_live, writeback_live_science
+
+    for module in (writeback_live, writeback_live_science):
+        for name, leaf in (("OUTPUT_ROOT", "output"), ("EVIDENCE_ROOT", "evidence")):
+            replacement = (Path(root) / leaf).resolve()
+            test.assertTrue(replacement.is_absolute())
+            test.enterContext(patch.object(module, name, replacement))
+
+
 def receipt_projection_fixture(test):
     """Plain inputs for receipt/proof leaf tests, NOT an accepted writeback plan.
 
@@ -36,6 +47,8 @@ def receipt_projection_fixture(test):
     from tests.test_millefeuille_stage_cli import RUN_ID, _prepare_fixture_run
     temp = tempfile.TemporaryDirectory(prefix="mf-proof-leaf-")
     test.addCleanup(temp.cleanup)
+    if os.name == "nt":
+        native_request_roots(test, temp.name)
     _, run = _prepare_fixture_run(temp.name)
     index = json.loads((run / "artifact-index.json").read_text())
     before = WritebackCoreTests.snapshot_fixture()
@@ -101,6 +114,8 @@ class WritebackCoreTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="mfwb-")
         self.addCleanup(self.temp.cleanup)
         root = Path(self.temp.name)
+        if os.name == "nt":
+            native_request_roots(self, root)
         if os.name == "nt" and self._testMethodName not in {
             "test_proposal_wrong_mapping_notes_and_source_denied",
             "test_pure_plan_no_io_and_snapshot_is_immutable",

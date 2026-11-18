@@ -95,6 +95,10 @@ class TestClassificationLive(unittest.TestCase):
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
         f = self.fixture
+        if os.name == "nt":
+            self.enterContext(
+                patch.object(scope, "OUTPUT_ROOT", (f.root / "live-output").resolve())
+            )
         self.inputs = {
             "source_pack_root": str(f.root.resolve()),
             "run_id": model_tests.RUN_ID,
@@ -192,7 +196,46 @@ class TestClassificationLive(unittest.TestCase):
                 inputs=self.inputs, packet=self.packet, receipt=self.receipt
             )
 
+    def assert_native_broker_refusal(self, outcome=None):
+        before = {
+            p: p.read_bytes() for p in self.fixture.root.rglob("*") if p.is_file()
+        }
+        with (
+            patch.object(broker, "_read_administrator_file") as authority,
+            patch.object(broker, "validate_scope") as validate,
+            patch.object(broker, "_consume") as consume,
+        ):
+            with self.assertRaisesRegex(
+                ValueError, "^classification broker requires Linux root$"
+            ):
+                broker._process({
+                    "inputs": self.inputs, "packet": self.packet.to_dict(),
+                    "receipt": self.receipt.to_dict(), "outcome": outcome,
+                })
+            authority.assert_not_called()
+            validate.assert_not_called()
+            consume.assert_not_called()
+        self.assertEqual(
+            before,
+            {p: p.read_bytes() for p in self.fixture.root.rglob("*") if p.is_file()},
+        )
+
     def test_real_ledger_publication_and_replay_denial(self):
+        if os.name == "nt":
+            execution = self.execution()
+            outcome = live.ClassificationOutcome(
+                self.receipt.content_digest, scope.identity(self.plan), execution
+            )
+            self.assertEqual(len(live.validated_files(
+                inputs=self.inputs, outcome=outcome
+            )), 3)
+            self.assert_native_broker_refusal()
+            self.assert_native_broker_refusal({
+                "execution_receipt_digest": self.receipt.content_digest,
+                "plan_sha256": scope.identity(self.plan),
+                "result": execution.result, "output": execution.output.decode(),
+            })
+            return
         from contextlib import ExitStack
         import sqlite3
 
@@ -289,6 +332,9 @@ class TestClassificationLive(unittest.TestCase):
                 connection.close()
 
     def test_wrong_root_authority_denies_before_privileged_source_reads(self):
+        if os.name == "nt":
+            self.assert_native_broker_refusal()
+            return
         with (
             patch.object(broker, "_ROOT_UID", os.geteuid()),
             patch.object(
