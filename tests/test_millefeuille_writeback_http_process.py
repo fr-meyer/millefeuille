@@ -28,7 +28,7 @@ class ProcessHTTPTests(unittest.TestCase):
         self.processes = []
         self.original_popen = subprocess.Popen
         if sys.platform == "linux":
-            self.set_up_linux_supervisor()
+            ProcessHTTPTests.set_up_linux_supervisor(self)
 
     def set_up_linux_supervisor(self):
         self.original_alarm = signal.signal(
