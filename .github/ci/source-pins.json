@@ -1,7 +1,7 @@
 {
   "candidate": "observation-v3-unaccepted",
   "ci_inputs": {
-    ".github/ci/installed-policy.json": "a9a9442dffae28206851f95d4700a7f4f3e2fcc92af9cab78d268029963bd788",
+    ".github/ci/installed-policy.json": "4cdf393a4752a5601803b1634034df7f7a7900e54c97fc774fa60fcba23b0c0b",
     ".github/ci/installed_guard.py": "1602b29812261ba353c4afd37ab247652482dc90b6e7a2a85bef423d45cb348a",
     ".github/ci/installed_tests.py": "c6f16f20bf1793d1bd01b8ddfa7adf0ba5ad5513bbf03d98e436130476af539c",
     ".github/ci/run_tests.py": "b5813a04616d54617953aa6eb144ce4246846091afd8e47061efe74f16ea2c55",
@@ -624,7 +624,7 @@
     "tests/test_millefeuille_card_index_state.py": "d837cd007365ef286721ccd815e3c38664d092fe84fa303901dc2890c9df2f82",
     "tests/test_millefeuille_classification_actions.py": "0c2c754877fd3404424f7d1abb9f7a78c99b4e148013d8a8f121209368490f7f",
     "tests/test_millefeuille_classification_batch.py": "9c389cecf0cd313ddc7b07026dd1c8675befb3b0116fff2ca7370feb2e0e4952",
-    "tests/test_millefeuille_classification_deadlines.py": "6a1319f11d8c0a2059bd072bd672b37cc0993295220d3ecfb082051ec915c156",
+    "tests/test_millefeuille_classification_deadlines.py": "8afd06767b424ead20c9cef1d3b20da3255279a30a832c453b82ef731495a8ad",
     "tests/test_millefeuille_classification_live.py": "7dac2943a7e8e1be6fe87c8ab22ae07d1ba46999bb6035b302a618342a439660",
     "tests/test_millefeuille_classification_model.py": "0604065be3744af016294e66805553408117837cd91f5359dc9775bf32963105",
     "tests/test_millefeuille_classification_model_schema.py": "2a9bbabc3edfe4aa888674e5074fbfaf676e76187f168f5168042e02de6c52eb",
