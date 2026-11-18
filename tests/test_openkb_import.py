@@ -3,6 +3,7 @@
 import hashlib
 from io import StringIO
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -76,6 +77,36 @@ class OpenKBImportTests(unittest.TestCase):
         )
         self.output = self.root / "converted"
 
+    def assert_unsupported_import(self):
+        from millefeuille.domain import openkb_import as importer
+        before = {
+            str(p.relative_to(self.fixture_root)): p.read_bytes()
+            for p in self.fixture_root.rglob("*") if p.is_file()
+        }
+        with patch.object(importer, "_read") as read, patch.object(
+            importer, "reserve_directory"
+        ) as reserve:
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "^metadata writes require POSIX transaction support$",
+            ):
+                self.run_import()
+            read.assert_not_called()
+            reserve.assert_not_called()
+        self.assertFalse(self.output.exists())
+        self.assertEqual(list(self.protected_staging_root.iterdir()), [])
+        self.assertEqual(before, {
+            str(p.relative_to(self.fixture_root)): p.read_bytes()
+            for p in self.fixture_root.rglob("*") if p.is_file()
+        })
+
+    def install_existing_import_export(self):
+        from tests.fixture_exports import load_export
+        raw = load_export("openkb/imported-evidence.json")
+        self.output.mkdir()
+        (self.output / "imported-evidence.json").write_bytes(raw)
+        self.assertEqual((self.output / "imported-evidence.json").read_bytes(), raw)
+
     def save_manifest(self):
         self.manifest_path = self.pack / "manifest.json"
         self.manifest_path.write_text(json.dumps(self.manifest))
@@ -95,8 +126,12 @@ class OpenKBImportTests(unittest.TestCase):
         return import_openkb(**args)
 
     def test_import_and_page_retrieval_are_not_acceptance(self):
-        result = self.run_import()
-        self.assertFalse(result["accepted_run"])
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            self.install_existing_import_export()
+        else:
+            result = self.run_import()
+            self.assertFalse(result["accepted_run"])
         pages = retrieve_imported_pages(output=self.output, pages=[1])
         self.assertEqual(pages["pages"][0]["text"], "# Synthetic test page\n")
         self.assertFalse((self.output / "stage-manifest.json").exists())
@@ -138,6 +173,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertFalse(self.output.exists())
 
     def test_existing_destination_not_overwritten(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         self.run_import()
         before = (self.output / "imported-evidence.json").read_bytes()
         with self.assertRaises(MillefeuilleContractError):
@@ -145,7 +183,11 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertEqual(before, (self.output / "imported-evidence.json").read_bytes())
 
     def test_invalid_page_and_content_tamper_rejected(self):
-        self.run_import()
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            self.install_existing_import_export()
+        else:
+            self.run_import()
         with self.assertRaises(MillefeuilleContractError):
             retrieve_imported_pages(output=self.output, pages=[2])
         p = self.output / "imported-evidence.json"
@@ -156,6 +198,10 @@ class OpenKBImportTests(unittest.TestCase):
             retrieve_imported_pages(output=self.output, pages=[1])
 
     def test_cli_import(self):
+        before = {
+            str(p.relative_to(self.fixture_root)): p.read_bytes()
+            for p in self.fixture_root.rglob("*") if p.is_file()
+        }
         out, err = StringIO(), StringIO()
         code = run_source_pack_cli(
             [
@@ -178,10 +224,27 @@ class OpenKBImportTests(unittest.TestCase):
             stdout=out,
             stderr=err,
         )
-        self.assertEqual(code, 0, err.getvalue())
-        self.assertFalse(json.loads(out.getvalue())["accepted_run"])
+        if os.name == "nt":
+            self.assertNotEqual(code, 0)
+            self.assertEqual(
+                err.getvalue(),
+                "millefeuille source-pack import-openkb: MillefeuilleContractError\n",
+            )
+            self.assertEqual(out.getvalue(), "")
+            self.assertFalse(self.output.exists())
+            self.assertEqual(list(self.protected_staging_root.iterdir()), [])
+            self.assertEqual(before, {
+                str(p.relative_to(self.fixture_root)): p.read_bytes()
+                for p in self.fixture_root.rglob("*") if p.is_file()
+            })
+        else:
+            self.assertEqual(code, 0, err.getvalue())
+            self.assertFalse(json.loads(out.getvalue())["accepted_run"])
 
     def test_native_transaction_failure_rolls_back(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         import millefeuille.domain.metadata_transaction as transaction
 
         original = transaction._rename_entry
@@ -206,6 +269,9 @@ class OpenKBImportTests(unittest.TestCase):
         )
 
     def test_snapshot_drift_rejected_before_write(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         (self.pack / "pages/page-0001.md").write_text("Changed after pinning\n")
         with self.assertRaisesRegex(MillefeuilleContractError, "snapshot"):
             self.run_import()
@@ -225,6 +291,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertFalse(self.output.exists())
 
     def test_materialize_imported_source_and_structure(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain.openkb_source_materialization import (
             materialize_imported_source,
         )
@@ -257,6 +326,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertFalse((pack / "analyses/millefeuille/accepted-run").exists())
 
     def test_materialize_rejects_tampered_import_before_new_pack(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain.openkb_source_materialization import (
             materialize_imported_source,
         )
@@ -277,6 +349,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertFalse((self.root / "source-packs/zotero/zotero-ITEM1").exists())
 
     def test_destination_created_during_staging_is_not_adopted(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain import openkb_import as module
 
         real = module.reserve_directory
@@ -294,6 +369,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertEqual(list(self.output.iterdir()), [self.output / "foreign.txt"])
 
     def test_reserved_destination_replacement_is_not_adopted(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain import openkb_import as module
 
         real = module.write_metadata_transaction
@@ -333,6 +411,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertEqual(list(foreign.iterdir()), [])
 
     def test_materialization_foreign_destination_is_not_adopted(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain import openkb_source_materialization as module
 
         self.run_import()
@@ -359,6 +440,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertEqual(len(list(foreign.iterdir())), 1)
 
     def test_materialization_replacement_before_publication_is_rejected(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain import openkb_source_materialization as module
 
         self.run_import()
@@ -399,6 +483,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertEqual(list(foreign.iterdir()), [])
 
     def test_materialization_structure_destination_is_exclusive(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain.openkb_source_materialization import (
             materialize_imported_source,
         )
@@ -420,7 +507,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertFalse((self.root / "packs/zotero/zotero-ITEM1/source.pdf").exists())
 
     def test_original_mkdir_first_stat_schedule_cannot_reach_destination(self):
-        import os
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
 
         from millefeuille.domain import fresh_directory as fresh
 
@@ -443,6 +532,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertTrue((self.output / "imported-evidence.json").exists())
 
     def test_foreign_entry_at_atomic_publication_is_never_adopted(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain import fresh_directory as fresh
 
         original = fresh._publish_directory
@@ -460,6 +552,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertEqual(list(self.output.iterdir()), [self.output / "foreign.txt"])
 
     def test_materialization_publication_replacement_rejected_before_adoption(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain import fresh_directory as fresh
         from millefeuille.domain.openkb_source_materialization import (
             materialize_imported_source,
@@ -490,6 +585,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertEqual(list((self.root / "reserved-moved").iterdir()), [])
 
     def test_legal_json_paths_round_trip_without_markdown_substitution(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain.openkb_source_materialization import (
             materialize_imported_source,
         )
@@ -525,8 +623,10 @@ class OpenKBImportTests(unittest.TestCase):
             )
 
     def test_unavailable_atomic_primitive_and_fd_cleanup(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         import errno
-        import os
 
         from millefeuille.domain import fresh_directory as fresh
 
@@ -571,6 +671,9 @@ class OpenKBImportTests(unittest.TestCase):
             pass
 
     def test_markdown_looking_like_staging_path_is_not_rewritten(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain import openkb_source_materialization as module
 
         self.run_import()
@@ -631,6 +734,9 @@ class OpenKBImportTests(unittest.TestCase):
         self.assertFalse(target.exists())
 
     def test_explicit_separate_protected_namespace_is_supported(self):
+        if os.name == "nt":
+            self.assert_unsupported_import()
+            return
         from millefeuille.domain.fresh_directory import reserve_directory
 
         staging = self.root / "protected"
@@ -640,7 +746,6 @@ class OpenKBImportTests(unittest.TestCase):
             fd,
             identity,
         ):
-            import os
 
             self.assertEqual(identity, (os.fstat(fd).st_dev, os.fstat(fd).st_ino))
         self.assertEqual(list(staging.iterdir()), [])

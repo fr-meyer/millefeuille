@@ -45,8 +45,12 @@ class HeldDirectories(unittest.TestCase):
                     else:
                         d.mkdir()
                         p.write_bytes(b"a")
-                    with self.assertRaises(Error):
-                        io.read_bytes_no_follow(p, "test")
+                    if os.name == "nt" and not link:
+                        # Portable reads qualify fresh paths, not retained directories.
+                        self.assertEqual(io.read_bytes_no_follow(p, "test"), b"a")
+                    else:
+                        with self.assertRaises(Error):
+                            io.read_bytes_no_follow(p, "test")
 
     def test_leaf_symlink_and_hardlink_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -30,8 +30,29 @@ from tests import test_millefeuille_writeback_core as core
 from tests.test_millefeuille_writeback_science import issue, observation
 
 
+def assert_dispatch_unavailable(test, payload):
+    from unittest.mock import Mock
+    channel = Mock()
+    # Retain scenario input as unread data: unauthenticated peers cannot dispatch it.
+    pending = _wire({"scenario": payload})
+    channel.recv.return_value = struct.pack("!I", len(pending)) + pending
+    with patch.object(broker, "process") as process, patch.object(
+        broker, "protected_read"
+    ) as custody, patch.object(contained.subprocess, "Popen") as worker:
+        with test.assertRaisesRegex(broker.Error, "GPT card broker needs peer credentials"):
+            broker.serve_connection(channel, {"caller_uid": 0})
+        process.assert_not_called()
+        custody.assert_not_called()
+        worker.assert_not_called()
+    channel.recv.assert_not_called()
+    channel.send.assert_not_called()
+    channel.getsockopt.assert_not_called()
+
+
 class DispatchTests(unittest.TestCase):
     def setUp(self):
+        if os.name == "nt":
+            return  # Test bodies assert refusal before custody/HTTP setup.
         self.f = core.WritebackCoreTests()
         self.f.setUp()
         self.addCleanup(self.f.doCleanups)
@@ -205,6 +226,9 @@ class DispatchTests(unittest.TestCase):
         return response[0]
 
     def test_actual_socket_execute_and_restart_replay(self):
+        if os.name == "nt":
+            assert_dispatch_unavailable(self, "test_actual_socket_execute_and_restart_replay")
+            return
         payload = {
             "operation": "execute",
             "plan_digest": self.plan.digest,
@@ -436,9 +460,15 @@ class DispatchTests(unittest.TestCase):
         )
 
     def test_collection_drift_denies_before_patch(self):
+        if os.name == "nt":
+            assert_dispatch_unavailable(self, "test_collection_drift_denies_before_patch")
+            return
         self.collection_drift = True
         self.test_actual_socket_execute_and_restart_replay()
 
     def test_rollback_changed_version_denies(self):
+        if os.name == "nt":
+            assert_dispatch_unavailable(self, "test_rollback_changed_version_denies")
+            return
         self.rollback_drift = True
         self.test_actual_socket_execute_and_restart_replay()

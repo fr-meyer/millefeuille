@@ -1,6 +1,7 @@
 """Receipt authenticity separation and raw-proof/version tests, all synthetic."""
 
 import copy
+import os
 from datetime import UTC, datetime, timedelta
 import unittest
 
@@ -72,6 +73,9 @@ def observation(snapshot):
 
 class ScienceTests(unittest.TestCase):
     def setUp(self):
+        if os.name == "nt":
+            self.f = core.receipt_projection_fixture(self)
+            return
         self.f = core.WritebackCoreTests()
         self.f.setUp()
         self.addCleanup(self.f.doCleanups)
@@ -122,6 +126,10 @@ class ScienceTests(unittest.TestCase):
             )
 
     def test_preparation_consumes_separate_receipt_before_two_actual_reads(self):
+        if os.name == "nt":
+            self.temp = self.f.temp
+            core.assert_journal_unavailable(self)
+            return
         import sqlite3
 
         import httpx

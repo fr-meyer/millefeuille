@@ -2,6 +2,7 @@
 
 import json
 import signal
+import sys
 import threading
 import unittest
 from unittest.mock import patch
@@ -131,6 +132,19 @@ class Observations(unittest.TestCase):
         import struct
 
         obs.activate()
+        if not hasattr(socket, "SO_PEERCRED"):
+            from unittest.mock import Mock
+            channel = Mock()
+            with patch.object(broker, "_process") as processing:
+                with self.assertRaisesRegex(
+                    broker.Error, "GPT card broker needs peer credentials"
+                ):
+                    broker.serve_connection(channel, {"caller_uid": 0})
+                processing.assert_not_called()
+            channel.recv.assert_not_called()
+            channel.send.assert_not_called()
+            self.assertIsNone(obs.drain())
+            return
 
         def delayed(payload, config, state):
             obs.activate()  # next test starts while original request is in flight
@@ -196,12 +210,20 @@ class ActualSupervisor(unittest.TestCase):
         return caught.exception, value["records"][-1]
 
     def test_operational_deadline_actual_reaping(self):
+        if sys.platform != "linux":
+            self.fixture.assert_unsupported_platform()
+            self.assertIsNone(obs.drain())
+            return
         _, row = self.invoke("import time;time.sleep(30)")
         self.assertEqual(row["category"], "timeout")
         self.assertTrue(row["clean"])
         self.assertIsNone(row["expired"])  # primary short-circuits final clock
 
     def test_incomplete_actual_frame(self):
+        if sys.platform != "linux":
+            self.fixture.assert_unsupported_platform()
+            self.assertIsNone(obs.drain())
+            return
         _, row = self.invoke(
             "import sys;sys.stdout.buffer.write(b'bad');sys.stdout.flush()"
         )
@@ -209,6 +231,10 @@ class ActualSupervisor(unittest.TestCase):
         self.assertTrue(row["clean"])
 
     def test_nonzero_exit_after_complete_frame(self):
+        if sys.platform != "linux":
+            self.fixture.assert_unsupported_platform()
+            self.assertIsNone(obs.drain())
+            return
         source = (
             "import sys,struct;"
             'wire=b\'{"kind":"ok","result":{}}\';'
@@ -222,6 +248,10 @@ class ActualSupervisor(unittest.TestCase):
         self.assertTrue(row["clean"])
 
     def test_enabled_disabled_public_error_equivalence(self):
+        if sys.platform != "linux":
+            self.fixture.assert_unsupported_platform()
+            self.assertIsNone(obs.drain())
+            return
         outcomes = []
         for enabled in (False, True):
             obs.activate() if enabled else obs.deactivate()
@@ -233,6 +263,10 @@ class ActualSupervisor(unittest.TestCase):
         self.assertEqual(outcomes[0], outcomes[1])
 
     def test_worker_secret_echo_is_never_serialized(self):
+        if sys.platform != "linux":
+            self.fixture.assert_unsupported_platform()
+            self.assertIsNone(obs.drain())
+            return
         source = (
             "import sys,struct;wire=b'DUMMYSECRET';"
             "sys.stdout.buffer.write(struct.pack('!I',len(wire))+wire);"
@@ -244,6 +278,10 @@ class ActualSupervisor(unittest.TestCase):
         self.assertTrue(row["clean"])
 
     def test_worker_unconfirmed(self):
+        if sys.platform != "linux":
+            self.fixture.assert_unsupported_platform()
+            self.assertIsNone(obs.drain())
+            return
         source = (
             "import sys,struct;"
             'wire=b\'{"kind":"unconfirmed"}\';'
@@ -255,6 +293,10 @@ class ActualSupervisor(unittest.TestCase):
         self.assertTrue(row["clean"])
 
     def test_actual_cancellation_latch(self):
+        if sys.platform != "linux":
+            self.fixture.assert_unsupported_platform()
+            self.assertIsNone(obs.drain())
+            return
         _, row = self.invoke(
             "import os,signal,time;os.kill(os.getppid(),signal.SIGTERM);time.sleep(30)"
         )
@@ -262,6 +304,10 @@ class ActualSupervisor(unittest.TestCase):
         self.assertTrue(row["clean"])
 
     def test_refusal_priority_with_late_exit(self):
+        if sys.platform != "linux":
+            self.fixture.assert_unsupported_platform()
+            self.assertIsNone(obs.drain())
+            return
         source = (
             "import sys,struct,time;"
             'wire=b\'{"kind":"refused"}\';'
@@ -275,6 +321,10 @@ class ActualSupervisor(unittest.TestCase):
         self.assertTrue(row["clean"])
 
     def test_faulted_recorder_preserves_public_outcome(self):
+        if sys.platform != "linux":
+            self.fixture.assert_unsupported_platform()
+            self.assertIsNone(obs.drain())
+            return
         with (
             patch.object(obs, "record", side_effect=OSError("SECRET")),
             self.assertRaisesRegex(ValueError, "contained read unconfirmed"),
@@ -283,6 +333,10 @@ class ActualSupervisor(unittest.TestCase):
         self.fixture.assert_reaped()
 
     def test_restoration_failure_keeps_fail_closed(self):
+        if sys.platform != "linux":
+            self.fixture.assert_unsupported_platform()
+            self.assertIsNone(obs.drain())
+            return
         original = signal.signal
         old = signal.getsignal(signal.SIGTERM)
 

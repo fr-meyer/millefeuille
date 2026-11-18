@@ -1,6 +1,7 @@
 """Actual worker pipes and parent decoder; no DNS or real API."""
 
 import time
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -29,6 +30,7 @@ _main()
 
 class CollectionIPCTests(unittest.TestCase):
     setUp = base.ProcessHTTPTests.setUp
+    assert_unsupported_platform = base.ProcessHTTPTests.assert_unsupported_platform
     worker = base.ProcessHTTPTests.worker
     assert_reaped = base.ProcessHTTPTests.assert_reaped
 
@@ -54,6 +56,9 @@ class CollectionIPCTests(unittest.TestCase):
                 self.assert_reaped()
 
     def test_valid_default_collection_and_once_only(self):
+        if sys.platform != "linux":
+            self.assert_unsupported_platform()
+            return
         self.assertEqual(self.invoke()["snapshot"]["version"], 7)
         reader = CollectionReader("DUMMYSECRET")
         with patch.object(
@@ -68,6 +73,9 @@ class CollectionIPCTests(unittest.TestCase):
                 spawn.assert_not_called()
 
     def test_parent_rejects_tampered_collection_proofs(self):
+        if sys.platform != "linux":
+            self.assert_unsupported_platform()
+            return
         cases = {
             "missing": "value={}",
             "malformed": "value=None",
@@ -94,6 +102,9 @@ class CollectionIPCTests(unittest.TestCase):
             self.assertNotIsInstance(caught.exception, _AmbiguousWriteError)
 
     def test_unknown_and_expired_deny_before_spawn(self):
+        if sys.platform != "linux":
+            self.assert_unsupported_platform()
+            return
         with patch.object(process.subprocess, "Popen") as spawn:
             for method, deadline in [
                 ("UNKNOWN", time.monotonic() + 1),
@@ -106,6 +117,9 @@ class CollectionIPCTests(unittest.TestCase):
             spawn.assert_not_called()
 
     def test_collection_validation_keeps_inherited_deadline(self):
+        if sys.platform != "linux":
+            self.assert_unsupported_platform()
+            return
         from millefeuille.domain import writeback_live_collection as collection
 
         original = collection.checked_collection
@@ -122,6 +136,9 @@ class CollectionIPCTests(unittest.TestCase):
             self.invoke()
 
     def test_oversized_ipc_response_is_reaped(self):
+        if sys.platform != "linux":
+            self.assert_unsupported_platform()
+            return
         source = (
             "import sys,struct;sys.stdin.buffer.read();"
             "sys.stdout.buffer.write(struct.pack('!I',200001)+b'x'*200001);"

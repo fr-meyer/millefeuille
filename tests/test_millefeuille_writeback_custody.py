@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from millefeuille.domain.writeback_live_files import protected_read
+from millefeuille.domain.millefeuille import MillefeuilleContractError
 
 
 class CustodyTests(unittest.TestCase):
@@ -20,6 +21,19 @@ class CustodyTests(unittest.TestCase):
         self.path.chmod(0o600)
         self.real_fstat = os.fstat
 
+    def assert_unsupported_read(self):
+        before = self.path.read_bytes()
+        with patch("os.open") as opened, patch("os.read") as read:
+            with self.assertRaisesRegex(
+                MillefeuilleContractError,
+                "protected evidence reads require POSIX no-follow descriptors",
+            ):
+                protected_read(self.path, uid=0)
+            opened.assert_not_called()
+            read.assert_not_called()
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertEqual(list(self.path.parent.iterdir()), [self.path])
+
     def synthetic_ancestor_ownership(self, fd):
         info = self.real_fstat(fd)
         # Only ancestor uid/mode mocked; actual file metadata/read/identity untouched.
@@ -28,6 +42,9 @@ class CustodyTests(unittest.TestCase):
         return info
 
     def test_positive_and_permissions_hardlink_symlink_size(self):
+        if os.name == "nt":
+            self.assert_unsupported_read()
+            return
         with patch("os.fstat", side_effect=self.synthetic_ancestor_ownership):
             self.assertEqual(
                 protected_read(self.path, uid=os.geteuid()), b"authentic-fixture"
@@ -48,6 +65,9 @@ class CustodyTests(unittest.TestCase):
                 protected_read(link, uid=os.geteuid())
 
     def test_replacement_during_read_denied(self):
+        if os.name == "nt":
+            self.assert_unsupported_read()
+            return
         actual_read = os.read
         swapped = False
 
@@ -70,5 +90,8 @@ class CustodyTests(unittest.TestCase):
             protected_read(self.path, uid=os.geteuid())
 
     def test_real_untrusted_ancestor_denied(self):
+        if os.name == "nt":
+            self.assert_unsupported_read()
+            return
         with self.assertRaises(ValueError):
             protected_read(self.path, uid=os.geteuid())

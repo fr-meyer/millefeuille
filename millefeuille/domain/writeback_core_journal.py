@@ -93,6 +93,10 @@ _SCHEMA = (
 
 @contextmanager
 def _held(path, commitment=None):
+    if os.name != "posix" or not all(
+        hasattr(os, name) for name in ("O_NOFOLLOW", "O_DIRECTORY", "geteuid")
+    ):
+        raise Error("protected journals require POSIX no-follow descriptors")
     path = Path(path)
     if not path.is_absolute() or ".." in path.parts:
         raise Error("canonical absolute journal path required")
@@ -136,6 +140,10 @@ def _provision_journal(path):
     ledger in independently trusted configuration. No automatic recovery/reset.
     Any failure leaves the created file quarantined, never deleted/reinitialized.
     """
+    if os.name != "posix" or not all(
+        hasattr(os, name) for name in ("O_NOFOLLOW", "O_DIRECTORY", "geteuid")
+    ):
+        raise Error("protected journals require POSIX no-follow descriptors")
     path = Path(path)
     with _held(path) as (directory, _):
         fd = os.open(

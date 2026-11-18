@@ -1,0 +1,22 @@
+{
+  "confidence": "high",
+  "evidence_refs": [
+    "summaries/hierarchical-summary.json",
+    "cards/paper-card.json"
+  ],
+  "mode": "single",
+  "paper_id": "zotero-ITEM1",
+  "primary_path": "Methods > Normalization & training dynamics",
+  "rejected_alternatives": [
+    {
+      "path": "Applications > Vision",
+      "reason": "the primary contribution is methodological"
+    }
+  ],
+  "run_id": "run-fixture",
+  "schema_version": "millefeuille-classification-decision/v0.1",
+  "source_hash": "sha256:d2cdefee2d0dd786c00f3beca5122e81791b2220622924b6a8ca92f4d0e5bf0c",
+  "status": "classified",
+  "taxonomy_version": "taxonomy-v1",
+  "writeback_preview_ref": "classification/zotero-writeback-preview.json"
+}

@@ -12,6 +12,17 @@ from millefeuille.domain import classification_live_broker as b
 
 
 class ClassificationDeadlines(unittest.TestCase):
+    def assert_peer_unavailable(self):
+        from unittest.mock import Mock
+        channel = Mock()
+        with patch.object(b, "_process") as process:
+            with self.assertRaisesRegex(b.Error, "GPT card broker needs peer credentials"):
+                b._serve_connection(channel, 0)
+            process.assert_not_called()
+        channel.recv.assert_not_called()
+        channel.send.assert_not_called()
+        channel.getsockopt.assert_not_called()
+
     def pair(self):
         left, right = socket.socketpair()
         self.addCleanup(left.close)
@@ -41,6 +52,9 @@ class ClassificationDeadlines(unittest.TestCase):
         self.addCleanup(finish)
 
     def test_slow_header_times_out_before_dispatch(self):
+        if not hasattr(socket, "SO_PEERCRED"):
+            self.assert_peer_unavailable()
+            return
         left, right = self.pair()
         self.drip(right, [(0.03, bytes([x])) for x in (0, 0, 0, 2)])
         with (
@@ -54,6 +68,9 @@ class ClassificationDeadlines(unittest.TestCase):
             process.assert_not_called()
 
     def test_slow_body_uses_remaining_header_budget(self):
+        if not hasattr(socket, "SO_PEERCRED"):
+            self.assert_peer_unavailable()
+            return
         left, right = self.pair()
         self.drip(right, [(0.05, struct.pack("!I", 2)), (0.05, b"{"), (0.05, b"}")])
         with (
@@ -67,6 +84,9 @@ class ClassificationDeadlines(unittest.TestCase):
             process.assert_not_called()
 
     def test_fast_frame_and_actual_peer_check(self):
+        if not hasattr(socket, "SO_PEERCRED"):
+            self.assert_peer_unavailable()
+            return
         left, right = self.pair()
         right.sendall(struct.pack("!I", 2) + b"{}")
         with patch.object(b, "_process", return_value={"status": "dummy"}) as process:
@@ -79,6 +99,9 @@ class ClassificationDeadlines(unittest.TestCase):
         )
 
     def test_eof_and_oversize_never_dispatch(self):
+        if not hasattr(socket, "SO_PEERCRED"):
+            self.assert_peer_unavailable()
+            return
         for frame in (b"\x00", struct.pack("!I", b.LIMIT + 1)):
             with self.subTest(frame=frame):
                 left, right = self.pair()
@@ -94,6 +117,9 @@ class ClassificationDeadlines(unittest.TestCase):
                 )
 
     def test_processing_expiry_does_not_send_or_retry(self):
+        if not hasattr(socket, "SO_PEERCRED"):
+            self.assert_peer_unavailable()
+            return
         left, right = self.pair()
         right.sendall(struct.pack("!I", 2) + b"{}")
 
@@ -115,6 +141,18 @@ class ClassificationDeadlines(unittest.TestCase):
     def test_blocked_send_is_bounded(self):
         left, _right = self.pair()
         left.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 4096)
+        if os.name == "nt":
+            left.setblocking(False)
+            filled = 0
+            until = time.monotonic() + 1
+            while filled < 16 * 1024 * 1024 and time.monotonic() < until:
+                try:
+                    filled += left.send(b"x" * 65536)
+                except BlockingIOError:
+                    break
+            else:
+                self.fail("bounded socket fill did not establish backpressure")
+            self.assertGreater(filled, 0)
         start = time.monotonic()
         with self.assertRaises(TimeoutError):
             b._send_frame(left, b"x" * (1024 * 1024), start + 0.05)

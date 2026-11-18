@@ -3,6 +3,7 @@
 import copy
 from datetime import UTC, datetime, timedelta
 import json
+import os
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -23,32 +24,100 @@ from tests.test_millefeuille_classification_actions import (
 )
 
 
+def receipt_projection_fixture(test):
+    """Plain inputs for receipt/proof leaf tests, NOT an accepted writeback plan.
+
+    Reuse existing source fixture identity and raw snapshot. No acceptance flags,
+    materialization bundle, journal, or authenticated evidence are constructed.
+    """
+    from types import SimpleNamespace
+    from millefeuille.domain.writeback_core import _Plan, _snapshot, _wire
+    from tests.test_millefeuille_stage_cli import _prepare_fixture_run, RUN_ID
+    temp = tempfile.TemporaryDirectory(prefix="mf-proof-leaf-")
+    test.addCleanup(temp.cleanup)
+    _, run = _prepare_fixture_run(temp.name)
+    index = json.loads((run / "artifact-index.json").read_text())
+    before = WritebackCoreTests.snapshot_fixture()
+    mapping = {"key": "DEST1234"}
+    plan = _Plan(_wire({
+        "run_id": RUN_ID,
+        "source_hash": index["source_pack"]["source_hash"],
+        "source_item_version": 7,
+        "before": _snapshot(before),
+        "mapping": mapping,
+    }))
+    return SimpleNamespace(temp=temp, before=before, plan=plan, mapping=mapping)
+
+
+def assert_journal_unavailable(test, *, existing=False, reopen=False):
+    """No database, worker or transport may start without protected custody."""
+    from millefeuille.domain import writeback_core_journal as journal
+    from millefeuille.domain.millefeuille import MillefeuilleContractError
+    root = Path(test.temp.name)
+    path = root / "operations.sqlite3"
+    scenario = test._testMethodName
+    if existing:
+        # Untrusted existing bytes are deliberately not an accepted SQLite journal.
+        path.write_bytes(b"existing-journal-must-not-be-adopted")
+        if scenario == "test_missing_empty_and_valid_replacement_fail_new_open":
+            path.write_bytes(b"")
+        elif scenario == "test_mode_and_hardlink_drift_deny_before_effect":
+            path.chmod(0o644)
+        elif scenario == "test_parent_permission_replacement_and_symlink_deny":
+            root.chmod(0o755)
+        elif scenario == "test_incompatible_schema_and_journal_id_denied":
+            path.write_bytes(b"incompatible-schema-and-journal-id")
+        elif scenario == "test_sync_link_inode_and_parent_drift_preserves_consumption":
+            path.rename(root / "retained-original")
+            path.write_bytes(b"replacement-inode")
+    before = {p.name: p.read_bytes() for p in root.iterdir() if p.is_file()}
+    with patch.object(journal.os, "open") as opened, patch.object(
+        journal.sqlite3, "connect"
+    ) as database, patch.object(journal.os, "fsync") as sync, patch(
+        "subprocess.Popen"
+    ) as worker, patch("socket.socket") as transport:
+        with test.assertRaisesRegex(
+            MillefeuilleContractError,
+            "^protected journals require POSIX no-follow descriptors$",
+        ):
+            if reopen:
+                with journal._held(path):
+                    test.fail("unsupported journal custody entered")
+            else:
+                journal._provision_journal(path)
+        opened.assert_not_called()
+        database.assert_not_called()
+        sync.assert_not_called()
+        worker.assert_not_called()
+        transport.assert_not_called()
+    test.assertEqual(before, {p.name: p.read_bytes() for p in root.iterdir() if p.is_file()})
+
+
 class WritebackCoreTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="mfwb-")
         self.addCleanup(self.temp.cleanup)
         root = Path(self.temp.name)
-        _, run = _prepare_classified_run(self.temp.name)
+        if os.name == "nt" and self._testMethodName not in {
+            "test_proposal_wrong_mapping_notes_and_source_denied",
+            "test_pure_plan_no_io_and_snapshot_is_immutable",
+        }:
+            return  # Each durable test explicitly exercises its real refusal below.
+        if os.name == "nt":
+            from tests.fixture_exports import load_export
 
-        def load(name):
-            return json.loads((run / name).read_text())
+            def load(name):
+                return json.loads(load_export("classified/" + name))
+        else:
+            _, run = _prepare_classified_run(self.temp.name)
+
+            def load(name):
+                return json.loads((run / name).read_text())
 
         idx = load("artifact-index.json")
         decision = load("classification/decision-records/zotero-ITEM1.json")
         idx["source_identity"]["zotero_item_key"] = "ABCD1234"
-        self.before = {
-            "library_type": "user",
-            "library_id": "12345",
-            "key": "ABCD1234",
-            "version": 9,
-            "data": {
-                "itemType": "journalArticle",
-                "title": "DUMMY",
-                "tags": [{"tag": "unrelated", "type": 1}, {"tag": "remove", "type": 1}],
-                "collections": ["KEEP1234"],
-                "extra": "preserved",
-            },
-        }
+        self.before = WritebackCoreTests.snapshot_fixture()
         self.bundle = {
             "index": idx,
             "manifest": load("stage-manifest.json"),
@@ -72,6 +141,9 @@ class WritebackCoreTests(unittest.TestCase):
             "taxonomy_lock_identity": self.bundle["taxonomy_lock"]["content_identity"],
         }
         self.plan = self.makeplan()
+        if os.name == "nt":
+            self.calls = []
+            return  # Pure planning/CLI inputs never acquire POSIX journal custody.
         journal_dir = root / "journal"
         journal_dir.mkdir(mode=0o700)
         self.commitment = _provision_journal(journal_dir / "operations.sqlite3")
@@ -122,6 +194,22 @@ class WritebackCoreTests(unittest.TestCase):
         self.reader = Reader()
         self.writer = Writer()
 
+    @staticmethod
+    def snapshot_fixture():
+        return {
+            "library_type": "user",
+            "library_id": "12345",
+            "key": "ABCD1234",
+            "version": 9,
+            "data": {
+                "itemType": "journalArticle",
+                "title": "DUMMY",
+                "tags": [{"tag": "unrelated", "type": 1}, {"tag": "remove", "type": 1}],
+                "collections": ["KEEP1234"],
+                "extra": "preserved",
+            },
+        }
+
     def makeplan(self, **changes):
         args = {
             "materialized": self.bundle,
@@ -155,6 +243,9 @@ class WritebackCoreTests(unittest.TestCase):
         return _run(**args)
 
     def test_pure_plan_exact_preservation_and_result_schema(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         from jsonschema import validate
 
         out = self.execute()
@@ -194,6 +285,9 @@ class WritebackCoreTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
     def test_version_conflict_no_mutation_and_no_replay(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         self.state["version"] += 1
         self.assertEqual(self.execute()["result"]["status"], "needs-review")
         self.assertEqual(self.calls, [])
@@ -201,6 +295,9 @@ class WritebackCoreTests(unittest.TestCase):
             self.execute()
 
     def test_applied_reply_lost_is_not_owned_written(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         original = self.writer.patch
 
         def lost(*args, **kwargs):
@@ -212,6 +309,9 @@ class WritebackCoreTests(unittest.TestCase):
         self.assertEqual(len(self.calls), 1)
 
     def test_429_and_readback_mismatch_never_retry(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         with patch.object(
             self.writer, "patch", side_effect=RuntimeError("429")
         ) as mutation:
@@ -219,6 +319,9 @@ class WritebackCoreTests(unittest.TestCase):
             mutation.assert_called_once()
 
     def test_partial_or_unrelated_edit_needs_review(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         original = self.writer.patch
 
         def edit(*args, **kwargs):
@@ -230,6 +333,9 @@ class WritebackCoreTests(unittest.TestCase):
         self.assertEqual(len(self.calls), 1)
 
     def test_separate_rollback_restores_only_owned_delta(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         out = self.execute()
         with self.assertRaises(ValueError):
             self.execute(rollback=True)
@@ -242,6 +348,9 @@ class WritebackCoreTests(unittest.TestCase):
         self.assertEqual(len(self.calls), 2)
 
     def test_rollback_concurrent_edit_denied(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         out = self.execute()
         self.state["version"] += 1
         rolled = self.execute(
@@ -252,6 +361,9 @@ class WritebackCoreTests(unittest.TestCase):
         self.assertEqual(len(self.calls), 1)
 
     def test_fsync_failure_prevents_mutation(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         with (
             patch.object(
                 self.journal, "_sync", side_effect=OSError("dummy fsync failure")
@@ -262,6 +374,9 @@ class WritebackCoreTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
     def test_concurrent_duplicate_consumption_only_one_effect(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         results = []
 
         def invoke():
@@ -280,6 +395,9 @@ class WritebackCoreTests(unittest.TestCase):
         self.assertEqual(len(self.calls), 1)
 
     def test_deadline_after_first_read_prevents_effect(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         with patch(
             "millefeuille.domain.writeback_core.time.monotonic", side_effect=[0, 0, 11]
         ):
@@ -287,6 +405,9 @@ class WritebackCoreTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
     def test_missing_journal_does_not_recreate_or_dispatch(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         self.journal.path.unlink()
         with self.assertRaises(FileNotFoundError):
             self.execute()
@@ -294,6 +415,9 @@ class WritebackCoreTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
     def test_expired_authority_and_wrong_plan_deny(self):
+        if os.name == "nt":
+            assert_journal_unavailable(self)
+            return
         from dataclasses import replace
 
         for authority in (

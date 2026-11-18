@@ -3,6 +3,7 @@
 from copy import deepcopy
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -44,15 +45,21 @@ class TestSummaryStageSelection(unittest.TestCase):
             "structure_evidence_path": structure,
             "preparation_path": default,
         }
-        result = prepare_summary_execution_packages(
-            route_evidence_paths=[route],
-            structure_evidence_paths=[structure],
-            output_dir=self.root / "bounded",
-            requested_stages=STAGES,
-        )
+        if os.name == "nt":
+            preparation_path = dispatch_tests.portable_preparation_fixture(
+                route, structure, self.root / "bounded", STAGES
+            )
+        else:
+            result = prepare_summary_execution_packages(
+                route_evidence_paths=[route],
+                structure_evidence_paths=[structure],
+                output_dir=self.root / "bounded",
+                requested_stages=STAGES,
+            )
+            preparation_path = result.documents[0].package_path
         self.evidence = {
             **self.default,
-            "preparation_path": result.documents[0].package_path,
+            "preparation_path": preparation_path,
         }
         self.plan = plan_grounded_gpt_summary_batch(**self.evidence)
 

@@ -1,0 +1,17 @@
+{
+  "allOriginalInputBytesEqual": true,
+  "consumerRestriction": "Only portable test planning and imported-page reads. Never root custody, journal, dispatch or real-paper acceptance.",
+  "files": {
+    "classified/artifact-index.json": "8c79203343d0f2a98d2dbcb56f2e3b912201dc78062156972ffe590ce5dc8c9c",
+    "classified/classification/decision-records/zotero-ITEM1.json": "81e251db339e50e526d5969d74b9e9cce1fd24b72c82572a5732a6fa3352fa4e",
+    "classified/reports/acceptance-summary.json": "92070875dd46d34126f9289819752df987e8ec14ddac68cf16ebcb453fca208a",
+    "classified/stage-manifest.json": "32e54a4b24b0c675152574be5bff787ddbd68d6593bc9cad2199d9d8025b3571",
+    "openkb/imported-evidence.json": "8287fad7046151c08096505ee7306216bf4dccbefd87be513ed91d234f58e1ce"
+  },
+  "generation": "Unchanged existing classification acceptance and OpenKB import fixture pipelines; generic relative root millefeuille-existing-fixture-export; independent regeneration and relocation byte-identical. No JSON normalization.",
+  "label": "SYNTHETIC TEST DATA FROM UNCHANGED EXISTING FIXTURE, NEVER REAL-PAPER ACCEPTANCE",
+  "originalInputCount": 26,
+  "producerManifestSha256": "c6dcc07266c22e5e06da01be5ce0d6ff788ebcc19e66c60a9a22dc44f0a06280",
+  "producerResultSha256": "88447c1bb7444bf5c28c4ac970721b4537b99dd4ab56e9adb686cb0507e57c0a",
+  "sourceHEAD": "70c588e670b8061188a85e721baf4b32899715a1"
+}

@@ -19,6 +19,9 @@ class JournalIntegrityTests(unittest.TestCase):
     execute = core.WritebackCoreTests.execute
 
     def test_valid_reopen_and_new_process_replay(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self, existing=True, reopen=True)
+            return
         self.journal.consume(self.plan, self.authority())
         self.journal = _Journal(self.journal.path, self.commitment)
         with self.assertRaises(sqlite3.IntegrityError):
@@ -53,6 +56,9 @@ sys.exit(19)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_missing_empty_and_valid_replacement_fail_new_open(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self, existing=True, reopen=True)
+            return
         self.journal.consume(self.plan, self.authority())
         path = self.journal.path
         saved = path.with_suffix(".retained")
@@ -74,6 +80,9 @@ sys.exit(19)
         self.assertEqual(self.calls, [])
 
     def test_provision_existing_and_wrong_commitment_denied(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self, existing=True, reopen=False)
+            return
         with self.assertRaises(FileExistsError):
             _provision_journal(self.journal.path)
         for change in (
@@ -85,6 +94,9 @@ sys.exit(19)
                 _Journal(self.journal.path, {**self.commitment, **change})
 
     def test_incompatible_schema_and_journal_id_denied(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self, existing=True, reopen=True)
+            return
         for statement in (
             "CREATE TABLE unexpected (x)",
             "UPDATE metadata SET journal_id='wrong'",
@@ -105,6 +117,9 @@ sys.exit(19)
         self.assertEqual(self.calls, [])
 
     def test_mode_and_hardlink_drift_deny_before_effect(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self, existing=True, reopen=True)
+            return
         path = self.journal.path
         path.chmod(0o644)
         try:
@@ -122,6 +137,9 @@ sys.exit(19)
         self.assertEqual(self.calls, [])
 
     def test_parent_permission_replacement_and_symlink_deny(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self, existing=True, reopen=True)
+            return
         parent = self.journal.path.parent
         parent.chmod(0o755)
         try:
@@ -147,6 +165,9 @@ sys.exit(19)
         self.assertEqual(self.calls, [])
 
     def test_sync_time_drift_never_dispatches(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self, existing=True, reopen=True)
+            return
         path = self.journal.path
         original = os.fsync
         calls = 0
@@ -168,6 +189,9 @@ sys.exit(19)
             _Journal(path, self.commitment).consume(self.plan, self.authority())
 
     def test_failed_provision_leaves_quarantine(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self, existing=False, reopen=False)
+            return
         path = self.journal.path.with_name("quarantine.sqlite3")
         with (
             patch("os.fsync", side_effect=OSError("dummy")),
@@ -179,6 +203,9 @@ sys.exit(19)
             _provision_journal(path)
 
     def test_sync_link_inode_and_parent_drift_preserves_consumption(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self, existing=True, reopen=True)
+            return
         for kind in ("link", "inode", "parent-mode"):
             with self.subTest(kind=kind):
                 f = core.WritebackCoreTests()
@@ -221,6 +248,9 @@ sys.exit(19)
                     _Journal(path, f.commitment).consume(f.plan, f.authority())
 
     def test_pre_dispatch_drift_cannot_mutate(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self, existing=True, reopen=True)
+            return
         original = self.journal.event
 
         def changed(plan, authority, kind, payload):
@@ -239,6 +269,9 @@ sys.exit(19)
         self.assertEqual(self.calls, [])
 
     def test_file_symlink_and_uid_mismatch_deny(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self, existing=True, reopen=True)
+            return
         path = self.journal.path
         retained = path.with_suffix(".retained")
         path.rename(retained)

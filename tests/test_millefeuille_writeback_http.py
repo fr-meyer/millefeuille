@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import time
 import unittest
 from unittest.mock import patch
@@ -28,9 +29,24 @@ class Stream(httpx.AsyncByteStream):
 
 class HTTPTests(unittest.TestCase):
     def setUp(self):
-        self.f = core.WritebackCoreTests()
-        self.f.setUp()
-        self.addCleanup(self.f.doCleanups)
+        # Projection and HTTP transport tests need only the existing raw snapshot,
+        # never an accepted classification bundle or durable mutation journal.
+        durable = self._testMethodName in {
+            "test_exact_actual_requests_success_raw_proof_and_rollback",
+            "test_refused_ambiguous_and_concurrent_never_owned",
+        }
+        if durable and os.name == "nt":
+            import tempfile
+            self.temp = tempfile.TemporaryDirectory(prefix="mf-http-refusal-")
+            self.addCleanup(self.temp.cleanup)
+            return
+        if durable or os.name != "nt":
+            self.f = core.WritebackCoreTests()
+            self.f.setUp()
+            self.addCleanup(self.f.doCleanups)
+        else:
+            from types import SimpleNamespace
+            self.f = SimpleNamespace(state=core.WritebackCoreTests.snapshot_fixture())
         self.identity = {
             k: self.f.state[k] for k in ("library_type", "library_id", "key")
         }
@@ -87,6 +103,9 @@ class HTTPTests(unittest.TestCase):
         ), h._HTTPWriter("DUMMYSECRET", httpx.MockTransport(self.handler))
 
     def test_exact_actual_requests_success_raw_proof_and_rollback(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self)
+            return
         reader, writer = self.transports()
         result = self.f.execute(reader=reader, writer=writer)
         self.assertEqual(result["result"]["status"], "written")
@@ -120,6 +139,9 @@ class HTTPTests(unittest.TestCase):
         self.assertNotIn("DUMMYSECRET", str(records))
 
     def test_refused_ambiguous_and_concurrent_never_owned(self):
+        if os.name == "nt":
+            core.assert_journal_unavailable(self)
+            return
         for behavior in ("412", "429", "lost", "concurrent"):
             with self.subTest(behavior=behavior):
                 self.setUp()

@@ -1,0 +1,252 @@
+{
+  "artifact_root": "millefeuille-existing-fixture-export/source-packs/zotero/zotero-ITEM1/analyses/millefeuille/run-fixture",
+  "artifacts": {
+    "acceptance_summary": {
+      "format": "json",
+      "kind": "acceptance-summary",
+      "private_content": false,
+      "ref": "reports/acceptance-summary.json",
+      "stage": "acceptance"
+    },
+    "acceptance_summary_markdown": {
+      "format": "markdown",
+      "kind": "acceptance-summary-markdown",
+      "private_content": false,
+      "ref": "reports/acceptance-summary.md",
+      "stage": "acceptance"
+    },
+    "classification_decision": {
+      "format": "json",
+      "kind": "classification-decision",
+      "private_content": false,
+      "ref": "classification/decision-records/zotero-ITEM1.json",
+      "stage": "classify"
+    },
+    "classification_decision_markdown": {
+      "format": "markdown",
+      "kind": "classification-decision-markdown",
+      "private_content": false,
+      "ref": "classification/decision-records/zotero-ITEM1.md",
+      "stage": "classify"
+    },
+    "classification_plan": {
+      "format": "json",
+      "kind": "classification-plan",
+      "private_content": false,
+      "ref": "classification/classification-plan.json",
+      "stage": "classify"
+    },
+    "hierarchical_summary": {
+      "format": "json",
+      "kind": "hierarchical-summary",
+      "private_content": false,
+      "ref": "summaries/hierarchical-summary.json",
+      "stage": "summarize"
+    },
+    "native_extraction_evidence": {
+      "format": "json",
+      "kind": "native-extraction-evidence",
+      "private_content": false,
+      "ref": "../../../extractions/native/evidence.json",
+      "stage": "extract-native"
+    },
+    "native_extraction_markdown": {
+      "format": "markdown",
+      "kind": "native-extraction-markdown",
+      "private_content": true,
+      "ref": "../../../extractions/native/fulltext.md",
+      "stage": "extract-native"
+    },
+    "ocr_extraction_evidence": {
+      "format": "json",
+      "kind": "ocr-extraction-evidence",
+      "private_content": false,
+      "ref": "../../../extractions/mistral-ocr/evidence.json",
+      "stage": "extract-ocr"
+    },
+    "ocr_extraction_markdown": {
+      "format": "markdown",
+      "kind": "ocr-extraction-markdown",
+      "private_content": true,
+      "ref": "../../../extractions/mistral-ocr/fulltext.md",
+      "stage": "extract-ocr"
+    },
+    "paper_card_json": {
+      "format": "json",
+      "kind": "paper-card",
+      "private_content": false,
+      "ref": "cards/paper-card.json",
+      "stage": "card"
+    },
+    "paper_card_markdown": {
+      "format": "markdown",
+      "kind": "paper-card-markdown",
+      "private_content": true,
+      "ref": "cards/paper-card.md",
+      "stage": "card"
+    },
+    "retrieval_index_status": {
+      "format": "json",
+      "kind": "retrieval-index-status",
+      "private_content": false,
+      "ref": "index/index-status.json",
+      "stage": "index"
+    },
+    "route_evidence": {
+      "format": "json",
+      "kind": "route-selection-evidence",
+      "private_content": false,
+      "ref": "../../../selected/route.json",
+      "stage": "route"
+    },
+    "selected_fulltext": {
+      "format": "markdown",
+      "kind": "selected-fulltext",
+      "private_content": true,
+      "ref": "../../../selected/fulltext.md",
+      "stage": "route"
+    },
+    "stage_manifest": {
+      "format": "json",
+      "kind": "stage-manifest",
+      "private_content": false,
+      "ref": "stage-manifest.json",
+      "stage": "discover"
+    },
+    "structure_evidence": {
+      "format": "json",
+      "kind": "structure-evidence",
+      "private_content": false,
+      "ref": "../../../structure/structure.json",
+      "stage": "structure"
+    },
+    "structure_outline": {
+      "format": "markdown",
+      "kind": "structure-outline",
+      "private_content": true,
+      "ref": "../../../structure/outline.md",
+      "stage": "structure"
+    },
+    "summary_texts": {
+      "format": "directory",
+      "kind": "summary-texts",
+      "private_content": true,
+      "ref": "summaries/texts",
+      "stage": "summarize"
+    },
+    "zotero_writeback_preview": {
+      "format": "json",
+      "kind": "zotero-writeback-preview",
+      "private_content": false,
+      "ref": "classification/zotero-writeback-preview.json",
+      "stage": "classify"
+    }
+  },
+  "indexes": [
+    {
+      "lane": "openkb",
+      "skip_reason": "fixture-only run",
+      "status": "skipped"
+    },
+    {
+      "lane": "pageindex",
+      "status": "previewed"
+    },
+    {
+      "lane": "condb",
+      "skip_reason": "optional support lane not run",
+      "status": "skipped"
+    },
+    {
+      "lane": "chatindex",
+      "skip_reason": "optional support lane not run",
+      "status": "skipped"
+    }
+  ],
+  "paper_id": "zotero-ITEM1",
+  "run_id": "run-fixture",
+  "schema_version": "millefeuille-artifact-index/v0.1",
+  "source_identity": {
+    "canonical_filename": "Example Author - 2026 - Intake Fixture.pdf",
+    "citation_key": "fixture2026intake",
+    "doi": "10.0000/intake-fixture",
+    "pdf_count": 1,
+    "title": "Intake Fixture Paper",
+    "year": 2026,
+    "zotero_attachment_key": "ATT1",
+    "zotero_item_key": "ITEM1"
+  },
+  "source_pack": {
+    "manifest_ref": "../../../manifest.json",
+    "ref": "millefeuille-existing-fixture-export/source-packs/zotero/zotero-ITEM1",
+    "source_hash": "sha256:d2cdefee2d0dd786c00f3beca5122e81791b2220622924b6a8ca92f4d0e5bf0c",
+    "source_type": "zotero"
+  },
+  "stages": {
+    "acceptance": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "card": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "classify": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "discover": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "extract-native": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "extract-ocr": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "handoff": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "index": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "openkb-add": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "not-started"
+    },
+    "recover": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "skipped"
+    },
+    "route": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "source-pack": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "structure": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "summarize": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "passed"
+    },
+    "writeback": {
+      "manifest_ref": "stage-manifest.json",
+      "status": "skipped"
+    }
+  },
+  "zotero_writeback": {
+    "mode": "preview",
+    "plan_ref": "classification/zotero-writeback-preview.json",
+    "status": "previewed"
+  }
+}

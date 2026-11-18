@@ -1,0 +1,199 @@
+{
+  "manual_gates": [],
+  "mode": "preview",
+  "run_id": "run-fixture",
+  "schema_version": "millefeuille-stage-manifest/v0.1",
+  "source_type": "zotero",
+  "stages": [
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "discover",
+      "notes": [
+        "dry-run discovered Zotero item ITEM1"
+      ],
+      "outputs": [
+        "artifact-index.json",
+        "stage-manifest.json"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [
+        "zotero:item:ITEM1"
+      ],
+      "manual_gate_required": false,
+      "name": "handoff",
+      "notes": [
+        "1 PDF handoff row(s) available for preview"
+      ],
+      "outputs": [
+        "openkb-millefeuille-handoff-preview"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [
+        "openkb-millefeuille-handoff-preview"
+      ],
+      "manual_gate_required": false,
+      "name": "recover",
+      "notes": [
+        "source-pack manifest already exists; PDF recovery not performed"
+      ],
+      "outputs": [],
+      "status": "skipped"
+    },
+    {
+      "inputs": [
+        "source-pack manifest"
+      ],
+      "manual_gate_required": false,
+      "name": "source-pack",
+      "notes": [
+        "existing source-pack manifest verified for artifact-root lane"
+      ],
+      "outputs": [
+        "source-pack manifest"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "extract-native",
+      "notes": [
+        "fixture native extraction evidence available"
+      ],
+      "outputs": [
+        "native extraction evidence",
+        "native markdown"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "extract-ocr",
+      "notes": [
+        "fixture OCR extraction evidence available"
+      ],
+      "outputs": [
+        "OCR extraction evidence",
+        "OCR markdown"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "route",
+      "notes": [
+        "fixture route selection evidence available"
+      ],
+      "outputs": [
+        "route selection evidence",
+        "selected fulltext"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "structure",
+      "notes": [
+        "fixture structure evidence available"
+      ],
+      "outputs": [
+        "structure evidence",
+        "structure outline"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "summarize",
+      "notes": [
+        "fixture hierarchical summary available"
+      ],
+      "outputs": [
+        "hierarchical summary",
+        "summary texts"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "card",
+      "notes": [
+        "fixture paper card available"
+      ],
+      "outputs": [
+        "paper card json",
+        "paper card markdown"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "openkb-add",
+      "notes": [
+        "source-pack evidence available; stage not run in dry-run writer"
+      ],
+      "outputs": [],
+      "status": "not-started"
+    },
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "index",
+      "notes": [
+        "fixture retrieval/index status available"
+      ],
+      "outputs": [
+        "retrieval index status"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "acceptance",
+      "notes": [
+        "acceptance summary written for zotero-ITEM1"
+      ],
+      "outputs": [
+        "reports/acceptance-summary.json",
+        "reports/acceptance-summary.md"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "classify",
+      "notes": [
+        "classification preview written for zotero-ITEM1"
+      ],
+      "outputs": [
+        "classification/classification-plan.json",
+        "classification/decision-records/zotero-ITEM1.json",
+        "classification/zotero-writeback-preview.json"
+      ],
+      "status": "passed"
+    },
+    {
+      "inputs": [],
+      "manual_gate_required": false,
+      "name": "writeback",
+      "notes": [
+        "dry-run artifact writer does not write Zotero state"
+      ],
+      "outputs": [],
+      "status": "skipped"
+    }
+  ]
+}

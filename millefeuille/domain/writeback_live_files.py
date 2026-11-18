@@ -34,6 +34,10 @@ def _identity(s):
 
 def protected_read(path, *, uid=0, limit=1048576):
     """Trusted ancestors and private single-link files; root remains trusted."""
+    if os.name != "posix" or not all(
+        hasattr(os, name) for name in ("O_NOFOLLOW", "O_CLOEXEC", "O_DIRECTORY")
+    ):
+        raise Error("protected evidence reads require POSIX no-follow descriptors")
     path = Path(path)
     if not path.is_absolute() or ".." in path.parts:
         raise Error("absolute protected path required")

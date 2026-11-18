@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -15,6 +16,24 @@ from millefeuille.domain.model_executor import verify_model_executor_input
 from millefeuille.domain.summary_dispatch import plan_verified_summary_dispatch
 from millefeuille.domain.summary_preparation import prepare_summary_execution_packages
 from tests.platform_capabilities import requires_secure_nofollow_writes
+
+def portable_preparation_fixture(route, structure, output, stages=None):
+    """Persist only genuine no-call constructor bytes, not accepted receipts."""
+    from millefeuille.domain import summary_preparation as preparation
+    profile = preparation._default_profile()
+    document = preparation._prepare_document(
+        route=preparation.load_route_selection_evidence_batch(route)[0],
+        structure=preparation.load_structure_evidence_batch(structure)[0],
+        output_root=Path(output),
+        profile=profile,
+        plans={stage: preparation.build_summary_execution_plan(profile=profile, stage=stage)
+               for stage in preparation.SUMMARY_MODEL_STAGES},
+    )
+    document = preparation._select_prepared(document, stages)
+    document.package_path.parent.mkdir(parents=True, exist_ok=True)
+    document.package_path.write_bytes(document.package_bytes)
+    return document.package_path
+
 
 CONTRACTS = {
     "summarize_page": ("summary-page", "v1"),
@@ -52,6 +71,23 @@ class TestSummaryDispatch(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        if os.name == "nt":
+            from millefeuille.domain import local_structure as local
+            document = local._prepare_document(
+                local.load_route_selection_evidence_batch(route)[0], root / "structures"
+            )
+            for path, data in (
+                (document.structure_path, document.structure_bytes),
+                (document.outline_path, document.outline_bytes),
+                (document.evidence_path, document.evidence_bytes),
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            structure = document.evidence_path
+            preparation = portable_preparation_fixture(
+                route, structure, root / "summary-preparation"
+            )
+            return route, structure, preparation
         structures = prepare_local_structures_from_route_evidence(
             route_evidence_paths=[route], output_dir=root / "structures"
         )

@@ -96,12 +96,12 @@ class TestClassificationLive(unittest.TestCase):
         self.addCleanup(self.fixture.doCleanups)
         f = self.fixture
         self.inputs = {
-            "source_pack_root": str(f.root),
+            "source_pack_root": str(f.root.resolve()),
             "run_id": model_tests.RUN_ID,
             "paper_id": model_tests.PAPER_ID,
             "expected_selected_text_sha256": f.selected_sha,
-            "taxonomy_lock_path": str(f.lock_path),
-            "handoff_path": str(f.handoff),
+            "taxonomy_lock_path": str(f.lock_path.resolve()),
+            "handoff_path": str(f.handoff.resolve()),
         }
         self.plan = scope.prepare(self.inputs)
         self.packet, self.receipt = pair(self.inputs, self.plan)
