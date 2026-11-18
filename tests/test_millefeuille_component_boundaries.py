@@ -127,7 +127,7 @@ class TestComponentModelBoundaries(unittest.TestCase):
                     requests = [u.request for u in batch.units]
                     requests.extend([card.request, classification.request])
                     for request in requests:
-                        assert request['requested_model'] == 'openai/gpt-5.6-sol'
+                        assert request['requested_model'] == 'openai/gpt-6-astra'
                         assert request['thinking'] == 'xhigh'
                         auth = request['authentication']
                         assert auth['required_class'] == 'subscription_oauth'
@@ -137,7 +137,7 @@ class TestComponentModelBoundaries(unittest.TestCase):
                     profile = profiles['research-default']
                     for foreign_model in [
                         'mistral/mistral-medium-3-5', 'gpt-4o-2024-11-20',
-                        'gpt-4o-mini', 'gpt-5.6-sol-xhigh',
+                        'gpt-4o-mini', 'gpt-6-astra-xhigh',
                     ]:
                         for stage, planner in [
                             ('summarize_page', dispatch),

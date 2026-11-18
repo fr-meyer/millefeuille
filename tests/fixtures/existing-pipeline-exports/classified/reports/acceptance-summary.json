@@ -1,0 +1,141 @@
+{
+  "checks": [
+    {
+      "name": "source-pack",
+      "notes": [
+        "verified source-pack manifest loaded"
+      ],
+      "refs": [
+        "../../../manifest.json"
+      ],
+      "status": "passed"
+    },
+    {
+      "name": "handoff",
+      "notes": [
+        "matched handoff evidence"
+      ],
+      "refs": [
+        "../../../../../../handoff.jsonl"
+      ],
+      "status": "passed"
+    },
+    {
+      "name": "extract-native",
+      "notes": [
+        "artifact verified"
+      ],
+      "refs": [
+        "../../../extractions/native/evidence.json"
+      ],
+      "status": "passed"
+    },
+    {
+      "name": "extract-ocr",
+      "notes": [
+        "artifact verified"
+      ],
+      "refs": [
+        "../../../extractions/mistral-ocr/evidence.json"
+      ],
+      "status": "passed"
+    },
+    {
+      "name": "route",
+      "notes": [
+        "artifact verified"
+      ],
+      "refs": [
+        "../../../selected/route.json"
+      ],
+      "status": "passed"
+    },
+    {
+      "name": "structure",
+      "notes": [
+        "artifact verified"
+      ],
+      "refs": [
+        "../../../structure/structure.json"
+      ],
+      "status": "passed"
+    },
+    {
+      "details": {
+        "summary_count": 2
+      },
+      "name": "summarize",
+      "notes": [
+        "hierarchical summary verified"
+      ],
+      "refs": [
+        "summaries/hierarchical-summary.json"
+      ],
+      "status": "passed"
+    },
+    {
+      "name": "card",
+      "notes": [
+        "paper card verified"
+      ],
+      "refs": [
+        "cards/paper-card.json"
+      ],
+      "status": "passed"
+    },
+    {
+      "details": {
+        "lanes": [
+          "openkb",
+          "pageindex"
+        ]
+      },
+      "name": "index",
+      "notes": [
+        "retrieval index and paper card state verified"
+      ],
+      "refs": [
+        "index/index-status.json"
+      ],
+      "status": "passed"
+    },
+    {
+      "name": "duplicate-scan",
+      "notes": [
+        "duplicate scan indicates no blocking duplicate"
+      ],
+      "refs": [],
+      "status": "passed"
+    }
+  ],
+  "counts": {
+    "card": 1,
+    "duplicate_scan": 1,
+    "handoff_rows": 1,
+    "index": 1,
+    "native_extraction": 1,
+    "ocr_extraction": 1,
+    "passed_stages_before_acceptance": 10,
+    "route": 1,
+    "source_pack": 1,
+    "structure": 1,
+    "summary": 1
+  },
+  "duplicate_scan": {
+    "reason": "fixture-only run",
+    "status": "not-run"
+  },
+  "handoff": {
+    "canonical_filename": "Example Author - 2026 - Intake Fixture.pdf",
+    "match_count": 1,
+    "matched": true,
+    "sha256_present": true,
+    "verification_strength": "full"
+  },
+  "paper_id": "zotero-ITEM1",
+  "run_id": "run-fixture",
+  "schema_version": "openkb-millefeuille-acceptance-summary/v0.1",
+  "source_hash": "sha256:d2cdefee2d0dd786c00f3beca5122e81791b2220622924b6a8ca92f4d0e5bf0c",
+  "source_pack_ref": "../../..",
+  "status": "pass"
+}

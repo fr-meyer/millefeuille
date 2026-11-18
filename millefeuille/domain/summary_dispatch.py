@@ -19,9 +19,10 @@ from millefeuille.domain.model_execution import SUMMARY_MODEL_STAGES
 from millefeuille.domain.model_executor import build_summary_work_unit_request
 from millefeuille.domain.secure_io import RootArtifactReader, read_bytes_no_follow
 from millefeuille.domain.summary_preparation import verify_summary_preparation_package
+from millefeuille.domain.summary_stage_selection import selected_summary_stages
 
 PromptBuilder = Callable[[str, str, tuple[str, ...], bytes, bytes], bytes]
-GPT_MODEL = "openai/gpt-5.6-sol"
+GPT_MODEL = "openai/gpt-6-astra"
 SUMMARY_OUTPUT_CONTRACTS = MappingProxyType(
     {
         "summarize_page": ("summary-page", "v1"),
@@ -46,6 +47,7 @@ class SummaryDispatchBatch:
     paper_id: str
     preparation_sha256: str
     units: tuple[SummaryDispatchUnit, ...]
+    requested_stages: tuple[str, ...] | None = None
 
 
 def plan_verified_summary_dispatch(
@@ -108,7 +110,7 @@ def plan_verified_summary_dispatch(
     preparation_digest = "sha256:" + hashlib.sha256(prepared_bytes).hexdigest()
     units: list[SummaryDispatchUnit] = []
     request_ids: set[str] = set()
-    for stage in SUMMARY_MODEL_STAGES:
+    for stage in selected_summary_stages(preparation):
         schema_id, schema_version = output_contracts[stage]
         for work_unit in preparation["work_units"][stage]:
             unit_id = work_unit["unit_id"]
@@ -178,6 +180,11 @@ def plan_verified_summary_dispatch(
         paper_id=preparation["paper_id"],
         preparation_sha256=preparation_digest,
         units=tuple(units),
+        requested_stages=(
+            selected_summary_stages(preparation)
+            if "requested_stages" in preparation
+            else None
+        ),
     )
 
 

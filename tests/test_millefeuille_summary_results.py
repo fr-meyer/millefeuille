@@ -82,7 +82,7 @@ class TestSummaryResults(unittest.TestCase):
             input_payload=prompt,
             output_schema_id=schema_id,
             output_schema_version="v1",
-            requested_model="openai/gpt-5.6-sol",
+            requested_model="openai/gpt-6-astra",
             fallback_models=[],
         )
         return SummaryDispatchUnit(
@@ -114,15 +114,15 @@ class TestSummaryResults(unittest.TestCase):
         result = materialize_model_executor_result(
             request=unit.request,
             status="succeeded",
-            actual_model="openai/gpt-5.6-sol",
+            actual_model="openai/gpt-6-astra",
             auth_profile_ref=profile,
             started_at="2026-09-25T00:00:00Z",
             completed_at="2026-09-25T00:00:02Z",
             attempts=[
                 {
                     "sequence": 1,
-                    "model": "openai/gpt-5.6-sol",
-                    "actual_model": "openai/gpt-5.6-sol",
+                    "model": "openai/gpt-6-astra",
+                    "actual_model": "openai/gpt-6-astra",
                     "status": "succeeded",
                     "started_at": "2026-09-25T00:00:00Z",
                     "completed_at": "2026-09-25T00:00:02Z",
@@ -239,7 +239,7 @@ class TestSummaryResults(unittest.TestCase):
             attempts=[
                 {
                     "sequence": 1,
-                    "model": "openai/gpt-5.6-sol",
+                    "model": "openai/gpt-6-astra",
                     "actual_model": None,
                     "status": "failed",
                     "started_at": "2026-09-25T00:00:00Z",

@@ -103,7 +103,7 @@ class TestGptPaperCardPlan(unittest.TestCase):
         Draft202012Validator(request_schema).validate(plan.request)
         self.assertEqual(plan.source_locators, ("p.1", "p.2"))
         self.assertEqual(plan.request["task"]["kind"], "paper_card")
-        self.assertEqual(plan.request["requested_model"], "openai/gpt-5.6-sol")
+        self.assertEqual(plan.request["requested_model"], "openai/gpt-6-astra")
         self.assertEqual(
             plan.request["authentication"]["required_class"], "subscription_oauth"
         )

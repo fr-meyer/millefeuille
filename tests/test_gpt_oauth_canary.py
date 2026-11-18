@@ -103,7 +103,7 @@ class _FakeClient:
 def _approved_pair(
     root: Path,
     *,
-    model: str = "gpt-5.6-sol",
+    model: str = "gpt-6-astra",
     approved_at: datetime | None = None,
 ):
     now = (approved_at or datetime.now(UTC)).replace(microsecond=0)

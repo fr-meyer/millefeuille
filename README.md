@@ -29,6 +29,16 @@ classification lifecycle for research-paper attachments discovered from Zotero.
 
 ## Choosing a Command Surface
 
+`millefeuille classification-operator` provides a distinct exact-scope Astra
+classification call and separately approved proposal/evidence publication. See
+[the classification operator contract](docs/classification-live-operator.md).
+It neither borrows summary/card authority nor enables live Zotero writes.
+
+The installed `millefeuille live-operator` provides explicit summary/card
+planning, no-auth scope preflight, and separately approved execution/publication.
+See [the bounded operator recipe](docs/live-operator.md). It does not enable
+live classification or Zotero writeback, and does not alter offline stage gates.
+
 Millefeuille currently preserves two command surfaces. Root-level Hydra
 overrides such as `millefeuille ocr.enabled=true` run the original monolithic
 Zotero/OCR workflow. Named commands such as `millefeuille extract-native` and
@@ -367,7 +377,7 @@ These commands stay offline and preview-only in the current contract slice:
   required provenance fields while proving that no credential lookup or
   provider call occurred. The
   `research-default` page, section, and full-paper summary stages select
-  `openai/gpt-5.6-sol` with `reasoning_effort: xhigh` and `fast_mode: off`.
+  `openai/gpt-6-astra` with `reasoning_effort: xhigh` and `fast_mode: off`.
   `models --provenance --plan-file <json> --execution-evidence <json>`
   requires that plan to match the canonical bundled profile, validates exact
   post-execution evidence against it, and materializes a strict
@@ -1301,7 +1311,7 @@ Verified duplicate dispositions are described in the
 See [Classification model request boundary](specs/millefeuille-pipeline/classification-model-boundary.md) for accepted-run planning, reuse of published summaries, locked-taxonomy joins and strict transient output validation.
 
 The bundled `research-default.classify` preview matches the accepted-run GPT
-request: `openai/gpt-5.6-sol`, `xhigh`, subscription OAuth and no fallback.
+request: `openai/gpt-6-astra`, `xhigh`, subscription OAuth and no fallback.
 Planning and dispatch reject changed model, authentication or profile defaults
 before any provider call.
 

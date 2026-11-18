@@ -59,7 +59,7 @@
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?Z$"
     },
     "allowedModel": {
-      "enum": ["openai/gpt-5.6-sol", "xai/grok-4.6"]
+      "enum": ["openai/gpt-6-astra", "xai/grok-4.6"]
     },
     "nullableAllowedModel": {
       "oneOf": [

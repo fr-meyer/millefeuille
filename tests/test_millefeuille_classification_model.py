@@ -38,10 +38,13 @@ class ClassificationModelTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root, self.run = _prepare_fixture_run(self.temp.name)
+        # Resolve the temporary directory BEFORE generating bound artifact roots.
+        # Windows short-name expansion must not happen only at the consumer.
+        fixture_root = str(Path(self.temp.name).resolve())
+        self.root, self.run = _prepare_fixture_run(fixture_root)
         self.handoff = self.run / "reports/model-classification-handoff.jsonl"
         self.handoff.parent.mkdir(exist_ok=True)
-        self.handoff.write_bytes(_write_handoff_jsonl(self.temp.name).read_bytes())
+        self.handoff.write_bytes(_write_handoff_jsonl(fixture_root).read_bytes())
         write_fixture_acceptance(
             source_pack_root=self.root,
             run_id=RUN_ID,
@@ -141,7 +144,7 @@ class ClassificationModelTests(unittest.TestCase):
         packet = json.loads(plan.prompt)
         verify_model_executor_input(plan.request, plan.prompt)
         self.assertEqual(plan.request["task"]["kind"], "classify")
-        self.assertEqual(plan.request["requested_model"], "openai/gpt-5.6-sol")
+        self.assertEqual(plan.request["requested_model"], "openai/gpt-6-astra")
         self.assertEqual(plan.request["thinking"], "xhigh")
         self.assertEqual(plan.request["retry"]["max_attempts"], 1)
         self.assertEqual(plan.request["fallback"]["models"], [])
@@ -256,7 +259,7 @@ class ClassificationModelTests(unittest.TestCase):
                     "task_kind": "classify",
                     "unit_id": "classification",
                     "source_locators": list(plan.source_locators),
-                    "requested_model": "openai/gpt-5.6-sol",
+                    "requested_model": "openai/gpt-6-astra",
                     "thinking": "xhigh",
                     "prompt_template_id": "millefeuille-classification",
                     "prompt_template_version": "0.1",

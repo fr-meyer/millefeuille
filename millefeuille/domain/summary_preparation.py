@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import json
 from pathlib import Path
@@ -29,6 +29,10 @@ from millefeuille.domain.source_packs import paper_id_for_zotero_item_key
 from millefeuille.domain.structure_fixtures import (
     StructureFixtureEvidence,
     load_structure_evidence_batch,
+)
+from millefeuille.domain.summary_stage_selection import (
+    selected_summary_stages,
+    validate_summary_stages,
 )
 
 SUMMARY_PREPARATION_SCHEMA_VERSION = "millefeuille-summary-preparation/v0.1"
@@ -90,9 +94,11 @@ def prepare_summary_execution_packages(
     structure_evidence_paths: list[str | Path],
     output_dir: str | Path,
     profile: str | None = None,
+    requested_stages: list[str] | tuple[str, ...] | None = None,
 ) -> SummaryPreparationBatchResult:
     """Bind verified local inputs to no-call model plans without summaries."""
 
+    stages = validate_summary_stages(requested_stages)
     if not route_evidence_paths:
         raise MillefeuilleContractError("at least one route evidence path is required")
     if not structure_evidence_paths:
@@ -121,6 +127,7 @@ def prepare_summary_execution_packages(
                 structure_evidence_path=structure_evidence_paths[0],
                 output_dir=output_dir,
                 profile=profile_name,
+                requested_stages=requested_stages,
             )
     plans = {
         stage: build_summary_execution_plan(profile=profile_name, stage=stage)
@@ -165,6 +172,7 @@ def prepare_summary_execution_packages(
         )
         for key in sorted(route_by_key)
     ]
+    prepared = [_select_prepared(document, requested_stages) for document in prepared]
     summary_path = output_root / "summary.json"
     summary_bytes = _canonical_json_bytes(
         {
@@ -183,7 +191,7 @@ def prepare_summary_execution_packages(
             ],
             "totals": {
                 "documents": len(prepared),
-                "requested_stages": len(prepared) * len(SUMMARY_MODEL_STAGES),
+                "requested_stages": len(prepared) * len(stages),
                 "work_units": sum(
                     sum(document.work_unit_counts.values()) for document in prepared
                 ),
@@ -213,7 +221,7 @@ def prepare_summary_execution_packages(
             status=statuses[document.paper_id],
             package_path=document.package_path,
             profile=profile_name,
-            requested_stages=tuple(SUMMARY_MODEL_STAGES),
+            requested_stages=stages,
             work_unit_counts=document.work_unit_counts,
             blockers=document.blockers,
         )
@@ -264,6 +272,8 @@ def verify_summary_preparation_package(
         ) from exc
     if not isinstance(package, dict):
         raise MillefeuilleContractError("summary preparation package must be an object")
+    stages = selected_summary_stages(package)
+    selection = list(stages) if "requested_stages" in package else None
     profile = package.get("profile")
     if not isinstance(profile, str) or not profile:
         raise MillefeuilleContractError(
@@ -283,6 +293,7 @@ def verify_summary_preparation_package(
                 artifact_reader=artifact_reader,
             )
         )
+        expected_bytes = _select_bytes(expected_bytes, selection)
         if package_path != expected_path or package_bytes != expected_bytes:
             raise MillefeuilleContractError(
                 "multi-source summary preparation package or source drift"
@@ -310,6 +321,7 @@ def verify_summary_preparation_package(
         plans=plans,
         artifact_reader=artifact_reader,
     )
+    expected = _select_prepared(expected, selection)
     if package_path != expected.package_path or package_bytes != expected.package_bytes:
         raise MillefeuilleContractError("summary preparation package or source drift")
     return package
@@ -665,6 +677,7 @@ def _prepare_multi_source_batch(
     structure_evidence_path: str | Path,
     output_dir: str | Path,
     profile: str,
+    requested_stages=None,
 ) -> SummaryPreparationBatchResult:
     from millefeuille.domain.multi_source_summary import (
         build_multi_source_summary_package,
@@ -677,6 +690,9 @@ def _prepare_multi_source_batch(
         output_dir=output_root,
         profile=profile,
     )
+    stages = validate_summary_stages(requested_stages)
+    package_bytes = _select_bytes(package_bytes, requested_stages)
+    counts = {stage: counts[stage] for stage in stages}
     paper_id = package_path.name.removesuffix(".summary-preparation.json")
     summary_path = output_root / "summary.json"
     summary_bytes = _canonical_json_bytes(
@@ -695,7 +711,7 @@ def _prepare_multi_source_batch(
             ],
             "totals": {
                 "documents": 1,
-                "requested_stages": len(SUMMARY_MODEL_STAGES),
+                "requested_stages": len(stages),
                 "work_units": sum(counts.values()),
                 "summary_outputs_generated": 0,
             },
@@ -713,7 +729,7 @@ def _prepare_multi_source_batch(
         status=package_status,
         package_path=package_path,
         profile=profile,
-        requested_stages=tuple(SUMMARY_MODEL_STAGES),
+        requested_stages=stages,
         work_unit_counts=counts,
         blockers=blockers,
     )
@@ -735,4 +751,23 @@ def _write_new_output(path: Path, expected: bytes) -> None:
         path,
         expected.decode("utf-8"),
         "summary preparation output",
+    )
+
+
+def _select_bytes(encoded, selection):
+    if selection is None:
+        return encoded
+    payload = json.loads(encoded)
+    payload["requested_stages"] = list(validate_summary_stages(selection))
+    return _canonical_json_bytes(payload)
+
+
+def _select_prepared(document, selection):
+    if selection is None:
+        return document
+    stages = validate_summary_stages(selection)
+    return replace(
+        document,
+        package_bytes=_select_bytes(document.package_bytes, selection),
+        work_unit_counts={stage: document.work_unit_counts[stage] for stage in stages},
     )

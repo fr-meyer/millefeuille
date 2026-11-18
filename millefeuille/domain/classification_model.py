@@ -27,7 +27,7 @@ from millefeuille.domain.model_executor import (
     verify_model_executor_input,
 )
 from millefeuille.domain.model_profiles import DEFAULT_MODEL_PROFILE_BUNDLE
-from millefeuille.domain.secure_io import read_bytes_no_follow
+from millefeuille.domain.secure_io import held_directory_reads, read_bytes_no_follow
 from millefeuille.domain.stage_runtime import resolve_run_artifacts
 from millefeuille.domain.summary_fixtures import load_hierarchical_summary
 from millefeuille.domain.taxonomy import load_taxonomy_lock, validate_taxonomy_lock
@@ -43,7 +43,7 @@ def _require_gpt_classification_profile() -> None:
     profile = research.get("classify") if isinstance(research, dict) else None
     expected = {
         "backend": "chat",
-        "model": "openai/gpt-5.6-sol",
+        "model": "openai/gpt-6-astra",
         "provider": "openai",
         "auth_lane": "openclaw-native-codex-oauth",
         "fallback_policy": "none",
@@ -113,6 +113,7 @@ class ClassificationModelPlan:
         return verify_classification_model_plan(self)
 
 
+@held_directory_reads()
 def prepare_classification_model_plan(
     *,
     source_pack_root: str | Path,
@@ -259,7 +260,7 @@ def prepare_classification_model_plan(
         task_kind="classify",
         unit_id="classification",
         source_locators=list(locators),
-        requested_model="openai/gpt-5.6-sol",
+        requested_model="openai/gpt-6-astra",
         thinking="xhigh",
         prompt_template_id="millefeuille-classification",
         prompt_template_version="0.1",

@@ -21,8 +21,8 @@ class TestSummaryModelRouting(unittest.TestCase):
         route = resolve_summary_model_route(
             profile="research-default", stage="summarize_page"
         )
-        self.assertEqual(route["profile_model"], "openai/gpt-5.6-sol")
-        self.assertEqual(route["requested_model"], "openai/gpt-5.6-sol")
+        self.assertEqual(route["profile_model"], "openai/gpt-6-astra")
+        self.assertEqual(route["requested_model"], "openai/gpt-6-astra")
         self.assertEqual(route["thinking"], "xhigh")
         self.assertFalse(route["override_used"])
         self.assertEqual(route["fallback"], {"policy": "none", "models": []})
@@ -34,7 +34,7 @@ class TestSummaryModelRouting(unittest.TestCase):
         options = {
             "requested_model": "xai/grok-4.6",
             "thinking": "xhigh",
-            "fallback_models": ["openai/gpt-5.6-sol"],
+            "fallback_models": ["openai/gpt-6-astra"],
             "retry_on": ["model_unavailable", "timeout"],
         }
         route = resolve_summary_model_route(
@@ -99,7 +99,7 @@ class TestSummaryModelRouting(unittest.TestCase):
             {"fallback_models": ["xai/grok-4.6"]},
             {"retry_on": ["timeout"]},
             {
-                "fallback_models": ["openai/gpt-5.6-sol"],
+                "fallback_models": ["openai/gpt-6-astra"],
                 "retry_on": ["timeout"],
             },
             {
@@ -134,7 +134,7 @@ class TestSummaryModelRouting(unittest.TestCase):
             "--model",
             "xai/grok-4.6",
             "--fallback-model",
-            "openai/gpt-5.6-sol",
+            "openai/gpt-6-astra",
             "--retry-on",
             "timeout",
             "--json",
@@ -142,7 +142,7 @@ class TestSummaryModelRouting(unittest.TestCase):
         self.assertEqual(run_stage_cli(args, stdout=out, stderr=err), 0)
         payload = json.loads(out.getvalue())
         self.assertEqual(payload["requested_model"], "xai/grok-4.6")
-        self.assertEqual(payload["fallback"]["models"], ["openai/gpt-5.6-sol"])
+        self.assertEqual(payload["fallback"]["models"], ["openai/gpt-6-astra"])
         self.assertFalse(payload["provider_call_performed"])
 
         out, err = StringIO(), StringIO()

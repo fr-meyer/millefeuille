@@ -30,6 +30,7 @@ from millefeuille.domain.summary_dispatch import (
     SummaryDispatchUnit,
 )
 from millefeuille.domain.summary_preparation import verify_summary_preparation_package
+from millefeuille.domain.summary_stage_selection import selected_summary_stages
 
 _OUTPUT_FIELDS = frozenset(
     {"schema_version", "paper_id", "stage", "unit_id", "summary", "source_locators"}
@@ -219,9 +220,16 @@ def verify_summary_dispatch_batch(
         or "structure page coverage incomplete" in preparation["execution"]["blockers"]
     ):
         raise MillefeuilleContractError("summary batch preparation evidence drift")
+    expected_selection = (
+        selected_summary_stages(preparation)
+        if "requested_stages" in preparation
+        else None
+    )
+    if batch.requested_stages != expected_selection:
+        raise MillefeuilleContractError("summary batch stage selection drift")
     expected_units = [
         (stage, work_unit["unit_id"], tuple(work_unit["source_locators"]))
-        for stage in SUMMARY_MODEL_STAGES
+        for stage in selected_summary_stages(preparation)
         for work_unit in preparation["work_units"][stage]
     ]
     actual_units = [

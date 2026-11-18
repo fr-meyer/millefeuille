@@ -10,7 +10,7 @@ The exact supported operation is `model.card`, with one paper, one explicit
 card run, one GPT request and zero incremental API cost. Targets must include
 the source-pack artifact root, paper ID, card run ID, card request-plan hash,
 published summary bundle hash and preflight authorization context. The model
-is `gpt-5.6-sol` through the OpenClaw subscription OAuth profile. API-key use,
+is `gpt-6-astra` through the OpenClaw subscription OAuth profile. API-key use,
 hidden fallback, wider calls, extra operations, other roots and changed source
 or run scope are rejected. Packet and receipt integrity, scope matching and
 expiry are checked using the existing MF-100 contract.

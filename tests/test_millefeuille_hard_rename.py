@@ -35,6 +35,24 @@ def _tracked_files() -> list[Path]:
     return [REPO_ROOT / line for line in result.stdout.splitlines() if line.strip()]
 
 
+# This is an upstream wire-format identifier, not this product's identity.
+# Only the exact quoted literal at these import-boundary files is exempt.
+EXTERNAL_SCHEMA_LITERAL = '"openkb-docai-source-pack/v0.1"'
+EXTERNAL_SCHEMA_BOUNDARIES = frozenset(
+    {
+        "millefeuille/domain/openkb_import.py",
+        "tests/test_openkb_import.py",
+        "tests/test_millefeuille_hard_rename.py",  # declaration and negative tests
+    }
+)
+
+
+def _identity_text(path, text):
+    if path in EXTERNAL_SCHEMA_BOUNDARIES:
+        return text.replace(EXTERNAL_SCHEMA_LITERAL, "<external-schema>")
+    return text
+
+
 class TestMillefeuilleHardRename(unittest.TestCase):
     def test_old_package_and_cli_identity_are_not_tracked(self) -> None:
         old_snake = "zotero" + "_doc" + "ai" + "_pipeline"
@@ -62,6 +80,7 @@ class TestMillefeuilleHardRename(unittest.TestCase):
                 continue
             rel = path.relative_to(REPO_ROOT)
             portable_rel = rel.as_posix()
+            text = _identity_text(portable_rel, text)
             for marker in forbidden:
                 if (
                     marker == old_short
@@ -72,3 +91,15 @@ class TestMillefeuilleHardRename(unittest.TestCase):
                     violations.append(f"{rel}: {marker}")
 
         self.assertEqual([], violations)
+
+    def test_external_exception_does_not_hide_other_legacy_identity(self):
+        marker = "doc" + "ai"
+        literal = EXTERNAL_SCHEMA_LITERAL
+        boundary = "millefeuille/domain/openkb_import.py"
+        self.assertNotIn(marker, _identity_text(boundary, literal))
+        self.assertIn(marker, _identity_text("millefeuille/other.py", literal))
+        self.assertIn(marker, _identity_text(boundary, literal + " " + marker))
+        self.assertIn(marker, _identity_text(boundary, literal.replace("v0.1", "v0.2")))
+        self.assertIn(
+            marker, _identity_text(boundary, "zotero_" + marker + "_pipeline")
+        )

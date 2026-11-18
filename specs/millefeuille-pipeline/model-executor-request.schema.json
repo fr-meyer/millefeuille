@@ -39,7 +39,7 @@
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
     "allowedModel": {
-      "enum": ["openai/gpt-5.6-sol", "xai/grok-4.6"]
+      "enum": ["openai/gpt-6-astra", "xai/grok-4.6"]
     }
   },
   "properties": {

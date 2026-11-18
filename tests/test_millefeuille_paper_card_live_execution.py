@@ -107,7 +107,7 @@ class TestTrustedGptCardExecution(unittest.TestCase):
     def test_real_adapter_unknown_cost_survives_one_call_through_card_validation(self):
         calls = []
         response = client_tests._model_response(
-            "openai", "gpt-5.6-sol", self.fixture.output.decode()
+            "openai", "gpt-6-astra", self.fixture.output.decode()
         )
         response["usage"] = {"input": 100, "output": 20, "total": 120}
 

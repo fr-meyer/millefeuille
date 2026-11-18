@@ -54,7 +54,7 @@
       "additionalProperties": false,
       "properties": {
         "documents": {"type": "integer", "minimum": 1},
-        "requested_stages": {"type": "integer", "minimum": 3},
+        "requested_stages": {"type": "integer", "minimum": 1},
         "work_units": {"type": "integer", "minimum": 1},
         "summary_outputs_generated": {"const": 0}
       }
@@ -66,11 +66,7 @@
   "$defs": {
     "work_unit_counts": {
       "type": "object",
-      "required": [
-        "summarize_page",
-        "summarize_section",
-        "summarize_full_paper"
-      ],
+      "minProperties": 1,
       "additionalProperties": false,
       "properties": {
         "summarize_page": {"type": "integer", "minimum": 1},

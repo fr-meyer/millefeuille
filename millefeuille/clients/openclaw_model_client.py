@@ -36,8 +36,11 @@ from millefeuille.domain.model_executor import (
 _MAX_OPENCLAW_STDOUT_BYTES = 4 * 1024 * 1024
 _MAX_OPENCLAW_STDERR_BYTES = 256 * 1024
 _LOGGER = logging.getLogger(__name__)
-_SUPPORTED_RUNTIME_MODEL = "openai/gpt-5.6-sol"
-_SUPPORTED_AUTH_DB_SCHEMA = 19
+_SUPPORTED_RUNTIME_MODEL = "openai/gpt-6-astra"
+# Audited auth-cell contract, not permission to migrate the agent database.
+# See docs/openclaw-oauth-schema-compatibility.md before extending this set.
+_SUPPORTED_AUTH_DB_SCHEMAS = frozenset(range(19, 26))
+_AUTH_SNAPSHOT_DB_SCHEMA = 19
 _JSON_SAFE_INTEGER_MAX = (1 << 53) - 1
 _AGENT_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}\Z")
 _CHILD_ENV_ALLOWLIST = frozenset(
@@ -140,83 +143,103 @@ def _bounded_run(
         start_new_session=os.name != "nt",
         creationflags=(subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0),
     ) as process:
-        assert process.stdout is not None and process.stderr is not None
-        stdout = bytearray()
-        stderr = bytearray()
-        overflow = threading.Event()
-        read_errors: list[OSError] = []
-
-        def collect(stream: Any, buffer: bytearray, limit: int) -> None:
-            try:
-                while chunk := os.read(stream.fileno(), 64 * 1024):
-                    if len(buffer) + len(chunk) > limit:
-                        overflow.set()
-                        _kill_process_tree(process)
-                        return
-                    buffer.extend(chunk)
-            except OSError as exc:
-                read_errors.append(exc)
-
-        def send_input() -> None:
-            assert input_bytes is not None and process.stdin is not None
-            try:
-                with process.stdin:
-                    for offset in range(0, len(input_bytes), 64 * 1024):
-                        view = memoryview(input_bytes)[offset : offset + 64 * 1024]
-                        while view:
-                            view = view[os.write(process.stdin.fileno(), view) :]
-            except (BrokenPipeError, OSError):
-                # The child may reject stdin; its exit status remains authoritative.
-                pass
-
-        readers = [
-            threading.Thread(
-                target=collect,
-                args=(process.stdout, stdout, max_stdout_bytes),
-                daemon=True,
-            ),
-            threading.Thread(
-                target=collect,
-                args=(process.stderr, stderr, max_stderr_bytes),
-                daemon=True,
-            ),
-        ]
-        for reader in readers:
-            reader.start()
-        writer = (
-            threading.Thread(target=send_input, daemon=True)
-            if input_bytes is not None
-            else None
-        )
-        if writer is not None:
-            writer.start()
+        workers: list[threading.Thread] = []
         try:
+            assert process.stdout is not None and process.stderr is not None
+            stdout = bytearray()
+            stderr = bytearray()
+            overflow = threading.Event()
+            read_errors: list[OSError] = []
+
+            def collect(stream: Any, buffer: bytearray, limit: int) -> None:
+                try:
+                    while chunk := os.read(stream.fileno(), 64 * 1024):
+                        if len(buffer) + len(chunk) > limit:
+                            overflow.set()
+                            _kill_process_tree(process)
+                            return
+                        buffer.extend(chunk)
+                except OSError as exc:
+                    read_errors.append(exc)
+
+            def send_input() -> None:
+                assert input_bytes is not None and process.stdin is not None
+                try:
+                    with process.stdin:
+                        for offset in range(0, len(input_bytes), 64 * 1024):
+                            view = memoryview(input_bytes)[offset : offset + 64 * 1024]
+                            while view:
+                                view = view[os.write(process.stdin.fileno(), view) :]
+                except (BrokenPipeError, OSError):
+                    # The child may reject stdin; its exit status remains authoritative.
+                    pass
+
+            readers = [
+                threading.Thread(
+                    target=collect,
+                    args=(process.stdout, stdout, max_stdout_bytes),
+                    daemon=True,
+                ),
+                threading.Thread(
+                    target=collect,
+                    args=(process.stderr, stderr, max_stderr_bytes),
+                    daemon=True,
+                ),
+            ]
+            workers.extend(readers)
+            for reader in readers:
+                reader.start()
+            writer = (
+                threading.Thread(target=send_input, daemon=True)
+                if input_bytes is not None
+                else None
+            )
+            if writer is not None:
+                workers.append(writer)
+                writer.start()
             returncode = process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            _kill_process_tree(process)
-            with suppress(subprocess.TimeoutExpired):
-                process.wait(timeout=2)
-            raise
-        finally:
-            for thread in [*readers, *([writer] if writer is not None else [])]:
+            for thread in workers:
                 thread.join(timeout=1)
-            if any(reader.is_alive() for reader in readers):
+            if any(thread.is_alive() for thread in workers):
                 _kill_process_tree(process)
-                for reader in readers:
-                    reader.join(timeout=1)
-        if overflow.is_set():
-            raise _OutputLimitExceeded("OpenClaw child output limit exceeded")
-        if any(reader.is_alive() for reader in readers) or read_errors:
-            raise subprocess.SubprocessError("OpenClaw child output was incomplete")
-        completed = subprocess.CompletedProcess(
-            args=command,
-            returncode=returncode,
-            stdout=stdout.decode(encoding),
-            stderr=stderr.decode(encoding),
-        )
-        if check:
-            completed.check_returncode()
-        return completed
+                for thread in workers:
+                    thread.join(timeout=1)
+            if overflow.is_set():
+                raise _OutputLimitExceeded("OpenClaw child output limit exceeded")
+            if any(reader.is_alive() for reader in readers) or read_errors:
+                raise subprocess.SubprocessError("OpenClaw child output was incomplete")
+            completed = subprocess.CompletedProcess(
+                args=command,
+                returncode=returncode,
+                stdout=stdout.decode(encoding),
+                stderr=stderr.decode(encoding),
+            )
+            if check:
+                completed.check_returncode()
+            return completed
+        except BaseException:
+            # Direct-child exit does not imply that its process group is empty.
+            # This also handles first cancellation during ordinary worker joins.
+            # Cleanup is best-effort without replacing the primary exception.
+            def finish_cleanup(action: Callable[[], Any]) -> None:
+                try:
+                    action()
+                except Exception:
+                    pass  # Secondary cleanup errors cannot replace the cause.
+                except BaseException:
+                    # A FIRST control signal may arrive while unwinding an
+                    # earlier timeout/error. Complete the interrupted cleanup;
+                    # the CLI cancellation latch absorbs subsequent signals.
+                    with suppress(BaseException):
+                        action()
+
+            finish_cleanup(lambda: _kill_process_tree(process))
+            finish_cleanup(lambda: process.wait(timeout=2))
+            for worker in workers:
+                # start() may have failed or been interrupted midway.
+                if worker.ident is not None:
+                    finish_cleanup(lambda worker=worker: worker.join(timeout=1))
+            raise
 
 
 def _read_agent_local_oauth_access(
@@ -239,10 +262,32 @@ def _read_agent_local_oauth_access(
             sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=1)
         ) as connection:
             connection.execute("PRAGMA query_only = ON")
-            if connection.execute("PRAGMA user_version").fetchone()[0] != (
-                _SUPPORTED_AUTH_DB_SCHEMA
+            connection.execute("BEGIN")
+            if connection.execute("PRAGMA user_version").fetchone()[0] not in (
+                _SUPPORTED_AUTH_DB_SCHEMAS
             ):
                 return None
+            for table, prefix in (
+                ("auth_profile_store", "store"),
+                ("auth_profile_state", "state"),
+            ):
+                # Reject views, reordered/extra/generated columns and noncanonical
+                # constraints before touching the selected credential cell.
+                shape = connection.execute(
+                    f"PRAGMA main.table_xinfo({table})"
+                ).fetchall()
+                expected = [
+                    (0, f"{prefix}_key", "TEXT", 1, None, 1, 0),
+                    (1, f"{prefix}_json", "TEXT", 1, None, 0, 0),
+                    (2, "updated_at", "INTEGER", 1, None, 0, 0),
+                ]
+                tables = connection.execute(
+                    "SELECT type, ncol, wr, strict FROM pragma_table_list "
+                    "WHERE schema = 'main' AND name = ?",
+                    (table,),
+                ).fetchall()
+                if shape != expected or tables != [("table", 3, 0, 1)]:
+                    return None
             row = connection.execute(
                 "SELECT json_extract(store_json, ?) FROM auth_profile_store "
                 "WHERE store_key = 'primary'",
@@ -311,7 +356,7 @@ def _write_oauth_access_snapshot(
     snapshot_agent_dir.mkdir(mode=0o700)
     database = snapshot_agent_dir / "openclaw-agent.sqlite"
     with closing(sqlite3.connect(database)) as connection:
-        connection.execute(f"PRAGMA user_version = {_SUPPORTED_AUTH_DB_SCHEMA}")
+        connection.execute(f"PRAGMA user_version = {_AUTH_SNAPSHOT_DB_SCHEMA}")
         connection.execute(
             "CREATE TABLE auth_profile_store (store_key TEXT NOT NULL PRIMARY KEY, "
             "store_json TEXT NOT NULL, updated_at INTEGER NOT NULL) STRICT"
@@ -392,7 +437,7 @@ class OpenClawModelClient:
         verify_model_executor_input(normalized, input_payload)
         if normalized["requested_model"] != _SUPPORTED_RUNTIME_MODEL:
             raise MillefeuilleContractError(
-                "OpenClaw live adapter currently supports only openai/gpt-5.6-sol"
+                "OpenClaw live adapter currently supports only openai/gpt-6-astra"
             )
         if normalized["fallback"] != {"policy": "none", "models": []}:
             raise MillefeuilleContractError(
@@ -862,6 +907,12 @@ def _validate_openclaw_response(
     if not isinstance(provider, str) or not isinstance(model, str):
         raise MillefeuilleContractError("OpenClaw model attribution is missing")
     actual_model = f"{provider}/{model}"
+    # Installed agent exec reports the exact model, but no resolved effort.
+    # Never infer effective effort from model identity; reject explicit drift
+    # if a newer runtime supplies attribution. xhigh is sent via --thinking.
+    for field in ("thinking", "reasoning_effort"):
+        if field in response and response[field] != "xhigh":
+            raise MillefeuilleContractError("OpenClaw reasoning effort mismatch")
 
     # OpenClaw 2026.9.4 omits these summaries when no tool or bridge ran.
     if "toolSummary" in response:

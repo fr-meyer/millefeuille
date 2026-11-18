@@ -1,0 +1,39 @@
+{
+  "accepted_run": false,
+  "doi": null,
+  "evidence_sha256": "066cea70b788a79f45bb3d1d26e1cf187c2037b6d7b452c15b874721d4054813",
+  "immutable_backend_version": null,
+  "origin": "OpenKB helper native + Mistral OCR",
+  "page_count": 1,
+  "pages": [
+    {
+      "page": 1,
+      "route": "native",
+      "sha256": "6d995319997ddfddf0475f130b5402227d335d85fe516ead2f91f384621450df",
+      "text": "# Synthetic test page\n"
+    },
+    {
+      "page": 1,
+      "route": "mistral-ocr",
+      "sha256": "6d995319997ddfddf0475f130b5402227d335d85fe516ead2f91f384621450df",
+      "text": "# Synthetic test page\n"
+    },
+    {
+      "page": 1,
+      "route": "selected",
+      "sha256": "6d995319997ddfddf0475f130b5402227d335d85fe516ead2f91f384621450df",
+      "text": "# Synthetic test page\n"
+    }
+  ],
+  "paper_id": "zotero-ITEM1",
+  "provider_calls": 0,
+  "raw_provider_sha256": "39f540d423af7d8c5b6fe7c72a2b6ced6fddbf99d00f22d823ad7dc8bc8fc2e1",
+  "requested_model": "mistral-ocr-latest",
+  "returned_model": "mistral-ocr-latest",
+  "schema_version": "millefeuille-openkb-import/v0.1",
+  "source_hash": "sha256:c2a796a76625e3a74418eb6f72c2b9ed1b5c9dd9a0a0831115596504eae0ca1c",
+  "upstream_manifest_sha256": "66a2c93928e03b98f98aafa1aa9e90a9497bf24e14e50216a60f89711ccbcfda",
+  "usage_info": {
+    "pages_processed": 1
+  }
+}

@@ -1,0 +1,11 @@
+# Collection IPC result dispatch repair
+
+R1: worker accepted GET-COLLECTION, but parent decoder treated every non-GET result as PATCH acknowledgement. Fix explicitly admits only GET/GET-COLLECTION/PATCH before spawn, routes item proof to item validator, collection proof to existing collection rederivation plus exact requested identity, and PATCH to unchanged strict ACK validation. Collection proof failure is a read failure, not ambiguous write. Original inherited deadline is checked after proof validation. Receipt/journal consumption is unchanged: no refund, reset or retry on failed preparation.
+
+The final root vertical tests no longer replace parent _HTTPBoundary._call or call _exchange directly. They run actual _contained_exchange/owned child/worker framing/parent decoder. A test-only fixed _worker_command loads tests/writeback_mock_worker.py inside the child; its only HTTP seam is MockTransport installed on child boundary construction. It validates fixed URLs, HTTP methods, cache headers, synthetic key and conditional versions, then canonical raw HTTP responses pass through the real _exchange. Bounded private TEMP state carries synthetic parent version/tags/collections across separately reaped workers. Parent dispatcher is real Linux main thread, Unix client a thread; temporary root UID metadata/chown remain explicitly synthetic. No production test command/environment/configuration route was added.
+
+Default collection IPC tests cover malformed/missing result, rawhash/content/version/identity/library drift, nonfinite/duplicate raw JSON, oversized raw proof, expired-before-spawn and unknown operation, postvalidation inherited deadline, and single-call budget. Independent unchanged reviewer reproducer fails on7c02 and passes after repair.
+
+The outer30second socket frame deadline bounds frame IO and is checked after processing; it is not a preemptive wall-clock bound on all root CPU/file processing. Each actual HTTP request/preparation retains its existing owned-process deadline/cleanup semantics. No new service architecture or timeout promise.
+
+Whole source rereview and exact package qualification remain separate from this functional repair. No live root service, credentials, DNS/API, deployment, package installation or publication performed.

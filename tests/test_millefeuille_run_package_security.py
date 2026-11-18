@@ -4,6 +4,7 @@ from contextlib import ExitStack
 import os
 from pathlib import Path
 import socket
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -16,6 +17,22 @@ from tests.test_millefeuille_multi_source_run_package import (
     _saved_output_refs,
     _saved_run,
 )
+
+
+def _bind_fixture_socket(sock, entry):
+    flags = ("O_DIRECTORY", "O_NOFOLLOW")
+    if (
+        sys.platform.startswith("linux")
+        and all(hasattr(os, name) for name in flags)
+        and Path("/proc/self/fd").is_dir()
+    ):
+        parent_fd = os.open(entry.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            sock.bind(f"/proc/self/fd/{parent_fd}/{entry.name}")
+        finally:
+            os.close(parent_fd)
+    else:
+        sock.bind(str(entry))
 
 
 @requires_secure_nofollow_writes
@@ -31,7 +48,7 @@ class RunPackageSecurityTests(unittest.TestCase):
                         os.mkfifo(entry)
                     elif kind == "socket":
                         sock = stack.enter_context(socket.socket(socket.AF_UNIX))
-                        sock.bind(str(entry))
+                        _bind_fixture_socket(sock, entry)
                     else:
                         target = {
                             "file-symlink": run / "cards/paper-card.md",

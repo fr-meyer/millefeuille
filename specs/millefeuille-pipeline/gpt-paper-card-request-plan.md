@@ -9,7 +9,7 @@ provider execution, receipt reservation, or writes.
 The request binds the paper ID, run ID, source hash, published summary bundle,
 all input hashes, exact prompt bytes, source pages, output contract, timeout,
 and pinned model. `research-default.paper_card` selects
-`openai/gpt-5.6-sol`, subscription OAuth, `xhigh`, fast mode off, one attempt,
+`openai/gpt-6-astra`, subscription OAuth, `xhigh`, fast mode off, one attempt,
 no API key, and no fallback. Profile drift fails closed. The metadata manifest
 and object representations exclude paper and summary text.
 

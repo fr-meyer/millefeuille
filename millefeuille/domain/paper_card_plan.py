@@ -140,7 +140,7 @@ def plan_gpt_paper_card_request(
     config = DEFAULT_MODEL_PROFILE_BUNDLE["profiles"]["research-default"]["paper_card"]
     expected = {
         "backend": "chat",
-        "model": "openai/gpt-5.6-sol",
+        "model": "openai/gpt-6-astra",
         "provider": "openai",
         "auth_lane": "openclaw-native-codex-oauth",
         "fallback_policy": "none",
