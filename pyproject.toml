@@ -30,6 +30,7 @@ classifiers = [
 ]
 dependencies = [
     "pyzotero",
+    "httpx>=0.27,<0.29",
     "mistralai<2",
     "tabulate",
     "pageindex",

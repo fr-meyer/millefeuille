@@ -1,8 +1,23 @@
 # Standalone one-paper processing
 
-Python 3.11+ on Windows, macOS or Linux. Install the package and its declared
+Python 3.11+. The default clean-start lifecycle requires a trusted POSIX
+filesystem and cooperating writers; Windows qualification is not claimed.
+Install the package and its declared
 Python dependencies in your own environment. No OpenClaw, GCP, broker, socket,
 privileged service, or machine-specific directory is required.
+
+## Current default: clean-start processing
+
+Normal live processing requires an explicitly initialized clean taxonomy store
+via --taxonomy-store, not --taxonomy. Follow [clean-start](clean-start.md) for
+reviewed seed or empty initialization, credentials, final selection and replay.
+It performs taxonomy-free scientific analysis, final classification and card
+export before recording completion. PDFs and artifacts are preserved pending
+actual cloud-hash qualification; --keep-pdf is not needed on this default path.
+
+The taxonomy-based analysis and automatic retention sections below describe only
+the explicitly selected --legacy-analysis-only path, not the current default.
+Neither mode implies end-to-end or scientific-quality acceptance.
 
 ## Read-only discovery
 
@@ -22,9 +37,9 @@ Exactly one Zotero-stored PDF and at most ten children are supported. Ambiguous,
 linked-only, missing or oversized sources stop, not silently skip to another
 paper. Existing classification tags are not evidence of processing success.
 
-## Explicit live local processing
+## Legacy analysis-only: explicit live local processing
 
-Also set MISTRAL_API_KEY. Supply a released, validated Millefeuille taxonomy
+Select --legacy-analysis-only explicitly. Also set MISTRAL_API_KEY. Supply a released, validated Millefeuille taxonomy
 registry JSON via --taxonomy. By default install Codex CLI on PATH and run
 `codex login` with your ChatGPT subscription. The CLI checks availability and
 `codex login status` (15-second bound, output suppressed) before OCR spend,
@@ -38,7 +53,7 @@ An arbitrary CLI is not necessarily compatible with the JSON executor protocol.
 ```sh
 millefeuille process --tag millefeuille --max-items 1 --output-dir ./papers \
   --item-key YOURKEY8 --taxonomy ./released-taxonomy.json \
-  --live
+  --legacy-analysis-only --live
 ```
 
 Optional override: --executor-command '["/path/to/protocol-compatible-executor"]'.
@@ -59,9 +74,10 @@ the operator; the CLI does not extract OAuth credentials or install executables.
 
 Each library/item has an exclusively created directory under output-dir. It
 temporarily contains source.pdf, a real-live source manifest and an immutable run
-journal. Successful processing now defaults to verified removal of source.pdf
+journal. Only legacy analysis-only processing defaults to verified removal of source.pdf
 and the OCR original.pdf copy, while retaining the Zotero cloud original.
-Use --keep-pdf only when deliberately retaining both local PDFs. See
+On that legacy path, use --keep-pdf to retain both local PDFs. The default
+clean-start path preserves them regardless. See
 [retention and reconciliation](standalone-retention.md). A retention failure
 returns exit 2 and preserves its journals; 06-completed alone is processing
 evidence, not no-PDF completion. The run retains exact discovery JSON, selected Zotero metadata/version,
@@ -105,9 +121,9 @@ credentials and private text are not printed. Always inspect the last retained
 journal stage after interruption. Real-paper acceptance must use actual Zotero,
 Mistral and selected-model outputs; compilation/lint is not functional proof.
 
-## Completed-run discovery and retention
+## Legacy completed-run discovery and retention
 
-Successful `process` completion calls `finalize_completed_run`: it creates a
+Successful legacy `process --legacy-analysis-only` completion calls `finalize_completed_run`: it creates a
 source-backed portable paper card, optionally exports that card, then removes the
 two known local PDF copies after verified Zotero recovery. `--keep-pdf` is an
 explicit override, not the default.
