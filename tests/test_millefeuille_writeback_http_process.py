@@ -27,6 +27,10 @@ class ProcessHTTPTests(unittest.TestCase):
         }
         self.processes = []
         self.original_popen = subprocess.Popen
+        if sys.platform == "linux":
+            self.set_up_linux_supervisor()
+
+    def set_up_linux_supervisor(self):
         self.original_alarm = signal.signal(
             signal.SIGALRM,
             lambda *_: (_ for _ in ()).throw(TimeoutError("outer test bound")),
@@ -43,6 +47,46 @@ class ProcessHTTPTests(unittest.TestCase):
                     process.wait(timeout=1)
 
         self.addCleanup(cleanup)
+
+    def assert_unsupported_platform(self):
+        """Real supervisor refusal, not Linux lifecycle qualification."""
+        self.assertNotEqual(sys.platform, "linux")
+        before = list(self.root.iterdir())
+        with contextlib.ExitStack() as stack:
+            # Fail before any worker/IPC, credential serialization or transport.
+            guards = [
+                stack.enter_context(
+                    patch.object(owner, name, side_effect=AssertionError(name))
+                )
+                for owner, name in (
+                    (p, "_worker_command"),
+                    (p.subprocess, "Popen"),
+                    (p, "_wire"),
+                    (p.ctypes, "CDLL"),
+                    (p.selectors, "DefaultSelector"),
+                    (p.signal, "getsignal"),
+                    (h._HTTPBoundary, "_exchange"),
+                )
+            ]
+            for method in ("GET", "GET-COLLECTION", "PATCH"):
+                with self.subTest(contract="non-Linux refusal", method=method):
+                    with self.assertRaisesRegex(
+                        h.Error,
+                        "^contained HTTP requires Linux main-thread supervisor$",
+                    ) as caught:
+                        p._contained_exchange(
+                            "DUMMYSECRET",
+                            method,
+                            self.identity,
+                            time.monotonic() + 1.2,
+                        )
+                    self.assertIs(type(caught.exception), h.Error)
+                    self.assertNotIn("DUMMYSECRET", str(caught.exception))
+            for guard in guards:
+                guard.assert_not_called()
+        self.assertEqual(list(self.root.iterdir()), before)
+        self.assertEqual(self.processes, [])
+        self.assertFalse(p._LOCK.locked())
 
     def worker(self, source):
         path = self.root / "worker.py"
@@ -83,6 +127,8 @@ class ProcessHTTPTests(unittest.TestCase):
             self.assertFalse(Path("/proc", str(process.pid)).exists())
 
     def test_indefinite_default_executor_and_descendant_are_reaped(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         sentinel = self.original_popen(
             [sys.executable, "-I", "-c", "import time;time.sleep(5)"],
             start_new_session=True,
@@ -114,6 +160,8 @@ _main()
         sentinel.wait(timeout=1)
 
     def test_delayed_executor_shutdown_cannot_publish_success(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         source = """
 import asyncio,threading
 from millefeuille.domain import writeback_http as h
@@ -130,6 +178,8 @@ _main()
         self.assert_reaped()
 
     def test_fast_actual_worker_ack_and_proof(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         source = """
 import json
 from millefeuille.domain import writeback_http as h
@@ -150,6 +200,8 @@ _main()
         self.assert_reaped()
 
     def test_malformed_oversize_exit_and_parent_signal(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         for source in (
             "import sys;sys.stdout.buffer.write(b'bad');sys.stdout.flush()",
             "import sys,struct;sys.stdout.buffer.write(struct.pack('!I',200001));"
@@ -162,6 +214,8 @@ _main()
             self.assert_reaped()
 
     def test_explicit_refusal_retained(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         source = """
 from millefeuille.domain import writeback_http as h
 from millefeuille.domain.writeback_http_worker import _main
@@ -175,6 +229,8 @@ _main()
         self.assert_reaped()
 
     def test_complete_refusal_with_delayed_exit_is_not_overwritten(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         source = """
 import struct,time
 wire=b'{"kind":"refused"}'

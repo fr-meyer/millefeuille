@@ -3,6 +3,7 @@
 import ctypes
 import os
 import signal
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -11,7 +12,9 @@ from millefeuille.domain import writeback_http as h
 from millefeuille.domain import writeback_http_process as p
 from tests import test_millefeuille_writeback_http_process as base
 
-MANAGED = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+MANAGED = (
+    (signal.SIGINT, signal.SIGTERM, signal.SIGHUP) if sys.platform == "linux" else ()
+)
 FAST = """
 from millefeuille.domain import writeback_http as h
 from millefeuille.domain.writeback_http_worker import _main
@@ -24,6 +27,8 @@ SLEEP = "import time;time.sleep(30)"
 
 class LifecycleTests(unittest.TestCase):
     setUp = base.ProcessHTTPTests.setUp
+    set_up_linux_supervisor = base.ProcessHTTPTests.set_up_linux_supervisor
+    assert_unsupported_platform = base.ProcessHTTPTests.assert_unsupported_platform
     worker = base.ProcessHTTPTests.worker
     invoke = base.ProcessHTTPTests.invoke
     assert_reaped = base.ProcessHTTPTests.assert_reaped
@@ -43,6 +48,8 @@ class LifecycleTests(unittest.TestCase):
         self.assert_reaped()
 
     def test_cdll_selector_failure_and_actual_next_call(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         for target in ("cdll", "selector"):
             before = self.state()
             context = (
@@ -63,6 +70,8 @@ class LifecycleTests(unittest.TestCase):
             self.assert_restored(before)
 
     def test_real_sighup_during_exchange(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         with _controlled_termination():
             before = self.state()
             with self.assertRaises(ValueError):
@@ -73,8 +82,8 @@ class LifecycleTests(unittest.TestCase):
             self.assert_restored(before)
 
     def test_repeated_mixed_cleanup_and_restore_cancel_no_ack(self):
-        import sys
-
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         sentinel = self.original_popen(
             [sys.executable, "-I", "-c", "import time;time.sleep(30)"],
             start_new_session=True,
@@ -128,6 +137,8 @@ class LifecycleTests(unittest.TestCase):
             self.assertIsNone(sentinel.poll())
 
     def test_partial_handler_installation_and_next_call(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         before = self.state()
         real_signal = signal.signal
         count = 0
@@ -148,6 +159,8 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.invoke(FAST, method="PATCH").version, 10)
 
     def test_prctl_setup_and_interrupted_restore(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         real_factory = ctypes.CDLL
         for mode in ("setup", "restore"):
             before = self.state()
@@ -176,6 +189,8 @@ class LifecycleTests(unittest.TestCase):
             self.assertEqual(self.invoke(FAST, method="PATCH").version, 10)
 
     def test_refusal_preserved_under_cleanup_cancellation(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         before = self.state()
         real = p._kill_process_tree
 
@@ -195,6 +210,8 @@ class LifecycleTests(unittest.TestCase):
         self.assert_restored(before)
 
     def test_selector_close_fault_denies_ack_and_next_call_works(self):
+        if sys.platform != "linux":
+            return self.assert_unsupported_platform()
         before = self.state()
         factory = p.selectors.DefaultSelector
         attempts = []
