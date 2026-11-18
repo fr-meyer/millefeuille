@@ -90,6 +90,24 @@ def main():
     loader = unittest.TestLoader()
     suite = loader.discover("tests", top_level_dir=".")
     if loader.errors:
+        # Emit only bounded repository module identifiers, never raw exception
+        # messages, tracebacks, environment values, or imported source content.
+        failed_modules = sorted(
+            {
+                test.id()
+                for test in flatten(suite)
+                if isinstance(test, unittest.loader._FailedTest)
+            }
+        )
+        safe_modules = [
+            name
+            for name in failed_modules[:100]
+            if len(name) <= 240
+            and all(
+                char.isascii() and (char.isalnum() or char in "._") for char in name
+            )
+        ]
+        print(json.dumps({"collection_error_modules": safe_modules}), flush=True)
         raise RuntimeError("CI collection errors")
     output = ROOT / ".ci-output"
     output.mkdir(exist_ok=True)
