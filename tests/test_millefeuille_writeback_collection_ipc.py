@@ -1,7 +1,7 @@
 """Actual worker pipes and parent decoder; no DNS or real API."""
 
-import time
 import sys
+import time
 import unittest
 from unittest.mock import patch
 

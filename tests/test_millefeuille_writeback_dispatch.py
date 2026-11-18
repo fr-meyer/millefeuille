@@ -39,7 +39,9 @@ def assert_dispatch_unavailable(test, payload):
     with patch.object(broker, "process") as process, patch.object(
         broker, "protected_read"
     ) as custody, patch.object(contained.subprocess, "Popen") as worker:
-        with test.assertRaisesRegex(broker.Error, "GPT card broker needs peer credentials"):
+        with test.assertRaisesRegex(
+            broker.Error, "GPT card broker needs peer credentials"
+        ):
             broker.serve_connection(channel, {"caller_uid": 0})
         process.assert_not_called()
         custody.assert_not_called()
@@ -227,7 +229,9 @@ class DispatchTests(unittest.TestCase):
 
     def test_actual_socket_execute_and_restart_replay(self):
         if os.name == "nt":
-            assert_dispatch_unavailable(self, "test_actual_socket_execute_and_restart_replay")
+            assert_dispatch_unavailable(
+                self, "test_actual_socket_execute_and_restart_replay"
+            )
             return
         payload = {
             "operation": "execute",
@@ -461,7 +465,9 @@ class DispatchTests(unittest.TestCase):
 
     def test_collection_drift_denies_before_patch(self):
         if os.name == "nt":
-            assert_dispatch_unavailable(self, "test_collection_drift_denies_before_patch")
+            assert_dispatch_unavailable(
+                self, "test_collection_drift_denies_before_patch"
+            )
             return
         self.collection_drift = True
         self.test_actual_socket_execute_and_restart_replay()

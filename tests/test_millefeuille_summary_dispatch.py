@@ -17,6 +17,7 @@ from millefeuille.domain.summary_dispatch import plan_verified_summary_dispatch
 from millefeuille.domain.summary_preparation import prepare_summary_execution_packages
 from tests.platform_capabilities import requires_secure_nofollow_writes
 
+
 def portable_preparation_fixture(route, structure, output, stages=None):
     """Persist only genuine no-call constructor bytes, not accepted receipts."""
     from millefeuille.domain import summary_preparation as preparation
@@ -26,8 +27,12 @@ def portable_preparation_fixture(route, structure, output, stages=None):
         structure=preparation.load_structure_evidence_batch(structure)[0],
         output_root=Path(output),
         profile=profile,
-        plans={stage: preparation.build_summary_execution_plan(profile=profile, stage=stage)
-               for stage in preparation.SUMMARY_MODEL_STAGES},
+        plans={
+            stage: preparation.build_summary_execution_plan(
+                profile=profile, stage=stage
+            )
+            for stage in preparation.SUMMARY_MODEL_STAGES
+        },
     )
     document = preparation._select_prepared(document, stages)
     document.package_path.parent.mkdir(parents=True, exist_ok=True)

@@ -8,8 +8,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from millefeuille.domain.writeback_live_files import protected_read
 from millefeuille.domain.millefeuille import MillefeuilleContractError
+from millefeuille.domain.writeback_live_files import protected_read
 
 
 class CustodyTests(unittest.TestCase):

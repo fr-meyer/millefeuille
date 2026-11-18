@@ -1,8 +1,8 @@
 """Receipt authenticity separation and raw-proof/version tests, all synthetic."""
 
 import copy
-import os
 from datetime import UTC, datetime, timedelta
+import os
 import unittest
 
 from millefeuille.domain.live_receipts import compute_approved_live_receipt_digest

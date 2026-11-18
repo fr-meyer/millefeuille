@@ -16,7 +16,9 @@ class ClassificationDeadlines(unittest.TestCase):
         from unittest.mock import Mock
         channel = Mock()
         with patch.object(b, "_process") as process:
-            with self.assertRaisesRegex(b.Error, "GPT card broker needs peer credentials"):
+            with self.assertRaisesRegex(
+                b.Error, "GPT card broker needs peer credentials"
+            ):
                 b._serve_connection(channel, 0)
             process.assert_not_called()
         channel.recv.assert_not_called()

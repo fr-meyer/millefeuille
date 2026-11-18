@@ -23,7 +23,10 @@ from tests import test_millefeuille_writeback_core as core_tests
 
 class BindingTests(unittest.TestCase):
     def setUp(self):
-        if os.name == "nt" and self._testMethodName != "test_cli_plan_preflight_and_invalid_no_network":
+        if (
+            os.name == "nt"
+            and self._testMethodName != "test_cli_plan_preflight_and_invalid_no_network"
+        ):
             if self._testMethodName == "test_exact_authenticated_receipt_and_operation":
                 self.fixture = core_tests.receipt_projection_fixture(self)
                 self.plan = self.fixture.plan
@@ -135,7 +138,9 @@ class BindingTests(unittest.TestCase):
 
     def test_actual_dispatch_consumption_restart_and_rollback(self):
         if os.name == "nt":
-            from tests.test_millefeuille_writeback_dispatch import assert_dispatch_unavailable
+            from tests.test_millefeuille_writeback_dispatch import (
+                assert_dispatch_unavailable,
+            )
             assert_dispatch_unavailable(self, "execute-replay-rollback")
             return
         # Replace obsolete mocked-root success with the actual guarded socket path.
@@ -150,7 +155,9 @@ class BindingTests(unittest.TestCase):
 
     def test_socket_denial_frame_on_main_thread(self):
         if os.name == "nt":
-            from tests.test_millefeuille_writeback_dispatch import assert_dispatch_unavailable
+            from tests.test_millefeuille_writeback_dispatch import (
+                assert_dispatch_unavailable,
+            )
             assert_dispatch_unavailable(self, "forged")
             return
         a, b = socket.socketpair()

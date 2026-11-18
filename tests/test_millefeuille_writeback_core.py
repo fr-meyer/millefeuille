@@ -31,8 +31,9 @@ def receipt_projection_fixture(test):
     materialization bundle, journal, or authenticated evidence are constructed.
     """
     from types import SimpleNamespace
+
     from millefeuille.domain.writeback_core import _Plan, _snapshot, _wire
-    from tests.test_millefeuille_stage_cli import _prepare_fixture_run, RUN_ID
+    from tests.test_millefeuille_stage_cli import RUN_ID, _prepare_fixture_run
     temp = tempfile.TemporaryDirectory(prefix="mf-proof-leaf-")
     test.addCleanup(temp.cleanup)
     _, run = _prepare_fixture_run(temp.name)
@@ -90,7 +91,9 @@ def assert_journal_unavailable(test, *, existing=False, reopen=False):
         sync.assert_not_called()
         worker.assert_not_called()
         transport.assert_not_called()
-    test.assertEqual(before, {p.name: p.read_bytes() for p in root.iterdir() if p.is_file()})
+    test.assertEqual(
+        before, {p.name: p.read_bytes() for p in root.iterdir() if p.is_file()}
+    )
 
 
 class WritebackCoreTests(unittest.TestCase):
