@@ -806,8 +806,31 @@ overrides; the packaged placeholder defaults are not accepted.
 
 
 def entrypoint() -> None:
-    """Dispatch read-only subcommands before falling back to Hydra."""
+    """Dispatch explicit subcommands before falling back to Hydra."""
     argv = sys.argv[1:]
+    if argv and argv[0] == "process":
+        from millefeuille.cli.standalone import run_process_cli
+
+        sys.exit(run_process_cli(argv[1:]))
+    standalone_commands = {
+        "clean-start": ("clean_start", "run_clean_start_cli"),
+        "final-classification": ("final_classification", "run_final_classification_cli"),
+        "standalone-retention": ("standalone_retention", "run_standalone_retention_cli"),
+        "paper-card": ("paper_cards", "run_paper_card_cli"),
+        "taxonomy-store": ("taxonomy_store", "run_taxonomy_store_cli"),
+        "decisions-classify": ("decisions_classification", "run_decisions_classification_cli"),
+    }
+    if argv and argv[0] in standalone_commands:
+        from importlib import import_module
+
+        module, function = standalone_commands[argv[0]]
+        sys.exit(getattr(import_module("millefeuille.cli." + module), function)(argv[1:]))
+    if argv and argv[0] == "standalone-writeback":
+        from millefeuille.cli.standalone_writeback import (
+            run_standalone_writeback_cli,
+        )
+
+        sys.exit(run_standalone_writeback_cli(argv[1:]))
     if argv and argv[0] == "writeback-operator":
         from millefeuille.cli.writeback_operator import run_writeback_operator_cli
 
