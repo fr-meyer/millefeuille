@@ -1,3 +1,4 @@
+from millefeuille.credentials import CredentialError, credential_source
 """Packaged CLI entry point for Millefeuille.
 
 This module mirrors the repo-root main.py but is designed for installed-package
@@ -11,6 +12,8 @@ invocation via ``millefeuille`` (console_scripts) or
 3. Path-consuming modes (download, save-to-disk) reject the packaged
    placeholder defaults and require an explicit override.
 """
+from millefeuille.credentials import CredentialError, credential_source, credential_value, native_batch_credential_scope
+from contextlib import ExitStack
 
 from collections.abc import Mapping
 import json
@@ -102,7 +105,7 @@ def initialize_clients(
     zotero_client = ZoteroClient(cfg.credentials)
     logger.info("Zotero client initialized successfully")
 
-    if not cfg.ocr.enabled:
+    if cfg.processing.scientific_summary or not cfg.ocr.enabled:
         logger.info("OCR disabled — skipping OCR client initialization")
         return zotero_client, None
 
@@ -223,6 +226,7 @@ def validate_flags(cfg: AppConfig) -> None:
         and not cfg.ocr.enabled
         and not cfg.tag_adding.enabled
         and not cfg.selection_tagging.enabled
+        and not cfg.processing.scientific_summary
         and not standalone_export
     ):
         raise ConfigError(
@@ -430,7 +434,7 @@ def initialize_tree_processor(
         Optional TreeStructureProcessor instance. Returns None when tree
         structure extraction is disabled or tree credentials are missing.
     """
-    if not cfg.tree_structure.enabled:
+    if cfg.processing.scientific_summary or not cfg.tree_structure.enabled:
         logger.debug("Tree structure processing disabled")
         return None
 
@@ -704,8 +708,8 @@ def build_app_config(cfg: DictConfig) -> AppConfig:
                 )
 
     library_id = os.getenv("ZOTERO_LIBRARY_ID") or PACKAGED_PLACEHOLDER_LIBRARY_ID
-    read_key_env = os.getenv("ZOTERO_READ_KEY") or PACKAGED_PLACEHOLDER_READ_KEY
-    write_key_env = os.getenv("ZOTERO_WRITE_KEY")
+    read_key_env = (os.getenv("ZOTERO_READ_KEY") or PACKAGED_PLACEHOLDER_READ_KEY) if credential_source() == "legacy-env" else credential_value("ZOTERO_READ_KEY", stage="discovery")
+    write_key_env = os.getenv("ZOTERO_WRITE_KEY") if credential_source() == "legacy-env" else None if credential_source() == "legacy-env" else None
     if OmegaConf.is_missing(cfg, "credentials"):
         redact_logs = True
     else:
@@ -1111,7 +1115,9 @@ def main(cfg: DictConfig) -> None:
     logger = logging.getLogger(__name__)
 
     exit_code = 3
+    credential_scopes = ExitStack()
     try:
+        credential_scopes.enter_context(native_batch_credential_scope(cfg))
         app_cfg = build_app_config(cfg)
 
         # --- No-op help branch (replaces the ConfigError for all-disabled) ---
@@ -1120,6 +1126,7 @@ def main(cfg: DictConfig) -> None:
             and not app_cfg.ocr.enabled
             and not app_cfg.tag_adding.enabled
             and not app_cfg.selection_tagging.enabled
+            and not app_cfg.processing.scientific_summary
         )
         standalone_export = (
             app_cfg.export.openkb_handoff.enabled
@@ -1130,6 +1137,8 @@ def main(cfg: DictConfig) -> None:
             print(_HELP_TEXT)
             exit_code = 0
         else:
+            if credential_source() == "gcp-runtime":
+                raise CredentialError("CREDENTIAL_SCOPE_DENIED")
             # --- Fail-fast path enforcement for download mode ---
             _enforce_explicit_download_upload_folder(app_cfg)
 
@@ -1186,6 +1195,12 @@ def main(cfg: DictConfig) -> None:
                     app_cfg, logger, zotero_client, ocr_client, tree_processor
                 )
 
+    except CredentialError as e:
+        logger.error(e.code)
+        exit_code = 2
+    except CredentialError as e:
+        logger.error(e.code)
+        exit_code = 2
     except OpenKBHandoffValidationError as e:
         logger.error(f"OpenKB handoff validation failed: {redact_message(str(e))}")
         exit_code = 2
@@ -1198,6 +1213,9 @@ def main(cfg: DictConfig) -> None:
     except Exception as e:
         logger.error(f"Fatal error: {redact_message(str(e))}", exc_info=True)
         exit_code = 3
+
+    finally:
+        credential_scopes.close()
 
     sys.exit(exit_code)
 

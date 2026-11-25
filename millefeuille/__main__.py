@@ -2,7 +2,7 @@
 
 import sys
 
-from millefeuille.cli.main import entrypoint
+from millefeuille.cli.dispatch import entrypoint
 
 if __name__ == "__main__":
     sys.exit(entrypoint())

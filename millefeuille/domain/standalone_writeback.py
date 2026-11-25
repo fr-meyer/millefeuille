@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 from html.parser import HTMLParser
 import json
+from millefeuille.credentials import credential_value
 import os
 from pathlib import Path
 import re
@@ -378,9 +379,13 @@ async def execute(context, live):
             return {"status": "needs-review", "note_key": previous.get("note_key")}
     elif not live:
         return {"status": "planned-read-only", "note_key": None}
-    read_key = os.environ.get("ZOTERO_READ_KEY", "")
+    from millefeuille.domain.request_recovery import _normal_stage_scope, _root
+
+    if not old:
+        _normal_stage_scope(_root(c["run"]))
+    read_key = credential_value("ZOTERO_READ_KEY", stage="writeback")
     require(read_key)
-    write_key = os.environ.get("ZOTERO_WRITE_KEY", "") if not old else ""
+    write_key = credential_value("ZOTERO_WRITE_KEY", stage="writeback") if not old else ""
     require(old or write_key)
     deadline = time.monotonic() + 120
     reader = Transport(read_key, deadline)
@@ -429,6 +434,8 @@ async def execute(context, live):
                 for v in children
             )
         )
+        # Recheck after awaited inventory reads, before a new immutable intent.
+        _normal_stage_scope(_root(c["run"]))
         # O_EXCL reservation is also the durable pre-dispatch intent. Never removed.
         save_new(
             journal,
@@ -446,6 +453,7 @@ async def execute(context, live):
         )
         reserved = True
         # Exactly one POST, with no retry or library-version concurrency claim.
+        _normal_stage_scope(_root(c["run"]))
         ack, ack_headers = await writer.request(
             "POST",
             base + "/items",
