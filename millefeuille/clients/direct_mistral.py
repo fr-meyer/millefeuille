@@ -4,6 +4,7 @@ Call only after approving forwarding this exact PDF to Mistral. No retry or
 resume is automatic: an existing reservation requires operator reconciliation.
 HTTP timeouts bound individual I/O waits, not a hard process wall deadline.
 """
+from millefeuille.credentials import credential_value
 
 from datetime import UTC, datetime
 import hashlib
@@ -62,6 +63,7 @@ def extract_pdf(
     timeout_seconds=180.0,
     max_pages=250,
     max_input_bytes=50000000,
+    admission=None,
 ) -> dict:
     """Retain original, exact OCR wire JSON, page evidence and fulltext privately.
 
@@ -83,7 +85,9 @@ def extract_pdf(
         or not re.fullmatch(r"mistral-ocr-[A-Za-z0-9.-]+", model)
     ):
         raise DirectOCRError("Invalid bounded OCR settings")
-    key = api_key if api_key is not None else os.environ.get("MISTRAL_API_KEY")
+    from millefeuille.domain.postrun_reuse import forbid_new_provider
+    forbid_new_provider()
+    key = api_key if api_key is not None else credential_value("MISTRAL_API_KEY", stage="ocr")
     if not isinstance(key, str) or not key.strip():
         raise DirectOCRError("MISTRAL_API_KEY is required for explicit direct OCR")
     source = Path(pdf_path)
@@ -170,6 +174,8 @@ def extract_pdf(
             timeout_ms=max(1, int(timeout_seconds * 1000)),
         )
         try:
+            if admission is not None:
+                admission()
             _json(run / "upload-started.json", {"outcome": "unknown_until_response"})
             uploaded = client.files.upload(
                 file={"file_name": "original.pdf", "content": data},
@@ -187,6 +193,8 @@ def extract_pdf(
                 )
             _json(run / "upload.json", {"file_id": file_id})
             stage = "ocr"
+            if admission is not None:
+                admission()
             _json(run / "ocr-started.json", {"outcome": "unknown_until_response"})
             client.ocr.process(
                 model=model,

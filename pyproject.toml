@@ -41,14 +41,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-native = ["PyPDF2>=3.0.1,<4"]
+native = ["PyPDF2>=3.0.1,<4", "httpx"]
 test = [
     "jsonschema>=4.23",
     "ruff>=0.9",
 ]
 
 [project.scripts]
-millefeuille = "millefeuille.cli.main:entrypoint"
+millefeuille = "millefeuille.cli.dispatch:entrypoint"
 
 [tool.setuptools]
 
@@ -58,7 +58,7 @@ include = ["millefeuille*"]
 exclude = ["tests*", "*.tests*", "*.tests.*", "tests.*"]
 
 [tool.setuptools.package-data]
-millefeuille = ["conf/**/*.yaml"]
+millefeuille = ["conf/**/*.yaml", "clients/*.mjs", "clients/*.cjs"]
 
 [tool.ruff]
 target-version = "py311"

@@ -1,6 +1,8 @@
+from millefeuille.credentials import credential_value
 "Clean-root one-paper selection, durable binding before taxonomy adoption."
 
 import os
+from millefeuille.clients.native_profile import configured_profile
 import sys
 
 from millefeuille.clients.decisions import MODEL, REQUEST_CAP, post_decision
@@ -31,6 +33,11 @@ def generation_preflight(executor=None):
         )
     )
     require("taxonomy-category" in capabilities()["tasks"])
+    from millefeuille.domain.native_sdk_bridge import selected
+    if selected():
+        require(executor is None)
+        require(configured_profile() == os.environ.get("MILLEFEUILLE_OPENCLAW_PROFILE"))
+        return
     require(
         all(
             os.environ.get(k, "").strip()
@@ -42,13 +49,15 @@ def generation_preflight(executor=None):
     )
 
 
-def directory(run):
-    return run.parent.parent / "decisions" / "clean-final-v1"
+def directory(run, revision=0):
+    from millefeuille.domain.scientific_revision import final_directory
+
+    return final_directory(run, revision)
 
 
-def prepare(run_dir, store):
+def prepare(run_dir, store, *, revision=0):
     run = safe_path(run_dir)
-    root = directory(run)
+    root = directory(run, revision)
     registry = (
         taxonomy.validate(load(root / "selected-taxonomy.json"))
         if root.exists()
@@ -65,7 +74,7 @@ def prepare(run_dir, store):
         )
         == registry
     )
-    evidence = project(run)
+    evidence = project(run, revision=revision)
     leaves = sorted(
         (e for e in registry["entries"] if e["level"] == 2), key=lambda e: e["entry_id"]
     )
@@ -121,6 +130,7 @@ def prepare(run_dir, store):
     }
     return {
         "run": run,
+        "revision": revision,
         "registry": registry,
         "payload": payload,
         "binding": binding,
@@ -192,9 +202,8 @@ def outcome(context, root):
     if chosen == CREATE:
         from millefeuille.clients.direct_generation import validate_response
 
-        request = category_request(context)
-        require(load(root / "category-request.json") == request)
-        response = load(root / "category-response.json")
+        request, response_path = _category_material(context, root)
+        response = load(response_path)
         require("transport_evidence" in response)
         validate_response(request, response)
         registry, chosen = taxonomy.derive(registry, response["output"])
@@ -202,7 +211,9 @@ def outcome(context, root):
 
 
 def finish(context):
-    root = directory(context["run"])
+    from millefeuille.domain.pipeline_resources import before_native_work
+    before_native_work(directory(context["run"], context.get("revision", 0)) if "revision" in context else directory(context["run"]))
+    root = directory(context["run"], context.get("revision", 0))
     registry, chosen, decision = outcome(context, root)
     leaf = next(e for e in registry["entries"] if e["entry_id"] == chosen)
     require(leaf["level"] == 2)
@@ -228,7 +239,7 @@ def finish(context):
         "successor": registry["content_identity"],
         "final_sha256": sha(canonical(final)),
         "lock_sha256": sha(canonical(lock)),
-        "proposal_sha256": sha(read_bytes(root / "category-response.json"))
+        "proposal_sha256": sha(read_bytes(_category_material(context, root)[1]))
         if decision["chosen_id"] == CREATE
         else None,
     }
@@ -239,7 +250,7 @@ def finish(context):
 
 
 def verify(context):
-    root = directory(context["run"])
+    root = directory(context["run"], context.get("revision", 0))
     registry, chosen, decision = outcome(context, root)
     lock = {
         "schema_version": "millefeuille-clean-paper-lock/v1",
@@ -268,7 +279,7 @@ def verify(context):
         "successor": registry["content_identity"],
         "final_sha256": sha(canonical(final)),
         "lock_sha256": sha(canonical(lock)),
-        "proposal_sha256": sha(read_bytes(root / "category-response.json"))
+        "proposal_sha256": sha(read_bytes(_category_material(context, root)[1]))
         if decision["chosen_id"] == CREATE
         else None,
     }
@@ -287,7 +298,7 @@ def verify(context):
 
 
 async def execute(context, *, live=False, replay=False):
-    root = directory(context["run"])
+    root = directory(context["run"], context.get("revision", 0))
     if replay:
         if not (root / "installation.json").exists():
             finish(context)  # no credentials, no provider invocation
@@ -298,21 +309,46 @@ async def execute(context, *, live=False, replay=False):
             "binding": context["binding"],
             "request_sha256": sha(context["payload"]),
         }
-    require(not root.exists() and not legacy.reservation_path(context["run"]).exists())
+    from millefeuille.domain.postrun_reuse import forbid_new_provider
+    from millefeuille.domain.pipeline_resources import admit
+    forbid_new_provider()
+    from millefeuille.domain.pipeline_receipts import reserve_request, dispatch_reserved
+    import json
+
+    def admission():
+        # Re-read pause, disk headroom and current policy for EACH hand-off.
+        forbid_new_provider()
+        admit(context["run"], context["store"])
+        require(taxonomy.current(context["store"]) == context["registry"])
+
+    def decision_admission():
+        admission()
+        generation_preflight()
+        require(bool(credential_value("OPENAI_API_KEY", stage="decisions")))
+
+    def category_admission():
+        admission()
+        generation_preflight()
+
+    admission()
+    reservation = (
+        legacy.reservation_path(context["run"])
+        if not context.get("revision", 0)
+        else root.parent / ("revision-reservation-" + str(context["revision"]))
+    )
+    require(not root.exists() and not reservation.exists())
     generation_preflight()
     if not context["binding"]["bootstrap"]:
-        require(bool(os.environ.get("OPENAI_API_KEY", "").strip()))
+        require(bool(credential_value("OPENAI_API_KEY", stage="decisions")))
     require(taxonomy.current(context["store"]) == context["registry"])
     root.parent.mkdir(mode=0o700, exist_ok=True)
     sync(root.parent.parent)
-    reserve(
-        legacy.reservation_path(context["run"])
-    )  # one owner across old/new protocols
+    reserve(reservation)  # revision0 shares the original legacy spending namespace
     reserve(root)
     publish(root / "selected-taxonomy.json", canonical(context["registry"]))
     publish(root / "intent.json", canonical(context["binding"]))
-    publish(root / "request.json", context["payload"])
     if context["binding"]["bootstrap"]:
+        publish(root / "request.json", context["payload"])
         decision = {
             "chosen_id": CREATE,
             "basis": "only-logical-option-empty-root",
@@ -320,8 +356,12 @@ async def execute(context, *, live=False, replay=False):
         }
         publish(root / "bootstrap.json", canonical(decision))
     else:
+        request_path = root / "request.json"
+        reserve_request(request_path, json.loads(context["payload"]), decision_admission)
+        require(read_bytes(request_path) == context["payload"])
+        dispatch_reserved(request_path, decision_admission)
         status, raw = await post_decision(
-            context["payload"], os.environ["OPENAI_API_KEY"]
+            context["payload"], credential_value("OPENAI_API_KEY", stage="decisions")
         )
         publish(root / "response.json", raw)
         publish(
@@ -334,9 +374,20 @@ async def execute(context, *, live=False, replay=False):
         from millefeuille.clients.direct_generation import generate
 
         request = category_request(context)
+        request_path = root / "category-request.json"
+        reserve_request(request_path, request, category_admission)
         reserve(root / "category-attempt")
-        publish(root / "category-request.json", canonical(request))
+        dispatch_reserved(request_path, category_admission)
         response = generate(request, executor_argv=None)
         publish(root / "category-response.json", canonical(response))
     finish(context)
     return {"status": "final-classified", "final": verify(context)}
+
+def _category_material(context, root):
+    path = root / "category-response.json"
+    if path.exists():
+        request = category_request(context)
+        require(load(root / "category-request.json") == request)
+        return request, path
+    from millefeuille.domain.category_recovery import material
+    return material(context, root)

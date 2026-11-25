@@ -1,6 +1,7 @@
 """Explicit standalone, one-paper processing. No Zotero mutation surface."""
 
 from __future__ import annotations
+from millefeuille.credentials import CredentialError, command_credential_scope, credential_value
 
 import argparse
 import asyncio
@@ -293,235 +294,85 @@ def _artifact(value, name, root):
 
 
 def _operate(args):
-    if args.max_items != 1:
-        raise ProcessError("This bounded command requires --max-items 1")
-    if not args.tag or len(args.tag) > 128 or any(ord(c) < 32 for c in args.tag):
-        raise ProcessError("Provide one nonempty exact tag, at most 128 characters")
-    root = _safe_path(args.output_dir)
-    executor = None
-    clean = not args.legacy_analysis_only
-    if args.live:
-        if clean:
-            from millefeuille.domain.clean_evidence import analyze as analyze_paper
-            from millefeuille.domain.clean_final import generation_preflight
-            from millefeuille.domain.clean_taxonomy import current
+    from millefeuille.domain.paper_intake import extract_and_analyze
 
-            if args.taxonomy or args.final_taxonomy:
-                raise ProcessError("Clean pipeline rejects historical taxonomy priors")
-            registry = current(args.taxonomy_store)
-            generation_preflight()
-            if args.executor_command:
-                raise ProcessError("Clean pipeline uses packaged adapter")
-            if registry["entries"] and not os.environ.get("OPENAI_API_KEY", "").strip():
-                raise ProcessError("Decisions credential required before OCR")
-        else:
-            if not args.legacy_analysis_only and not os.environ.get("OPENAI_API_KEY"):
-                raise ProcessError(
-                    "Final classification requires OPENAI_API_KEY before OCR spend"
-                )
-            executor = _executor(args.executor_command)
-            if not args.taxonomy:
-                raise ProcessError(
-                    "--live requires --taxonomy PATH before provider spend"
-                )
-            taxonomy = _safe_path(args.taxonomy)
-            if not taxonomy.is_file() or taxonomy.stat().st_size > JSON_CAP:
-                raise ProcessError("Taxonomy must be a local JSON file under 1 MB")
-            from millefeuille.domain.taxonomy import load_taxonomy_registry
+    if getattr(args, "status", False):
+        from millefeuille.domain.paper_intake import retained_papers
+        if not args.item_key or not os.environ.get("ZOTERO_LIBRARY_ID", "").isdigit():
+            raise ProcessError("Local status requires --item-key and numeric ZOTERO_LIBRARY_ID")
+        paths = retained_papers(args)
+        return {"item_key": args.item_key, "status": "retained-do-not-replay" if paths else "not-started",
+                "paper_paths": [str(path) for path in paths], "provider_calls": 0,
+                "files_written": 0}
+    from millefeuille.domain import native_sdk_bridge as bridge
 
-            registry = load_taxonomy_registry(taxonomy)
-            if registry["status"] != "released":
-                raise ProcessError("Use a released taxonomy registry")
-            with taxonomy.open("rb") as stream:
-                taxonomy_bytes = stream.read(JSON_CAP + 1)
-            if len(taxonomy_bytes) > JSON_CAP:
-                raise ProcessError("Taxonomy changed beyond byte budget")
-            from millefeuille.domain.direct_analysis import analyze_paper
-        if not os.environ.get("MISTRAL_API_KEY", "").strip():
-            raise ProcessError("Set MISTRAL_API_KEY for live OCR")
-        from millefeuille.clients.direct_mistral import extract_pdf
-    library = os.environ.get("ZOTERO_LIBRARY_ID", "")
-    secret = os.environ.get("ZOTERO_READ_KEY", "")
-    if not re.fullmatch(r"[1-9][0-9]{0,14}", library):
-        raise ProcessError("Set ZOTERO_LIBRARY_ID to the numeric library ID")
-    if not re.fullmatch(r"[A-Za-z0-9]{1,128}", secret):
-        raise ProcessError("Set ZOTERO_READ_KEY to a library-readable API key")
-    if args.item_key:
-        _key(args.item_key)
-    prefix = "users" if args.library_type == "user" else "groups"
-    base = f"https://api.zotero.org/{prefix}/{library}"
-    selected = asyncio.run(
-        _discover(base, secret, args.tag, args.library_type, library, args.item_key)
-    )
-    if selected is None:
-        return {
-            "status": "no-matching-paper",
-            "provider_calls": 0,
-            "zotero_writeback": "none",
-        }
-    item, attachment = selected["item"], selected["attachment"]
-    key, attachment_key = item["key"], attachment["key"]
-    if not args.live:
-        return {
-            "status": "read-only-discovery",
-            "item_key": key,
-            "attachment_key": attachment_key,
-            "provider_calls": 0,
-            "files_written": 0,
-            "zotero_writeback": "none",
-            "live_requires": [
-                "Packaged subscription adapter credentials"
-                if clean
-                else "Reviewed subscription adapter",
-                "--taxonomy-store EXPLICIT_INITIALIZED_STORE"
-                if clean
-                else "--taxonomy PATH",
-                "MISTRAL_API_KEY",
-                "--live",
-            ],
-        }
-    root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    paper = root / f"{args.library_type}-{library}-{key}"
-    try:
-        paper.mkdir(mode=0o700)
-    except FileExistsError:
-        raise ProcessError(
-            "Paper reservation already exists. Inspect its journal; do not retry "
-            "uncertain provider work or change output roots to bypass it."
-        ) from None
-    run_id = uuid.uuid4().hex
-    run = paper / "runs" / run_id
-    run.parent.mkdir(mode=0o700)
-    run.mkdir(mode=0o700)
-    binding = {
-        "run_id": run_id,
-        "library_type": args.library_type,
-        "library_id": library,
-        "item_key": key,
-        "attachment_key": attachment_key,
-        "item_version": item["version"],
-        "attachment_version": attachment["version"],
-        "tag": args.tag,
-        "max_items": 1,
-        "zotero_writeback": "none",
-    }
-    _save(paper / "reservation.json", binding)
-    _save(run / "00-selected.json", selected)
-    _save(run / "01-download-started.json", binding)
-    pdf = asyncio.run(
-        _get(f"{base}/items/{attachment_key}/file", secret, cap=PDF_CAP, pdf=True)
-    )
-    if not pdf.startswith(b"%PDF-"):
-        raise ProcessError("Downloaded attachment is not a PDF")
-    pdf_path = paper / "source.pdf"
-    with pdf_path.open("xb") as stream:
-        os.chmod(pdf_path, 0o600)
-        stream.write(pdf)
-        stream.flush()
-        os.fsync(stream.fileno())
-    digest = hashlib.sha256(pdf).hexdigest()
-    _save(
-        paper / "manifest.json",
-        {
-            "schema_version": "millefeuille-standalone-source-pack/v1",
-            **binding,
-            "created_at": datetime.now(UTC).isoformat(),
-            "source": {"ref": "source.pdf", "sha256": digest, "byte_size": len(pdf)},
-            "provenance": {
-                "intake_method": "live-zotero-api",
-                "selection_ref": f"runs/{run_id}/00-selected.json",
-            },
-            "verification": "locally-hashed-live-download-not-independent-checksum",
-        },
-    )
-    del pdf
-    taxonomy_copy = None
-    if not clean:
-        taxonomy_copy = run / "taxonomy.json"
-        with taxonomy_copy.open("xb") as stream:
-            os.chmod(taxonomy_copy, 0o600)
-            stream.write(taxonomy_bytes)
-        if load_taxonomy_registry(taxonomy_copy) != registry:
-            raise ProcessError("Taxonomy changed after preflight")
-    _save(
-        run / "02-ocr-started.json",
-        {**binding, "source_sha256": digest, "model": "mistral-ocr-latest"},
-    )
-    ocr = extract_pdf(
-        pdf_path,
-        run / "ocr",
-        model="mistral-ocr-latest",
-        timeout_seconds=180.0,
-        max_pages=250,
-        max_input_bytes=PDF_CAP,
-    )
-    if ocr.get("requested_model") != "mistral-ocr-latest" or not ocr.get(
-        "returned_model"
-    ):
-        raise ProcessError("OCR model provenance missing or mismatched")
-    ocr_files = {
-        name: _artifact(ocr, name, run)
-        for name in ("fulltext_path", "evidence_path", "raw_response_path")
-    }
-    _save(run / "03-ocr-completed.json", {"files": ocr_files, "result": ocr})
-    _save(
-        run / "04-analysis-started.json",
-        {**binding, "model": "openai/gpt-6-astra", "reasoning": "xhigh"},
-    )
-    analysis = analyze_paper(
-        ocr["fulltext_path"],
-        run / "analysis",
-        title=item["data"].get("title", ""),
-        paper_id=f"zotero-{key}",
-        executor_argv=executor,
-        model="openai/gpt-6-astra",
-        reasoning="xhigh",
-        timeout_seconds=300,
-        taxonomy_path=taxonomy_copy,
-    )
-    if (
-        analysis.get("model") != "openai/gpt-6-astra"
-        or analysis.get("reasoning") != "xhigh"
-    ):
-        raise ProcessError("Analysis model provenance mismatch")
-    files = {
-        name: _artifact(analysis, name, run)
-        for name in (
-            ("summary_path", "evidence_path")
-            if clean
-            else ("summary_path", "classification_path", "evidence_path")
-        )
-    }
-    _save(run / "05-analysis-completed.json", {"files": files, "result": analysis})
-    if clean:
-        from millefeuille.domain.clean_final import execute, prepare
-
-        context = prepare(run, args.taxonomy_store)
-        asyncio.run(execute(context, live=True))
-    result = {
-        "status": "local-processing-complete",
-        **binding,
-        "run_dir": str(run),
-        "source_sha256": digest,
-        "canonical_stage_acceptance": "not-claimed",
-    }
-    if clean:
-        from millefeuille.domain.clean_cards import export
-
-        result["card"] = export(context, args.memory_dir)
-        result["retention"] = "preserved-pending-cloud-hash-qualification"
-        _save(run / "06-completed.json", result)
+    if not args.legacy_analysis_only:
+        os.environ.setdefault(bridge.ENV, bridge.PROFILE)
+        if not bridge.selected():
+            raise ProcessError("Ordinary scientific processing uses the native OpenClaw SDK")
+    if args.writeback and (not args.live or args.legacy_analysis_only or args.defer_final):
+        raise ProcessError("--writeback requires live clean scientific processing")
+    if args.max_revision_rounds < 0:
+        raise ProcessError("Revision rounds must be nonnegative")
+    if args.writeback and args.library_type != "user":
+        raise ProcessError("Scientific note publication supports user libraries")
+    if args.writeback:
+        from millefeuille.domain.clean_inventory import build
+        from millefeuille.domain.clean_taxonomy import current
+        from millefeuille.domain.standalone_writeback import load
+        store = _safe_path(args.taxonomy_store)
+        registry = current(store)
+        inventory = build(args.historical_taxonomy, registry["registry_id"],
+                          {"library_type": args.library_type,
+                           "library_id": os.environ.get("ZOTERO_LIBRARY_ID", ""),
+                           "item_keys": [args.item_key]})
+        initial = load(store / "initialization.json")["initial_registry"]
+        seed = initial.get("seed_provenance")
+        if seed is not None and not any(
+                row["source_sha256"] == seed["raw_sha256"]
+                and row["semantic_sha256"] == seed["semantic_sha256"]
+                for row in inventory["sources"]):
+            raise ProcessError("Provide the actual seed taxonomy with --historical-taxonomy")
+        # Inputs are actual taxonomy provenance, never an owner-grant document.
+        # The detailed ancestry/tag checks are repeated against fresh final output.
+        if not credential_value("ZOTERO_WRITE_KEY", stage="writeback").strip():
+            raise ProcessError("Set ZOTERO_WRITE_KEY before publication processing")
+    result = extract_and_analyze(args)
+    if not args.writeback or "run_dir" not in result:
         return result
-    _save(run / "06-completed.json", result)
-    result.update(
-        finalize_completed_run(
-            run,
-            keep_pdf=args.keep_pdf,
-            memory_dir=args.memory_dir,
-            project_comment=args.memory_project_comment,
-        )
-    )
-    return result
+    from millefeuille.domain.scientific_note import prepare_note
+    from millefeuille.domain.scientific_completion import complete
+    from millefeuille.domain.scientific_revision import correct, science_path
+    from millefeuille.domain.independent_review import ScientificUnresolved
+    from millefeuille.domain.clean_final import prepare, execute
+    from millefeuille.domain.clean_cards import export
+    from millefeuille.domain.pipeline_guards import Lane, check_pause
+    from millefeuille.domain.pipeline_receipts import save
+    run = _safe_path(result["run_dir"])
+    store = _safe_path(args.taxonomy_store)
+    revision = 0
+    with Lane(store):
+        while True:
+            check_pause(run.parent.parent.parent / "PAUSE")
+            try:
+                prepared = prepare_note(run, store, revision=revision)
+                break
+            except ScientificUnresolved as finding:
+                if (finding.receipt["decision"] != "REVISE"
+                        or revision >= args.max_revision_rounds):
+                    raise
+                if not correct(run, revision + 1, revision, finding.receipt, store=store):
+                    raise
+                revision += 1
+                context = prepare(run, store, revision=revision)
+                asyncio.run(execute(context, live=True))
+                save(science_path(run, revision).parent / "classification-completed.json",
+                     {"card": export(context)})
+        publication = complete(run, store, inputs={"historical": args.historical_taxonomy,
+                                                  "lineage": []},
+                               prepared=prepared, retain_pdfs=True, operator_live=True)
+    return {**result, "publication": publication,
+            "status": "scientific-publication-verified-pdf-retained"}
 
 
 def finalize_completed_run(
@@ -547,12 +398,18 @@ def run_process_cli(argv):
         prog="millefeuille process",
         description="Discover one tagged paper read-only; "
         "--live explicitly approves local PDF, "
-        "OCR and analysis work, never Zotero writes.",
+        "OCR and analysis; --writeback additionally requests independently reviewed note/tag publication.",
     )
     parser.add_argument("--tag", default="millefeuille")
     parser.add_argument("--max-items", type=int, default=1)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--status", action="store_true", help="Local retained-data status only; no credentials or network")
     parser.add_argument("--live", action="store_true")
+    parser.add_argument("--writeback", action="store_true",
+                        help="Publish only after independent scientific review and fresh readback")
+    parser.add_argument("--max-revision-rounds", type=int, default=1)
+    parser.add_argument("--historical-taxonomy", type=Path, action="append", default=[],
+                        help="Existing historical taxonomy input for semantic tag reconciliation")
     parser.add_argument(
         "--keep-pdf",
         action="store_true",
@@ -572,30 +429,44 @@ def run_process_cli(argv):
     parser.add_argument("--final-taxonomy", type=Path)
     parser.add_argument("--taxonomy-store", type=Path)
     parser.add_argument("--legacy-analysis-only", action="store_true")
+    parser.add_argument("--defer-final", action="store_true")
+    parser.add_argument("--shared-stop", type=Path)
     parser.add_argument("--library-type", choices=("user", "group"), default="user")
     parser.add_argument("--item-key", help="Pin the exact tagged parent item")
+    parser.add_argument("--attachment-key", help="Require the exact discovered PDF attachment")
+    parser.add_argument("--expected-item-version", type=int)
+    parser.add_argument("--expected-attachment-version", type=int)
+    parser.add_argument("--expected-pdf-size", type=int)
+    parser.add_argument("--expected-pdf-md5", help="Bind the accepted PDF MD5 to fresh Zotero metadata")
     args = parser.parse_args(argv)
-    # httpx INFO logs include signed redirect URLs, never enable these here.
-    old_level = logging.getLogger("httpx").level
-    logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
-        result = _operate(args)
-        print(json.dumps(result, ensure_ascii=False, allow_nan=False))
-        return 0
-    except ProcessError as exc:
-        print(f"millefeuille process: {exc}", file=sys.stderr)
+        with command_credential_scope(args, 'process'):
+            # httpx INFO logs include signed redirect URLs, never enable these here.
+            old_level = logging.getLogger("httpx").level
+            logging.getLogger("httpx").setLevel(logging.WARNING)
+            try:
+                result = _operate(args)
+                print(json.dumps(result, ensure_ascii=False, allow_nan=False))
+                return 0
+            except CredentialError:
+                raise
+            except ProcessError as exc:
+                print(f"millefeuille process: {exc}", file=sys.stderr)
+                return 2
+            except Exception as exc:
+                # Provider/network exceptions may contain credentials, text or signed URLs.
+                print(
+                    f"millefeuille process: {type(exc).__name__}; stopped without retry. "
+                    "Check configuration and retained local journal/evidence. "
+                    "A started stage without completion has an uncertain outcome.",
+                    file=sys.stderr,
+                )
+                return 2
+            finally:
+                logging.getLogger("httpx").setLevel(old_level)
+    except CredentialError as exc:
+        print(exc.code, file=__import__("sys").stderr)
         return 2
-    except Exception as exc:
-        # Provider/network exceptions may contain credentials, text or signed URLs.
-        print(
-            f"millefeuille process: {type(exc).__name__}; stopped without retry. "
-            "Check configuration and retained local journal/evidence. "
-            "A started stage without completion has an uncertain outcome.",
-            file=sys.stderr,
-        )
-        return 2
-    finally:
-        logging.getLogger("httpx").setLevel(old_level)
 
 
 if __name__ == "__main__":
